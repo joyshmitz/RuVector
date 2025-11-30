@@ -27,6 +27,9 @@ pub struct VectorDB {
 
 impl VectorDB {
     /// Create a new vector database with the given options
+    ///
+    /// If a storage path is provided and contains persisted vectors,
+    /// the HNSW index will be automatically rebuilt from storage.
     pub fn new(options: DbOptions) -> Result<Self> {
         #[cfg(feature = "storage")]
         let storage = Arc::new(VectorStorage::new(
@@ -38,7 +41,7 @@ impl VectorDB {
         let storage = Arc::new(VectorStorage::new(options.dimensions)?);
 
         // Choose index based on configuration and available features
-        let index: Box<dyn VectorIndex> = if let Some(hnsw_config) = &options.hnsw_config {
+        let mut index: Box<dyn VectorIndex> = if let Some(hnsw_config) = &options.hnsw_config {
             #[cfg(feature = "hnsw")]
             {
                 Box::new(HnswIndex::new(
@@ -56,6 +59,32 @@ impl VectorDB {
         } else {
             Box::new(FlatIndex::new(options.dimensions, options.distance_metric))
         };
+
+        // Rebuild index from persisted vectors if storage is not empty
+        // This fixes the bug where search() returns empty results after restart
+        #[cfg(feature = "storage")]
+        {
+            let stored_ids = storage.all_ids()?;
+            if !stored_ids.is_empty() {
+                tracing::info!(
+                    "Rebuilding index from {} persisted vectors",
+                    stored_ids.len()
+                );
+
+                // Batch load all vectors for efficient index rebuilding
+                let mut entries = Vec::with_capacity(stored_ids.len());
+                for id in stored_ids {
+                    if let Some(entry) = storage.get(&id)? {
+                        entries.push((id, entry.vector));
+                    }
+                }
+
+                // Add all vectors to index in batch for better performance
+                index.add_batch(entries)?;
+
+                tracing::info!("Index rebuilt successfully");
+            }
+        }
 
         Ok(Self {
             storage,
@@ -224,6 +253,94 @@ mod tests {
             results[0].score < 0.01,
             "Exact match should have ~0 distance"
         );
+
+        Ok(())
+    }
+
+    /// Test that search works after simulated restart (new VectorDB instance)
+    /// This verifies the fix for issue #30: HNSW index not rebuilt from storage
+    #[test]
+    #[cfg(feature = "storage")]
+    fn test_search_after_restart() -> Result<()> {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("persist.db").to_string_lossy().to_string();
+
+        // Phase 1: Create database and insert vectors
+        {
+            let mut options = DbOptions::default();
+            options.storage_path = db_path.clone();
+            options.dimensions = 3;
+            options.distance_metric = DistanceMetric::Euclidean;
+            options.hnsw_config = None;
+
+            let db = VectorDB::new(options)?;
+
+            db.insert(VectorEntry {
+                id: Some("v1".to_string()),
+                vector: vec![1.0, 0.0, 0.0],
+                metadata: None,
+            })?;
+
+            db.insert(VectorEntry {
+                id: Some("v2".to_string()),
+                vector: vec![0.0, 1.0, 0.0],
+                metadata: None,
+            })?;
+
+            db.insert(VectorEntry {
+                id: Some("v3".to_string()),
+                vector: vec![0.7, 0.7, 0.0],
+                metadata: None,
+            })?;
+
+            // Verify search works before "restart"
+            let results = db.search(SearchQuery {
+                vector: vec![0.8, 0.6, 0.0],
+                k: 3,
+                filter: None,
+                ef_search: None,
+            })?;
+            assert_eq!(results.len(), 3, "Should find all 3 vectors before restart");
+        }
+        // db is dropped here, simulating application shutdown
+
+        // Phase 2: Create new database instance (simulates restart)
+        {
+            let mut options = DbOptions::default();
+            options.storage_path = db_path.clone();
+            options.dimensions = 3;
+            options.distance_metric = DistanceMetric::Euclidean;
+            options.hnsw_config = None;
+
+            let db = VectorDB::new(options)?;
+
+            // Verify vectors are still accessible
+            assert_eq!(db.len()?, 3, "Should have 3 vectors after restart");
+
+            // Verify get() works
+            let v1 = db.get("v1")?;
+            assert!(v1.is_some(), "get() should work after restart");
+
+            // Verify search() works - THIS WAS THE BUG
+            let results = db.search(SearchQuery {
+                vector: vec![0.8, 0.6, 0.0],
+                k: 3,
+                filter: None,
+                ef_search: None,
+            })?;
+
+            assert_eq!(
+                results.len(),
+                3,
+                "search() should return results after restart (was returning 0 before fix)"
+            );
+
+            // v3 should be closest to query [0.8, 0.6, 0.0]
+            assert_eq!(
+                results[0].id, "v3",
+                "v3 [0.7, 0.7, 0.0] should be closest to query [0.8, 0.6, 0.0]"
+            );
+        }
 
         Ok(())
     }
