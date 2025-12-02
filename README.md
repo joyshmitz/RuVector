@@ -84,11 +84,20 @@ npx ruvector
 | **Hyperedges** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Self-Learning (GNN)** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **AI Agent Routing** | ✅ Tiny Dancer | ❌ | ❌ | ❌ | ❌ |
+| **Attention Mechanisms** | ✅ 39 types | ❌ | ❌ | ❌ | ❌ |
+| **Hyperbolic Embeddings** | ✅ Poincaré | ❌ | ❌ | ❌ | ❌ |
+| **PostgreSQL Extension** | ✅ pgvector drop-in | ❌ | ❌ | ❌ | ❌ |
+| **SIMD Optimization** | ✅ AVX-512/NEON | Partial | ✅ | ✅ | ❌ |
+| **Metadata Filtering** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Sparse Vectors** | ✅ BM25/TF-IDF | ✅ | ✅ | ✅ | ❌ |
 | **Raft Consensus** | ✅ | ❌ | ✅ | ❌ | ❌ |
 | **Multi-Master Replication** | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **Auto-Sharding** | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Auto-Compression** | ✅ 2-32x | ❌ | ❌ | ✅ | ❌ |
+| **Snapshots/Backups** | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Browser/WASM** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Differentiable** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Multi-Tenancy** | ✅ Collections | ✅ | ✅ | ✅ | ✅ |
 | **Open Source** | ✅ MIT | ❌ | ✅ | ✅ | ✅ |
 
 *With PQ8 compression. Benchmarks on Apple M2 / Intel i7.
