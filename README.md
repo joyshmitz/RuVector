@@ -91,6 +91,8 @@ High-performance attention mechanisms for transformers, graph neural networks, a
 
 #### Core Attention Mechanisms
 
+Standard attention layers for sequence modeling and transformers.
+
 | Mechanism | Complexity | Memory | Best For |
 |-----------|------------|--------|----------|
 | **DotProductAttention** | O(n²) | O(n²) | Basic attention for small-medium sequences |
@@ -102,6 +104,8 @@ High-performance attention mechanisms for transformers, graph neural networks, a
 
 #### Graph Attention Mechanisms
 
+Attention layers designed for graph-structured data and GNNs.
+
 | Mechanism | Complexity | Best For |
 |-----------|------------|----------|
 | **GraphRoPeAttention** | O(n²) | Position-aware graph transformers |
@@ -110,6 +114,8 @@ High-performance attention mechanisms for transformers, graph neural networks, a
 | **LocalGlobalAttention** | O(n·k + n) | 100K+ node graphs, scalable GNNs |
 
 #### Specialized Mechanisms
+
+Task-specific attention variants for efficiency and multi-modal learning.
 
 | Mechanism | Type | Best For |
 |-----------|------|----------|
@@ -120,7 +126,7 @@ High-performance attention mechanisms for transformers, graph neural networks, a
 
 #### Hyperbolic Math Functions
 
-Operations for Poincaré ball embeddings (curved space for hierarchies):
+Operations for Poincaré ball embeddings—curved space that naturally represents hierarchies.
 
 | Function | Description | Use Case |
 |----------|-------------|----------|
@@ -131,6 +137,8 @@ Operations for Poincaré ball embeddings (curved space for hierarchies):
 | `projectToPoincareBall(p, c)` | Ensure valid coordinates | Prevent numerical errors |
 
 #### Async & Batch Operations
+
+Utilities for high-throughput inference and training optimization.
 
 | Operation | Description | Performance |
 |-----------|-------------|-------------|
