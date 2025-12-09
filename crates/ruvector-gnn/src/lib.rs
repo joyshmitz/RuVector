@@ -70,8 +70,8 @@ pub use replay::{DistributionStats, ReplayBuffer, ReplayEntry};
 pub use scheduler::{LearningRateScheduler, SchedulerType};
 pub use search::{cosine_similarity, differentiable_search, hierarchical_forward};
 pub use training::{
-    info_nce_loss, local_contrastive_loss, sgd_step, OnlineConfig, Optimizer, OptimizerType,
-    TrainConfig,
+    info_nce_loss, local_contrastive_loss, sgd_step, Loss, LossType, OnlineConfig, Optimizer,
+    OptimizerType, TrainConfig,
 };
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "mmap"))]
