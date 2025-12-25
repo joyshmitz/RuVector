@@ -25,16 +25,18 @@ docs/
 ├── hnsw/                   # HNSW index documentation
 ├── implementation/         # Implementation details
 ├── integration/            # Integration guides
-├── latent-space/           # Research & advanced features
 ├── optimization/           # Performance optimization
+├── plans/                  # Implementation plans
 ├── postgres/               # PostgreSQL extension docs
 │   └── zero-copy/          # Zero-copy memory docs
 ├── project-phases/         # Development phases
 ├── publishing/             # NPM publishing guides
 ├── research/               # Research documentation
-│   └── gnn-v2/             # GNN v2 research plans
+│   ├── cognitive-frontier/ # Cognitive frontier research
+│   ├── gnn-v2/             # GNN v2 research plans
+│   ├── latent-space/       # HNSW & attention research
+│   └── mincut/             # MinCut algorithm research
 ├── sql/                    # SQL examples
-├── status/                 # Build & deployment status
 └── testing/                # Testing documentation
 ```
 
@@ -161,14 +163,6 @@ docs/
 - **[Package Validation](publishing/PACKAGE-VALIDATION-REPORT.md)** - Validation report
 - **[Publishing Status](publishing/PUBLISHING.md)** - Current status
 
-### Status Reports
-- **[Deliverables](status/DELIVERABLES.md)** - Project deliverables
-- **[All Packages Status](status/ALL_PACKAGES_STATUS.md)** - Package overview
-- **[Build Process](status/BUILD_PROCESS.md)** - Build documentation
-- **[Build Summary](status/BUILD_SUMMARY.md)** - Build results
-- **[Current Status](status/CURRENT_STATUS.md)** - Project status
-- **[Deployment Status](status/DEPLOYMENT_STATUS.md)** - Deployment state
-
 ## Development
 
 - **[Contributing Guide](development/CONTRIBUTING.md)** - How to contribute
@@ -184,15 +178,24 @@ docs/
 
 ## Research & Advanced Features
 
+### Cognitive Frontier
+- **[Temporal Hypergraphs](research/cognitive-frontier/temporal-hypergraphs.md)** - Time-varying hyperedges with causal constraints
+- **[Federated Strange Loops](research/cognitive-frontier/federated-strange-loops.md)** - Multi-system mutual observation
+
 ### Latent Space
-- **[Implementation Roadmap](latent-space/implementation-roadmap.md)** - Development plan
-- **[GNN Architecture Analysis](latent-space/gnn-architecture-analysis.md)** - Architecture deep-dive
-- **[Attention Mechanisms Research](latent-space/attention-mechanisms-research.md)** - Research notes
-- **[Advanced Architectures](latent-space/advanced-architectures.md)** - Advanced designs
-- **[Optimization Strategies](latent-space/optimization-strategies.md)** - Optimization approaches
-- **[HNSW Evolution](latent-space/hnsw-evolution-overview.md)** - HNSW research
-- **[HNSW Neural Augmentation](latent-space/hnsw-neural-augmentation.md)** - Neural features
-- **[HNSW Quantum Hybrid](latent-space/hnsw-quantum-hybrid.md)** - Quantum computing
+- **[Implementation Roadmap](research/latent-space/implementation-roadmap.md)** - Development plan
+- **[GNN Architecture Analysis](research/latent-space/gnn-architecture-analysis.md)** - Architecture deep-dive
+- **[Attention Mechanisms Research](research/latent-space/attention-mechanisms-research.md)** - Research notes
+- **[Advanced Architectures](research/latent-space/advanced-architectures.md)** - Advanced designs
+- **[Optimization Strategies](research/latent-space/optimization-strategies.md)** - Optimization approaches
+- **[HNSW Evolution](research/latent-space/hnsw-evolution-overview.md)** - HNSW research
+- **[HNSW Neural Augmentation](research/latent-space/hnsw-neural-augmentation.md)** - Neural features
+- **[HNSW Quantum Hybrid](research/latent-space/hnsw-quantum-hybrid.md)** - Quantum computing
+
+### MinCut Research
+- **[LocalKCut Algorithm](research/mincut/localkcut-algorithm.md)** - Algorithm overview
+- **[LocalKCut Implementation](research/mincut/localkcut-implementation-summary.md)** - Implementation details
+- **[Paper Implementation](research/mincut/localkcut-paper-implementation.md)** - December 2025 paper
 
 ### GNN v2 Research
 - **[Master Plan](research/gnn-v2/00-master-plan.md)** - GNN v2 overview
@@ -222,7 +225,7 @@ docs/
 ## Documentation Statistics
 
 - **Total directories**: 20+
-- **Total documentation files**: 150+ markdown files
+- **Total documentation files**: 170+ markdown files
 - **User guides**: 12+ comprehensive guides
 - **API references**: 3 platform APIs
 - **Code examples**: 10+ working examples
@@ -243,5 +246,5 @@ docs/
 
 ---
 
-**Last Updated**: 2025-12-02
-**Version**: 0.1.20
+**Last Updated**: 2025-12-25
+**Version**: 0.1.29
