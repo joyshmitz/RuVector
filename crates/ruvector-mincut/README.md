@@ -219,6 +219,8 @@ Learn to build networks that think for themselves. These examples demonstrate se
 | **Time Crystal** | Self-sustaining periodic coordination patterns | `cargo run -p ruvector-mincut --release --example time_crystal` |
 | **Morphogenetic** | Networks that grow like biological organisms | `cargo run -p ruvector-mincut --release --example morphogenetic` |
 | **Neural Optimizer** | ML that learns optimal graph configurations | `cargo run -p ruvector-mincut --release --example neural_optimizer` |
+| **Temporal Hypergraph** | Time-varying hyperedges with causal constraints (all 5 phases) | `cd examples/mincut && cargo run --release --example temporal_hypergraph` |
+| **Federated Loops** | Multi-system mutual observation with spike-based consensus (all 4 phases) | `cd examples/mincut && cargo run --release --example federated_loops` |
 
 See the full [Examples Guide](https://github.com/ruvnet/ruvector/tree/main/examples/mincut) for detailed explanations and real-world applications.
 
@@ -917,7 +919,7 @@ This implementation is based on research in dynamic graph algorithms:
 
 **Built with ❤️ by [ruv.io](https://ruv.io)**
 
-**Status**: Production-ready • **Version**: 0.1.28 • **Rust Version**: 1.77+ • **Tests**: 448+ passing
+**Status**: Production-ready • **Version**: 0.1.29 • **Rust Version**: 1.77+ • **Tests**: 448+ passing
 
 *Keywords: rust, minimum-cut, dynamic-graph, graph-algorithm, connectivity, network-analysis, subpolynomial, real-time, wasm, simd*
 

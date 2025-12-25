@@ -38,3 +38,15 @@ path = "neural_optimizer/main.rs"
 [[example]]
 name = "benchmarks"
 path = "benchmarks/main.rs"
+
+[[example]]
+name = "snn_integration"
+path = "snn_integration/main.rs"
+
+[[example]]
+name = "temporal_hypergraph"
+path = "temporal_hypergraph/main.rs"
+
+[[example]]
+name = "federated_loops"
+path = "federated_loops/main.rs"
