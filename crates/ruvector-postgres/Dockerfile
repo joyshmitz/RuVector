@@ -39,6 +39,9 @@ WORKDIR /build
 # (not the workspace version)
 COPY crates/ruvector-postgres/ ./
 
+# Copy the ruvector-mincut-gated-transformer dependency (required for gated-transformer feature)
+COPY crates/ruvector-mincut-gated-transformer /build/../ruvector-mincut-gated-transformer/
+
 # Use the workspace Cargo.lock to pin dependencies and avoid registry parsing issues
 COPY Cargo.lock ./
 
@@ -52,8 +55,8 @@ RUN cargo fetch
 # This uses the git protocol instead of sparse which skips problematic index entries
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git
 
-# Build the extension with all features including embeddings
-RUN cargo pgrx package --features "pg17 index-all quant-all embeddings"
+# Build the extension with all features including embeddings and gated-transformer
+RUN cargo pgrx package --features "pg17 index-all quant-all embeddings gated-transformer"
 
 # Build the model downloader binary
 RUN cargo build --release --bin download-models --features "embeddings"

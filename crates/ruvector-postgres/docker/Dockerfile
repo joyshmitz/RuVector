@@ -70,6 +70,9 @@ FROM deps-builder AS extension-builder
 
 ARG PG_VERSION
 
+# Copy the ruvector-mincut-gated-transformer dependency (required for gated-transformer feature)
+COPY crates/ruvector-mincut-gated-transformer /build/ruvector-mincut-gated-transformer/
+
 # Copy actual source code
 COPY crates/ruvector-postgres/Cargo.toml ./
 COPY crates/ruvector-postgres/build.rs ./
@@ -78,10 +81,10 @@ COPY crates/ruvector-postgres/src ./src/
 COPY crates/ruvector-postgres/sql ./sql/
 COPY crates/ruvector-postgres/benches ./benches/
 
-# Build the extension with the specified PG version feature and all features enabled
+# Build the extension with all features including gated-transformer
 RUN cargo pgrx package \
     --pg-config /usr/lib/postgresql/${PG_VERSION}/bin/pg_config \
-    --features pg${PG_VERSION},graph-complete
+    --features pg${PG_VERSION},graph-complete,gated-transformer
 
 # pgrx generates .control and .so but not SQL - copy our hand-written SQL file
 RUN cp sql/ruvector--2.0.0.sql target/release/ruvector-pg${PG_VERSION}/usr/share/postgresql/${PG_VERSION}/extension/ 2>/dev/null || true

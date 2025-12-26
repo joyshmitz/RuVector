@@ -103,7 +103,7 @@ jobs:
             org.opencontainers.image.description=High-performance vector database extension for PostgreSQL with 230+ SQL functions
             org.opencontainers.image.vendor=ruv.io
             ruvector.pg.version=${{ matrix.pg_version }}
-            ruvector.features=attention,gnn,hybrid,tenancy,healing,learning,hyperbolic,graph
+            ruvector.features=attention,gnn,hybrid,tenancy,healing,learning,hyperbolic,graph,gated-transformer,integrity
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
