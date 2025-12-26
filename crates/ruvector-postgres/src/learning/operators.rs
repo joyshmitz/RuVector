@@ -496,7 +496,7 @@ mod tests {
 
         ruvector_extract_patterns("test_consolidate", 10).unwrap();
 
-        let result = ruvector_consolidate_patterns("test_consolidate", Some(0.95));
+        let result = ruvector_consolidate_patterns("test_consolidate", 0.95);
         assert!(result.is_ok());
     }
 
@@ -510,9 +510,9 @@ mod tests {
                 .unwrap();
         }
 
-        ruvector_extract_patterns("test_prune", Some(5)).unwrap();
+        ruvector_extract_patterns("test_prune", 5).unwrap();
 
-        let result = ruvector_prune_patterns("test_prune", Some(100), Some(0.9));
+        let result = ruvector_prune_patterns("test_prune", 100, 0.9);
         assert!(result.is_ok());
     }
 

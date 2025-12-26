@@ -586,7 +586,7 @@ mod tests {
 
     #[pg_test]
     fn test_rls_sql_generation() {
-        let sql = ruvector_generate_rls_sql("embeddings", Some("tenant_id"));
+        let sql = ruvector_generate_rls_sql("embeddings", "tenant_id");
         assert!(sql.contains("ENABLE ROW LEVEL SECURITY"));
         assert!(sql.contains("ruvector_tenant_isolation"));
     }
@@ -595,9 +595,9 @@ mod tests {
     fn test_tenant_column_sql_generation() {
         let sql = ruvector_generate_tenant_column_sql(
             "embeddings",
-            Some("tenant_id"),
-            Some(true),
-            Some(true),
+            "tenant_id",
+            true,
+            true,
         );
         assert!(sql.contains("ADD COLUMN"));
         assert!(sql.contains("tenant_id"));
