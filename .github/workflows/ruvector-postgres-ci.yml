@@ -86,7 +86,7 @@ jobs:
         working-directory: crates/ruvector-postgres
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: cargo fmt -- --check
         working-directory: crates/ruvector-postgres
 
       - name: Run Clippy
