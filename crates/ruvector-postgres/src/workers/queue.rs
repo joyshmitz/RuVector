@@ -25,7 +25,6 @@
 //! ```
 
 use parking_lot::{Mutex, RwLock};
-use pgrx::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering as CmpOrdering;
 use std::collections::BinaryHeap;
