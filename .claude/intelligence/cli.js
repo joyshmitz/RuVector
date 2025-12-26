@@ -48,10 +48,6 @@ v3 Features:
   suggest-next <file>             Suggest next files to edit
   should-test <file>              Check if tests should run
 
-Migration:
-  migrate [--dry-run]             Migrate JSON to native storage
-  storage-info                    Show storage backend status
-
 Swarm (Hive-Mind):
   swarm-register <id> <type>      Register agent in swarm
   swarm-coordinate <src> <dst>    Record agent coordination
@@ -183,53 +179,15 @@ Swarm (Hive-Mind):
           } : null
         };
 
-        // === ENHANCED GUIDANCE OUTPUT ===
-        const confPct = (routing.confidence * 100).toFixed(0);
-        const showGuidance = routing.confidence >= 0.3; // Only show if meaningful confidence
-
-        console.log('🧠 Intelligence Guidance:');
+        // Pretty output for hook
+        console.log('🧠 Intelligence Analysis:');
         console.log(`   📁 ${crate || 'project'}/${fileName}`);
-
-        // Agent recommendation (only if confident)
-        if (showGuidance) {
-          console.log(`   🤖 Agent: ${routing.recommended} (${confPct}% learned)`);
-          if (routing.reason && !routing.reason.includes('default')) {
-            console.log(`      → ${routing.reason}`);
-          }
-        }
-
-        // Approach suggestion (only if confident)
-        if (suggestion.confidence > 0.2) {
+        console.log(`   🤖 Recommended: ${routing.recommended} (${(routing.confidence * 100).toFixed(0)}% confidence)`);
+        if (suggestion.confidence > 0) {
           console.log(`   💡 Approach: ${suggestion.action}`);
         }
-
-        // Similar past edits with actionable context
         if (similar.length > 0) {
-          console.log(`   📚 Similar: ${similar.length} past edits`);
-          const recentSimilar = similar[0];
-          if (recentSimilar?.metadata?.outcome === 'success') {
-            console.log(`      → Last similar edit succeeded`);
-          }
-        }
-
-        // Related files suggestion
-        const relatedFiles = intel.suggestNextFiles(file);
-        if (relatedFiles.length > 0 && relatedFiles[0].confidence > 0.4) {
-          console.log(`   📎 Related: ${relatedFiles.slice(0, 2).map(f => basename(f.file)).join(', ')}`);
-        }
-
-        // Crate-specific tips
-        if (crate && fileType === 'rs') {
-          const tips = {
-            'ruvector-core': '⚡ Core lib: run cargo test --lib after changes',
-            'rvlite': '🗄️ DB layer: check WASM build with wasm-pack',
-            'sona': '🧠 ML: verify trajectory recording works',
-            'ruvector-postgres': '🐘 PG: test with docker postgres',
-            'micro-hnsw-wasm': '📦 WASM: build with wasm-pack build --target web'
-          };
-          if (tips[crate]) {
-            console.log(`   💬 ${tips[crate]}`);
-          }
+          console.log(`   📚 ${similar.length} similar past edits found`);
         }
 
         break;
@@ -425,36 +383,6 @@ Swarm (Hive-Mind):
         const file = args[1];
         const suggestion = intel.shouldSuggestTests(file);
         console.log(JSON.stringify(suggestion, null, 2));
-        break;
-      }
-
-      // === MIGRATION ===
-
-      case 'migrate': {
-        const dryRun = args.includes('--dry-run');
-        const { migrateToNative } = await import('./storage.js');
-        const results = await migrateToNative({ dryRun });
-        console.log(JSON.stringify(results, null, 2));
-        break;
-      }
-
-      case 'storage-info': {
-        const { NativeVectorStorage, NativeReasoningBank } = await import('./storage.js');
-        const vectorStore = new NativeVectorStorage();
-        const reasoningBank = new NativeReasoningBank();
-        await vectorStore.init();
-        await reasoningBank.init();
-
-        console.log(JSON.stringify({
-          vectorStorage: {
-            useNative: vectorStore.useNative,
-            count: await vectorStore.count()
-          },
-          reasoningBank: {
-            useNative: reasoningBank.useNative,
-            stats: reasoningBank.getStats()
-          }
-        }, null, 2));
         break;
       }
 
