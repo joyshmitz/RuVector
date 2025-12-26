@@ -94,8 +94,14 @@ jobs:
       - name: Install cargo-pgrx
         run: cargo install cargo-pgrx --version 0.12.0 --locked
 
-      - name: Initialize pgrx
+      - name: Initialize pgrx (Ubuntu)
+        if: runner.os == 'Linux'
         run: cargo pgrx init --pg${{ matrix.pg_version }}=/usr/lib/postgresql/${{ matrix.pg_version }}/bin/pg_config
+        working-directory: crates/ruvector-postgres
+
+      - name: Initialize pgrx (macOS)
+        if: runner.os == 'macOS'
+        run: cargo pgrx init --pg${{ matrix.pg_version }}=/opt/homebrew/opt/postgresql@${{ matrix.pg_version }}/bin/pg_config
         working-directory: crates/ruvector-postgres
 
       - name: Check code formatting
