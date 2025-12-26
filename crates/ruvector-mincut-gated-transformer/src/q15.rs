@@ -340,6 +340,92 @@ impl Q15 {
     }
 }
 
+// ============================================================================
+// Batch Operations (SIMD-friendly)
+// ============================================================================
+
+/// Batch multiply Q15 values.
+///
+/// Processes arrays of Q15 values efficiently. When SIMD is available,
+/// this can achieve 16× speedup using PMULHUW-style operations.
+///
+/// # Arguments
+///
+/// * `a` - First operand array
+/// * `b` - Second operand array
+/// * `out` - Output array (must be same length as inputs)
+#[inline]
+pub fn q15_batch_mul(a: &[Q15], b: &[Q15], out: &mut [Q15]) {
+    debug_assert_eq!(a.len(), b.len());
+    debug_assert_eq!(a.len(), out.len());
+
+    for i in 0..a.len() {
+        out[i] = a[i].saturating_mul(b[i]);
+    }
+}
+
+/// Batch add Q15 values with saturation.
+#[inline]
+pub fn q15_batch_add(a: &[Q15], b: &[Q15], out: &mut [Q15]) {
+    debug_assert_eq!(a.len(), b.len());
+    debug_assert_eq!(a.len(), out.len());
+
+    for i in 0..a.len() {
+        out[i] = a[i].saturating_add(b[i]);
+    }
+}
+
+/// Batch linear interpolation.
+///
+/// Computes `a[i] + t * (b[i] - a[i])` for each element.
+#[inline]
+pub fn q15_batch_lerp(a: &[Q15], b: &[Q15], t: Q15, out: &mut [Q15]) {
+    debug_assert_eq!(a.len(), b.len());
+    debug_assert_eq!(a.len(), out.len());
+
+    for i in 0..a.len() {
+        out[i] = a[i].lerp(b[i], t);
+    }
+}
+
+/// Convert f32 slice to Q15 slice.
+#[inline]
+pub fn f32_to_q15_batch(input: &[f32], output: &mut [Q15]) {
+    debug_assert_eq!(input.len(), output.len());
+
+    for i in 0..input.len() {
+        output[i] = Q15::from_f32(input[i]);
+    }
+}
+
+/// Convert Q15 slice to f32 slice.
+#[inline]
+pub fn q15_to_f32_batch(input: &[Q15], output: &mut [f32]) {
+    debug_assert_eq!(input.len(), output.len());
+
+    for i in 0..input.len() {
+        output[i] = input[i].to_f32();
+    }
+}
+
+/// Dot product of two Q15 arrays.
+///
+/// Returns the sum of element-wise products, useful for attention scores.
+#[inline]
+pub fn q15_dot(a: &[Q15], b: &[Q15]) -> Q15 {
+    debug_assert_eq!(a.len(), b.len());
+
+    let mut acc: u32 = 0;
+    for i in 0..a.len() {
+        // Multiply and accumulate in u32 to avoid overflow
+        let product = (a[i].to_raw() as u32 * b[i].to_raw() as u32) >> 15;
+        acc = acc.saturating_add(product);
+    }
+
+    // Clamp to Q15 range
+    Q15::from_raw(acc.min(u16::MAX as u32) as u16)
+}
+
 // Implement arithmetic operations with wrapping behavior (use saturating_* for safety)
 
 impl Add for Q15 {

@@ -122,7 +122,7 @@ pub use error::{Error, Result};
 pub use packets::{
     GatePacket, SpikePacket, GateDecision, GateReason, Witness, InferInput, InferOutput, InferStats,
 };
-pub use q15::Q15;
+pub use q15::{Q15, q15_batch_mul, q15_batch_add, q15_batch_lerp, q15_dot, f32_to_q15_batch, q15_to_f32_batch};
 pub use state::RuntimeState;
 pub use model::{MincutGatedTransformer, QuantizedWeights, WeightsLoader};
 pub use gate::{GateController, TierDecision};
