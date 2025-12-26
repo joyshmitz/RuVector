@@ -1649,9 +1649,9 @@ static HNSW_AM_HANDLER: IndexAmRoutine = IndexAmRoutine {
     aminitparallelscan: None,
     amparallelrescan: None,
     // PG17 additions
-    #[cfg(any(feature = "pg17"))]
+    #[cfg(feature = "pg17")]
     amcanbuildparallel: true,
-    #[cfg(any(feature = "pg17"))]
+    #[cfg(feature = "pg17")]
     aminsertcleanup: None,
 };
 

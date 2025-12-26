@@ -1784,9 +1784,9 @@ static IVFFLAT_AM_HANDLER: IndexAmRoutine = IndexAmRoutine {
     amestimateparallelscan: None,
     aminitparallelscan: None,
     amparallelrescan: None,
-    #[cfg(any(feature = "pg17"))]
+    #[cfg(feature = "pg17")]
     amcanbuildparallel: false,
-    #[cfg(any(feature = "pg17"))]
+    #[cfg(feature = "pg17")]
     aminsertcleanup: None,
 };
 

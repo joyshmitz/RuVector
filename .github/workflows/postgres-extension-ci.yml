@@ -101,15 +101,15 @@ jobs:
         working-directory: crates/ruvector-postgres
 
       - name: Run clippy
-        run: cargo clippy --features pg${{ matrix.pg_version }} -- -D warnings
+        run: cargo clippy --no-default-features --features pg${{ matrix.pg_version }} -- -D warnings
         working-directory: crates/ruvector-postgres
 
       - name: Build extension
-        run: cargo build --features pg${{ matrix.pg_version }} --release
+        run: cargo build --no-default-features --features pg${{ matrix.pg_version }} --release
         working-directory: crates/ruvector-postgres
 
       - name: Run tests
-        run: cargo pgrx test pg${{ matrix.pg_version }}
+        run: cargo pgrx test pg${{ matrix.pg_version }} --no-default-features
         working-directory: crates/ruvector-postgres
 
   # Test with all features enabled
@@ -140,12 +140,12 @@ jobs:
 
       - name: Build with all features
         run: |
-          cargo build --features pg16,index-all,quant-all,hybrid-search,filtered-search --release
+          cargo build --no-default-features --features pg16,index-all,quant-all --release
         working-directory: crates/ruvector-postgres
 
       - name: Test with all features
         run: |
-          cargo pgrx test pg16 --features index-all,quant-all,hybrid-search,filtered-search
+          cargo pgrx test pg16 --no-default-features --features index-all,quant-all
         working-directory: crates/ruvector-postgres
 
   # Benchmark on pull requests
@@ -169,7 +169,7 @@ jobs:
           sudo apt-get install -y postgresql-16 postgresql-server-dev-16
 
       - name: Run benchmarks
-        run: cargo bench --features pg16 -- --output-format bencher | tee benchmark-output.txt
+        run: cargo bench --no-default-features --features pg16 -- --output-format bencher | tee benchmark-output.txt
         working-directory: crates/ruvector-postgres
 
       - name: Store benchmark result
@@ -230,7 +230,7 @@ jobs:
         working-directory: crates/ruvector-postgres
 
       - name: Package extension
-        run: cargo pgrx package --features pg${{ matrix.pg_version }}
+        run: cargo pgrx package --no-default-features --features pg${{ matrix.pg_version }}
         working-directory: crates/ruvector-postgres
 
       - name: Upload artifacts

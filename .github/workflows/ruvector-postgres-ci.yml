@@ -163,15 +163,15 @@ jobs:
         working-directory: crates/ruvector-postgres
 
       - name: Build extension
-        run: cargo build --features pg${{ matrix.pg_version }} --release
+        run: cargo build --no-default-features --features pg${{ matrix.pg_version }} --release
         working-directory: crates/ruvector-postgres
 
       - name: Run unit tests
-        run: cargo test --features pg${{ matrix.pg_version }} --lib -- --nocapture
+        run: cargo test --no-default-features --features pg${{ matrix.pg_version }} --lib -- --nocapture
         working-directory: crates/ruvector-postgres
 
       - name: Run pgrx tests
-        run: cargo pgrx test pg${{ matrix.pg_version }}
+        run: cargo pgrx test pg${{ matrix.pg_version }} --no-default-features
         working-directory: crates/ruvector-postgres
 
   # ============================================================================
@@ -446,7 +446,7 @@ jobs:
         working-directory: crates/ruvector-postgres
 
       - name: Package extension
-        run: cargo pgrx package --features pg${{ matrix.pg_version }},graph-complete
+        run: cargo pgrx package --no-default-features --features pg${{ matrix.pg_version }},graph-complete
         working-directory: crates/ruvector-postgres
 
       - name: Upload package artifacts
