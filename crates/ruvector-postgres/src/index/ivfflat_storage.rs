@@ -343,8 +343,6 @@ pub unsafe fn scan_heap_for_vectors(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_centroid_serialization() {
         // Test would validate centroid read/write

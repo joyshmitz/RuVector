@@ -462,8 +462,6 @@ pub fn ruvector_healing_problem_types() -> pgrx::JsonB {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // These tests would run in a PostgreSQL context with pg_test
     // For now, they verify the function signatures compile correctly
 }

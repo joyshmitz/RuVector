@@ -483,7 +483,7 @@ pub fn format_turtle(triples: &[Triple]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ast::{Iri, Literal};
+    use super::super::ast::Iri;
     use super::super::executor::SelectResult;
     use super::*;
     use std::collections::HashMap;

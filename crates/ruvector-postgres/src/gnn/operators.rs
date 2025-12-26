@@ -306,22 +306,46 @@ pub fn ruvector_gnn_batch_forward(
 mod tests {
     use super::*;
 
+    // Helper to convert Vec to JsonB
+    fn to_json(data: Vec<Vec<f32>>) -> JsonB {
+        JsonB(serde_json::json!(data))
+    }
+
+    // Helper to parse JsonB result to Vec
+    fn parse_result(json: &JsonB) -> Vec<Vec<f32>> {
+        json.0
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| {
+                        v.as_array().map(|a| {
+                            a.iter()
+                                .filter_map(|x| x.as_f64().map(|f| f as f32))
+                                .collect()
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     #[pg_test]
     fn test_ruvector_gcn_forward() {
-        let embeddings = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        let embeddings = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]]);
 
         let src = vec![0, 1, 2];
         let dst = vec![1, 2, 0];
 
         let result = ruvector_gcn_forward(embeddings, src, dst, None, 2);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].len(), 2);
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].len(), 2);
     }
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_sum() {
-        let messages = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let messages = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "sum".to_string());
 
@@ -330,7 +354,7 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_mean() {
-        let messages = vec![vec![2.0, 4.0], vec![4.0, 6.0]];
+        let messages = to_json(vec![vec![2.0, 4.0], vec![4.0, 6.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "mean".to_string());
 
@@ -339,7 +363,7 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_max() {
-        let messages = vec![vec![1.0, 6.0], vec![5.0, 2.0]];
+        let messages = to_json(vec![vec![1.0, 6.0], vec![5.0, 2.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "max".to_string());
 
@@ -348,15 +372,16 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_graphsage_forward() {
-        let embeddings = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        let embeddings = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]]);
 
         let src = vec![0, 1, 2];
         let dst = vec![1, 2, 0];
 
         let result = ruvector_graphsage_forward(embeddings, src, dst, 2, 2);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].len(), 2);
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].len(), 2);
     }
 
     #[pg_test]
@@ -375,7 +400,7 @@ mod tests {
 
     #[pg_test]
     fn test_empty_inputs() {
-        let empty_embeddings: Vec<Vec<f32>> = vec![];
+        let empty_embeddings = to_json(vec![]);
         let empty_src: Vec<i32> = vec![];
         let empty_dst: Vec<i32> = vec![];
 

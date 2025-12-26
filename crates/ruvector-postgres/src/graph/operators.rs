@@ -653,7 +653,6 @@ fn format_term(term: &super::sparql::ast::RdfTerm) -> String {
 #[pg_schema]
 mod tests {
     use super::*;
-    use pgrx::prelude::*;
 
     #[pg_test]
     fn test_create_graph() {

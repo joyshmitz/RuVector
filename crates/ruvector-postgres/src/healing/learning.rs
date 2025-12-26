@@ -500,7 +500,6 @@ impl EffectivenessReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::healing::strategies::RemediationOutcome;
 
     fn create_problem() -> Problem {
         Problem::new(ProblemType::IndexDegradation, Severity::Medium)

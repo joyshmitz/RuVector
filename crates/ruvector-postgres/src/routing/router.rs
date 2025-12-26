@@ -426,7 +426,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::agents::{AgentType, CostModel, PerformanceMetrics};
+    use crate::routing::agents::AgentType;
 
     fn create_test_agent(name: &str, cost: f32, latency: f32, quality: f32) -> Agent {
         let mut agent = Agent::new(name.to_string(), AgentType::LLM, vec!["test".to_string()]);
