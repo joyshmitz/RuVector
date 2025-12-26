@@ -1,10 +1,10 @@
 {
   "other_in_general": {
     "command-succeeded": 0.8,
-    "command-failed": -0.14816498542789164,
+    "command-failed": -0.06121401736624558,
     "_meta": {
-      "lastUpdate": "2025-12-26T16:21:10.852Z",
-      "updateCount": 5190
+      "lastUpdate": "2025-12-25T21:48:47.263Z",
+      "updateCount": 5167
     }
   },
   "test_in_general": {
@@ -54,10 +54,10 @@
   },
   "git_in_general": {
     "command-succeeded": 0.8,
-    "command-failed": -0.09009769156285218,
+    "command-failed": -0.023423467189245983,
     "_meta": {
-      "lastUpdate": "2025-12-26T16:19:53.795Z",
-      "updateCount": 318
+      "lastUpdate": "2025-12-26T16:27:21.593Z",
+      "updateCount": 303
     }
   },
   "other_in_rvlite": {
