@@ -3,15 +3,16 @@
  * RuVector CLI - Command-line interface for RuVector vector database
  *
  * This CLI provides access to hooks, memory, learning, and swarm commands.
+ * Supports PostgreSQL storage (preferred) with JSON fallback.
+ *
+ * Set RUVECTOR_POSTGRES_URL or DATABASE_URL for PostgreSQL support.
  */
 
 import { program } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-
-// Intelligence data path
-const INTEL_PATH = path.join(os.homedir(), '.ruvector', 'intelligence.json');
+import { createStorageSync, StorageBackend, JsonStorage } from './storage.js';
 
 interface QPattern {
   state: string;
