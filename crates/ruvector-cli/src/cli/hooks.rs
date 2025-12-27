@@ -897,9 +897,22 @@ impl Intelligence {
 
 // === Command Implementations ===
 
-/// Get intelligence data path
+/// Get intelligence data path (cross-platform)
 fn get_intelligence_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    // Try HOME (Unix) then USERPROFILE (Windows) then HOMEPATH (Windows fallback)
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| {
+            // Windows fallback: HOMEDRIVE + HOMEPATH
+            let drive = std::env::var("HOMEDRIVE").unwrap_or_default();
+            let homepath = std::env::var("HOMEPATH").unwrap_or_default();
+            if !drive.is_empty() && !homepath.is_empty() {
+                format!("{}{}", drive, homepath)
+            } else {
+                ".".to_string()
+            }
+        });
+
     PathBuf::from(home).join(".ruvector").join("intelligence.json")
 }
 
