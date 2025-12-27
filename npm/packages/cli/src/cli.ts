@@ -520,12 +520,16 @@ hooks.command('init')
   .action((opts: { force?: boolean }) => {
     const configPath = path.join(process.cwd(), '.ruvector', 'hooks.json');
     const configDir = path.dirname(configPath);
+    const claudeDir = path.join(process.cwd(), '.claude');
+    const settingsPath = path.join(claudeDir, 'settings.json');
 
-    if (fs.existsSync(configPath) && !opts.force) {
+    // Check if already initialized
+    if (fs.existsSync(settingsPath) && !opts.force) {
       console.log('Hooks already initialized. Use --force to overwrite.');
       return;
     }
 
+    // Create .ruvector config
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
     }
@@ -539,7 +543,30 @@ hooks.command('init')
     };
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('✅ Hooks initialized at .ruvector/hooks.json');
+
+    // Create .claude/settings.json with hooks
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+
+    let settings: Record<string, unknown> = {};
+    if (fs.existsSync(settingsPath)) {
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      } catch {}
+    }
+
+    const hooksConfig = generateClaudeHooksConfig();
+    settings = { ...settings, ...hooksConfig };
+
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+    console.log('✅ Hooks initialized!');
+    console.log('   Created: .ruvector/hooks.json');
+    console.log('   Created: .claude/settings.json');
+    console.log('\nNext steps:');
+    console.log('   1. Restart Claude Code to activate hooks');
+    console.log("   2. Run 'ruvector hooks stats' to verify");
   });
 
 hooks.command('install')
