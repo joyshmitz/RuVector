@@ -310,6 +310,9 @@ async fn main() -> Result<()> {
                     cli::hooks::swarm_heal_cmd(&agent_id, &config)
                 }
                 HooksCommands::SwarmStats => cli::hooks::swarm_stats_cmd(&config),
+                HooksCommands::Completions { shell } => cli::hooks::generate_completions(shell),
+                HooksCommands::Compress => cli::hooks::compress_storage(&config),
+                HooksCommands::CacheStats => cli::hooks::cache_stats(&config),
             }
         }
     };

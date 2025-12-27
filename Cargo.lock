@@ -6379,6 +6379,7 @@ dependencies = [
  "console",
  "csv",
  "deadpool-postgres",
+ "flate2",
  "futures",
  "http-body-util",
  "hyper 1.8.1",
