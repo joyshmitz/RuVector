@@ -6726,6 +6726,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-nervous-system"
+version = "0.1.29"
+dependencies = [
+ "anyhow",
+ "approx",
+ "bincode 2.0.1",
+ "criterion",
+ "ndarray 0.16.1",
+ "parking_lot 0.12.5",
+ "proptest",
+ "rand 0.8.5",
+ "rand_distr 0.4.3",
+ "rayon",
+ "serde",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "ruvector-node"
 version = "0.1.29"
 dependencies = [

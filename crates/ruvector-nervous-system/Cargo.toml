@@ -1,0 +1,58 @@
+[package]
+name = "ruvector-nervous-system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Core deps
+rand = { workspace = true }
+rand_distr = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+ndarray = { workspace = true }
+anyhow = { workspace = true }
+parking_lot = { workspace = true }
+
+# Parallel processing (optional for EWC)
+rayon = { workspace = true, optional = true }
+
+# Optional serialization
+bincode = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+approx = "0.5"
+
+[features]
+default = ["parallel"]
+serde = ["dep:bincode"]
+parallel = ["rayon"]
+
+[[bench]]
+name = "pattern_separation"
+harness = false
+
+[[bench]]
+name = "eprop_bench"
+harness = false
+
+[[bench]]
+name = "ewc_bench"
+harness = false
+
+[[bench]]
+name = "btsp_bench"
+harness = false
+
+[[bench]]
+name = "hdc_bench"
+harness = false
+
+[[bench]]
+name = "latency_benchmarks"
+harness = false
