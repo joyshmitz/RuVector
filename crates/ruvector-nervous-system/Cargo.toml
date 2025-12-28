@@ -96,3 +96,20 @@ path = "examples/tiers/t3_synthetic_nervous.rs"
 [[example]]
 name = "t3_bio_machine"
 path = "examples/tiers/t3_bio_machine.rs"
+
+# Tier 4: SOTA & Exotic Research Applications
+[[example]]
+name = "t4_neuromorphic_rag"
+path = "examples/tiers/t4_neuromorphic_rag.rs"
+
+[[example]]
+name = "t4_agentic_self_model"
+path = "examples/tiers/t4_agentic_self_model.rs"
+
+[[example]]
+name = "t4_collective_dreaming"
+path = "examples/tiers/t4_collective_dreaming.rs"
+
+[[example]]
+name = "t4_compositional_hdc"
+path = "examples/tiers/t4_compositional_hdc.rs"

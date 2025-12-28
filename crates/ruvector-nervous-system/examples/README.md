@@ -41,6 +41,16 @@ All tier examples are organized in the unified `tiers/` folder with prefixed nam
 | [t3_synthetic_nervous](tiers/t3_synthetic_nervous.rs) | Buildings, Factories, Cities | Environments respond like organisms |
 | [t3_bio_machine](tiers/t3_bio_machine.rs) | Prosthetics, Rehabilitation | Machines stop fighting biology |
 
+### Tier 4: SOTA & Exotic Research Applications
+*Cutting-edge research directions pushing neuromorphic boundaries*
+
+| Example | Domain | Key Benefit |
+|---------|--------|-------------|
+| [t4_neuromorphic_rag](tiers/t4_neuromorphic_rag.rs) | LLM Memory, Retrieval | Coherence-gated retrieval, 100x compute reduction |
+| [t4_agentic_self_model](tiers/t4_agentic_self_model.rs) | Agentic AI, Self-Awareness | Agent models own cognition, knows when capable |
+| [t4_collective_dreaming](tiers/t4_collective_dreaming.rs) | Swarm Consolidation | Hippocampal replay, cross-agent memory transfer |
+| [t4_compositional_hdc](tiers/t4_compositional_hdc.rs) | Zero-Shot Reasoning | HDC binding for analogy and composition |
+
 ## Quick Start
 
 ```bash
@@ -52,6 +62,9 @@ cargo run --example t2_swarm_intelligence
 
 # Run a Tier 3 example
 cargo run --example t3_self_awareness
+
+# Run a Tier 4 example
+cargo run --example t4_neuromorphic_rag
 ```
 
 ## Architecture Principles
@@ -189,13 +202,14 @@ workspace.broadcast(representation);
 | Hopfield Retrieval | <1ms | 1000+ queries/sec |
 | BTSP Update | <100ns | 10M+ synapses/sec |
 
-## From Practical to Exotic
+## From Practical to SOTA
 
 The same architecture scales from:
 
 1. **Practical**: Anomaly detection with microsecond response
 2. **Transformative**: Self-optimizing software systems
 3. **Exotic**: Machines that sense their own coherence
+4. **SOTA**: Neuromorphic RAG, self-modeling agents, collective dreaming
 
 The difference is how much reflex, learning, and coherence you turn on.
 
