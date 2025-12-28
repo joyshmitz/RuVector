@@ -273,14 +273,20 @@ async fn main() -> Result<()> {
                 HooksCommands::PostCommand { command, success, stderr } => {
                     cli::hooks::post_command_hook(&command.join(" "), success, stderr.as_deref(), &config)
                 }
-                HooksCommands::SessionStart { session_id } => {
-                    cli::hooks::session_start_hook(session_id.as_deref(), &config)
+                HooksCommands::SessionStart { session_id, resume } => {
+                    cli::hooks::session_start_hook(session_id.as_deref(), resume, &config)
                 }
                 HooksCommands::SessionEnd { export_metrics } => {
                     cli::hooks::session_end_hook(export_metrics, &config)
                 }
-                HooksCommands::PreCompact { length } => {
-                    cli::hooks::pre_compact_hook(length, &config)
+                HooksCommands::PreCompact { length, auto } => {
+                    cli::hooks::pre_compact_hook(length, auto, &config)
+                }
+                HooksCommands::SuggestContext => {
+                    cli::hooks::suggest_context_cmd(&config)
+                }
+                HooksCommands::TrackNotification { notification_type } => {
+                    cli::hooks::track_notification_cmd(notification_type.as_deref(), &config)
                 }
                 HooksCommands::RecordError { command, stderr } => {
                     cli::hooks::record_error_cmd(&command, &stderr, &config)

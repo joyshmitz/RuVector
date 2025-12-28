@@ -2,6 +2,11 @@
 //!
 //! Provides Q-learning based agent routing, error pattern recognition,
 //! file sequence prediction, and swarm coordination.
+//!
+//! ## Hook Input/Output
+//!
+//! Claude Code hooks receive JSON via stdin and can output JSON for control flow.
+//! See: https://docs.anthropic.com/en/docs/claude-code/hooks
 
 use crate::config::Config;
 use anyhow::{Context, Result};
@@ -14,10 +19,92 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// === Hook Input Structures (from stdin JSON) ===
+
+/// Universal hook input from Claude Code
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(default)]
+pub struct HookInput {
+    pub session_id: Option<String>,
+    pub transcript_path: Option<String>,
+    pub cwd: Option<String>,
+    pub hook_event_name: Option<String>,
+    // PreToolUse/PostToolUse specific
+    pub tool_name: Option<String>,
+    pub tool_input: Option<serde_json::Value>,
+    pub tool_response: Option<serde_json::Value>,
+    pub tool_use_id: Option<String>,
+    // Notification specific
+    pub notification_type: Option<String>,
+    pub message: Option<String>,
+    // PreCompact specific
+    pub trigger: Option<String>,
+    // SessionStart specific
+    pub source: Option<String>,
+}
+
+/// Hook output for control flow
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HookOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub continue_execution: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppress_output: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hook_specific_output: Option<HookSpecificOutput>,
+}
+
+/// Hook-specific output for context injection
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HookSpecificOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_context: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_decision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_decision_reason: Option<String>,
+}
+
+/// Try to parse stdin as JSON (non-blocking)
+pub fn try_parse_stdin() -> Option<HookInput> {
+    // Check if stdin has data (non-blocking)
+    let stdin = io::stdin();
+    let mut handle = stdin.lock();
+
+    // Try to read a line
+    let mut buffer = String::new();
+    if handle.read_line(&mut buffer).ok()? > 0 {
+        // Try to parse as JSON
+        serde_json::from_str(&buffer).ok()
+    } else {
+        None
+    }
+}
+
+/// Output JSON for context injection (PostToolUse)
+pub fn output_context_injection(context: &str) {
+    let output = HookOutput {
+        hook_specific_output: Some(HookSpecificOutput {
+            additional_context: Some(context.to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    if let Ok(json) = serde_json::to_string(&output) {
+        println!("{}", json);
+    }
+}
 
 /// Hooks subcommands
 #[derive(clap::Subcommand, Debug)]
@@ -145,6 +232,10 @@ pub enum HooksCommands {
         /// Session ID
         #[arg(long)]
         session_id: Option<String>,
+
+        /// Resume from previous session
+        #[arg(long)]
+        resume: bool,
     },
 
     /// Session end hook
@@ -159,6 +250,20 @@ pub enum HooksCommands {
         /// Conversation length
         #[arg(long)]
         length: Option<usize>,
+
+        /// Auto-triggered compaction
+        #[arg(long)]
+        auto: bool,
+    },
+
+    /// Suggest context for user prompt (UserPromptSubmit hook)
+    SuggestContext,
+
+    /// Track notification events
+    TrackNotification {
+        /// Notification type
+        #[arg(long)]
+        notification_type: Option<String>,
     },
 
     // === V3 Intelligence Features ===
@@ -930,48 +1035,99 @@ pub fn init_hooks(force: bool, _config: &Config) -> Result<()> {
 
     let hooks_config = serde_json::json!({
         "hooks": {
+            // Pre-tool hooks: provide guidance before actions
             "PreToolUse": [{
                 "matcher": "Edit|Write|MultiEdit",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-edit \"$TOOL_INPUT_FILE_PATH\""
+                    "command": "ruvector hooks pre-edit \"$TOOL_INPUT_FILE_PATH\"",
+                    "timeout": 3000
                 }]
             }, {
                 "matcher": "Bash",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-command \"$TOOL_INPUT_COMMAND\""
+                    "command": "ruvector hooks pre-command \"$TOOL_INPUT_COMMAND\"",
+                    "timeout": 3000
+                }]
+            }, {
+                "matcher": "Task",
+                "hooks": [{
+                    "type": "command",
+                    "command": "ruvector hooks swarm-recommend \"$TOOL_INPUT_SUBAGENT_TYPE\"",
+                    "timeout": 2000
                 }]
             }],
+            // Post-tool hooks: record outcomes for learning
             "PostToolUse": [{
                 "matcher": "Edit|Write|MultiEdit",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks post-edit \"$TOOL_INPUT_FILE_PATH\" --success=$TOOL_STATUS"
+                    "command": "ruvector hooks post-edit \"$TOOL_INPUT_FILE_PATH\" --success=$TOOL_STATUS",
+                    "timeout": 3000
                 }]
             }, {
                 "matcher": "Bash",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks post-command \"$TOOL_INPUT_COMMAND\" --success=$TOOL_STATUS"
+                    "command": "ruvector hooks post-command \"$TOOL_INPUT_COMMAND\" --success=$TOOL_STATUS",
+                    "timeout": 3000
                 }]
             }],
+            // Session lifecycle hooks
             "SessionStart": [{
+                "matcher": "startup",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks session-start"
+                    "command": "ruvector hooks session-start",
+                    "timeout": 5000
+                }]
+            }, {
+                "matcher": "resume",
+                "hooks": [{
+                    "type": "command",
+                    "command": "ruvector hooks session-start --resume",
+                    "timeout": 3000
                 }]
             }],
             "Stop": [{
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks session-end --export-metrics"
+                    "command": "ruvector hooks session-end --export-metrics",
+                    "timeout": 5000
                 }]
             }],
+            // Context compaction hooks
             "PreCompact": [{
+                "matcher": "auto",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-compact"
+                    "command": "ruvector hooks pre-compact --auto",
+                    "timeout": 3000
+                }]
+            }, {
+                "matcher": "manual",
+                "hooks": [{
+                    "type": "command",
+                    "command": "ruvector hooks pre-compact",
+                    "timeout": 3000
+                }]
+            }],
+            // User prompt injection (inject learned context)
+            "UserPromptSubmit": [{
+                "hooks": [{
+                    "type": "command",
+                    "command": "ruvector hooks suggest-context",
+                    "timeout": 2000
+                }]
+            }],
+            // Notification tracking
+            "Notification": [{
+                "matcher": ".*",
+                "hooks": [{
+                    "type": "command",
+                    "command": "ruvector hooks track-notification",
+                    "timeout": 1000
                 }]
             }]
         }
@@ -1288,22 +1444,39 @@ pub fn post_command_hook(command: &str, success: bool, stderr: Option<&str>, _co
 }
 
 /// Session start hook
-pub fn session_start_hook(_session_id: Option<&str>, _config: &Config) -> Result<()> {
+pub fn session_start_hook(_session_id: Option<&str>, resume: bool, _config: &Config) -> Result<()> {
     let mut intel = Intelligence::new(get_intelligence_path());
-    intel.data.stats.session_count += 1;
+
+    if !resume {
+        intel.data.stats.session_count += 1;
+    }
     intel.data.stats.last_session = Intelligence::now();
+    intel.mark_dirty();
     intel.save()?;
 
-    println!("{}", "🧠 RuVector Intelligence Layer Active".bold().cyan());
+    let stats = intel.stats();
+
+    if resume {
+        println!("{}", "🧠 RuVector Intelligence Layer Resumed".bold().cyan());
+    } else {
+        println!("{}", "🧠 RuVector Intelligence Layer Active".bold().cyan());
+    }
     println!();
     println!("⚡ Intelligence guides: agent routing, error fixes, file sequences");
+
+    // Show quick stats on startup
+    if stats.total_patterns > 0 || stats.total_memories > 0 {
+        println!("   {} patterns | {} memories | {} sessions",
+            stats.total_patterns, stats.total_memories, stats.session_count);
+    }
 
     Ok(())
 }
 
 /// Session end hook
 pub fn session_end_hook(export_metrics: bool, _config: &Config) -> Result<()> {
-    let intel = Intelligence::new(get_intelligence_path());
+    let mut intel = Intelligence::new(get_intelligence_path());
+    intel.save()?; // Final save
 
     if export_metrics {
         let stats = intel.stats();
@@ -1322,8 +1495,53 @@ pub fn session_end_hook(export_metrics: bool, _config: &Config) -> Result<()> {
 }
 
 /// Pre-compact hook
-pub fn pre_compact_hook(length: Option<usize>, _config: &Config) -> Result<()> {
-    println!("🗜️ Pre-compact: conversation length = {}", length.unwrap_or(0));
+pub fn pre_compact_hook(length: Option<usize>, auto: bool, _config: &Config) -> Result<()> {
+    let intel = Intelligence::new(get_intelligence_path());
+    let stats = intel.stats();
+
+    if auto {
+        // Auto-compact: just save critical state silently
+        println!("🗜️ Pre-compact: {} trajectories, {} memories saved",
+            stats.total_trajectories, stats.total_memories);
+    } else {
+        // Manual compact: show full summary
+        println!("{}", "🗜️ Pre-compact Summary".bold().cyan());
+        println!("   Conversation length: {}", length.unwrap_or(0));
+        println!("   Patterns learned: {}", stats.total_patterns);
+        println!("   Memories stored: {}", stats.total_memories);
+        println!("   Trajectories: {}", stats.total_trajectories);
+        println!("   Error patterns: {}", stats.total_errors);
+    }
+
+    Ok(())
+}
+
+/// Suggest context for user prompt (UserPromptSubmit hook)
+/// Returns learned patterns and suggestions to inject into Claude's context
+pub fn suggest_context_cmd(_config: &Config) -> Result<()> {
+    let intel = Intelligence::new(get_intelligence_path());
+    let stats = intel.stats();
+
+    // Only output if we have learned patterns
+    if stats.total_patterns > 0 || stats.total_errors > 0 {
+        // Output goes to stdout and gets injected as context
+        println!("RuVector Intelligence: {} learned patterns, {} error fixes available. Use 'ruvector hooks route' for agent suggestions.",
+            stats.total_patterns, stats.total_errors);
+    }
+
+    Ok(())
+}
+
+/// Track notification events
+pub fn track_notification_cmd(notification_type: Option<&str>, _config: &Config) -> Result<()> {
+    let mut intel = Intelligence::new(get_intelligence_path());
+
+    // Track notification as a learning trajectory
+    if let Some(ntype) = notification_type {
+        intel.learn(&format!("notification:{}", ntype), "observed", "tracked", 0.0);
+        intel.save()?;
+    }
+
     Ok(())
 }
 

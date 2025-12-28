@@ -699,14 +699,21 @@ This creates `.claude/settings.json` with hook configurations:
 }
 ```
 
-**All 5 Claude Code hooks covered:**
+**All 7 Claude Code hooks covered:**
 | Hook | When It Fires | What RuVector Does |
 |------|---------------|-------------------|
-| `PreToolUse` | Before file edit or command | Suggests agent, shows related files |
-| `PostToolUse` | After file edit or command | Records outcome, updates Q-values |
-| `SessionStart` | When session begins | Loads intelligence, shows stats |
+| `PreToolUse` | Before file edit, command, or Task | Suggests agent, shows related files, validates agent assignments |
+| `PostToolUse` | After file edit or command | Records outcome, updates Q-values, injects context |
+| `SessionStart` | When session begins/resumes | Loads intelligence, shows stats (startup vs resume) |
 | `Stop` | When session ends | Saves state, exports metrics |
-| `PreCompact` | Before context compaction | Preserves critical memories |
+| `PreCompact` | Before context compaction | Preserves critical memories (auto vs manual) |
+| `UserPromptSubmit` | Before processing user prompt | Injects learned patterns as context |
+| `Notification` | On system notifications | Tracks notification patterns |
+
+**Advanced Features:**
+- **Stdin JSON Parsing**: Hooks receive full JSON via stdin (session_id, tool_input, tool_response)
+- **Context Injection**: PostToolUse returns `additionalContext` to inject into Claude's context
+- **Timeout Optimization**: All hooks have optimized timeouts (1-5 seconds vs 60s default)
 
 **2. Use routing for intelligent agent selection:**
 
