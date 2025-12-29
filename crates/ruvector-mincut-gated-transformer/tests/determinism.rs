@@ -3,8 +3,8 @@
 //! Verifies that same inputs with same gate packets yield same outputs.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket,
-    InferInput, InferOutput, QuantizedWeights,
+    GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer, QuantizedWeights,
+    TransformerConfig,
 };
 
 fn create_transformer() -> MincutGatedTransformer {
@@ -103,7 +103,10 @@ fn test_deterministic_witness_same_gate() {
     assert_eq!(witness1.effective_seq_len, witness2.effective_seq_len);
     assert_eq!(witness1.effective_window, witness2.effective_window);
     assert_eq!(witness1.kv_writes_enabled, witness2.kv_writes_enabled);
-    assert_eq!(witness1.external_writes_enabled, witness2.external_writes_enabled);
+    assert_eq!(
+        witness1.external_writes_enabled,
+        witness2.external_writes_enabled
+    );
 }
 
 #[test]

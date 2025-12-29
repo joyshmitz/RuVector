@@ -251,7 +251,12 @@ impl DigitalTwin {
     }
 
     /// Add component to simulation
-    pub fn add_component(&mut self, id: &str, position: (f32, f32, f32), velocity: (f32, f32, f32)) {
+    pub fn add_component(
+        &mut self,
+        id: &str,
+        position: (f32, f32, f32),
+        velocity: (f32, f32, f32),
+    ) {
         self.components.insert(
             ComponentId(id.to_string()),
             ComponentState {
@@ -270,10 +275,9 @@ impl DigitalTwin {
 
         for state in self.components.values() {
             // High velocity = high urgency
-            let speed = (state.velocity.0.powi(2)
-                + state.velocity.1.powi(2)
-                + state.velocity.2.powi(2))
-            .sqrt();
+            let speed =
+                (state.velocity.0.powi(2) + state.velocity.1.powi(2) + state.velocity.2.powi(2))
+                    .sqrt();
 
             max_urgency = max_urgency.max(speed / 100.0); // Normalize
 
@@ -384,7 +388,10 @@ fn main() {
     twin.add_component("robot_arm", (50.0, 10.0, 0.0), (0.0, 5.0, 0.0));
     twin.add_component("package_a", (0.0, 0.0, 1.0), (15.0, 0.0, 0.0));
 
-    println!("Digital twin initialized with {} components", twin.components.len());
+    println!(
+        "Digital twin initialized with {} components",
+        twin.components.len()
+    );
 
     // Simulate normal operation (low fidelity, low cost)
     println!("\nNormal operation (low fidelity)...");
@@ -401,7 +408,10 @@ fn main() {
     }
 
     println!("\n  Compute cost so far: {:.1}", twin.total_compute_cost);
-    println!("  Efficiency vs always-high: {:.1}x", twin.efficiency_ratio());
+    println!(
+        "  Efficiency vs always-high: {:.1}x",
+        twin.efficiency_ratio()
+    );
 
     // Create collision scenario (triggers high fidelity)
     println!("\nCreating collision scenario...");

@@ -10,13 +10,13 @@
 //! - [`retrieval`]: Softmax-weighted retrieval implementation
 //! - [`capacity`]: Capacity calculations and β tuning
 
+mod capacity;
 mod network;
 mod retrieval;
-mod capacity;
 
+pub use capacity::{optimal_beta, theoretical_capacity};
 pub use network::ModernHopfield;
 pub use retrieval::{compute_attention, softmax};
-pub use capacity::{theoretical_capacity, optimal_beta};
 
 #[cfg(test)]
 mod tests;

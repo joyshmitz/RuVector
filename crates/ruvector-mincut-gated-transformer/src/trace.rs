@@ -59,7 +59,8 @@ impl TraceCounters {
         if self.calls == 0 {
             return 0.0;
         }
-        let interventions = self.reduce_scope + self.flush_kv + self.freeze_writes + self.quarantine;
+        let interventions =
+            self.reduce_scope + self.flush_kv + self.freeze_writes + self.quarantine;
         interventions as f64 / (self.calls - self.skipped) as f64
     }
 
@@ -113,7 +114,10 @@ impl Default for TraceSnapshot {
 
 impl TraceSnapshot {
     /// Get the most recent N entries (up to valid_entries)
-    pub fn recent(&self, n: usize) -> impl Iterator<Item = (GateDecision, GateReason, u32, u8)> + '_ {
+    pub fn recent(
+        &self,
+        n: usize,
+    ) -> impl Iterator<Item = (GateDecision, GateReason, u32, u8)> + '_ {
         let n = n.min(self.valid_entries);
         let start = if self.valid_entries >= TRACE_BUFFER_SIZE {
             self.write_index
@@ -135,7 +139,8 @@ impl TraceSnapshot {
     /// Check if recent history shows instability
     pub fn is_unstable(&self, window: usize, threshold: usize) -> bool {
         let window = window.min(self.valid_entries);
-        let interventions = self.recent(window)
+        let interventions = self
+            .recent(window)
             .filter(|(d, _, _, _)| d.is_intervention())
             .count();
         interventions >= threshold
@@ -151,8 +156,10 @@ impl TraceSnapshot {
         let values: Vec<u32> = self.recent(window).map(|(_, _, l, _)| l).collect();
 
         // Simple linear trend
-        let first_half_avg: f64 = values[..window / 2].iter().map(|&x| x as f64).sum::<f64>() / (window / 2) as f64;
-        let second_half_avg: f64 = values[window / 2..].iter().map(|&x| x as f64).sum::<f64>() / (window - window / 2) as f64;
+        let first_half_avg: f64 =
+            values[..window / 2].iter().map(|&x| x as f64).sum::<f64>() / (window / 2) as f64;
+        let second_half_avg: f64 = values[window / 2..].iter().map(|&x| x as f64).sum::<f64>()
+            / (window - window / 2) as f64;
 
         let change = (second_half_avg - first_half_avg) / first_half_avg.max(1.0);
 
@@ -224,9 +231,13 @@ impl TraceState {
         // Determine tier from effective parameters
         let tier = if witness.effective_seq_len == 0 {
             3
-        } else if witness.decision == GateDecision::FreezeWrites || witness.decision == GateDecision::QuarantineUpdates {
+        } else if witness.decision == GateDecision::FreezeWrites
+            || witness.decision == GateDecision::QuarantineUpdates
+        {
             2
-        } else if witness.decision == GateDecision::ReduceScope || witness.decision == GateDecision::FlushKv {
+        } else if witness.decision == GateDecision::ReduceScope
+            || witness.decision == GateDecision::FlushKv
+        {
             1
         } else {
             0
@@ -279,8 +290,8 @@ impl Default for TraceState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
     use crate::packets::GatePacket;
+    use alloc::vec::Vec;
 
     #[test]
     fn test_trace_counters() {

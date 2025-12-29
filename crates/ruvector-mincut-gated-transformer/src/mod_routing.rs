@@ -193,7 +193,10 @@ impl MincutDepthRouter {
 
         // Step 3: Ensure minimum compute tokens
         if compute_count < self.config.min_tokens_per_layer as usize {
-            self.ensure_minimum_compute(&mut routes, self.config.min_tokens_per_layer as usize - compute_count);
+            self.ensure_minimum_compute(
+                &mut routes,
+                self.config.min_tokens_per_layer as usize - compute_count,
+            );
         }
 
         routes
@@ -215,7 +218,10 @@ impl MincutDepthRouter {
     pub fn routing_stats(&self, routes: &[TokenRoute]) -> RoutingStats {
         let total = routes.len();
         let compute = routes.iter().filter(|r| r.requires_compute()).count();
-        let skip = routes.iter().filter(|r| matches!(r, TokenRoute::Skip)).count();
+        let skip = routes
+            .iter()
+            .filter(|r| matches!(r, TokenRoute::Skip))
+            .count();
         let boundary = routes.iter().filter(|r| r.is_boundary()).count();
 
         RoutingStats {
@@ -223,8 +229,16 @@ impl MincutDepthRouter {
             compute_tokens: compute,
             skip_tokens: skip,
             boundary_tokens: boundary,
-            compute_ratio: if total > 0 { compute as f32 / total as f32 } else { 0.0 },
-            skip_ratio: if total > 0 { skip as f32 / total as f32 } else { 0.0 },
+            compute_ratio: if total > 0 {
+                compute as f32 / total as f32
+            } else {
+                0.0
+            },
+            skip_ratio: if total > 0 {
+                skip as f32 / total as f32
+            } else {
+                0.0
+            },
         }
     }
 
@@ -251,7 +265,9 @@ impl MincutDepthRouter {
             capacity = (capacity as f32 * adjustment).ceil() as usize;
         }
 
-        capacity.max(self.config.min_tokens_per_layer as usize).min(num_tokens)
+        capacity
+            .max(self.config.min_tokens_per_layer as usize)
+            .min(num_tokens)
     }
 
     fn mark_boundary_tokens(

@@ -239,30 +239,40 @@ async fn main() -> Result<()> {
         Commands::Hooks { action } => {
             use cli::hooks::HooksCommands;
             match action {
-                HooksCommands::Init { force, postgres } => cli::hooks::init_hooks(force, postgres, &config),
-                HooksCommands::Install { settings_dir } => cli::hooks::install_hooks(&settings_dir, &config),
-                HooksCommands::Stats => cli::hooks::show_stats(&config),
-                HooksCommands::Remember { memory_type, content } => {
-                    cli::hooks::remember_content(&memory_type, &content.join(" "), &config)
+                HooksCommands::Init { force, postgres } => {
+                    cli::hooks::init_hooks(force, postgres, &config)
                 }
+                HooksCommands::Install { settings_dir } => {
+                    cli::hooks::install_hooks(&settings_dir, &config)
+                }
+                HooksCommands::Stats => cli::hooks::show_stats(&config),
+                HooksCommands::Remember {
+                    memory_type,
+                    content,
+                } => cli::hooks::remember_content(&memory_type, &content.join(" "), &config),
                 HooksCommands::Recall { query, top_k } => {
                     cli::hooks::recall_content(&query.join(" "), top_k, &config)
                 }
-                HooksCommands::Learn { state, action, reward } => {
-                    cli::hooks::learn_trajectory(&state, &action, reward, &config)
-                }
+                HooksCommands::Learn {
+                    state,
+                    action,
+                    reward,
+                } => cli::hooks::learn_trajectory(&state, &action, reward, &config),
                 HooksCommands::Suggest { state, actions } => {
                     cli::hooks::suggest_action(&state, &actions, &config)
                 }
-                HooksCommands::Route { task, file, crate_name, operation } => {
-                    cli::hooks::route_task(
-                        &task.join(" "),
-                        file.as_deref(),
-                        crate_name.as_deref(),
-                        &operation,
-                        &config,
-                    )
-                }
+                HooksCommands::Route {
+                    task,
+                    file,
+                    crate_name,
+                    operation,
+                } => cli::hooks::route_task(
+                    &task.join(" "),
+                    file.as_deref(),
+                    crate_name.as_deref(),
+                    &operation,
+                    &config,
+                ),
                 HooksCommands::PreEdit { file } => cli::hooks::pre_edit_hook(&file, &config),
                 HooksCommands::PostEdit { file, success } => {
                     cli::hooks::post_edit_hook(&file, success, &config)
@@ -270,9 +280,16 @@ async fn main() -> Result<()> {
                 HooksCommands::PreCommand { command } => {
                     cli::hooks::pre_command_hook(&command.join(" "), &config)
                 }
-                HooksCommands::PostCommand { command, success, stderr } => {
-                    cli::hooks::post_command_hook(&command.join(" "), success, stderr.as_deref(), &config)
-                }
+                HooksCommands::PostCommand {
+                    command,
+                    success,
+                    stderr,
+                } => cli::hooks::post_command_hook(
+                    &command.join(" "),
+                    success,
+                    stderr.as_deref(),
+                    &config,
+                ),
                 HooksCommands::SessionStart { session_id, resume } => {
                     cli::hooks::session_start_hook(session_id.as_deref(), resume, &config)
                 }
@@ -282,22 +299,34 @@ async fn main() -> Result<()> {
                 HooksCommands::PreCompact { length, auto } => {
                     cli::hooks::pre_compact_hook(length, auto, &config)
                 }
-                HooksCommands::SuggestContext => {
-                    cli::hooks::suggest_context_cmd(&config)
-                }
+                HooksCommands::SuggestContext => cli::hooks::suggest_context_cmd(&config),
                 HooksCommands::TrackNotification { notification_type } => {
                     cli::hooks::track_notification_cmd(notification_type.as_deref(), &config)
                 }
                 // Claude Code v2.0.55+ features
-                HooksCommands::LspDiagnostic { file, severity, message } => {
-                    cli::hooks::lsp_diagnostic_cmd(file.as_deref(), severity.as_deref(), message.as_deref(), &config)
-                }
+                HooksCommands::LspDiagnostic {
+                    file,
+                    severity,
+                    message,
+                } => cli::hooks::lsp_diagnostic_cmd(
+                    file.as_deref(),
+                    severity.as_deref(),
+                    message.as_deref(),
+                    &config,
+                ),
                 HooksCommands::SuggestUltrathink { task, file } => {
                     cli::hooks::suggest_ultrathink_cmd(&task.join(" "), file.as_deref(), &config)
                 }
-                HooksCommands::AsyncAgent { action, agent_id, task } => {
-                    cli::hooks::async_agent_cmd(&action, agent_id.as_deref(), task.as_deref(), &config)
-                }
+                HooksCommands::AsyncAgent {
+                    action,
+                    agent_id,
+                    task,
+                } => cli::hooks::async_agent_cmd(
+                    &action,
+                    agent_id.as_deref(),
+                    task.as_deref(),
+                    &config,
+                ),
                 HooksCommands::RecordError { command, stderr } => {
                     cli::hooks::record_error_cmd(&command, &stderr, &config)
                 }
@@ -307,15 +336,22 @@ async fn main() -> Result<()> {
                 HooksCommands::SuggestNext { file, count } => {
                     cli::hooks::suggest_next_cmd(&file, count, &config)
                 }
-                HooksCommands::ShouldTest { file } => {
-                    cli::hooks::should_test_cmd(&file, &config)
-                }
-                HooksCommands::SwarmRegister { agent_id, agent_type, capabilities } => {
-                    cli::hooks::swarm_register_cmd(&agent_id, &agent_type, capabilities.as_deref(), &config)
-                }
-                HooksCommands::SwarmCoordinate { source, target, weight } => {
-                    cli::hooks::swarm_coordinate_cmd(&source, &target, weight, &config)
-                }
+                HooksCommands::ShouldTest { file } => cli::hooks::should_test_cmd(&file, &config),
+                HooksCommands::SwarmRegister {
+                    agent_id,
+                    agent_type,
+                    capabilities,
+                } => cli::hooks::swarm_register_cmd(
+                    &agent_id,
+                    &agent_type,
+                    capabilities.as_deref(),
+                    &config,
+                ),
+                HooksCommands::SwarmCoordinate {
+                    source,
+                    target,
+                    weight,
+                } => cli::hooks::swarm_coordinate_cmd(&source, &target, weight, &config),
                 HooksCommands::SwarmOptimize { tasks } => {
                     cli::hooks::swarm_optimize_cmd(&tasks, &config)
                 }

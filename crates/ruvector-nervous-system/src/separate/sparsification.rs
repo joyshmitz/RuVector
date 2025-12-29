@@ -92,7 +92,7 @@ impl SparseBitVector {
 
         // Binary search for insertion point
         match self.indices.binary_search(&index) {
-            Ok(_) => {}, // Already present
+            Ok(_) => {} // Already present
             Err(pos) => self.indices.insert(pos, index),
         }
     }

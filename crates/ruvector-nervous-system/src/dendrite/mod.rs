@@ -22,12 +22,12 @@
 //! - Coincidence detection: <10μs for 100 synapses
 //! - Suitable for real-time Cognitum deployment
 
-mod compartment;
 mod coincidence;
+mod compartment;
 mod plateau;
 mod tree;
 
-pub use compartment::Compartment;
 pub use coincidence::Dendrite;
+pub use compartment::Compartment;
 pub use plateau::PlateauPotential;
 pub use tree::DendriticTree;

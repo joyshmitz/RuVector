@@ -296,9 +296,7 @@ impl MincutSparseAttention {
         // 1. Sequence is long enough to benefit
         // 2. We have meaningful partition structure
         // 3. Lambda indicates stability
-        seq_len >= 16
-            && gate.partition_count >= 2
-            && gate.lambda >= 30 // Minimum stability threshold
+        seq_len >= 16 && gate.partition_count >= 2 && gate.lambda >= 30 // Minimum stability threshold
     }
 
     pub fn calculate_density(&self, gate: &GatePacket) -> f32 {
@@ -309,7 +307,8 @@ impl MincutSparseAttention {
             }) => {
                 // Linear interpolation based on lambda
                 // Assume lambda range [30, 300]
-                let lambda_normalized = ((gate.lambda.min(300) as f32 - 30.0) / 270.0).clamp(0.0, 1.0);
+                let lambda_normalized =
+                    ((gate.lambda.min(300) as f32 - 30.0) / 270.0).clamp(0.0, 1.0);
                 min_density + lambda_normalized * (max_density - min_density)
             }
             Some(LambdaDensitySchedule::Threshold { dense_above_lambda }) => {

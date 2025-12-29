@@ -163,7 +163,9 @@ unsafe fn quantize_f32_to_i8_simd(input: &[f32], inv_scale: f32, output: &mut [i
 /// Expected speedup: 4× over scalar.
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 #[inline]
-unsafe fn gelu_approx_neon(x: core::arch::aarch64::float32x4_t) -> core::arch::aarch64::float32x4_t {
+unsafe fn gelu_approx_neon(
+    x: core::arch::aarch64::float32x4_t,
+) -> core::arch::aarch64::float32x4_t {
     use core::arch::aarch64::*;
 
     // Constants
@@ -465,7 +467,9 @@ impl QuantizedFfn {
 
         // Quantize back to i8 for second matmul (allocation-free)
         let activation_scale = compute_activation_scale(activation_buf);
-        let buf_len = activation_i8_buf.len().min(seq_len.saturating_mul(intermediate));
+        let buf_len = activation_i8_buf
+            .len()
+            .min(seq_len.saturating_mul(intermediate));
         quantize_f32_to_i8(
             &activation_buf[..buf_len],
             activation_scale,

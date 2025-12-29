@@ -3,8 +3,7 @@
 //! Verifies that synthetic lambda traces produce expected tier changes.
 
 use ruvector_mincut_gated_transformer::{
-    GatePolicy, GatePacket, SpikePacket, GateDecision, GateReason,
-    gate::GateController,
+    gate::GateController, GateDecision, GatePacket, GatePolicy, GateReason, SpikePacket,
 };
 
 fn create_controller() -> GateController {
@@ -224,7 +223,7 @@ fn test_spike_active_allows() {
     };
 
     let spike = SpikePacket {
-        fired: 1, // Fired
+        fired: 1,        // Fired
         rate_q15: 10000, // Normal rate
         novelty_q15: 15000,
         ..Default::default()

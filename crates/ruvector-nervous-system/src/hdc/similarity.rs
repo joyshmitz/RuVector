@@ -229,11 +229,7 @@ pub fn batch_similarities(query: &Hypervector, candidates: &[Hypervector]) -> Ve
 /// let matches = find_similar(&query, &candidates, 0.9);
 /// assert!(matches.contains(&42)); // Should find itself
 /// ```
-pub fn find_similar(
-    query: &Hypervector,
-    candidates: &[Hypervector],
-    threshold: f32,
-) -> Vec<usize> {
+pub fn find_similar(query: &Hypervector, candidates: &[Hypervector], threshold: f32) -> Vec<usize> {
     candidates
         .iter()
         .enumerate()
@@ -282,7 +278,11 @@ mod tests {
 
         let sim = cosine_similarity(&v1, &v2);
         // Cosine similarity for binary vectors: 1 - 2*hamming/dim gives [-1, 1]
-        assert!(sim >= -1.0 && sim <= 1.0, "similarity out of bounds: {}", sim);
+        assert!(
+            sim >= -1.0 && sim <= 1.0,
+            "similarity out of bounds: {}",
+            sim
+        );
     }
 
     #[test]
@@ -385,7 +385,11 @@ mod tests {
         for row in &matrix {
             for &sim in row {
                 // Similarity range is [-1, 1] for cosine similarity
-                assert!(sim >= -1.0 && sim <= 1.0, "similarity out of bounds: {}", sim);
+                assert!(
+                    sim >= -1.0 && sim <= 1.0,
+                    "similarity out of bounds: {}",
+                    sim
+                );
             }
         }
     }

@@ -12,9 +12,7 @@
 //! # Then serve index.html and import the generated package
 //! ```
 
-use ruvector_mincut_gated_transformer_wasm::{
-    WasmTransformer, WasmGatePacket,
-};
+use ruvector_mincut_gated_transformer_wasm::{WasmGatePacket, WasmTransformer};
 use wasm_bindgen::prelude::*;
 
 /// Example showing basic inference with coherence control.
@@ -36,23 +34,11 @@ pub fn run_basic_example() -> Result<JsValue, JsValue> {
     // Create result object for JavaScript
     let output = js_sys::Object::new();
 
-    js_sys::Reflect::set(
-        &output,
-        &"decision".into(),
-        &result.decision().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"decision".into(), &result.decision().into())?;
 
-    js_sys::Reflect::set(
-        &output,
-        &"reason".into(),
-        &result.reason().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"reason".into(), &result.reason().into())?;
 
-    js_sys::Reflect::set(
-        &output,
-        &"tier".into(),
-        &result.tier().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"tier".into(), &result.tier().into())?;
 
     js_sys::Reflect::set(
         &output,
@@ -82,23 +68,11 @@ pub fn run_intervention_example() -> Result<JsValue, JsValue> {
     // Create result object
     let output = js_sys::Object::new();
 
-    js_sys::Reflect::set(
-        &output,
-        &"decision".into(),
-        &result.decision().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"decision".into(), &result.decision().into())?;
 
-    js_sys::Reflect::set(
-        &output,
-        &"reason".into(),
-        &result.reason().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"reason".into(), &result.reason().into())?;
 
-    js_sys::Reflect::set(
-        &output,
-        &"lambda".into(),
-        &result.lambda().into(),
-    )?;
+    js_sys::Reflect::set(&output, &"lambda".into(), &result.lambda().into())?;
 
     js_sys::Reflect::set(
         &output,
@@ -122,7 +96,11 @@ pub fn run_sequence_example() -> Result<JsValue, JsValue> {
     for (i, &lambda) in lambda_sequence.iter().enumerate() {
         let mut gate = WasmGatePacket::new();
         gate.lambda = lambda;
-        gate.lambda_prev = if i > 0 { lambda_sequence[i - 1] } else { lambda };
+        gate.lambda_prev = if i > 0 {
+            lambda_sequence[i - 1]
+        } else {
+            lambda
+        };
 
         let gate_js = serde_wasm_bindgen::to_value(&gate)?;
 
@@ -169,7 +147,11 @@ pub fn run_custom_config_example() -> Result<JsValue, JsValue> {
     let result = transformer.infer(&tokens, gate_js)?;
 
     let output = js_sys::Object::new();
-    js_sys::Reflect::set(&output, &"buffer_size".into(), &transformer.buffer_size().into())?;
+    js_sys::Reflect::set(
+        &output,
+        &"buffer_size".into(),
+        &transformer.buffer_size().into(),
+    )?;
     js_sys::Reflect::set(&output, &"decision".into(), &result.decision().into())?;
 
     Ok(output.into())

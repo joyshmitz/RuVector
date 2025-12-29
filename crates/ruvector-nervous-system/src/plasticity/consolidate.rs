@@ -306,10 +306,7 @@ impl<T> RingBuffer<T> {
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
 
-        let valid_items: Vec<&T> = self.buffer
-            .iter()
-            .filter_map(|opt| opt.as_ref())
-            .collect();
+        let valid_items: Vec<&T> = self.buffer.iter().filter_map(|opt| opt.as_ref()).collect();
 
         valid_items
             .choose_multiple(&mut rng, n.min(valid_items.len()))
@@ -425,7 +422,8 @@ impl ComplementaryLearning {
             // Get experiences in separate scope to avoid borrow conflicts
             let sampled_experiences: Vec<Experience> = {
                 let hippo = self.hippocampus.read();
-                hippo.sample(self.replay_batch_size)
+                hippo
+                    .sample(self.replay_batch_size)
                     .into_iter()
                     .map(|e| e.clone())
                     .collect()
@@ -449,7 +447,8 @@ impl ComplementaryLearning {
 
                 // Simple gradient descent update (placeholder)
                 for i in 0..exp.target.len().min(self.neocortex_params.len()) {
-                    let grad = 2.0 * (self.neocortex_params[i] - exp.target[i]) / exp.target.len() as f32;
+                    let grad =
+                        2.0 * (self.neocortex_params[i] - exp.target[i]) / exp.target.len() as f32;
                     let ewc_grad = if self.ewc.is_initialized() {
                         self.ewc.ewc_gradient(&self.neocortex_params)[i]
                     } else {

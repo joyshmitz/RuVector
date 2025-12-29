@@ -3,7 +3,7 @@
 //! The dentate gyrus is the input layer of the hippocampus responsible for
 //! pattern separation - creating orthogonal representations from similar inputs.
 
-use super::{SparseProjection, SparseBitVector};
+use super::{SparseBitVector, SparseProjection};
 use crate::{NervousSystemError, Result};
 
 /// Dentate gyrus pattern separation encoder
@@ -116,8 +116,7 @@ impl DentateGyrus {
     /// ```
     pub fn encode(&self, input: &[f32]) -> SparseBitVector {
         // Step 1: Sparse projection
-        let projected = self.projection.project(input)
-            .expect("Projection failed");
+        let projected = self.projection.project(input).expect("Projection failed");
 
         // Step 2: K-winners-take-all
         self.k_winners_take_all(&projected)
@@ -135,8 +134,7 @@ impl DentateGyrus {
     ///
     /// Dense vector with k non-zero elements
     pub fn encode_dense(&self, input: &[f32]) -> Vec<f32> {
-        let projected = self.projection.project(input)
-            .expect("Projection failed");
+        let projected = self.projection.project(input).expect("Projection failed");
 
         let sparse = self.k_winners_take_all(&projected);
 
@@ -172,10 +170,8 @@ impl DentateGyrus {
         });
 
         // Take top k indices
-        let mut top_k_indices: Vec<u16> = indexed[..self.k]
-            .iter()
-            .map(|(i, _)| *i as u16)
-            .collect();
+        let mut top_k_indices: Vec<u16> =
+            indexed[..self.k].iter().map(|(i, _)| *i as u16).collect();
 
         top_k_indices.sort_unstable();
 
@@ -258,7 +254,10 @@ mod tests {
         let dense = dg.encode_dense(&input);
         let nonzero_count = dense.iter().filter(|&&x| x != 0.0).count();
 
-        assert_eq!(nonzero_count, 200, "Should have exactly k non-zero elements");
+        assert_eq!(
+            nonzero_count, 200,
+            "Should have exactly k non-zero elements"
+        );
     }
 
     #[test]
@@ -271,7 +270,10 @@ mod tests {
         let sparse1 = dg.encode(&input1);
         let sparse2 = dg.encode(&input2);
 
-        assert_ne!(sparse1, sparse2, "Different inputs should produce different encodings");
+        assert_ne!(
+            sparse1, sparse2,
+            "Different inputs should produce different encodings"
+        );
     }
 
     #[test]
@@ -309,9 +311,9 @@ mod tests {
     fn test_sparsity_levels() {
         // Test different sparsity levels
         let cases = vec![
-            (10000, 200, 0.02),   // 2%
-            (10000, 300, 0.03),   // 3%
-            (10000, 500, 0.05),   // 5%
+            (10000, 200, 0.02), // 2%
+            (10000, 300, 0.03), // 3%
+            (10000, 500, 0.05), // 5%
         ];
 
         for (output_dim, k, expected_sparsity) in cases {

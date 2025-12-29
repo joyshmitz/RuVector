@@ -9,8 +9,8 @@
 #![cfg(feature = "spectral_pe")]
 
 use ruvector_mincut_gated_transformer::{
-    SpectralPositionEncoder, SpectralPEConfig,
     spectral::{power_iteration, rayleigh_quotient},
+    SpectralPEConfig, SpectralPositionEncoder,
 };
 
 #[test]
@@ -73,8 +73,13 @@ fn test_laplacian_symmetry() {
     // Laplacian should be symmetric
     for i in 0..3 {
         for j in 0..3 {
-            assert_eq!(laplacian[i * 3 + j], laplacian[j * 3 + i],
-                      "Laplacian should be symmetric at ({}, {})", i, j);
+            assert_eq!(
+                laplacian[i * 3 + j],
+                laplacian[j * 3 + i],
+                "Laplacian should be symmetric at ({}, {})",
+                i,
+                j
+            );
         }
     }
 }
@@ -84,11 +89,7 @@ fn test_laplacian_complete_graph() {
     let encoder = SpectralPositionEncoder::default();
 
     // Complete graph K4: all nodes connected
-    let edges = vec![
-        (0, 1), (0, 2), (0, 3),
-        (1, 2), (1, 3),
-        (2, 3),
-    ];
+    let edges = vec![(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
     let laplacian = encoder.compute_laplacian(&edges, 4);
 
     // All nodes should have degree 3
@@ -131,8 +132,11 @@ fn test_normalized_laplacian() {
 
     // Normalized Laplacian values should be in [-1, 1]
     for &val in &laplacian {
-        assert!(val >= -1.0 - 1e-5 && val <= 1.0 + 1e-5,
-                "Normalized value {} out of range", val);
+        assert!(
+            val >= -1.0 - 1e-5 && val <= 1.0 + 1e-5,
+            "Normalized value {} out of range",
+            val
+        );
     }
 
     // Should still be symmetric
@@ -194,16 +198,16 @@ fn test_power_iteration_convergence() {
     let v_1000 = power_iteration(&matrix, n, 1000);
 
     // Should converge (later iterations closer together)
-    let diff_early: f32 = v_10.iter().zip(&v_100)
-        .map(|(a, b)| (a - b).abs())
-        .sum();
+    let diff_early: f32 = v_10.iter().zip(&v_100).map(|(a, b)| (a - b).abs()).sum();
 
-    let diff_late: f32 = v_100.iter().zip(&v_1000)
-        .map(|(a, b)| (a - b).abs())
-        .sum();
+    let diff_late: f32 = v_100.iter().zip(&v_1000).map(|(a, b)| (a - b).abs()).sum();
 
-    assert!(diff_late < diff_early,
-            "Should converge: early_diff={}, late_diff={}", diff_early, diff_late);
+    assert!(
+        diff_late < diff_early,
+        "Should converge: early_diff={}, late_diff={}",
+        diff_early,
+        diff_late
+    );
 }
 
 #[test]
@@ -231,10 +235,7 @@ fn test_rayleigh_quotient() {
 fn test_encode_positions_basic() {
     let encoder = SpectralPositionEncoder::default();
 
-    let eigenvectors = vec![
-        vec![0.1, 0.2, 0.3, 0.4],
-        vec![0.5, 0.6, 0.7, 0.8],
-    ];
+    let eigenvectors = vec![vec![0.1, 0.2, 0.3, 0.4], vec![0.5, 0.6, 0.7, 0.8]];
 
     let encoding = encoder.encode_positions(&eigenvectors);
 
@@ -276,7 +277,7 @@ fn test_add_to_embeddings() {
     // 2 positions, 2 dimensions each = 4 total
     let mut embeddings = vec![10i8, 20, 30, 40];
     let pe = vec![
-        0.5, 1.0,   // Position 0: PE values
+        0.5, 1.0, // Position 0: PE values
         -0.5, -1.0, // Position 1: PE values
     ];
 
@@ -285,10 +286,10 @@ fn test_add_to_embeddings() {
     // PE values scaled by 10 and added to first k=2 dims of each position
     // Position 0: [10, 20] + [5, 10] = [15, 30]
     // Position 1: [30, 40] + [-5, -10] = [25, 30]
-    assert_eq!(embeddings[0], 15);  // 10 + 5
-    assert_eq!(embeddings[1], 30);  // 20 + 10
-    assert_eq!(embeddings[2], 25);  // 30 + (-5)
-    assert_eq!(embeddings[3], 30);  // 40 + (-10)
+    assert_eq!(embeddings[0], 15); // 10 + 5
+    assert_eq!(embeddings[1], 30); // 20 + 10
+    assert_eq!(embeddings[2], 25); // 30 + (-5)
+    assert_eq!(embeddings[3], 30); // 40 + (-10)
 }
 
 #[test]
@@ -306,7 +307,7 @@ fn test_add_to_embeddings_saturation() {
     encoder.add_to_embeddings(&mut embeddings, &pe, 10.0);
 
     // Should saturate at i8 limits
-    assert_eq!(embeddings[0], 127);  // Can't exceed 127 (127 + 100 clamped)
+    assert_eq!(embeddings[0], 127); // Can't exceed 127 (127 + 100 clamped)
     assert_eq!(embeddings[1], -128); // Can't go below -128 (-128 + (-100) clamped)
 }
 
@@ -492,8 +493,11 @@ fn test_eigenvectors_normalized() {
     // Each eigenvector should be normalized
     for evec in &eigenvectors {
         let norm: f32 = evec.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-3,
-                "Eigenvector should be normalized: norm={}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-3,
+            "Eigenvector should be normalized: norm={}",
+            norm
+        );
     }
 }
 
@@ -509,11 +513,16 @@ fn test_position_encoding_uniqueness() {
     let encoding2 = encoder.encode_from_edges(&edges2, 3);
 
     // Encodings should differ
-    let diff: f32 = encoding1.iter().zip(&encoding2)
+    let diff: f32 = encoding1
+        .iter()
+        .zip(&encoding2)
         .map(|(a, b)| (a - b).abs())
         .sum();
 
-    assert!(diff > 0.01, "Different graphs should produce different encodings");
+    assert!(
+        diff > 0.01,
+        "Different graphs should produce different encodings"
+    );
 }
 
 #[test]
@@ -527,11 +536,7 @@ fn test_mincut_integration() {
 
     // Simulate mincut boundary edges from a bipartite cut
     // Nodes 0,1,2 in one partition, 3,4,5 in another
-    let boundary_edges = vec![
-        (0, 3), (0, 4),
-        (1, 3), (1, 5),
-        (2, 4), (2, 5),
-    ];
+    let boundary_edges = vec![(0, 3), (0, 4), (1, 3), (1, 5), (2, 4), (2, 5)];
 
     let encoding = encoder.encode_from_edges(&boundary_edges, 6);
 
@@ -559,7 +564,7 @@ fn test_large_graph_scaling() {
     // Create larger graph (32 nodes, chain)
     let n = 32;
     let mut edges = vec![];
-    for i in 0..n-1 {
+    for i in 0..n - 1 {
         edges.push((i, i + 1));
     }
 

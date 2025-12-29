@@ -3,13 +3,13 @@
 //! This module provides sparse random projection and k-winners-take-all mechanisms
 //! for creating collision-resistant, orthogonal vector representations.
 
+mod dentate;
 mod projection;
 mod sparsification;
-mod dentate;
 
+pub use dentate::DentateGyrus;
 pub use projection::SparseProjection;
 pub use sparsification::SparseBitVector;
-pub use dentate::DentateGyrus;
 
 #[cfg(test)]
 mod tests {
@@ -54,9 +54,7 @@ mod tests {
 
         let mut encodings = Vec::new();
         for i in 0..num_samples {
-            let input: Vec<f32> = (0..128)
-                .map(|j| ((i * 128 + j) as f32).sin())
-                .collect();
+            let input: Vec<f32> = (0..128).map(|j| ((i * 128 + j) as f32).sin()).collect();
             encodings.push(dg.encode(&input));
         }
 
@@ -93,7 +91,11 @@ mod tests {
         let sparsity = sparse.indices.len() as f32 / output_dim as f32;
 
         // Verify exact k winners
-        assert_eq!(sparse.indices.len(), k, "Should have exactly k active neurons");
+        assert_eq!(
+            sparse.indices.len(),
+            k,
+            "Should have exactly k active neurons"
+        );
 
         // Verify sparsity in 2-5% range
         assert!(
@@ -165,7 +167,8 @@ mod tests {
         let original: Vec<f32> = (0..128).map(|i| (i as f32).sin()).collect();
 
         // Similar input (small perturbation)
-        let similar: Vec<f32> = original.iter()
+        let similar: Vec<f32> = original
+            .iter()
             .map(|&x| x + 0.1 * ((x * 10.0).cos()))
             .collect();
 

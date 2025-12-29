@@ -329,7 +329,9 @@ impl IntegrityEventStore {
     /// Record an event
     pub fn record(&self, mut event: IntegrityEventContent) -> u64 {
         // Assign event ID
-        let event_id = self.next_event_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let event_id = self
+            .next_event_id
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         event.event_id = event_id;
 
         // Add to buffer
@@ -359,7 +361,11 @@ impl IntegrityEventStore {
     }
 
     /// Get events by type
-    pub fn get_by_type(&self, event_type: IntegrityEventType, count: usize) -> Vec<IntegrityEventContent> {
+    pub fn get_by_type(
+        &self,
+        event_type: IntegrityEventType,
+        count: usize,
+    ) -> Vec<IntegrityEventContent> {
         let events = self.events.read().unwrap();
         events
             .iter()
@@ -407,7 +413,8 @@ impl IntegrityEventStore {
     /// Get statistics
     pub fn stats(&self) -> EventStoreStats {
         let events = self.events.read().unwrap();
-        let mut by_type: std::collections::HashMap<IntegrityEventType, usize> = std::collections::HashMap::new();
+        let mut by_type: std::collections::HashMap<IntegrityEventType, usize> =
+            std::collections::HashMap::new();
         let mut by_severity = [0usize; 3];
 
         for event in events.iter() {
@@ -471,7 +478,8 @@ pub fn event_to_delta(event: &IntegrityEventContent) -> Option<GraphDelta> {
 
     match event.event_type {
         IntegrityEventType::PartitionCreated => {
-            if let Some(partition_id) = event.metadata.get("partition_id").and_then(|v| v.as_i64()) {
+            if let Some(partition_id) = event.metadata.get("partition_id").and_then(|v| v.as_i64())
+            {
                 delta.add_nodes.push(DeltaNode {
                     node_type: "partition".to_string(),
                     node_id: partition_id,
@@ -482,8 +490,11 @@ pub fn event_to_delta(event: &IntegrityEventContent) -> Option<GraphDelta> {
             }
         }
         IntegrityEventType::PartitionDeleted => {
-            if let Some(partition_id) = event.metadata.get("partition_id").and_then(|v| v.as_i64()) {
-                delta.remove_nodes.push(("partition".to_string(), partition_id));
+            if let Some(partition_id) = event.metadata.get("partition_id").and_then(|v| v.as_i64())
+            {
+                delta
+                    .remove_nodes
+                    .push(("partition".to_string(), partition_id));
             }
         }
         IntegrityEventType::DependencyDown => {
@@ -526,8 +537,14 @@ mod tests {
 
     #[test]
     fn test_event_type_display() {
-        assert_eq!(IntegrityEventType::StateChanged.to_string(), "state_changed");
-        assert_eq!(IntegrityEventType::LambdaSampled.to_string(), "lambda_sampled");
+        assert_eq!(
+            IntegrityEventType::StateChanged.to_string(),
+            "state_changed"
+        );
+        assert_eq!(
+            IntegrityEventType::LambdaSampled.to_string(),
+            "lambda_sampled"
+        );
     }
 
     #[test]
@@ -569,8 +586,16 @@ mod tests {
         let store = IntegrityEventStore::new(1, 100);
 
         // Record events
-        let id1 = store.record(IntegrityEventContent::new(1, IntegrityEventType::GraphRebuilt, "test"));
-        let id2 = store.record(IntegrityEventContent::new(1, IntegrityEventType::LambdaSampled, "test"));
+        let id1 = store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::GraphRebuilt,
+            "test",
+        ));
+        let id2 = store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::LambdaSampled,
+            "test",
+        ));
 
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
@@ -588,7 +613,11 @@ mod tests {
 
         // Record more than max
         for i in 0..10 {
-            store.record(IntegrityEventContent::new(1, IntegrityEventType::LambdaSampled, format!("test_{}", i)));
+            store.record(IntegrityEventContent::new(
+                1,
+                IntegrityEventType::LambdaSampled,
+                format!("test_{}", i),
+            ));
         }
 
         assert_eq!(store.event_count(), 5);
@@ -603,9 +632,21 @@ mod tests {
     fn test_get_by_type() {
         let store = IntegrityEventStore::new(1, 100);
 
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::GraphRebuilt, "test"));
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::LambdaSampled, "test"));
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::LambdaSampled, "test"));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::GraphRebuilt,
+            "test",
+        ));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::LambdaSampled,
+            "test",
+        ));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::LambdaSampled,
+            "test",
+        ));
 
         let sampled = store.get_by_type(IntegrityEventType::LambdaSampled, 10);
         assert_eq!(sampled.len(), 2);
@@ -645,9 +686,21 @@ mod tests {
     fn test_event_store_stats() {
         let store = IntegrityEventStore::new(1, 100);
 
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::LambdaSampled, "test"));
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::StateChanged, "test"));
-        store.record(IntegrityEventContent::new(1, IntegrityEventType::DependencyDown, "test"));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::LambdaSampled,
+            "test",
+        ));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::StateChanged,
+            "test",
+        ));
+        store.record(IntegrityEventContent::new(
+            1,
+            IntegrityEventType::DependencyDown,
+            "test",
+        ));
 
         let stats = store.stats();
         assert_eq!(stats.total_events, 3);

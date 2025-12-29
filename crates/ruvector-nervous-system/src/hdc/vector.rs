@@ -386,7 +386,11 @@ mod tests {
 
         let sim = a.similarity(&b);
         // Cosine similarity formula: 1 - 2*hamming/dim gives range [-1, 1]
-        assert!(sim >= -1.0 && sim <= 1.0, "similarity out of bounds: {}", sim);
+        assert!(
+            sim >= -1.0 && sim <= 1.0,
+            "similarity out of bounds: {}",
+            sim
+        );
     }
 
     #[test]

@@ -159,8 +159,7 @@ mod tests {
 
     #[test]
     fn test_dvs_event_with_confidence() {
-        let event = DVSEvent::new(1000, 42, 123, false)
-            .with_confidence(0.95);
+        let event = DVSEvent::new(1000, 42, 123, false).with_confidence(0.95);
 
         assert_eq!(event.confidence, Some(0.95));
     }

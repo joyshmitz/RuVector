@@ -40,8 +40,10 @@ impl<E: Event + Copy> EventRingBuffer<E> {
     ///
     /// Capacity must be power of 2 for efficient modulo operations.
     pub fn new(capacity: usize) -> Self {
-        assert!(capacity > 0 && capacity.is_power_of_two(),
-                "Capacity must be power of 2");
+        assert!(
+            capacity > 0 && capacity.is_power_of_two(),
+            "Capacity must be power of 2"
+        );
 
         // Initialize with default events (timestamp 0)
         let buffer: Vec<UnsafeCell<E>> = (0..capacity)

@@ -132,10 +132,7 @@ impl OscillatoryRouter {
             let gain = self.communication_gain(sender, receiver);
 
             // Apply gain to message
-            let weighted_message: Vec<f32> = message
-                .iter()
-                .map(|&x| x * gain)
-                .collect();
+            let weighted_message: Vec<f32> = message.iter().map(|&x| x * gain).collect();
 
             routed.push((receiver, weighted_message));
         }
@@ -225,7 +222,12 @@ mod tests {
         // Allow for numerical accumulation over many steps
         let phase_diff = (final_phase - initial_phase).abs();
         let phase_diff_mod = phase_diff.min(TAU - phase_diff); // Handle wrap-around
-        assert!(phase_diff_mod < 0.5, "Phase should complete cycle, diff: {} (mod: {})", phase_diff, phase_diff_mod);
+        assert!(
+            phase_diff_mod < 0.5,
+            "Phase should complete cycle, diff: {} (mod: {})",
+            phase_diff,
+            phase_diff_mod
+        );
     }
 
     #[test]
@@ -236,7 +238,10 @@ mod tests {
         router.phases[0] = 0.0;
         router.phases[1] = 0.0;
         let gain_in_phase = router.communication_gain(0, 1);
-        assert!((gain_in_phase - 1.0).abs() < 0.01, "In-phase gain should be ~1.0");
+        assert!(
+            (gain_in_phase - 1.0).abs() < 0.01,
+            "In-phase gain should be ~1.0"
+        );
 
         // Out-of-phase: should have low gain
         router.phases[0] = 0.0;
@@ -248,7 +253,10 @@ mod tests {
         router.phases[0] = 0.0;
         router.phases[1] = PI / 2.0;
         let gain_quad = router.communication_gain(0, 1);
-        assert!((gain_quad - 0.5).abs() < 0.1, "Quadrature gain should be ~0.5");
+        assert!(
+            (gain_quad - 0.5).abs() < 0.1,
+            "Quadrature gain should be ~0.5"
+        );
     }
 
     #[test]
@@ -256,9 +264,9 @@ mod tests {
         let mut router = OscillatoryRouter::new(3, GAMMA_FREQ);
 
         // Set specific phase relationships
-        router.phases[0] = 0.0;      // Sender
-        router.phases[1] = 0.0;      // In-phase receiver
-        router.phases[2] = PI;       // Out-of-phase receiver
+        router.phases[0] = 0.0; // Sender
+        router.phases[1] = 0.0; // In-phase receiver
+        router.phases[2] = PI; // Out-of-phase receiver
 
         let message = vec![1.0, 2.0, 3.0];
         let receivers = vec![1, 2];
@@ -270,12 +278,18 @@ mod tests {
         // Receiver 1 (in-phase) should get strong signal
         let (id1, msg1) = &routed[0];
         assert_eq!(*id1, 1);
-        assert!(msg1.iter().all(|&x| x > 0.9), "In-phase message should be strong");
+        assert!(
+            msg1.iter().all(|&x| x > 0.9),
+            "In-phase message should be strong"
+        );
 
         // Receiver 2 (out-of-phase) should get weak signal
         let (id2, msg2) = &routed[1];
         assert_eq!(*id2, 2);
-        assert!(msg2.iter().all(|&x| x < 0.1), "Out-of-phase message should be weak");
+        assert!(
+            msg2.iter().all(|&x| x < 0.1),
+            "Out-of-phase message should be weak"
+        );
     }
 
     #[test]
@@ -296,9 +310,17 @@ mod tests {
 
         // Order parameter should increase (more synchronized)
         // Kuramoto model may not fully sync with heterogeneous phases
-        assert!(final_order > initial_order * 0.9,
-                "Order parameter should not decrease significantly: {} -> {}", initial_order, final_order);
-        assert!(final_order > 0.5, "Should achieve moderate synchronization, got {}", final_order);
+        assert!(
+            final_order > initial_order * 0.9,
+            "Order parameter should not decrease significantly: {} -> {}",
+            initial_order,
+            final_order
+        );
+        assert!(
+            final_order > 0.5,
+            "Should achieve moderate synchronization, got {}",
+            final_order
+        );
     }
 
     #[test]
@@ -310,12 +332,24 @@ mod tests {
         let expected_mean = GAMMA_FREQ * TAU;
 
         // Allow larger tolerance for frequency distribution
-        assert!((mean_freq - expected_mean).abs() < 10.0,
-                "Mean frequency should be close to target: got {}, expected {}", mean_freq, expected_mean);
+        assert!(
+            (mean_freq - expected_mean).abs() < 10.0,
+            "Mean frequency should be close to target: got {}, expected {}",
+            mean_freq,
+            expected_mean
+        );
 
         // Should have variation
-        let min_freq = router.frequencies.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max_freq = router.frequencies.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min_freq = router
+            .frequencies
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
+        let max_freq = router
+            .frequencies
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         assert!(max_freq > min_freq, "Frequencies should vary");
     }
 
@@ -340,7 +374,10 @@ mod tests {
             router.phases[i] = 0.5;
         }
         let sync_order = router.order_parameter();
-        assert!((sync_order - 1.0).abs() < 0.01, "Perfect sync should give r~1");
+        assert!(
+            (sync_order - 1.0).abs() < 0.01,
+            "Perfect sync should give r~1"
+        );
 
         // Evenly distributed phases (low synchronization)
         for i in 0..4 {
@@ -365,8 +402,10 @@ mod tests {
 
         // Relaxed target for CI environments: <10μs per module = <1ms for 100 modules
         // With 10000 iterations, that's 10,000,000,000ns (10s) total
-        assert!(elapsed.as_secs() < 30,
-                "Performance target: should complete in reasonable time");
+        assert!(
+            elapsed.as_secs() < 30,
+            "Performance target: should complete in reasonable time"
+        );
     }
 
     #[test]
@@ -385,7 +424,9 @@ mod tests {
         println!("Average gain computation: {}ns", avg_gain);
 
         // Target: <100ns per pair
-        assert!(avg_gain < 100,
-                "Performance target: <100ns per gain computation");
+        assert!(
+            avg_gain < 100,
+            "Performance target: <100ns per gain computation"
+        );
     }
 }

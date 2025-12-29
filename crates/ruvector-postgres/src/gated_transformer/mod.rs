@@ -16,16 +16,15 @@
 //! - `gated_transformer_early_exit_score(lambda, layer)` - Check early exit potential
 //! - `gated_transformer_config()` - Get current transformer configuration
 
+use parking_lot::RwLock;
 use pgrx::prelude::*;
 use ruvector_mincut_gated_transformer::{
-    GatePacket, GateDecision, GateReason, TransformerConfig, GatePolicy,
-    GateController, TierDecision,
-    CoherenceEarlyExit, EarlyExitConfig, ExitReason,
-    MincutDepthRouter, ModRoutingConfig, TokenRoute,
+    CoherenceEarlyExit, EarlyExitConfig, ExitReason, GateController, GateDecision, GatePacket,
+    GatePolicy, GateReason, MincutDepthRouter, ModRoutingConfig, TierDecision, TokenRoute,
+    TransformerConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-use parking_lot::RwLock;
 
 /// Global transformer configuration
 static TRANSFORMER_CONFIG: OnceLock<RwLock<TransformerConfig>> = OnceLock::new();
@@ -249,7 +248,11 @@ fn gated_transformer_early_exit_check(
 
     let result = EarlyExitResult {
         should_exit: decision.can_exit,
-        exit_layer: if decision.can_exit { Some(decision.exit_layer) } else { None },
+        exit_layer: if decision.can_exit {
+            Some(decision.exit_layer)
+        } else {
+            None
+        },
         confidence_q15: decision.confidence_q15,
         reason: reason_str.to_string(),
         speculative_tokens: if decision.enable_speculation { 4 } else { 0 },
@@ -260,11 +263,7 @@ fn gated_transformer_early_exit_check(
 
 /// Check if early exit is possible at the given layer
 #[pg_extern(immutable, parallel_safe)]
-fn gated_transformer_can_exit_early(
-    lambda: i32,
-    layer: i32,
-    num_layers: i32,
-) -> bool {
+fn gated_transformer_can_exit_early(lambda: i32, layer: i32, num_layers: i32) -> bool {
     ensure_initialized();
 
     let gate = GatePacket {
@@ -352,10 +351,7 @@ fn gated_transformer_route_tokens(
 
 /// Get number of tokens to process given capacity
 #[pg_extern(immutable, parallel_safe)]
-fn gated_transformer_routing_capacity(
-    num_tokens: i32,
-    capacity_ratio: f32,
-) -> i32 {
+fn gated_transformer_routing_capacity(num_tokens: i32, capacity_ratio: f32) -> i32 {
     ((num_tokens as f32) * capacity_ratio.clamp(0.0, 1.0)).ceil() as i32
 }
 
@@ -441,9 +437,7 @@ fn gated_transformer_set_policy(preset: &str) -> bool {
 /// This function bridges the integrity module's mincut computation with
 /// the gated transformer's gate controller.
 #[pg_extern]
-fn gated_transformer_from_integrity(
-    index_name: &str,
-) -> pgrx::JsonB {
+fn gated_transformer_from_integrity(index_name: &str) -> pgrx::JsonB {
     ensure_initialized();
 
     // Get current mincut from integrity module
@@ -466,23 +460,17 @@ fn gated_transformer_from_integrity(
             let result = GateDecisionResult::from(tier_decision);
             pgrx::JsonB(serde_json::to_value(&result).unwrap_or_default())
         }
-        Err(e) => {
-            pgrx::JsonB(serde_json::json!({
-                "error": format!("Failed to get mincut: {}", e),
-                "decision": "allow",
-                "tier": 0,
-            }))
-        }
+        Err(e) => pgrx::JsonB(serde_json::json!({
+            "error": format!("Failed to get mincut: {}", e),
+            "decision": "allow",
+            "tier": 0,
+        })),
     }
 }
 
 /// Get coherence score combining mincut and transformer signals
 #[pg_extern(immutable, parallel_safe)]
-fn gated_transformer_coherence_score(
-    lambda: i32,
-    lambda_prev: i32,
-    boundary_edges: i32,
-) -> f32 {
+fn gated_transformer_coherence_score(lambda: i32, lambda_prev: i32, boundary_edges: i32) -> f32 {
     // Combine mincut stability with boundary edge count
     let lambda_stability = if lambda_prev > 0 {
         1.0 - ((lambda - lambda_prev).abs() as f32 / lambda_prev as f32).min(1.0)

@@ -4,8 +4,8 @@
 //! and fallback to full computation.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket,
-    InferInput, InferOutput, QuantizedWeights, GateDecision, GateReason,
+    GateDecision, GatePacket, GatePolicy, GateReason, InferInput, InferOutput,
+    MincutGatedTransformer, QuantizedWeights, TransformerConfig,
 };
 
 fn create_transformer(config: TransformerConfig) -> MincutGatedTransformer {
@@ -84,10 +84,10 @@ fn test_early_exit_tier_selection() {
     // Different conditions should select different tiers
     let test_cases = vec![
         // (lambda, lambda_prev, boundary_edges, expected_tier_range)
-        (100, 95, 5, 0..=0),         // Normal - tier 0
-        (100, 95, 30, 1..=1),        // Boundary spike - tier 1
-        (20, 100, 5, 2..=2),         // Low lambda - tier 2
-        (100, 95, 5, 0..=0),         // Normal again - tier 0
+        (100, 95, 5, 0..=0),  // Normal - tier 0
+        (100, 95, 30, 1..=1), // Boundary spike - tier 1
+        (20, 100, 5, 2..=2),  // Low lambda - tier 2
+        (100, 95, 5, 0..=0),  // Normal again - tier 0
     ];
 
     for (lambda, lambda_prev, boundary_edges, expected_tier_range) in test_cases {
@@ -109,7 +109,11 @@ fn test_early_exit_tier_selection() {
         assert!(
             expected_tier_range.contains(&output.stats.tier),
             "Tier {} not in expected range {:?} for lambda={}, lambda_prev={}, boundary_edges={}",
-            output.stats.tier, expected_tier_range, lambda, lambda_prev, boundary_edges
+            output.stats.tier,
+            expected_tier_range,
+            lambda,
+            lambda_prev,
+            boundary_edges
         );
 
         transformer.reset();

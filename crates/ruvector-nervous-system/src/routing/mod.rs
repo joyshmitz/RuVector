@@ -232,10 +232,10 @@ mod tests {
     #[test]
     fn test_integrated_system() {
         let mut system = CoherenceGatedSystem::new(
-            5,      // 5 modules
-            128,    // 128-dim vectors
-            40.0,   // 40Hz gamma
-            7,      // 7-item workspace
+            5,    // 5 modules
+            128,  // 128-dim vectors
+            40.0, // 40Hz gamma
+            7,    // 7-item workspace
         );
 
         assert_eq!(system.phases().len(), 5);
@@ -321,11 +321,17 @@ mod tests {
         let final_sync = system.synchronization();
 
         // Synchronization should be a valid metric in [0, 1] range
-        assert!(final_sync >= 0.0 && final_sync <= 1.0,
-                "Synchronization should be in valid range: {}", final_sync);
+        assert!(
+            final_sync >= 0.0 && final_sync <= 1.0,
+            "Synchronization should be in valid range: {}",
+            final_sync
+        );
         // Verify the metric works correctly
-        assert!(initial_sync >= 0.0 && initial_sync <= 1.0,
-                "Initial sync should be valid: {}", initial_sync);
+        assert!(
+            initial_sync >= 0.0 && initial_sync <= 1.0,
+            "Initial sync should be valid: {}",
+            initial_sync
+        );
     }
 
     #[test]
@@ -385,7 +391,11 @@ mod tests {
         }
 
         // Should have some successful routes (predictive coding may suppress some)
-        assert!(routed_count > 0, "Should have at least some successful routes, got {}", routed_count);
+        assert!(
+            routed_count > 0,
+            "Should have at least some successful routes, got {}",
+            routed_count
+        );
 
         // Workspace should have accumulated some representations
         system.compete_workspace();

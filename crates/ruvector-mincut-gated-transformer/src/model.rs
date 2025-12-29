@@ -19,13 +19,13 @@ extern crate alloc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::config::{TransformerConfig, GatePolicy};
+use crate::config::{GatePolicy, TransformerConfig};
+use crate::early_exit::{CoherenceEarlyExit, EarlyExitConfig};
 use crate::error::{Error, Result};
-use crate::packets::{InferInput, InferOutput, InferStats, GateDecision, Witness};
-use crate::state::RuntimeState;
 use crate::gate::{GateController, TierDecision};
 use crate::mod_routing::{MincutDepthRouter, ModRoutingConfig};
-use crate::early_exit::{CoherenceEarlyExit, EarlyExitConfig};
+use crate::packets::{GateDecision, InferInput, InferOutput, InferStats, Witness};
+use crate::state::RuntimeState;
 
 #[cfg(feature = "trace")]
 use crate::trace::TraceState;
@@ -353,8 +353,7 @@ impl MincutGatedTransformer {
     /// MoD routing allows tokens to skip layers based on λ-stability,
     /// achieving up to 50% FLOPs reduction while maintaining quality.
     pub fn enable_mod_routing(&mut self, config: ModRoutingConfig) -> Result<()> {
-        let router = MincutDepthRouter::new(config)
-            .map_err(|e| Error::BadConfig(e))?;
+        let router = MincutDepthRouter::new(config).map_err(|e| Error::BadConfig(e))?;
         self.mod_router = Some(router);
         Ok(())
     }
@@ -369,8 +368,8 @@ impl MincutGatedTransformer {
     /// Early exit allows the model to exit at intermediate layers when
     /// λ-stability indicates sufficient confidence, enabling self-speculative decoding.
     pub fn enable_early_exit(&mut self, config: EarlyExitConfig) -> Result<()> {
-        let early_exit = CoherenceEarlyExit::new(config, self.config.layers)
-            .map_err(|e| Error::BadConfig(e))?;
+        let early_exit =
+            CoherenceEarlyExit::new(config, self.config.layers).map_err(|e| Error::BadConfig(e))?;
         self.early_exit = Some(early_exit);
         Ok(())
     }
@@ -545,9 +544,14 @@ impl MincutGatedTransformer {
         // Generate MoD routing decisions if enabled
         let mod_routes = if let Some(ref router) = self.mod_router {
             // Create token positions (simplified - in practice would come from actual tokens)
-            let num_tokens = input.tokens
+            let num_tokens = input
+                .tokens
                 .map(|t| t.len())
-                .or_else(|| input.embedding_q.map(|e| e.len() / self.config.hidden as usize))
+                .or_else(|| {
+                    input
+                        .embedding_q
+                        .map(|e| e.len() / self.config.hidden as usize)
+                })
                 .unwrap_or(self.config.seq_len_max as usize)
                 .min(self.config.seq_len_max as usize);
 
@@ -633,11 +637,7 @@ impl MincutGatedTransformer {
         Ok(())
     }
 
-    fn create_witness(
-        &self,
-        gate: &crate::packets::GatePacket,
-        tier: &TierDecision,
-    ) -> Witness {
+    fn create_witness(&self, gate: &crate::packets::GatePacket, tier: &TierDecision) -> Witness {
         if tier.decision == GateDecision::Allow {
             Witness::allow(gate, tier.effective_seq_len, tier.effective_window)
         } else {

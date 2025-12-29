@@ -291,7 +291,11 @@ impl Witness {
             effective_seq_len: seq_len,
             effective_window: window,
             kv_writes_enabled: if decision.allows_kv_writes() { 1 } else { 0 },
-            external_writes_enabled: if decision.allows_external_writes() { 1 } else { 0 },
+            external_writes_enabled: if decision.allows_external_writes() {
+                1
+            } else {
+                0
+            },
             boundary_edges: gate.boundary_edges,
             boundary_concentration_q15: gate.boundary_concentration_q15,
             partition_count: gate.partition_count,

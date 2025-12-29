@@ -2,8 +2,8 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
-use tempfile::TempDir;
 use std::fs;
+use tempfile::TempDir;
 
 /// Helper to get the ruvector binary command
 fn ruvector_cmd() -> Command {
@@ -284,11 +284,7 @@ fn test_hooks_pre_compact() {
 fn test_hooks_init_creates_config() {
     // Just test that init command runs successfully
     // The actual config is created in ~/.ruvector/ not the current directory
-    ruvector_cmd()
-        .arg("hooks")
-        .arg("init")
-        .assert()
-        .success();
+    ruvector_cmd().arg("hooks").arg("init").assert().success();
 }
 
 #[test]

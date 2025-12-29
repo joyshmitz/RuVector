@@ -206,9 +206,11 @@ impl ConfidenceTracker {
             return 0.0;
         }
         let mean = self.average;
-        self.history.iter()
+        self.history
+            .iter()
             .map(|&v| (v - mean).powi(2))
-            .sum::<f32>() / (self.history.len() - 1) as f32
+            .sum::<f32>()
+            / (self.history.len() - 1) as f32
     }
 }
 
@@ -370,9 +372,15 @@ impl SelfAwareAgent {
         agent.coherence.register_module("action");
 
         // Register standard capabilities
-        agent.capabilities.insert("complex_reasoning".to_string(), true);
-        agent.capabilities.insert("creative_generation".to_string(), true);
-        agent.capabilities.insert("precise_calculation".to_string(), true);
+        agent
+            .capabilities
+            .insert("complex_reasoning".to_string(), true);
+        agent
+            .capabilities
+            .insert("creative_generation".to_string(), true);
+        agent
+            .capabilities
+            .insert("precise_calculation".to_string(), true);
         agent.capabilities.insert("fast_response".to_string(), true);
 
         agent
@@ -384,16 +392,30 @@ impl SelfAwareAgent {
         let phase = self.clock.state();
 
         // Determine capability availability based on state
-        let capabilities = self.capabilities.iter()
+        let capabilities = self
+            .capabilities
+            .iter()
             .map(|(name, baseline)| {
-                let (available, reason) = self.capability_available(name, *baseline, &phase, coherence);
-                (name.clone(), CapabilityState {
-                    name: name.clone(),
-                    available,
-                    performance: if available { self.energy.current() } else { 0.0 },
-                    reason,
-                    recovery_time: if available { None } else { Some(self.time_to_recovery()) },
-                })
+                let (available, reason) =
+                    self.capability_available(name, *baseline, &phase, coherence);
+                (
+                    name.clone(),
+                    CapabilityState {
+                        name: name.clone(),
+                        available,
+                        performance: if available {
+                            self.energy.current()
+                        } else {
+                            0.0
+                        },
+                        reason,
+                        recovery_time: if available {
+                            None
+                        } else {
+                            Some(self.time_to_recovery())
+                        },
+                    },
+                )
             })
             .collect();
 
@@ -408,7 +430,13 @@ impl SelfAwareAgent {
         }
     }
 
-    fn capability_available(&self, name: &str, baseline: bool, phase: &CircadianPhase, coherence: f32) -> (bool, Option<String>) {
+    fn capability_available(
+        &self,
+        name: &str,
+        baseline: bool,
+        phase: &CircadianPhase,
+        coherence: f32,
+    ) -> (bool, Option<String>) {
         if !baseline {
             return (false, Some("Capability disabled".to_string()));
         }
@@ -416,9 +444,15 @@ impl SelfAwareAgent {
         match name {
             "complex_reasoning" => {
                 if matches!(phase, CircadianPhase::Rest) {
-                    (false, Some("Rest phase - complex reasoning unavailable".to_string()))
+                    (
+                        false,
+                        Some("Rest phase - complex reasoning unavailable".to_string()),
+                    )
                 } else if coherence < 0.5 {
-                    (false, Some("Low coherence - reasoning compromised".to_string()))
+                    (
+                        false,
+                        Some("Low coherence - reasoning compromised".to_string()),
+                    )
                 } else if self.energy.current() < 0.2 {
                     (false, Some("Low energy - reasoning expensive".to_string()))
                 } else {
@@ -427,21 +461,33 @@ impl SelfAwareAgent {
             }
             "creative_generation" => {
                 if matches!(phase, CircadianPhase::Rest | CircadianPhase::Dusk) {
-                    (false, Some(format!("{} phase - creativity reduced", phase.description())))
+                    (
+                        false,
+                        Some(format!(
+                            "{} phase - creativity reduced",
+                            phase.description()
+                        )),
+                    )
                 } else {
                     (true, None)
                 }
             }
             "precise_calculation" => {
                 if coherence < 0.7 {
-                    (false, Some("Coherence below precision threshold".to_string()))
+                    (
+                        false,
+                        Some("Coherence below precision threshold".to_string()),
+                    )
                 } else {
                     (true, None)
                 }
             }
             "fast_response" => {
                 if self.energy.current() < 0.3 {
-                    (false, Some("Insufficient energy for fast response".to_string()))
+                    (
+                        false,
+                        Some("Insufficient energy for fast response".to_string()),
+                    )
                 } else {
                     (true, None)
                 }
@@ -474,29 +520,55 @@ impl SelfAwareAgent {
         let state = self.introspect();
 
         let phase_desc = state.phase.description();
-        let coherence_desc = if state.coherence > 0.8 { "clear" }
-            else if state.coherence > 0.6 { "somewhat scattered" }
-            else { "confused" };
-        let energy_desc = if state.energy > 0.7 { "energized" }
-            else if state.energy > 0.3 { "adequate" }
-            else { "depleted" };
-        let confidence_desc = if state.confidence > 0.8 { "confident" }
-            else if state.confidence > 0.5 { "moderately confident" }
-            else { "uncertain" };
+        let coherence_desc = if state.coherence > 0.8 {
+            "clear"
+        } else if state.coherence > 0.6 {
+            "somewhat scattered"
+        } else {
+            "confused"
+        };
+        let energy_desc = if state.energy > 0.7 {
+            "energized"
+        } else if state.energy > 0.3 {
+            "adequate"
+        } else {
+            "depleted"
+        };
+        let confidence_desc = if state.confidence > 0.8 {
+            "confident"
+        } else if state.confidence > 0.5 {
+            "moderately confident"
+        } else {
+            "uncertain"
+        };
 
-        let unavailable: Vec<_> = state.capabilities.values()
+        let unavailable: Vec<_> = state
+            .capabilities
+            .values()
             .filter(|c| !c.available)
-            .map(|c| format!("{} ({})", c.name, c.reason.as_ref().unwrap_or(&"unavailable".to_string())))
+            .map(|c| {
+                format!(
+                    "{} ({})",
+                    c.name,
+                    c.reason.as_ref().unwrap_or(&"unavailable".to_string())
+                )
+            })
             .collect();
 
         let mut response = format!(
             "I am {}. Currently {} ({}), feeling {} and {}.",
-            self.name, phase_desc, format!("{:.0}%", state.phase.duty_factor() * 100.0),
-            coherence_desc, energy_desc
+            self.name,
+            phase_desc,
+            format!("{:.0}%", state.phase.duty_factor() * 100.0),
+            coherence_desc,
+            energy_desc
         );
 
         if !unavailable.is_empty() {
-            response.push_str(&format!("\n\nCurrently unavailable: {}", unavailable.join(", ")));
+            response.push_str(&format!(
+                "\n\nCurrently unavailable: {}",
+                unavailable.join(", ")
+            ));
         }
 
         if state.ttd.is_some() && state.energy < 0.3 {
@@ -518,8 +590,11 @@ impl SelfAwareAgent {
             if let Some(cap) = state.capabilities.get(req_cap) {
                 if !cap.available {
                     return TaskDecision::Decline {
-                        reason: format!("Required capability '{}' unavailable: {}",
-                            req_cap, cap.reason.as_ref().unwrap_or(&"unknown".to_string())),
+                        reason: format!(
+                            "Required capability '{}' unavailable: {}",
+                            req_cap,
+                            cap.reason.as_ref().unwrap_or(&"unknown".to_string())
+                        ),
                         retry_after: cap.recovery_time,
                     };
                 }
@@ -529,8 +604,11 @@ impl SelfAwareAgent {
         // Check energy budget
         if self.energy.current() < task.energy_cost {
             return TaskDecision::Decline {
-                reason: format!("Insufficient energy: have {:.0}%, need {:.0}%",
-                    self.energy.current() * 100.0, task.energy_cost * 100.0),
+                reason: format!(
+                    "Insufficient energy: have {:.0}%, need {:.0}%",
+                    self.energy.current() * 100.0,
+                    task.energy_cost * 100.0
+                ),
                 retry_after: Some(self.time_to_recovery()),
             };
         }
@@ -538,8 +616,11 @@ impl SelfAwareAgent {
         // Check coherence
         if state.coherence < task.min_coherence {
             return TaskDecision::Decline {
-                reason: format!("Coherence too low: {:.0}% < {:.0}% required",
-                    state.coherence * 100.0, task.min_coherence * 100.0),
+                reason: format!(
+                    "Coherence too low: {:.0}% < {:.0}% required",
+                    state.coherence * 100.0,
+                    task.min_coherence * 100.0
+                ),
                 retry_after: None,
             };
         }
@@ -566,8 +647,7 @@ impl SelfAwareAgent {
         let coherence_factor = state.coherence;
         let phase_factor = state.phase.duty_factor();
 
-        (base * energy_factor * coherence_factor * phase_factor)
-            .clamp(0.0, 1.0)
+        (base * energy_factor * coherence_factor * phase_factor).clamp(0.0, 1.0)
     }
 
     fn generate_warnings(&self, task: &Task, state: &CognitiveState) -> Vec<String> {
@@ -689,7 +769,10 @@ fn main() {
         },
         Task {
             name: "Critical system modification".to_string(),
-            required_capabilities: vec!["complex_reasoning".to_string(), "precise_calculation".to_string()],
+            required_capabilities: vec![
+                "complex_reasoning".to_string(),
+                "precise_calculation".to_string(),
+            ],
             energy_cost: 0.3,
             min_coherence: 0.8,
             requires_peak: true,
@@ -702,20 +785,32 @@ fn main() {
         println!("Task: {}", task.name);
         let decision = agent.should_accept_task(task);
         match &decision {
-            TaskDecision::Accept { confidence, warnings } => {
-                println!("  Decision: ACCEPT (confidence: {:.0}%)", confidence * 100.0);
+            TaskDecision::Accept {
+                confidence,
+                warnings,
+            } => {
+                println!(
+                    "  Decision: ACCEPT (confidence: {:.0}%)",
+                    confidence * 100.0
+                );
                 if !warnings.is_empty() {
                     println!("  Warnings: {}", warnings.join("; "));
                 }
                 agent.execute(&task.name, *confidence, task.energy_cost);
             }
-            TaskDecision::Defer { reason, optimal_time } => {
+            TaskDecision::Defer {
+                reason,
+                optimal_time,
+            } => {
                 println!("  Decision: DEFER - {}", reason);
                 if let Some(time) = optimal_time {
                     println!("  Optimal time: in {}s", time);
                 }
             }
-            TaskDecision::Decline { reason, retry_after } => {
+            TaskDecision::Decline {
+                reason,
+                retry_after,
+            } => {
                 println!("  Decision: DECLINE - {}", reason);
                 if let Some(time) = retry_after {
                     println!("  Retry after: {}s", time);
@@ -756,9 +851,14 @@ fn main() {
     let state = agent.introspect();
     println!("\n=== Detailed Capabilities ===");
     for (name, cap) in &state.capabilities {
-        println!("  {}: {} (perf: {:.0}%)",
+        println!(
+            "  {}: {} (perf: {:.0}%)",
             name,
-            if cap.available { "AVAILABLE" } else { "UNAVAILABLE" },
+            if cap.available {
+                "AVAILABLE"
+            } else {
+                "UNAVAILABLE"
+            },
             cap.performance * 100.0
         );
         if let Some(reason) = &cap.reason {

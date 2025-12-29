@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use ruvector_nervous_system::hdc::{Hypervector, HdcMemory, bind, bundle};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use ruvector_nervous_system::hdc::{bind, bundle, HdcMemory, Hypervector};
 
 fn bench_vector_creation(c: &mut Criterion) {
     c.bench_function("hypervector_random", |b| {
@@ -90,25 +90,17 @@ fn bench_memory_operations(c: &mut Criterion) {
 
         let query = Hypervector::random();
 
-        group.bench_with_input(
-            BenchmarkId::new("retrieve", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    black_box(memory.retrieve(&query, 0.8));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("retrieve", size), size, |b, _| {
+            b.iter(|| {
+                black_box(memory.retrieve(&query, 0.8));
+            });
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("retrieve_top_k", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    black_box(memory.retrieve_top_k(&query, 10));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("retrieve_top_k", size), size, |b, _| {
+            b.iter(|| {
+                black_box(memory.retrieve_top_k(&query, 10));
+            });
+        });
     }
 
     group.finish();

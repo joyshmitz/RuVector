@@ -203,14 +203,19 @@ mod tests {
         let signal = vec![1.0, 2.0, 3.0];
 
         // Repeat same signal - prediction should converge
-        for _ in 0..50 {  // More iterations for convergence
+        for _ in 0..50 {
+            // More iterations for convergence
             layer.update(&signal);
         }
 
         // Prediction should be close to signal (relaxed tolerance)
         for (pred, &actual) in layer.prediction.iter().zip(signal.iter()) {
-            assert!((pred - actual).abs() < 0.05,
-                    "Prediction {} did not converge to {}", pred, actual);
+            assert!(
+                (pred - actual).abs() < 0.05,
+                "Prediction {} did not converge to {}",
+                pred,
+                actual
+            );
         }
     }
 
@@ -232,7 +237,11 @@ mod tests {
 
         // Should transmit less as prediction improves
         // After 100 iterations, compression should be high (low transmission rate)
-        assert!(compression < 0.5, "Compression ratio too low: {}", compression);
+        assert!(
+            compression < 0.5,
+            "Compression ratio too low: {}",
+            compression
+        );
     }
 
     #[test]
@@ -272,7 +281,10 @@ mod tests {
         let reduction = 1.0 - (transmission_count as f32 / total_attempts as f32);
 
         // Should achieve at least 50% bandwidth reduction
-        assert!(reduction > 0.5,
-                "Bandwidth reduction too low: {:.1}%", reduction * 100.0);
+        assert!(
+            reduction > 0.5,
+            "Bandwidth reduction too low: {:.1}%",
+            reduction * 100.0
+        );
     }
 }

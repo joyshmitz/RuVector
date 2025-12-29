@@ -2,8 +2,8 @@
 // Measures P50, P99, P99.9 percentiles for all critical operations
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::time::Duration;
 
 // Note: Import actual types when implemented
@@ -65,35 +65,29 @@ fn benchmark_hdc(c: &mut Criterion) {
     let vec_a = generate_bitvector(&mut rng, 10000);
     let vec_b = generate_bitvector(&mut rng, 10000);
     group.bench_function("vector_binding", |bencher| {
-        bencher.iter(|| {
-            xor_bitvectors(black_box(&vec_a), black_box(&vec_b))
-        });
+        bencher.iter(|| xor_bitvectors(black_box(&vec_a), black_box(&vec_b)));
     });
 
     // Vector bundling (target: <500ns)
-    let bundle_vectors: Vec<_> = (0..10).map(|_| generate_bitvector(&mut rng, 10000)).collect();
+    let bundle_vectors: Vec<_> = (0..10)
+        .map(|_| generate_bitvector(&mut rng, 10000))
+        .collect();
     group.bench_function("vector_bundling", |bencher| {
-        bencher.iter(|| {
-            majority_bitvectors(black_box(&bundle_vectors))
-        });
+        bencher.iter(|| majority_bitvectors(black_box(&bundle_vectors)));
     });
 
     // Hamming distance (target: <100ns)
     let ham_a = generate_bitvector(&mut rng, 10000);
     let ham_b = generate_bitvector(&mut rng, 10000);
     group.bench_function("hamming_distance", |bencher| {
-        bencher.iter(|| {
-            hamming_distance(black_box(&ham_a), black_box(&ham_b))
-        });
+        bencher.iter(|| hamming_distance(black_box(&ham_a), black_box(&ham_b)));
     });
 
     // Similarity check (target: <200ns)
     let sim_a = generate_bitvector(&mut rng, 10000);
     let sim_b = generate_bitvector(&mut rng, 10000);
     group.bench_function("similarity_check", |bencher| {
-        bencher.iter(|| {
-            hdc_similarity(black_box(&sim_a), black_box(&sim_b))
-        });
+        bencher.iter(|| hdc_similarity(black_box(&sim_a), black_box(&sim_b)));
     });
 
     group.finish();
@@ -334,13 +328,16 @@ fn xor_bitvectors(a: &[u64], b: &[u64]) -> Vec<u64> {
 
 fn majority_bitvectors(vectors: &[Vec<u64>]) -> Vec<u64> {
     let len = vectors[0].len();
-    (0..len).map(|i| {
-        vectors.iter().map(|v| v[i]).fold(0u64, |acc, x| acc ^ x)
-    }).collect()
+    (0..len)
+        .map(|i| vectors.iter().map(|v| v[i]).fold(0u64, |acc, x| acc ^ x))
+        .collect()
 }
 
 fn hamming_distance(a: &[u64], b: &[u64]) -> u32 {
-    a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum()
+    a.iter()
+        .zip(b.iter())
+        .map(|(x, y)| (x ^ y).count_ones())
+        .sum()
 }
 
 fn hdc_similarity(a: &[u64], b: &[u64]) -> f32 {
@@ -350,7 +347,12 @@ fn hdc_similarity(a: &[u64], b: &[u64]) -> f32 {
 }
 
 fn argmax(inputs: &[f32]) -> usize {
-    inputs.iter().enumerate().max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).unwrap().0
+    inputs
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .unwrap()
+        .0
 }
 
 fn argmax_k(inputs: &[f32], k: usize) -> Vec<usize> {
@@ -361,7 +363,10 @@ fn argmax_k(inputs: &[f32], k: usize) -> Vec<usize> {
 
 fn apply_inhibition(inputs: &[f32], strength: f32) -> Vec<f32> {
     let max_val = inputs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    inputs.iter().map(|&x| (x - strength * max_val).max(0.0)).collect()
+    inputs
+        .iter()
+        .map(|&x| (x - strength * max_val).max(0.0))
+        .collect()
 }
 
 fn compute_energy_placeholder(state: &[f32]) -> f32 {

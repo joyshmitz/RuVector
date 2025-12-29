@@ -38,9 +38,9 @@
 //! let product = coherence * threshold;
 //! ```
 
-use serde::{Deserialize, Serialize};
 use core::fmt;
 use core::ops::{Add, Mul, Sub};
+use serde::{Deserialize, Serialize};
 
 /// Q15 fixed-point number representing values in the range [0.0, 1.0+)
 ///

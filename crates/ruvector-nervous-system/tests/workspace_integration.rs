@@ -1,7 +1,7 @@
 //! Integration tests for Global Workspace implementation
 
 use ruvector_nervous_system::routing::workspace::{
-    GlobalWorkspace, WorkspaceItem, WorkspaceRegistry, ModuleInfo, ContentType, AccessRequest,
+    AccessRequest, ContentType, GlobalWorkspace, ModuleInfo, WorkspaceItem, WorkspaceRegistry,
 };
 
 #[test]
@@ -63,7 +63,11 @@ fn test_performance_requirements() {
     }
     let duration = start.elapsed();
     let avg_us = duration.as_micros() / 1000;
-    assert!(avg_us < 10, "Access request avg: {}μs (target: <1μs)", avg_us);
+    assert!(
+        avg_us < 10,
+        "Access request avg: {}μs (target: <1μs)",
+        avg_us
+    );
 
     // Broadcast performance (<100μs target)
     let start = Instant::now();

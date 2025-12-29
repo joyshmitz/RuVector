@@ -402,7 +402,11 @@ impl BTSPAssociativeMemory {
             });
         }
 
-        Ok(self.layers.iter().map(|layer| layer.forward(query)).collect())
+        Ok(self
+            .layers
+            .iter()
+            .map(|layer| layer.forward(query))
+            .collect())
     }
 
     /// Store multiple associations
@@ -490,7 +494,12 @@ mod tests {
         // Verify immediate recall (very relaxed tolerance for weight clamping effects)
         let output = layer.forward(&pattern);
         let error = (output - target).abs();
-        assert!(error < 0.6, "One-shot learning failed: error = {}, output = {}", error, output);
+        assert!(
+            error < 0.6,
+            "One-shot learning failed: error = {}, output = {}",
+            error,
+            output
+        );
     }
 
     #[test]
@@ -527,7 +536,12 @@ mod tests {
         let retrieved = memory.retrieve(&key).unwrap();
 
         for (expected, actual) in value.iter().zip(retrieved.iter()) {
-            assert!((expected - actual).abs() < 0.35, "expected: {}, actual: {}", expected, actual);
+            assert!(
+                (expected - actual).abs() < 0.35,
+                "expected: {}, actual: {}",
+                expected,
+                actual
+            );
         }
     }
 
@@ -540,14 +554,24 @@ mod tests {
         let key2 = vec![0.5; 8];
         let val2 = vec![0.9; 4];
 
-        memory.store_batch(&[(&key1, &val1), (&key2, &val2)]).unwrap();
+        memory
+            .store_batch(&[(&key1, &val1), (&key2, &val2)])
+            .unwrap();
 
         let ret1 = memory.retrieve(&key1).unwrap();
         let ret2 = memory.retrieve(&key2).unwrap();
 
         // Verify retrieval works and dimensions are correct
-        assert_eq!(ret1.len(), 4, "Retrieved vector should have correct dimension");
-        assert_eq!(ret2.len(), 4, "Retrieved vector should have correct dimension");
+        assert_eq!(
+            ret1.len(),
+            4,
+            "Retrieved vector should have correct dimension"
+        );
+        assert_eq!(
+            ret2.len(),
+            4,
+            "Retrieved vector should have correct dimension"
+        );
 
         // Values should be in valid range after weight clamping
         for &v in &ret1 {

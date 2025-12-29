@@ -4,8 +4,8 @@
 //! with controlled sparsity (connection probability).
 
 use crate::{NervousSystemError, Result};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 /// Sparse random projection matrix for dimensionality expansion
 ///
@@ -60,20 +60,21 @@ impl SparseProjection {
     pub fn new(input_dim: usize, output_dim: usize, sparsity: f32, seed: u64) -> Result<Self> {
         if input_dim == 0 {
             return Err(NervousSystemError::InvalidDimension(
-                "Input dimension must be > 0".to_string()
+                "Input dimension must be > 0".to_string(),
             ));
         }
 
         if output_dim == 0 {
             return Err(NervousSystemError::InvalidDimension(
-                "Output dimension must be > 0".to_string()
+                "Output dimension must be > 0".to_string(),
             ));
         }
 
         if sparsity <= 0.0 || sparsity > 1.0 {
-            return Err(NervousSystemError::InvalidSparsity(
-                format!("Sparsity must be in (0, 1], got {}", sparsity)
-            ));
+            return Err(NervousSystemError::InvalidSparsity(format!(
+                "Sparsity must be in (0, 1], got {}",
+                sparsity
+            )));
         }
 
         let mut rng = StdRng::seed_from_u64(seed);
@@ -232,7 +233,12 @@ mod tests {
         let avg_dense: f32 = output_dense.iter().map(|x| x.abs()).sum::<f32>() / 1000.0;
 
         // 0.9 sparsity means 9x more connections, so roughly sqrt(9) = 3x larger magnitude
-        assert!(avg_dense > avg_sparse, "Dense avg={} should be > sparse avg={}", avg_dense, avg_sparse);
+        assert!(
+            avg_dense > avg_sparse,
+            "Dense avg={} should be > sparse avg={}",
+            avg_dense,
+            avg_sparse
+        );
     }
 
     #[test]

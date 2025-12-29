@@ -3,9 +3,9 @@
 
 #[cfg(test)]
 mod integration_tests {
-    use std::time::{Duration, Instant};
-    use rand::{Rng, SeedableRng};
     use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::time::{Duration, Instant};
 
     // ========================================================================
     // Helper Functions
@@ -25,9 +25,15 @@ mod integration_tests {
     fn generate_dvs_event_stream(rng: &mut StdRng, num_events: usize) -> Vec<(f32, f32, bool)> {
         // Generate synthetic DVS (Dynamic Vision Sensor) events
         // Format: (x, y, polarity)
-        (0..num_events).map(|_| {
-            (rng.gen_range(0.0..640.0), rng.gen_range(0.0..480.0), rng.gen())
-        }).collect()
+        (0..num_events)
+            .map(|_| {
+                (
+                    rng.gen_range(0.0..640.0),
+                    rng.gen_range(0.0..480.0),
+                    rng.gen(),
+                )
+            })
+            .collect()
     }
 
     fn encode_dvs_to_hypervector(events: &[(f32, f32, bool)]) -> Vec<u64> {
@@ -77,7 +83,11 @@ mod integration_tests {
             }
         }
 
-        println!("Training on {} samples ({} classes)...", training_data.len(), num_classes);
+        println!(
+            "Training on {} samples ({} classes)...",
+            training_data.len(),
+            num_classes
+        );
 
         // Train
         for (label, events) in &training_data {
@@ -104,7 +114,7 @@ mod integration_tests {
         let hv = encode_dvs_to_hypervector(&test_events);
         // let sparse = wta.compete(&hv);
         let sparse: Vec<f32> = vec![0.0; 512]; // Placeholder
-        // let retrieved = hopfield.retrieve(&sparse);
+                                               // let retrieved = hopfield.retrieve(&sparse);
         let retrieved = sparse.clone(); // Placeholder
 
         let latency = start.elapsed();
@@ -161,9 +171,10 @@ mod integration_tests {
         let mut total_accuracy = 0.0;
         for (i, pattern) in patterns.iter().enumerate() {
             // Add 15% noise
-            let noisy: Vec<f32> = pattern.iter().map(|&x| {
-                x + rng.gen_range(-0.15..0.15)
-            }).collect();
+            let noisy: Vec<f32> = pattern
+                .iter()
+                .map(|&x| x + rng.gen_range(-0.15..0.15))
+                .collect();
 
             // Retrieve
             // let retrieved = hopfield.retrieve(&noisy);
@@ -312,7 +323,10 @@ mod integration_tests {
             }
         }
 
-        println!("{} inputs passed coherence threshold", coherent_inputs.len());
+        println!(
+            "{} inputs passed coherence threshold",
+            coherent_inputs.len()
+        );
 
         // Attention mechanism selects top items
         coherent_inputs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -330,7 +344,7 @@ mod integration_tests {
         // Verify items are correctly prioritized
         for i in 1..workspace_items.len() {
             assert!(
-                workspace_items[i-1].1 >= workspace_items[i].1,
+                workspace_items[i - 1].1 >= workspace_items[i].1,
                 "Workspace not properly prioritized"
             );
         }

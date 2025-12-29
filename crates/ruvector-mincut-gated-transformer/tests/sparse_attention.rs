@@ -3,7 +3,7 @@
 #![cfg(feature = "sparse_attention")]
 
 use ruvector_mincut_gated_transformer::{
-    GatePacket, MincutSparseAttention, SparseMask, SparsityConfig, LambdaDensitySchedule,
+    GatePacket, LambdaDensitySchedule, MincutSparseAttention, SparseMask, SparsityConfig,
 };
 
 #[test]

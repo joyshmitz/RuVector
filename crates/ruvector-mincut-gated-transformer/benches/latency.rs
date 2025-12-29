@@ -2,10 +2,10 @@
 //!
 //! Tests inference latency across different tiers and configurations.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket, SpikePacket,
-    InferInput, InferOutput, QuantizedWeights,
+    GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer, QuantizedWeights,
+    SpikePacket, TransformerConfig,
 };
 
 fn create_transformer(config: TransformerConfig) -> MincutGatedTransformer {
@@ -37,17 +37,13 @@ fn bench_tier0_inference(c: &mut Criterion) {
         let input = InferInput::from_tokens(&tokens, gate);
         let mut logits = vec![0i32; config.logits as usize];
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(seq_len),
-            seq_len,
-            |b, _| {
-                b.iter(|| {
-                    let mut output = InferOutput::new(&mut logits);
-                    transformer.infer(black_box(&input), &mut output).unwrap();
-                    black_box(output.witness)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(seq_len), seq_len, |b, _| {
+            b.iter(|| {
+                let mut output = InferOutput::new(&mut logits);
+                transformer.infer(black_box(&input), &mut output).unwrap();
+                black_box(output.witness)
+            })
+        });
     }
 
     group.finish();
@@ -195,17 +191,13 @@ fn bench_window_sizes(c: &mut Criterion) {
         let input = InferInput::from_tokens(&tokens, gate);
         let mut logits = vec![0i32; config.logits as usize];
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(window),
-            window,
-            |b, _| {
-                b.iter(|| {
-                    let mut output = InferOutput::new(&mut logits);
-                    transformer.infer(black_box(&input), &mut output).unwrap();
-                    black_box(output.witness)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(window), window, |b, _| {
+            b.iter(|| {
+                let mut output = InferOutput::new(&mut logits);
+                transformer.infer(black_box(&input), &mut output).unwrap();
+                black_box(output.witness)
+            })
+        });
     }
 
     group.finish();

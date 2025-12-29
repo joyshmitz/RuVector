@@ -14,13 +14,7 @@
 /// * `eps` - Small constant for numerical stability
 /// * `output` - Output buffer, shape [n]
 #[inline]
-pub fn layer_norm(
-    input: &[f32],
-    gamma: &[f32],
-    beta: &[f32],
-    eps: f32,
-    output: &mut [f32],
-) {
+pub fn layer_norm(input: &[f32], gamma: &[f32], beta: &[f32], eps: f32, output: &mut [f32]) {
     let n = input.len();
     debug_assert_eq!(gamma.len(), n);
     debug_assert_eq!(beta.len(), n);
@@ -46,12 +40,7 @@ pub fn layer_norm(
 ///
 /// Modifies input buffer directly.
 #[inline]
-pub fn layer_norm_inplace(
-    data: &mut [f32],
-    gamma: &[f32],
-    beta: &[f32],
-    eps: f32,
-) {
+pub fn layer_norm_inplace(data: &mut [f32], gamma: &[f32], beta: &[f32], eps: f32) {
     let n = data.len();
     debug_assert_eq!(gamma.len(), n);
     debug_assert_eq!(beta.len(), n);
@@ -79,12 +68,7 @@ pub fn layer_norm_inplace(
 /// RMSNorm is faster than LayerNorm as it doesn't compute mean subtraction.
 #[inline]
 #[cfg(feature = "rmsnorm")]
-pub fn rms_norm(
-    input: &[f32],
-    gamma: &[f32],
-    eps: f32,
-    output: &mut [f32],
-) {
+pub fn rms_norm(input: &[f32], gamma: &[f32], eps: f32, output: &mut [f32]) {
     let n = input.len();
     debug_assert_eq!(gamma.len(), n);
     debug_assert_eq!(output.len(), n);
@@ -100,12 +84,7 @@ pub fn rms_norm(
 }
 
 #[cfg(not(feature = "rmsnorm"))]
-pub fn rms_norm(
-    input: &[f32],
-    gamma: &[f32],
-    eps: f32,
-    output: &mut [f32],
-) {
+pub fn rms_norm(input: &[f32], gamma: &[f32], eps: f32, output: &mut [f32]) {
     let n = input.len();
     debug_assert_eq!(gamma.len(), n);
     debug_assert_eq!(output.len(), n);
