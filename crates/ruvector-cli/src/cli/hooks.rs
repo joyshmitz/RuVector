@@ -1003,7 +1003,7 @@ impl Intelligence {
 // === Command Implementations ===
 
 /// Get intelligence data path (cross-platform)
-fn get_intelligence_path() -> PathBuf {
+pub fn get_intelligence_path() -> PathBuf {
     // Try HOME (Unix) then USERPROFILE (Windows) then HOMEPATH (Windows fallback)
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))

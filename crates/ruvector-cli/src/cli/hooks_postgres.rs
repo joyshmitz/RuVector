@@ -147,10 +147,11 @@ impl PostgresStorage {
         metadata: &serde_json::Value,
     ) -> Result<i32, Box<dyn std::error::Error>> {
         let client = self.pool.get().await?;
+        let metadata_str = serde_json::to_string(metadata)?;
         let row = client
             .query_one(
-                "SELECT ruvector_hooks_remember($1, $2, $3, $4)",
-                &[&memory_type, &content, &embedding, &metadata],
+                "SELECT ruvector_hooks_remember($1, $2, $3, $4::jsonb)",
+                &[&memory_type, &content, &embedding, &metadata_str],
             )
             .await?;
 
@@ -166,7 +167,7 @@ impl PostgresStorage {
         let client = self.pool.get().await?;
         let rows = client
             .query(
-                "SELECT id, memory_type, content, metadata, similarity
+                "SELECT id, memory_type, content, metadata::text, similarity
                  FROM ruvector_hooks_recall($1, $2)",
                 &[&query_embedding, &limit],
             )
@@ -174,12 +175,15 @@ impl PostgresStorage {
 
         Ok(rows
             .iter()
-            .map(|r| MemoryResult {
-                id: r.get(0),
-                memory_type: r.get(1),
-                content: r.get(2),
-                metadata: r.get(3),
-                similarity: r.get(4),
+            .map(|r| {
+                let metadata_str: String = r.get(3);
+                MemoryResult {
+                    id: r.get(0),
+                    memory_type: r.get(1),
+                    content: r.get(2),
+                    metadata: serde_json::from_str(&metadata_str).unwrap_or_default(),
+                    similarity: r.get(4),
+                }
             })
             .collect())
     }
@@ -362,12 +366,12 @@ impl StorageBackend {
                 }
             }
         }
-        Ok(Self::Json(super::Intelligence::new()))
+        Ok(Self::Json(super::Intelligence::new(super::get_intelligence_path())))
     }
 
     #[cfg(not(feature = "postgres"))]
     pub fn from_env() -> Self {
-        Self::Json(super::Intelligence::new())
+        Self::Json(super::Intelligence::new(super::get_intelligence_path()))
     }
 }
 
