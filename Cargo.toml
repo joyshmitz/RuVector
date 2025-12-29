@@ -36,6 +36,7 @@ members = [
     "crates/ruvector-mincut-gated-transformer",
     "crates/ruvector-mincut-gated-transformer-wasm",
     "crates/ruvector-postgres",
+    "crates/ruvector-nervous-system",
     "examples/refrag-pipeline",
     "examples/scipix",
     "examples/google-cloud",
@@ -43,6 +44,7 @@ members = [
     "examples/subpolynomial-time",
     "crates/sona",
     "crates/rvlite",
+    "crates/ruvector-nervous-system",
 ]
 resolver = "2"
 

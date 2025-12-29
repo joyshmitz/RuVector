@@ -1,10 +1,10 @@
 {
   "other_in_general": {
     "command-succeeded": 0.8,
-    "command-failed": -0.260692743274824,
+    "command-failed": -0.06121401736624558,
     "_meta": {
-      "lastUpdate": "2025-12-26T23:11:15.333Z",
-      "updateCount": 5229
+      "lastUpdate": "2025-12-25T21:48:47.263Z",
+      "updateCount": 5167
     }
   },
   "test_in_general": {
@@ -54,10 +54,10 @@
   },
   "git_in_general": {
     "command-succeeded": 0.8,
-    "command-failed": -0.08928877610836673,
+    "command-failed": -0.014850220937067752,
     "_meta": {
-      "lastUpdate": "2025-12-26T23:29:54.628Z",
-      "updateCount": 318
+      "lastUpdate": "2025-12-25T21:44:55.401Z",
+      "updateCount": 301
     }
   },
   "other_in_rvlite": {
@@ -124,11 +124,11 @@
     }
   },
   "cargo_in_general": {
-    "command-succeeded": 0.8,
-    "command-failed": -0.04007580132420528,
+    "command-succeeded": 0.03282057241011145,
+    "command-failed": 0,
     "_meta": {
-      "lastUpdate": "2025-12-26T23:31:34.154Z",
-      "updateCount": 96
+      "lastUpdate": "2025-12-27T00:35:50.295Z",
+      "updateCount": 89
     }
   },
   "build_in_mincut": {
@@ -471,11 +471,11 @@
   },
   "edit_rs_in_ruvector-core": {
     "_meta": {
-      "lastUpdate": "2025-11-21T13:24:54.000Z",
-      "updateCount": 12,
-      "firstSeen": "2025-12-16T17:26:07.000Z"
+      "lastUpdate": "2025-12-27T00:35:46.788Z",
+      "updateCount": 13
     },
-    "rust-developer": 0.6959263623272283
+    "rust-developer": 0.6959263623272283,
+    "successful-edit": 0.02773500981126146
   },
   "edit_unknown_in_project": {
     "_meta": {
@@ -583,11 +583,11 @@
   },
   "edit_rs_in_ruvector-postgres": {
     "_meta": {
-      "lastUpdate": "2025-12-26T23:31:15.201Z",
-      "updateCount": 29
+      "lastUpdate": "2025-12-09T17:48:32.000Z",
+      "updateCount": 14,
+      "firstSeen": "2025-12-11T18:50:56.000Z"
     },
-    "rust-developer": 0.7281451750785212,
-    "successful-edit": 0.2787118918790087
+    "rust-developer": 0.7281451750785212
   },
   "edit_py_in_rvlite": {
     "_meta": {
@@ -711,11 +711,11 @@
   },
   "edit_toml_in_ruvector-postgres": {
     "_meta": {
-      "lastUpdate": "2025-12-26T23:00:55.256Z",
-      "updateCount": 4
+      "lastUpdate": "2025-12-09T19:01:26.000Z",
+      "updateCount": 1,
+      "firstSeen": "2025-12-09T19:01:26.000Z"
     },
-    "general-developer": 0.2,
-    "successful-edit": 0.1681430045544632
+    "general-developer": 0.2
   },
   "edit_sql_in_project": {
     "_meta": {
@@ -1072,5 +1072,12 @@
       "updateCount": 1
     },
     "successful-edit": 0.1
+  },
+  "edit_rs_in_ruvector-nervous-system": {
+    "_meta": {
+      "lastUpdate": "2025-12-28T03:52:43.979Z",
+      "updateCount": 3
+    },
+    "successful-edit": 0.21190563708295282
   }
 }

@@ -1,5 +1,7 @@
 # Hooks System MVP - Implementation Checklist
 
+> **Related Documentation**: [README](README.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [Architecture](ARCHITECTURE.md)
+
 **Target**: 3-4 weeks | **Status**: Ready for Development
 **Feature Branch**: `feature/portable-hooks-mvp`
 

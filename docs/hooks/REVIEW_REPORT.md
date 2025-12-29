@@ -1,5 +1,7 @@
 # Implementation Plan Code Review Report
 
+> **Related Documentation**: [README](README.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md) | [MVP Checklist](MVP_CHECKLIST.md)
+
 **Document**: `/home/user/ruvector/docs/hooks/IMPLEMENTATION_PLAN.md`
 **Reviewer**: Code Review Agent
 **Date**: 2025-12-25

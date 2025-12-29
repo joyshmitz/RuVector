@@ -54,7 +54,7 @@ Query → HNSW Index → GNN Layer → Enhanced Results
 ```
 
 The GNN layer:
-1. Takes your query and its nearest neighborsa
+1. Takes your query and its nearest neighbors
 2. Applies multi-head attention to weigh which neighbors matter
 3. Updates representations based on graph structure
 4. Returns better-ranked results
@@ -65,7 +65,16 @@ Over time, frequently-accessed paths get reinforced, making common queries faste
 ## Quick Start
 
 ### One-Line Install
- 
+
+```bash
+# Vector database
+npm install ruvector
+npx ruvector
+
+# Self-learning hooks for Claude Code
+npx @ruvector/cli hooks init
+npx @ruvector/cli hooks install
+```
 
 ### Node.js / Browser
 
@@ -513,6 +522,304 @@ See [ruvector-postgres README](./crates/ruvector-postgres/README.md) for full SQ
 | [ruvector-bench](./crates/ruvector-bench) | Benchmarking suite for vector operations | [![crates.io](https://img.shields.io/crates/v/ruvector-bench.svg)](https://crates.io/crates/ruvector-bench) |
 | [profiling](./crates/profiling) | Performance profiling and analysis tools | [![crates.io](https://img.shields.io/crates/v/ruvector-profiling.svg)](https://crates.io/crates/ruvector-profiling) |
 | [micro-hnsw-wasm](./crates/micro-hnsw-wasm) | Lightweight HNSW implementation for WASM | [![crates.io](https://img.shields.io/crates/v/micro-hnsw-wasm.svg)](https://crates.io/crates/micro-hnsw-wasm) |
+
+### Self-Learning Intelligence Hooks
+
+**Make your AI assistant smarter over time.**
+
+When you use Claude Code (or any AI coding assistant), it starts fresh every session. It doesn't remember which approaches worked, which files you typically edit together, or what errors you've seen before.
+
+**RuVector Hooks fixes this.** It's a lightweight intelligence layer that:
+
+1. **Remembers what works** — Tracks which agent types succeed for different tasks
+2. **Learns from mistakes** — Records error patterns and suggests fixes you've used before
+3. **Predicts your workflow** — Knows that after editing `api.rs`, you usually edit `api_test.rs`
+4. **Coordinates teams** — Manages multi-agent swarms for complex tasks
+
+Think of it as giving your AI assistant a memory and intuition about your codebase.
+
+#### How It Works
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Claude Code    │────▶│  RuVector Hooks  │────▶│   Intelligence  │
+│  (PreToolUse)   │     │   (pre-edit)     │     │      Layer      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                                         │
+         ┌───────────────────────────────────────────────┘
+         ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Q-Learning    │     │  Vector Memory   │     │  Swarm Graph    │
+│   α=0.1 γ=0.95  │     │  64-dim embed    │     │  Coordination   │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
+
+The hooks integrate with Claude Code's event system:
+- **PreToolUse** → Provides guidance before edits (agent routing, related files)
+- **PostToolUse** → Records outcomes for learning (success/failure, patterns)
+- **SessionStart/Stop** → Manages session state and metrics export
+
+#### Technical Specifications
+
+| Component | Implementation | Details |
+|-----------|----------------|---------|
+| **Q-Learning** | Temporal Difference | α=0.1, γ=0.95, ε=0.1 (ε-greedy exploration) |
+| **Embeddings** | Hash-based vectors | 64 dimensions, normalized, cosine similarity |
+| **LRU Cache** | `lru` crate | 1000 entries, ~10x faster Q-value lookups |
+| **Compression** | `flate2` gzip | 70-83% storage reduction, fast compression |
+| **Storage** | JSON / PostgreSQL | Auto-fallback, 5000 memory entry limit |
+| **Cross-platform** | Rust + TypeScript | Windows (USERPROFILE), Unix (HOME) |
+
+#### Performance
+
+| Metric | Value |
+|--------|-------|
+| Q-value lookup (cached) | <1µs |
+| Q-value lookup (uncached) | ~50µs |
+| Memory search (1000 entries) | <5ms |
+| Storage compression ratio | 70-83% |
+| Session start overhead | <10ms |
+
+| Crate/Package | Description | Status |
+|---------------|-------------|--------|
+| [ruvector-cli hooks](./crates/ruvector-cli) | Rust CLI with 34 hooks commands | [![crates.io](https://img.shields.io/crates/v/ruvector-cli.svg)](https://crates.io/crates/ruvector-cli) |
+| [@ruvector/cli hooks](./npm/packages/cli) | npm CLI with 29 hooks commands | [![npm](https://img.shields.io/npm/v/@ruvector/cli.svg)](https://www.npmjs.com/package/@ruvector/cli) |
+
+#### Quick Start
+
+```bash
+# Rust CLI
+cargo install ruvector-cli
+ruvector hooks init
+ruvector hooks install
+
+# npm CLI
+npx @ruvector/cli hooks init
+npx @ruvector/cli hooks install
+```
+
+#### Core Capabilities
+
+| Feature | Description | Technical Details |
+|---------|-------------|-------------------|
+| **Q-Learning Routing** | Routes tasks to best agent with learned confidence scores | TD learning with α=0.1, γ=0.95, ε-greedy exploration |
+| **Semantic Memory** | Vector-based memory with embeddings for context retrieval | 64-dim hash embeddings, cosine similarity, top-k search |
+| **Error Learning** | Records error patterns and suggests fixes | Pattern matching for E0308, E0433, TS2322, etc. |
+| **File Sequences** | Predicts next files to edit based on historical patterns | Markov chain transitions, frequency-weighted suggestions |
+| **Swarm Coordination** | Registers agents, tracks coordination edges, optimizes | Graph-based topology, weighted edges, task assignment |
+| **LRU Cache** | 1000-entry cache for faster Q-value lookups | ~10x speedup, automatic eviction, RefCell for interior mutability |
+| **Gzip Compression** | Storage savings with automatic compression | flate2 fast mode, 70-83% reduction, transparent load/save |
+| **Batch Saves** | Dirty flag tracking to reduce disk I/O | Only writes when data changes, force_save() override |
+| **Shell Completions** | Tab completion for all commands | bash, zsh, fish, PowerShell support |
+
+#### Supported Error Codes
+
+The intelligence layer has built-in knowledge for common error patterns:
+
+| Language | Error Codes | Auto-Suggested Fixes |
+|----------|-------------|---------------------|
+| **Rust** | E0308, E0433, E0425, E0277, E0382 | Type mismatches, missing imports, borrow checker |
+| **TypeScript** | TS2322, TS2339, TS2345, TS7006 | Type assignments, property access, argument types |
+| **Python** | ImportError, AttributeError, TypeError | Module imports, attribute access, type errors |
+| **Go** | undefined, cannot use, not enough arguments | Variable scope, type conversion, function calls |
+
+#### Commands Reference
+
+```bash
+# Setup
+ruvector hooks init [--force] [--postgres]  # Initialize hooks (--postgres for DB schema)
+ruvector hooks install                   # Install into Claude settings
+
+# Core
+ruvector hooks stats                     # Show intelligence statistics
+ruvector hooks session-start [--resume]  # Start/resume a session
+ruvector hooks session-end               # End session with metrics
+
+# Memory
+ruvector hooks remember -t edit "content"  # Store in semantic memory
+ruvector hooks recall "query" -k 5         # Search memory semantically
+
+# Learning
+ruvector hooks learn <state> <action> --reward 0.8  # Record trajectory
+ruvector hooks suggest <state> --actions "a,b,c"    # Get action suggestion
+ruvector hooks route "implement caching" --file src/cache.rs  # Route to agent
+
+# Claude Code Hooks
+ruvector hooks pre-edit <file>           # Pre-edit intelligence hook
+ruvector hooks post-edit <file> --success  # Post-edit learning hook
+ruvector hooks pre-command <cmd>         # Pre-command hook
+ruvector hooks post-command <cmd> --success  # Post-command hook
+ruvector hooks suggest-context           # UserPromptSubmit context injection
+ruvector hooks track-notification        # Track notification patterns
+ruvector hooks pre-compact [--auto]      # Pre-compact hook (auto/manual)
+
+# Claude Code v2.0.55+ Features
+ruvector hooks lsp-diagnostic --file <f> --severity error  # LSP diagnostics
+ruvector hooks suggest-ultrathink "complex task"  # Recommend extended reasoning
+ruvector hooks async-agent --action spawn --agent-id <id>  # Async sub-agents
+
+# Intelligence
+ruvector hooks record-error <cmd> <stderr>  # Record error pattern
+ruvector hooks suggest-fix E0308           # Get fix for error code
+ruvector hooks suggest-next <file> -n 3    # Predict next files
+ruvector hooks should-test <file>          # Check if tests needed
+
+# Swarm
+ruvector hooks swarm-register <id> <type>  # Register agent
+ruvector hooks swarm-coordinate <src> <tgt>  # Record coordination
+ruvector hooks swarm-optimize "task1,task2"  # Optimize distribution
+ruvector hooks swarm-recommend "rust"      # Recommend agent for task
+ruvector hooks swarm-heal <agent-id>       # Handle agent failure
+ruvector hooks swarm-stats                 # Show swarm statistics
+
+# Optimization (Rust only)
+ruvector hooks compress                   # Compress storage (70-83% savings)
+ruvector hooks cache-stats                # Show LRU cache statistics
+ruvector hooks completions bash           # Generate shell completions
+```
+
+#### Tutorial: Claude Code Integration
+
+**1. Initialize and install hooks:**
+
+```bash
+ruvector hooks init
+ruvector hooks install --settings-dir .claude
+```
+
+This creates `.claude/settings.json` with hook configurations:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": ["ruvector hooks pre-edit \"$TOOL_INPUT_FILE_PATH\""] },
+      { "matcher": "Bash", "hooks": ["ruvector hooks pre-command \"$TOOL_INPUT_COMMAND\""] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": ["ruvector hooks post-edit ... --success"] },
+      { "matcher": "Bash", "hooks": ["ruvector hooks post-command ... --success"] }
+    ],
+    "SessionStart": ["ruvector hooks session-start"],
+    "Stop": ["ruvector hooks session-end --export-metrics"],
+    "PreCompact": ["ruvector hooks pre-compact"]
+  }
+}
+```
+
+**All 7 Claude Code hooks covered:**
+| Hook | When It Fires | What RuVector Does |
+|------|---------------|-------------------|
+| `PreToolUse` | Before file edit, command, or Task | Suggests agent, shows related files, validates agent assignments |
+| `PostToolUse` | After file edit or command | Records outcome, updates Q-values, injects context |
+| `SessionStart` | When session begins/resumes | Loads intelligence, shows stats (startup vs resume) |
+| `Stop` | When session ends | Saves state, exports metrics |
+| `PreCompact` | Before context compaction | Preserves critical memories (auto vs manual) |
+| `UserPromptSubmit` | Before processing user prompt | Injects learned patterns as context |
+| `Notification` | On system notifications | Tracks notification patterns |
+
+**Advanced Features:**
+- **Stdin JSON Parsing**: Hooks receive full JSON via stdin (session_id, tool_input, tool_response)
+- **Context Injection**: PostToolUse returns `additionalContext` to inject into Claude's context
+- **Timeout Optimization**: All hooks have optimized timeouts (1-5 seconds vs 60s default)
+
+**2. Use routing for intelligent agent selection:**
+
+```bash
+# Route a task to the best agent
+$ ruvector hooks route "implement vector search" --file src/lib.rs
+{
+  "recommended": "rust-developer",
+  "confidence": 0.85,
+  "reasoning": "learned from 47 similar edits"
+}
+```
+
+**3. Learn from outcomes:**
+
+```bash
+# Record successful outcome
+ruvector hooks learn "edit-rs-lib" "rust-developer" --reward 1.0
+
+# Record failed outcome
+ruvector hooks learn "edit-rs-lib" "typescript-dev" --reward -0.5
+```
+
+**4. Get error fix suggestions:**
+
+```bash
+$ ruvector hooks suggest-fix E0308
+{
+  "code": "E0308",
+  "type": "type_mismatch",
+  "fixes": [
+    "Check return type matches function signature",
+    "Use .into() or .as_ref() for type conversion",
+    "Verify generic type parameters"
+  ]
+}
+```
+
+#### Tutorial: Swarm Coordination
+
+**1. Register agents:**
+
+```bash
+ruvector hooks swarm-register agent-1 rust-developer --capabilities "rust,async,testing"
+ruvector hooks swarm-register agent-2 typescript-dev --capabilities "ts,react,node"
+ruvector hooks swarm-register agent-3 reviewer --capabilities "review,security,performance"
+```
+
+**2. Record coordination patterns:**
+
+```bash
+# Agent-1 hands off to Agent-3 for review
+ruvector hooks swarm-coordinate agent-1 agent-3 --weight 0.9
+```
+
+**3. Optimize task distribution:**
+
+```bash
+$ ruvector hooks swarm-optimize "implement-api,write-tests,code-review"
+{
+  "assignments": {
+    "implement-api": "agent-1",
+    "write-tests": "agent-1",
+    "code-review": "agent-3"
+  }
+}
+```
+
+**4. Handle failures with self-healing:**
+
+```bash
+# Mark agent as failed and redistribute
+ruvector hooks swarm-heal agent-2
+```
+
+#### PostgreSQL Storage (Optional)
+
+For production deployments, use PostgreSQL instead of JSON files:
+
+```bash
+# Set connection URL
+export RUVECTOR_POSTGRES_URL="postgres://user:pass@localhost/ruvector"
+
+# Initialize PostgreSQL schema (automatic)
+ruvector hooks init --postgres
+
+# Or apply schema manually
+psql $RUVECTOR_POSTGRES_URL -f crates/ruvector-cli/sql/hooks_schema.sql
+
+# Build CLI with postgres feature
+cargo build -p ruvector-cli --features postgres
+```
+
+The PostgreSQL backend provides:
+- Vector embeddings with native `ruvector` type
+- Q-learning functions (`ruvector_hooks_update_q`, `ruvector_hooks_best_action`)
+- Swarm coordination tables with foreign key relationships
+- Automatic memory cleanup (keeps last 5000 entries)
 
 ### Scientific OCR (SciPix)
 

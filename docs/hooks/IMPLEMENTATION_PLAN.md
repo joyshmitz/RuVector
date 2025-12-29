@@ -1,5 +1,7 @@
 # RuVector Generic Hooks System - Implementation Plan
 
+> **Related Documentation**: [README](README.md) | [User Guide](USER_GUIDE.md) | [CLI Reference](CLI_REFERENCE.md) | [Architecture](ARCHITECTURE.md)
+
 ## Executive Summary
 
 This document outlines a comprehensive SPARC-GOAP (Specification, Pseudocode, Architecture, Refinement, Completion + Goal-Oriented Action Planning) implementation plan for transforming the current repo-specific hooks system into a **generic, portable, CLI-integrated hooks system** for the ruvector project.

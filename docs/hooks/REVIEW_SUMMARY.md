@@ -1,5 +1,7 @@
 # Hooks Implementation Plan - Code Review Summary
 
+> **Related Documentation**: [README](README.md) | [Full Review](REVIEW_REPORT.md) | [Implementation Plan](IMPLEMENTATION_PLAN.md)
+
 **Status**: ✅ APPROVED WITH CRITICAL FIXES
 **Timeline**: Optimized from 6-8 weeks → **3-4 weeks for MVP**
 **Risk Level**: Low-Medium (major risks mitigated)
