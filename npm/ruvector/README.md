@@ -277,6 +277,86 @@ npx ruvector export my-index backup.bin
 npx ruvector import backup.bin restored-index
 ```
 
+## Self-Learning Hooks (Claude Code Integration)
+
+RuVector includes a self-learning intelligence layer that improves AI agent decisions over time. These hooks integrate with Claude Code and other AI development tools.
+
+### Setup
+
+```bash
+# Initialize hooks in your project
+npx ruvector hooks init
+```
+
+### Hook Commands
+
+```bash
+# Session Management
+ruvector hooks session-start          # Start session tracking
+ruvector hooks session-end            # End session with export
+
+# Pre/Post Edit Hooks
+ruvector hooks pre-edit <file>        # Get agent suggestions before editing
+ruvector hooks post-edit <file> --success  # Record edit outcomes
+
+# Pre/Post Command Hooks
+ruvector hooks pre-command "cargo test"    # Analyze command before running
+ruvector hooks post-command "cargo test" --success  # Record command outcomes
+
+# Intelligence
+ruvector hooks stats                  # Show learning statistics
+ruvector hooks route <task>           # Get agent routing suggestion
+ruvector hooks suggest-context        # Get context suggestions
+
+# Memory
+ruvector hooks remember <content> -t <type>  # Store in vector memory
+ruvector hooks recall <query>                # Semantic search memory
+```
+
+### How It Works
+
+The intelligence system uses:
+- **Q-Learning**: Learns optimal agent routing from past successes/failures
+- **Vector Memory**: Semantic storage with cosine similarity search
+- **File Sequences**: Predicts related files based on edit patterns
+- **Error Patterns**: Remembers fixes for common errors
+
+### Example Output
+
+```
+🧠 Intelligence Analysis:
+   📁 ruvector-core/lib.rs
+   🤖 Recommended: rust-developer (80% confidence)
+      → learned from past success
+   📚 Similar: 3 past edits
+   📎 Related: mod.rs, tests.rs
+   💬 ⚡ Core lib: run cargo test --lib after changes
+```
+
+### Claude Code Integration
+
+Add to your `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{ "command": "ruvector hooks pre-edit $file" }],
+    "PostToolUse": [{ "command": "ruvector hooks post-edit $file --success" }],
+    "SessionStart": [{ "command": "ruvector hooks session-start" }],
+    "Stop": [{ "command": "ruvector hooks session-end" }]
+  }
+}
+```
+
+### Learning Data
+
+| Storage | Contents |
+|---------|----------|
+| `.ruvector/intelligence.json` | Q-table, memories, trajectories |
+| Patterns | State-action values for agent routing |
+| Memories | Vector embeddings for semantic recall |
+| Trajectories | Learning history for continuous improvement |
+
 ## Integrations
 
 ### LangChain

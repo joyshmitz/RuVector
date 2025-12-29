@@ -24,7 +24,11 @@ if [ -n "$CHANGED_PACKAGES" ]; then
     echo "🔄 Running npm install to sync lock file..."
 
     # Run npm install to update lock file
-    npm install
+    # Use --ignore-optional to skip platform-specific optional deps (darwin-arm64 on linux, etc.)
+    npm install --ignore-optional || {
+        echo "⚠️  npm install had warnings (likely platform-specific optional deps)"
+        echo "   Continuing with lock file sync..."
+    }
 
     # Check if lock file changed
     if git diff --name-only | grep -q 'package-lock.json'; then

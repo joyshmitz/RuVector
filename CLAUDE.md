@@ -217,20 +217,21 @@ Flow-Nexus extends MCP capabilities with 70+ cloud-based orchestration tools:
 
 **1️⃣ BEFORE Work:**
 ```bash
-npx claude-flow@alpha hooks pre-task --description "[task]"
-npx claude-flow@alpha hooks session-restore --session-id "swarm-[id]"
+ruvector hooks session-start
+ruvector hooks pre-edit "[file]"
+ruvector hooks pre-command "[command]"
 ```
 
 **2️⃣ DURING Work:**
 ```bash
-npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "swarm/[agent]/[step]"
-npx claude-flow@alpha hooks notify --message "[what was done]"
+ruvector hooks post-edit "[file]" --success
+ruvector hooks remember "[context]" -t swarm
+ruvector hooks post-command "[command]" --success
 ```
 
 **3️⃣ AFTER Work:**
 ```bash
-npx claude-flow@alpha hooks post-task --task-id "[task]"
-npx claude-flow@alpha hooks session-end --export-metrics true
+ruvector hooks session-end
 ```
 
 ## 🎯 Concurrent Execution Examples
@@ -290,90 +291,118 @@ Message 4: Write "file.js"
 - **2.8-4.4x speed improvement**
 - **27+ neural models**
 
-## Hooks Integration
+## 🧠 RuVector Hooks Integration
 
-### Pre-Operation
-- Auto-assign agents by file type
-- Validate commands for safety
-- Prepare resources automatically
-- Optimize topology by complexity
-- Cache searches
+This project uses **RuVector's self-learning intelligence hooks** configured in `.claude/settings.json`.
 
-### Post-Operation
-- Auto-format code
-- Train neural patterns
-- Update memory
-- Analyze performance
-- Track token usage
+### Current Hooks Configuration
 
-### Session Management
-- Generate summaries
-- Persist state
-- Track metrics
-- Restore context
-- Export workflows
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": ["ruvector hooks pre-edit \"$TOOL_INPUT_file_path\""] },
+      { "matcher": "Bash", "hooks": ["ruvector hooks pre-command \"$TOOL_INPUT_command\""] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": ["ruvector hooks post-edit \"$TOOL_INPUT_file_path\""] },
+      { "matcher": "Bash", "hooks": ["ruvector hooks post-command \"$TOOL_INPUT_command\""] }
+    ],
+    "SessionStart": ["ruvector hooks session-start"],
+    "Stop": ["ruvector hooks session-end"],
+    "UserPromptSubmit": [{ "hooks": [{ "command": "ruvector-cli hooks suggest-context" }] }],
+    "PreCompact": [{ "matcher": "auto|manual", "hooks": [{ "command": "ruvector-cli hooks pre-compact" }] }],
+    "Notification": [{ "matcher": ".*", "hooks": [{ "command": "ruvector-cli hooks track-notification" }] }]
+  }
+}
+```
 
-## 🧠 Self-Learning Intelligence System
+### Hook Event Types
 
-This project includes a **self-learning intelligence layer** that improves Claude's decisions over time.
+| Event | Trigger | RuVector Action |
+|-------|---------|-----------------|
+| **PreToolUse** | Before Edit/Write/Bash | Agent routing, command risk analysis |
+| **PostToolUse** | After Edit/Write/Bash | Q-learning update, pattern recording |
+| **SessionStart** | Conversation begins | Load intelligence, display stats |
+| **Stop** | Conversation ends | Save learning data, export metrics |
+| **UserPromptSubmit** | User sends message | Context suggestions |
+| **PreCompact** | Before context compaction | Preserve important context |
+| **Notification** | Any notification | Track for learning |
 
-### How It Works
+### Environment Variables
 
-The intelligence system runs as hooks that:
-1. **PreToolUse**: Analyzes context and provides learned guidance BEFORE actions
-2. **PostToolUse**: Records outcomes and updates Q-learning values AFTER actions
-3. **SessionStart**: Displays learned patterns when a session begins
+```bash
+RUVECTOR_INTELLIGENCE_ENABLED=true    # Enable intelligence layer
+RUVECTOR_LEARNING_RATE=0.1            # Q-learning rate
+INTELLIGENCE_MODE=treatment           # treatment|control for A/B testing
+RUVECTOR_MEMORY_BACKEND=rvlite        # Memory storage backend
+```
+
+### RuVector Hooks CLI Commands
+
+```bash
+# Session Management
+ruvector hooks session-start          # Start session tracking
+ruvector hooks session-end            # End session, save learning
+
+# Pre/Post Edit (triggered automatically)
+ruvector hooks pre-edit <file>        # Get agent suggestions
+ruvector hooks post-edit <file> --success  # Record outcome
+
+# Pre/Post Command (triggered automatically)
+ruvector hooks pre-command "cargo test"    # Analyze command risk
+ruvector hooks post-command "cargo test" --success  # Record outcome
+
+# Intelligence
+ruvector hooks init                   # Initialize hooks in project
+ruvector hooks stats                  # Show learning statistics
+ruvector hooks route <task>           # Get agent routing suggestion
+ruvector hooks suggest-context        # Get context suggestions
+
+# Memory
+ruvector hooks remember <content> -t <type>  # Store in vector memory
+ruvector hooks recall <query>                # Semantic search memory
+```
 
 ### What You'll See
 
-When editing files, you'll receive guidance like:
+**Before editing files:**
 ```
-🧠 Intelligence Guidance:
+🧠 Intelligence Analysis:
    📁 ruvector-core/lib.rs
-   🤖 Agent: rust-developer (80% learned)
+   🤖 Recommended: rust-developer (80% confidence)
       → learned from past success
-   📚 Similar: 3 past edits
-   📎 Related: mod.rs, tests.rs
-   💬 ⚡ Core lib: run cargo test --lib after changes
 ```
 
-### Learning Data (Native Storage)
-
-| Storage | Format | Contents |
-|---------|--------|----------|
-| `intelligence.db` | redb | Vector embeddings (4000+ memories) |
-| `patterns.json` | JSON | Q-table with 131 state-action patterns |
-| `trajectories.json` | JSON | Last 1000 learning trajectories |
-| `feedback.json` | JSON | Suggestion follow/ignore tracking |
-
-### CLI Commands
-
-```bash
-# Check storage status
-node .claude/intelligence/cli.js storage-info
-
-# View statistics
-node .claude/intelligence/cli.js stats
-
-# Get routing suggestion
-node .claude/intelligence/cli.js route "edit lib.rs" --crate ruvector-core
-
-# Migrate data to native storage
-node .claude/intelligence/cli.js migrate --dry-run
+**Before running commands:**
 ```
+🧠 Command Analysis:
+   📦 Category: rust
+   🏷️  Type: test
+   ✅ Risk: LOW
+```
+
+**On prompt submit:**
+```
+RuVector Intelligence: 4 learned patterns, 0 error fixes available.
+```
+
+### Learning Data Storage
+
+| Storage | Contents |
+|---------|----------|
+| `.ruvector/intelligence.json` | Q-table patterns, vector memories, trajectories |
+| Patterns | State-action values for agent routing |
+| Memories | Vector embeddings for semantic recall |
+| Trajectories | Learning history for continuous improvement |
 
 ### Key Learned Patterns
 
-The system has learned from **4000+ file edits** in this monorepo:
-- Rust files in `ruvector-*` crates → `rust-developer` agent (80% confidence)
+The system learns from file edits in this monorepo:
+- Rust files in `ruvector-*` crates → `rust-developer` agent
 - TypeScript/JavaScript files → `coder` or `typescript-developer`
-- Cargo commands → High success rate patterns
+- Cargo commands → Success rate patterns
 - Error patterns (E0308, E0433) → Suggested fixes
-
-### INTELLIGENCE_MODE
-
-Set `INTELLIGENCE_MODE=treatment` in environment to enable learned routing.
-Set `INTELLIGENCE_MODE=control` for random baseline (A/B testing).
 
 ## Advanced Features (v2.0.0)
 

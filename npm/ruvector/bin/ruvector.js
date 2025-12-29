@@ -820,8 +820,9 @@ class Intelligence {
 
   load() {
     try {
-      if (fs.existsSync(INTEL_PATH)) {
-        return JSON.parse(require('fs').readFileSync(INTEL_PATH, 'utf-8'));
+      const fss = require('fs');
+      if (fss.existsSync(INTEL_PATH)) {
+        return JSON.parse(fss.readFileSync(INTEL_PATH, 'utf-8'));
       }
     } catch {}
     return {
@@ -837,9 +838,10 @@ class Intelligence {
   }
 
   save() {
+    const fss = require('fs');
     const dir = path.dirname(INTEL_PATH);
-    if (!fs.existsSync(dir)) require('fs').mkdirSync(dir, { recursive: true });
-    require('fs').writeFileSync(INTEL_PATH, JSON.stringify(this.data, null, 2));
+    if (!fss.existsSync(dir)) fss.mkdirSync(dir, { recursive: true });
+    fss.writeFileSync(INTEL_PATH, JSON.stringify(this.data, null, 2));
   }
 
   now() { return Math.floor(Date.now() / 1000); }
@@ -996,17 +998,18 @@ class Intelligence {
 const hooksCmd = program.command('hooks').description('Self-learning intelligence hooks for Claude Code');
 
 hooksCmd.command('init').description('Initialize hooks in current project').option('--force', 'Force overwrite').action((opts) => {
+  const fss = require('fs');
   const settingsPath = path.join(process.cwd(), '.claude', 'settings.json');
   const settingsDir = path.dirname(settingsPath);
-  if (!fs.existsSync(settingsDir)) require('fs').mkdirSync(settingsDir, { recursive: true });
+  if (!fss.existsSync(settingsDir)) fss.mkdirSync(settingsDir, { recursive: true });
   let settings = {};
-  if (fs.existsSync(settingsPath)) try { settings = JSON.parse(require('fs').readFileSync(settingsPath, 'utf-8')); } catch {}
+  if (fss.existsSync(settingsPath)) try { settings = JSON.parse(fss.readFileSync(settingsPath, 'utf-8')); } catch {}
   settings.hooks = settings.hooks || {};
   settings.hooks.PreToolUse = [{ matcher: 'Edit|Write|MultiEdit', hooks: ['ruvector hooks pre-edit "$TOOL_INPUT_file_path"'] }, { matcher: 'Bash', hooks: ['ruvector hooks pre-command "$TOOL_INPUT_command"'] }];
   settings.hooks.PostToolUse = [{ matcher: 'Edit|Write|MultiEdit', hooks: ['ruvector hooks post-edit "$TOOL_INPUT_file_path"'] }, { matcher: 'Bash', hooks: ['ruvector hooks post-command "$TOOL_INPUT_command"'] }];
   settings.hooks.SessionStart = ['ruvector hooks session-start'];
   settings.hooks.Stop = ['ruvector hooks session-end'];
-  require('fs').writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  fss.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log(chalk.green('✅ Hooks initialized in .claude/settings.json'));
 });
 

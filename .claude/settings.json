@@ -49,36 +49,13 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          {
-            "type": "command",
-            "timeout": 3000,
-            "command": "/usr/local/bin/ruvector-cli hooks pre-edit \"$TOOL_INPUT_FILE_PATH\""
-          }
+          "ruvector hooks pre-edit \"$TOOL_INPUT_file_path\""
         ]
       },
       {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "timeout": 3000,
-            "command": "/usr/local/bin/ruvector-cli hooks pre-command \"$TOOL_INPUT_COMMAND\""
-          }
-        ]
-      },
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 2000,
-            "command": "/usr/local/bin/ruvector-cli hooks swarm-recommend \"$TOOL_INPUT_SUBAGENT_TYPE\""
-          },
-          {
-            "type": "command",
-            "timeout": 1000,
-            "command": "/usr/local/bin/ruvector-cli hooks async-agent --action spawn --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\" --task \"$TOOL_INPUT_PROMPT\""
-          }
+          "ruvector hooks pre-command \"$TOOL_INPUT_command\""
         ]
       }
     ],
@@ -86,76 +63,21 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          {
-            "type": "command",
-            "timeout": 3000,
-            "command": "/usr/local/bin/ruvector-cli hooks post-edit \"$TOOL_INPUT_FILE_PATH\""
-          }
+          "ruvector hooks post-edit \"$TOOL_INPUT_file_path\""
         ]
       },
       {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "timeout": 3000,
-            "command": "/usr/local/bin/ruvector-cli hooks post-command \"$TOOL_INPUT_COMMAND\""
-          }
-        ]
-      },
-      {
-        "matcher": "LSP",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 2000,
-            "command": "/usr/local/bin/ruvector-cli hooks lsp-diagnostic --file \"$TOOL_INPUT_FILE\" --severity \"$TOOL_INPUT_SEVERITY\" --message \"$TOOL_INPUT_MESSAGE\""
-          }
-        ]
-      },
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 2000,
-            "command": "/usr/local/bin/ruvector-cli hooks async-agent --action complete --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\""
-          }
+          "ruvector hooks post-command \"$TOOL_INPUT_command\""
         ]
       }
     ],
     "SessionStart": [
-      {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 5000,
-            "command": "/usr/local/bin/ruvector-cli hooks session-start"
-          }
-        ]
-      },
-      {
-        "matcher": "resume",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 3000,
-            "command": "/usr/local/bin/ruvector-cli hooks session-start --resume"
-          }
-        ]
-      }
+      "ruvector hooks session-start"
     ],
     "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 5000,
-            "command": "/usr/local/bin/ruvector-cli hooks session-end --export-metrics"
-          }
-        ]
-      }
+      "ruvector hooks session-end"
     ],
     "PreCompact": [
       {
@@ -204,7 +126,10 @@
     ]
   },
   "includeCoAuthoredBy": true,
-  "enabledMcpjsonServers": ["claude-flow", "ruv-swarm"],
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm"
+  ],
   "statusLine": {
     "type": "command",
     "command": ".claude/statusline-command.sh"
