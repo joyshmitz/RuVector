@@ -1,6 +1,6 @@
 {
   "name": "ruvector",
-  "version": "0.1.22",
+  "version": "0.1.36",
   "description": "High-performance vector database with Graph Neural Networks, Cypher queries, and AI agent routing. Build RAG apps, semantic search, recommendations, and agentic AI systems. Pinecone + Neo4j + PyTorch alternative.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
