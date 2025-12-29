@@ -45,16 +45,16 @@ no_std_gateway = []
 
 [dependencies]
 # Core types only - avoid heavy dependencies
-thiserror = { workspace = true }
-serde = { workspace = true }
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
 
 # Optional WASM support
 getrandom = { version = "0.2", optional = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
-proptest = { workspace = true }
-rand = { workspace = true }
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+rand = "0.8"
 
 [[bench]]
 name = "latency"

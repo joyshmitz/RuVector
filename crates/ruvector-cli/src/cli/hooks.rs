@@ -514,12 +514,12 @@ pub struct IntelligenceStats {
 pub struct Intelligence {
     data: IntelligenceData,
     data_path: PathBuf,
-    alpha: f32,   // Learning rate
-    gamma: f32,   // Discount factor
-    epsilon: f32, // Exploration rate
-    dirty: bool,  // Track if data needs saving
+    alpha: f32,                              // Learning rate
+    gamma: f32,                              // Discount factor
+    epsilon: f32,                            // Exploration rate
+    dirty: bool,                             // Track if data needs saving
     q_cache: RefCell<LruCache<String, f32>>, // LRU cache for Q-values
-    use_compression: bool, // Use gzip compression
+    use_compression: bool,                   // Use gzip compression
 }
 
 impl Intelligence {
@@ -671,7 +671,12 @@ impl Intelligence {
     // === Memory Operations ===
 
     /// Remember content
-    pub fn remember(&mut self, memory_type: &str, content: &str, metadata: HashMap<String, String>) -> String {
+    pub fn remember(
+        &mut self,
+        memory_type: &str,
+        content: &str,
+        metadata: HashMap<String, String>,
+    ) -> String {
         let id = format!("mem_{}", Self::now());
         let embedding = self.embed(content);
 
@@ -697,7 +702,9 @@ impl Intelligence {
     pub fn recall(&self, query: &str, top_k: usize) -> Vec<&MemoryEntry> {
         let query_embed = self.embed(query);
 
-        let mut scored: Vec<_> = self.data.memories
+        let mut scored: Vec<_> = self
+            .data
+            .memories
             .iter()
             .map(|m| {
                 let score = Self::similarity(&query_embed, &m.embedding);
@@ -721,7 +728,12 @@ impl Intelligence {
         }
 
         // Lookup in data
-        let value = self.data.patterns.get(&key).map(|p| p.q_value).unwrap_or(0.0);
+        let value = self
+            .data
+            .patterns
+            .get(&key)
+            .map(|p| p.q_value)
+            .unwrap_or(0.0);
 
         // Cache the result
         self.q_cache.borrow_mut().put(key, value);
@@ -805,13 +817,24 @@ impl Intelligence {
     }
 
     /// Route to best agent
-    pub fn route(&self, task: &str, file: Option<&str>, crate_name: Option<&str>, operation: &str) -> (String, f32, String) {
+    pub fn route(
+        &self,
+        task: &str,
+        file: Option<&str>,
+        crate_name: Option<&str>,
+        operation: &str,
+    ) -> (String, f32, String) {
         let file_type = file
             .and_then(|f| Path::new(f).extension())
             .and_then(|e| e.to_str())
             .unwrap_or("unknown");
 
-        let state = format!("{}_{}_in_{}", operation, file_type, crate_name.unwrap_or("project"));
+        let state = format!(
+            "{}_{}_in_{}",
+            operation,
+            file_type,
+            crate_name.unwrap_or("project")
+        );
 
         // Agent candidates based on file type
         let agents: Vec<String> = match file_type {
@@ -821,7 +844,10 @@ impl Intelligence {
             "md" => vec!["docs-writer", "coder"],
             "toml" | "json" | "yaml" => vec!["config-specialist", "coder"],
             _ => vec!["coder", "reviewer"],
-        }.into_iter().map(String::from).collect();
+        }
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let (agent, confidence) = self.suggest(&state, &agents);
 
@@ -890,7 +916,8 @@ impl Intelligence {
             c if c.starts_with("E05") => "lifetime-error",
             c if c.starts_with("TS2") => "typescript-type-error",
             _ => "unknown",
-        }.to_string()
+        }
+        .to_string()
     }
 
     /// Suggest fix for error
@@ -903,7 +930,9 @@ impl Intelligence {
     /// Record file edit
     pub fn record_file_edit(&mut self, file: &str, previous_file: Option<&str>) {
         if let Some(prev) = previous_file {
-            let existing = self.data.file_sequences
+            let existing = self
+                .data
+                .file_sequences
                 .iter_mut()
                 .find(|s| s.from_file == prev && s.to_file == file);
 
@@ -921,7 +950,9 @@ impl Intelligence {
 
     /// Suggest next files
     pub fn suggest_next(&self, file: &str, count: usize) -> Vec<(&str, u32)> {
-        let mut suggestions: Vec<_> = self.data.file_sequences
+        let mut suggestions: Vec<_> = self
+            .data
+            .file_sequences
             .iter()
             .filter(|s| s.from_file == file)
             .map(|s| (s.to_file.as_str(), s.count))
@@ -962,19 +993,24 @@ impl Intelligence {
 
     /// Register agent
     pub fn swarm_register(&mut self, id: &str, agent_type: &str, capabilities: Vec<String>) {
-        self.data.agents.insert(id.to_string(), SwarmAgent {
-            id: id.to_string(),
-            agent_type: agent_type.to_string(),
-            capabilities,
-            success_rate: 1.0,
-            task_count: 0,
-            status: "active".to_string(),
-        });
+        self.data.agents.insert(
+            id.to_string(),
+            SwarmAgent {
+                id: id.to_string(),
+                agent_type: agent_type.to_string(),
+                capabilities,
+                success_rate: 1.0,
+                task_count: 0,
+                status: "active".to_string(),
+            },
+        );
     }
 
     /// Record coordination
     pub fn swarm_coordinate(&mut self, source: &str, target: &str, weight: f32) {
-        let existing = self.data.edges
+        let existing = self
+            .data
+            .edges
             .iter_mut()
             .find(|e| e.source == source && e.target == target);
 
@@ -993,11 +1029,14 @@ impl Intelligence {
 
     /// Recommend agent for task
     pub fn swarm_recommend(&self, task_type: &str) -> Option<&SwarmAgent> {
-        self.data.agents
+        self.data
+            .agents
             .values()
             .filter(|a| a.status == "active" && a.agent_type == task_type)
             .max_by(|a, b| {
-                a.success_rate.partial_cmp(&b.success_rate).unwrap_or(std::cmp::Ordering::Equal)
+                a.success_rate
+                    .partial_cmp(&b.success_rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 
@@ -1009,11 +1048,20 @@ impl Intelligence {
         }
 
         // Find replacement
-        let failed_type = self.data.agents.get(agent_id).map(|a| a.agent_type.clone())?;
-        self.data.agents
+        let failed_type = self
+            .data
+            .agents
+            .get(agent_id)
+            .map(|a| a.agent_type.clone())?;
+        self.data
+            .agents
             .values()
             .filter(|a| a.status == "active" && a.agent_type == failed_type && a.id != agent_id)
-            .max_by(|a, b| a.success_rate.partial_cmp(&b.success_rate).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.success_rate
+                    .partial_cmp(&b.success_rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|a| a.id.clone())
     }
 
@@ -1022,7 +1070,12 @@ impl Intelligence {
         let agent_count = self.data.agents.len();
         let edge_count = self.data.edges.len();
         let avg_success = if agent_count > 0 {
-            self.data.agents.values().map(|a| a.success_rate).sum::<f32>() / agent_count as f32
+            self.data
+                .agents
+                .values()
+                .map(|a| a.success_rate)
+                .sum::<f32>()
+                / agent_count as f32
         } else {
             0.0
         };
@@ -1063,7 +1116,9 @@ pub fn get_intelligence_path() -> PathBuf {
             }
         });
 
-    PathBuf::from(home).join(".ruvector").join("intelligence.json")
+    PathBuf::from(home)
+        .join(".ruvector")
+        .join("intelligence.json")
 }
 
 /// Initialize PostgreSQL schema for hooks
@@ -1093,7 +1148,10 @@ fn init_postgres_schema() -> Result<()> {
     match result {
         Ok(output) => {
             if output.status.success() {
-                println!("{}", "✅ PostgreSQL schema applied successfully!".green().bold());
+                println!(
+                    "{}",
+                    "✅ PostgreSQL schema applied successfully!".green().bold()
+                );
                 println!("\n{}", "Tables created:".bold());
                 println!("   • ruvector_hooks_patterns     (Q-learning)");
                 println!("   • ruvector_hooks_memories     (Vector embeddings)");
@@ -1119,7 +1177,10 @@ fn init_postgres_schema() -> Result<()> {
         }
         Err(e) => {
             // psql not found, provide manual instructions
-            println!("{}", "⚠️  psql not found. Apply schema manually:".yellow().bold());
+            println!(
+                "{}",
+                "⚠️  psql not found. Apply schema manually:".yellow().bold()
+            );
             println!("\n{}", "Option 1: Using psql".bold());
             println!("   psql $RUVECTOR_POSTGRES_URL -f crates/ruvector-cli/sql/hooks_schema.sql");
             println!("\n{}", "Option 2: Copy to clipboard (macOS)".bold());
@@ -1142,7 +1203,10 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
     let settings_path = claude_dir.join("settings.json");
 
     if settings_path.exists() && !force {
-        println!("{}", "Hooks already initialized. Use --force to overwrite.".yellow());
+        println!(
+            "{}",
+            "Hooks already initialized. Use --force to overwrite.".yellow()
+        );
         return Ok(());
     }
 
@@ -1317,10 +1381,22 @@ pub fn show_stats(_config: &Config) -> Result<()> {
 
     println!("{}", "🧠 RuVector Intelligence Stats".bold().cyan());
     println!();
-    println!("  {} Q-learning patterns", stats.total_patterns.to_string().green());
-    println!("  {} vector memories", stats.total_memories.to_string().green());
-    println!("  {} learning trajectories", stats.total_trajectories.to_string().green());
-    println!("  {} error patterns", stats.total_errors.to_string().green());
+    println!(
+        "  {} Q-learning patterns",
+        stats.total_patterns.to_string().green()
+    );
+    println!(
+        "  {} vector memories",
+        stats.total_memories.to_string().green()
+    );
+    println!(
+        "  {} learning trajectories",
+        stats.total_trajectories.to_string().green()
+    );
+    println!(
+        "  {} error patterns",
+        stats.total_errors.to_string().green()
+    );
     println!();
 
     let (agents, edges, avg_success) = intel.swarm_stats();
@@ -1330,7 +1406,10 @@ pub fn show_stats(_config: &Config) -> Result<()> {
     if avg_success.is_nan() || avg_success == 0.0 {
         println!("  {}% average success rate", "N/A".cyan());
     } else {
-        println!("  {:.0}% average success rate", (avg_success * 100.0).to_string().cyan());
+        println!(
+            "  {:.0}% average success rate",
+            (avg_success * 100.0).to_string().cyan()
+        );
     }
 
     Ok(())
@@ -1351,18 +1430,24 @@ pub fn recall_content(query: &str, top_k: usize, _config: &Config) -> Result<()>
     let intel = Intelligence::new(get_intelligence_path());
     let results = intel.recall(query, top_k);
 
-    let output: Vec<_> = results.iter().map(|m| {
-        serde_json::json!({
-            "type": m.memory_type,
-            "content": m.content.chars().take(200).collect::<String>(),
-            "timestamp": m.timestamp
+    let output: Vec<_> = results
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "type": m.memory_type,
+                "content": m.content.chars().take(200).collect::<String>(),
+                "timestamp": m.timestamp
+            })
         })
-    }).collect();
+        .collect();
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "query": query,
-        "results": output
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "query": query,
+            "results": output
+        }))?
+    );
 
     Ok(())
 }
@@ -1373,13 +1458,16 @@ pub fn learn_trajectory(state: &str, action: &str, reward: f32, _config: &Config
     let id = intel.learn(state, action, "recorded", reward);
     intel.save()?;
 
-    println!("{}", serde_json::json!({
-        "success": true,
-        "id": id,
-        "state": state,
-        "action": action,
-        "reward": reward
-    }));
+    println!(
+        "{}",
+        serde_json::json!({
+            "success": true,
+            "id": id,
+            "state": state,
+            "action": action,
+            "reward": reward
+        })
+    );
 
     Ok(())
 }
@@ -1387,32 +1475,47 @@ pub fn learn_trajectory(state: &str, action: &str, reward: f32, _config: &Config
 /// Suggest action
 pub fn suggest_action(state: &str, actions_str: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
-    let actions: Vec<String> = actions_str.split(',').map(|s| s.trim().to_string()).collect();
+    let actions: Vec<String> = actions_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect();
     let (action, confidence) = intel.suggest(state, &actions);
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "state": state,
-        "action": action,
-        "confidence": confidence,
-        "explored": confidence == 0.0
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "state": state,
+            "action": action,
+            "confidence": confidence,
+            "explored": confidence == 0.0
+        }))?
+    );
 
     Ok(())
 }
 
 /// Route to agent
-pub fn route_task(task: &str, file: Option<&str>, crate_name: Option<&str>, operation: &str, _config: &Config) -> Result<()> {
+pub fn route_task(
+    task: &str,
+    file: Option<&str>,
+    crate_name: Option<&str>,
+    operation: &str,
+    _config: &Config,
+) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
     let (agent, confidence, reason) = intel.route(task, file, crate_name, operation);
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "task": task,
-        "recommended": agent,
-        "confidence": confidence,
-        "reasoning": reason,
-        "file": file,
-        "crate": crate_name
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "task": task,
+            "recommended": agent,
+            "confidence": confidence,
+            "reasoning": reason,
+            "file": file,
+            "crate": crate_name
+        }))?
+    );
 
     Ok(())
 }
@@ -1431,21 +1534,25 @@ pub fn pre_edit_hook(file: &str, _config: &Config) -> Result<()> {
         .nth(1)
         .and_then(|s| s.split('/').next());
 
-    let (agent, confidence, reason) = intel.route(
-        &format!("edit {}", file),
-        Some(file),
-        crate_name,
-        "edit"
-    );
+    let (agent, confidence, reason) =
+        intel.route(&format!("edit {}", file), Some(file), crate_name, "edit");
 
-    let similar = intel.recall(&format!("edit {} {}", file_type, crate_name.unwrap_or("")), 3);
+    let similar = intel.recall(
+        &format!("edit {} {}", file_type, crate_name.unwrap_or("")),
+        3,
+    );
 
     println!("{}", "🧠 Intelligence Analysis:".bold());
-    println!("   📁 {}/{}",
+    println!(
+        "   📁 {}/{}",
         crate_name.unwrap_or("project").cyan(),
-        Path::new(file).file_name().unwrap_or_default().to_string_lossy()
+        Path::new(file)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
     );
-    println!("   🤖 Recommended: {} ({:.0}% confidence)",
+    println!(
+        "   🤖 Recommended: {} ({:.0}% confidence)",
         agent.green().bold(),
         confidence * 100.0
     );
@@ -1474,26 +1581,40 @@ pub fn post_edit_hook(file: &str, success: bool, _config: &Config) -> Result<()>
         .and_then(|s| s.split('/').next());
 
     let state = format!("edit_{}_in_{}", file_type, crate_name.unwrap_or("project"));
-    let action = if success { "successful-edit" } else { "failed-edit" };
+    let action = if success {
+        "successful-edit"
+    } else {
+        "failed-edit"
+    };
     let reward = if success { 1.0 } else { -0.5 };
 
-    intel.learn(&state, action, if success { "completed" } else { "failed" }, reward);
+    intel.learn(
+        &state,
+        action,
+        if success { "completed" } else { "failed" },
+        reward,
+    );
     intel.remember(
         "edit",
-        &format!("{} edit of {} in {}",
+        &format!(
+            "{} edit of {} in {}",
             if success { "successful" } else { "failed" },
             file_type,
             crate_name.unwrap_or("project")
         ),
-        HashMap::new()
+        HashMap::new(),
     );
 
     intel.save()?;
 
     let icon = if success { "✅" } else { "❌" };
-    println!("📊 Learning recorded: {} {}",
+    println!(
+        "📊 Learning recorded: {} {}",
         icon,
-        Path::new(file).file_name().unwrap_or_default().to_string_lossy()
+        Path::new(file)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
     );
 
     // Suggest tests
@@ -1505,8 +1626,15 @@ pub fn post_edit_hook(file: &str, success: bool, _config: &Config) -> Result<()>
     // Suggest next files
     let next = intel.suggest_next(file, 2);
     if !next.is_empty() {
-        let files: Vec<_> = next.iter()
-            .map(|(f, _)| Path::new(f).file_name().unwrap_or_default().to_string_lossy().to_string())
+        let files: Vec<_> = next
+            .iter()
+            .map(|(f, _)| {
+                Path::new(f)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            })
             .collect();
         println!("   📁 Often edit next: {}", files.join(", ").dimmed());
     }
@@ -1518,14 +1646,23 @@ pub fn post_edit_hook(file: &str, success: bool, _config: &Config) -> Result<()>
 pub fn pre_command_hook(command: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
 
-    let cmd_type = if command.starts_with("cargo") { "cargo" }
-        else if command.starts_with("npm") { "npm" }
-        else if command.starts_with("git") { "git" }
-        else if command.starts_with("wasm-pack") { "wasm" }
-        else { "other" };
+    let cmd_type = if command.starts_with("cargo") {
+        "cargo"
+    } else if command.starts_with("npm") {
+        "npm"
+    } else if command.starts_with("git") {
+        "git"
+    } else if command.starts_with("wasm-pack") {
+        "wasm"
+    } else {
+        "other"
+    };
 
     let state = format!("{}_in_general", cmd_type);
-    let actions = vec!["command-succeeded".to_string(), "command-failed".to_string()];
+    let actions = vec![
+        "command-succeeded".to_string(),
+        "command-failed".to_string(),
+    ];
     let (suggestion, confidence) = intel.suggest(&state, &actions);
 
     println!("🧠 Command: {}", cmd_type.cyan());
@@ -1537,27 +1674,50 @@ pub fn pre_command_hook(command: &str, _config: &Config) -> Result<()> {
 }
 
 /// Post-command hook
-pub fn post_command_hook(command: &str, success: bool, stderr: Option<&str>, _config: &Config) -> Result<()> {
+pub fn post_command_hook(
+    command: &str,
+    success: bool,
+    stderr: Option<&str>,
+    _config: &Config,
+) -> Result<()> {
     let mut intel = Intelligence::new(get_intelligence_path());
 
-    let cmd_type = if command.starts_with("cargo") { "cargo" }
-        else if command.starts_with("npm") { "npm" }
-        else if command.starts_with("git") { "git" }
-        else if command.starts_with("wasm-pack") { "wasm" }
-        else { "other" };
+    let cmd_type = if command.starts_with("cargo") {
+        "cargo"
+    } else if command.starts_with("npm") {
+        "npm"
+    } else if command.starts_with("git") {
+        "git"
+    } else if command.starts_with("wasm-pack") {
+        "wasm"
+    } else {
+        "other"
+    };
 
     let state = format!("{}_in_general", cmd_type);
-    let action = if success { "command-succeeded" } else { "command-failed" };
+    let action = if success {
+        "command-succeeded"
+    } else {
+        "command-failed"
+    };
     let reward = if success { 1.0 } else { -0.5 };
 
-    intel.learn(&state, action, &command.chars().take(100).collect::<String>(), reward);
+    intel.learn(
+        &state,
+        action,
+        &command.chars().take(100).collect::<String>(),
+        reward,
+    );
 
     // Record errors if failed
     if !success {
         if let Some(err) = stderr {
             let errors = intel.record_error(command, err);
             if !errors.is_empty() {
-                println!("📊 Command ❌ recorded ({} error patterns learned)", errors.len());
+                println!(
+                    "📊 Command ❌ recorded ({} error patterns learned)",
+                    errors.len()
+                );
                 for code in errors.iter().take(2) {
                     if let Some(pattern) = intel.suggest_fix(code) {
                         if !pattern.fixes.is_empty() {
@@ -1602,8 +1762,10 @@ pub fn session_start_hook(_session_id: Option<&str>, resume: bool, _config: &Con
 
     // Show quick stats on startup
     if stats.total_patterns > 0 || stats.total_memories > 0 {
-        println!("   {} patterns | {} memories | {} sessions",
-            stats.total_patterns, stats.total_memories, stats.session_count);
+        println!(
+            "   {} patterns | {} memories | {} sessions",
+            stats.total_patterns, stats.total_memories, stats.session_count
+        );
     }
 
     Ok(())
@@ -1616,13 +1778,16 @@ pub fn session_end_hook(export_metrics: bool, _config: &Config) -> Result<()> {
 
     if export_metrics {
         let stats = intel.stats();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "patterns": stats.total_patterns,
-            "memories": stats.total_memories,
-            "trajectories": stats.total_trajectories,
-            "errors": stats.total_errors,
-            "sessions": stats.session_count
-        }))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "patterns": stats.total_patterns,
+                "memories": stats.total_memories,
+                "trajectories": stats.total_trajectories,
+                "errors": stats.total_errors,
+                "sessions": stats.session_count
+            }))?
+        );
     }
 
     println!("{}", "📊 Session ended. Learning data saved.".green());
@@ -1637,8 +1802,10 @@ pub fn pre_compact_hook(length: Option<usize>, auto: bool, _config: &Config) -> 
 
     if auto {
         // Auto-compact: just save critical state silently
-        println!("🗜️ Pre-compact: {} trajectories, {} memories saved",
-            stats.total_trajectories, stats.total_memories);
+        println!(
+            "🗜️ Pre-compact: {} trajectories, {} memories saved",
+            stats.total_trajectories, stats.total_memories
+        );
     } else {
         // Manual compact: show full summary
         println!("{}", "🗜️ Pre-compact Summary".bold().cyan());
@@ -1674,7 +1841,12 @@ pub fn track_notification_cmd(notification_type: Option<&str>, _config: &Config)
 
     // Track notification as a learning trajectory
     if let Some(ntype) = notification_type {
-        intel.learn(&format!("notification:{}", ntype), "observed", "tracked", 0.0);
+        intel.learn(
+            &format!("notification:{}", ntype),
+            "observed",
+            "tracked",
+            0.0,
+        );
         intel.save()?;
     }
 
@@ -1687,10 +1859,13 @@ pub fn record_error_cmd(command: &str, stderr: &str, _config: &Config) -> Result
     let errors = intel.record_error(command, stderr);
     intel.save()?;
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "recorded": errors.len(),
-        "errors": errors
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "recorded": errors.len(),
+            "errors": errors
+        }))?
+    );
 
     Ok(())
 }
@@ -1700,17 +1875,23 @@ pub fn suggest_fix_cmd(error_code: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
 
     if let Some(pattern) = intel.suggest_fix(error_code) {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "code": pattern.code,
-            "type": pattern.error_type,
-            "occurrences": pattern.occurrences,
-            "fixes": pattern.fixes
-        }))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "code": pattern.code,
+                "type": pattern.error_type,
+                "occurrences": pattern.occurrences,
+                "fixes": pattern.fixes
+            }))?
+        );
     } else {
-        println!("{}", serde_json::json!({
-            "code": error_code,
-            "found": false
-        }));
+        println!(
+            "{}",
+            serde_json::json!({
+                "code": error_code,
+                "found": false
+            })
+        );
     }
 
     Ok(())
@@ -1721,12 +1902,15 @@ pub fn suggest_next_cmd(file: &str, count: usize, _config: &Config) -> Result<()
     let intel = Intelligence::new(get_intelligence_path());
     let suggestions = intel.suggest_next(file, count);
 
-    let output: Vec<_> = suggestions.iter().map(|(f, c)| {
-        serde_json::json!({
-            "file": f,
-            "count": c
+    let output: Vec<_> = suggestions
+        .iter()
+        .map(|(f, c)| {
+            serde_json::json!({
+                "file": f,
+                "count": c
+            })
         })
-    }).collect();
+        .collect();
 
     println!("{}", serde_json::to_string_pretty(&output)?);
 
@@ -1738,16 +1922,24 @@ pub fn should_test_cmd(file: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
     let (suggest, command) = intel.should_test(file);
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "suggest": suggest,
-        "command": command
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "suggest": suggest,
+            "command": command
+        }))?
+    );
 
     Ok(())
 }
 
 /// Swarm register
-pub fn swarm_register_cmd(agent_id: &str, agent_type: &str, capabilities: Option<&str>, _config: &Config) -> Result<()> {
+pub fn swarm_register_cmd(
+    agent_id: &str,
+    agent_type: &str,
+    capabilities: Option<&str>,
+    _config: &Config,
+) -> Result<()> {
     let mut intel = Intelligence::new(get_intelligence_path());
     let caps: Vec<String> = capabilities
         .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
@@ -1756,27 +1948,38 @@ pub fn swarm_register_cmd(agent_id: &str, agent_type: &str, capabilities: Option
     intel.swarm_register(agent_id, agent_type, caps);
     intel.save()?;
 
-    println!("{}", serde_json::json!({
-        "success": true,
-        "agent_id": agent_id,
-        "type": agent_type
-    }));
+    println!(
+        "{}",
+        serde_json::json!({
+            "success": true,
+            "agent_id": agent_id,
+            "type": agent_type
+        })
+    );
 
     Ok(())
 }
 
 /// Swarm coordinate
-pub fn swarm_coordinate_cmd(source: &str, target: &str, weight: f32, _config: &Config) -> Result<()> {
+pub fn swarm_coordinate_cmd(
+    source: &str,
+    target: &str,
+    weight: f32,
+    _config: &Config,
+) -> Result<()> {
     let mut intel = Intelligence::new(get_intelligence_path());
     intel.swarm_coordinate(source, target, weight);
     intel.save()?;
 
-    println!("{}", serde_json::json!({
-        "success": true,
-        "source": source,
-        "target": target,
-        "weight": weight
-    }));
+    println!(
+        "{}",
+        serde_json::json!({
+            "success": true,
+            "source": source,
+            "target": target,
+            "weight": weight
+        })
+    );
 
     Ok(())
 }
@@ -1786,19 +1989,25 @@ pub fn swarm_optimize_cmd(tasks: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
     let task_list: Vec<&str> = tasks.split(',').map(|s| s.trim()).collect();
 
-    let assignments: Vec<_> = task_list.iter().map(|task| {
-        let (agent, edges, _) = intel.swarm_stats();
-        serde_json::json!({
-            "task": task,
-            "available_agents": agent,
-            "coordination_edges": edges
+    let assignments: Vec<_> = task_list
+        .iter()
+        .map(|task| {
+            let (agent, edges, _) = intel.swarm_stats();
+            serde_json::json!({
+                "task": task,
+                "available_agents": agent,
+                "coordination_edges": edges
+            })
         })
-    }).collect();
+        .collect();
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "tasks": task_list.len(),
-        "assignments": assignments
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "tasks": task_list.len(),
+            "assignments": assignments
+        }))?
+    );
 
     Ok(())
 }
@@ -1808,18 +2017,24 @@ pub fn swarm_recommend_cmd(task_type: &str, _config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
 
     if let Some(agent) = intel.swarm_recommend(task_type) {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "task_type": task_type,
-            "recommended": agent.id,
-            "success_rate": agent.success_rate,
-            "capabilities": agent.capabilities
-        }))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "task_type": task_type,
+                "recommended": agent.id,
+                "success_rate": agent.success_rate,
+                "capabilities": agent.capabilities
+            }))?
+        );
     } else {
-        println!("{}", serde_json::json!({
-            "task_type": task_type,
-            "recommended": null,
-            "message": "No matching agent found"
-        }));
+        println!(
+            "{}",
+            serde_json::json!({
+                "task_type": task_type,
+                "recommended": null,
+                "message": "No matching agent found"
+            })
+        );
     }
 
     Ok(())
@@ -1831,11 +2046,14 @@ pub fn swarm_heal_cmd(agent_id: &str, _config: &Config) -> Result<()> {
     let replacement = intel.swarm_heal(agent_id);
     intel.save()?;
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "failed_agent": agent_id,
-        "replacement": replacement,
-        "healed": replacement.is_some()
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "failed_agent": agent_id,
+            "replacement": replacement,
+            "healed": replacement.is_some()
+        }))?
+    );
 
     Ok(())
 }
@@ -1845,12 +2063,15 @@ pub fn swarm_stats_cmd(_config: &Config) -> Result<()> {
     let intel = Intelligence::new(get_intelligence_path());
     let (agents, edges, avg_success) = intel.swarm_stats();
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "agents": agents,
-        "edges": edges,
-        "average_success_rate": avg_success,
-        "topology": "mesh"
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "agents": agents,
+            "edges": edges,
+            "average_success_rate": avg_success,
+            "topology": "mesh"
+        }))?
+    );
 
     Ok(())
 }
@@ -1870,16 +2091,30 @@ pub fn lsp_diagnostic_cmd(
     let stdin_input = try_parse_stdin();
 
     let file = file
-        .or_else(|| stdin_input.as_ref().and_then(|i| i.tool_input.as_ref()
-            .and_then(|t| t.get("file").and_then(|f| f.as_str()))))
+        .or_else(|| {
+            stdin_input.as_ref().and_then(|i| {
+                i.tool_input
+                    .as_ref()
+                    .and_then(|t| t.get("file").and_then(|f| f.as_str()))
+            })
+        })
         .unwrap_or("unknown");
 
     let severity = severity.unwrap_or("error");
     let message = message.unwrap_or("");
 
     // Learn from diagnostic patterns
-    let state = format!("lsp:{}:{}", severity, file.split('/').last().unwrap_or(file));
-    intel.learn(&state, "diagnostic", severity, if severity == "error" { -0.5 } else { 0.0 });
+    let state = format!(
+        "lsp:{}:{}",
+        severity,
+        file.split('/').last().unwrap_or(file)
+    );
+    intel.learn(
+        &state,
+        "diagnostic",
+        severity,
+        if severity == "error" { -0.5 } else { 0.0 },
+    );
     intel.save()?;
 
     // Output JSON for context injection
@@ -1942,7 +2177,10 @@ pub fn suggest_ultrathink_cmd(task: &str, file: Option<&str>, _config: &Config) 
     }
 
     // Check learned patterns
-    let state = format!("task:{}", task_lower.split_whitespace().next().unwrap_or("unknown"));
+    let state = format!(
+        "task:{}",
+        task_lower.split_whitespace().next().unwrap_or("unknown")
+    );
     let (_, q_value) = intel.suggest(&state, &["ultrathink".to_string(), "normal".to_string()]);
     if q_value > 0.5 {
         complexity_score += 0.3;
@@ -1950,17 +2188,20 @@ pub fn suggest_ultrathink_cmd(task: &str, file: Option<&str>, _config: &Config) 
 
     let recommend_ultrathink = complexity_score >= 0.6;
 
-    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-        "task": task,
-        "complexity_score": complexity_score,
-        "recommend_ultrathink": recommend_ultrathink,
-        "matched_patterns": matched_patterns,
-        "suggestion": if recommend_ultrathink {
-            "Consider using 'ultrathink' for this complex task"
-        } else {
-            "Standard reasoning should suffice"
-        }
-    }))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "task": task,
+            "complexity_score": complexity_score,
+            "recommend_ultrathink": recommend_ultrathink,
+            "matched_patterns": matched_patterns,
+            "suggestion": if recommend_ultrathink {
+                "Consider using 'ultrathink' for this complex task"
+            } else {
+                "Standard reasoning should suffice"
+            }
+        }))?
+    );
 
     Ok(())
 }
@@ -1976,10 +2217,13 @@ pub fn async_agent_cmd(
 
     match action {
         "spawn" => {
-            let default_id = format!("async-{}", std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis());
+            let default_id = format!(
+                "async-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+            );
             let agent_id = agent_id.unwrap_or(&default_id);
             let task = task.unwrap_or("unknown");
 
@@ -1988,13 +2232,16 @@ pub fn async_agent_cmd(
             intel.learn(&format!("async:{}", agent_id), "spawned", "active", 0.0);
             intel.save()?;
 
-            println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                "action": "spawn",
-                "agent_id": agent_id,
-                "task": task,
-                "status": "spawned",
-                "coordination": "async"
-            }))?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "action": "spawn",
+                    "agent_id": agent_id,
+                    "task": task,
+                    "status": "spawned",
+                    "coordination": "async"
+                }))?
+            );
         }
         "sync" => {
             // Record coordination between async agents
@@ -2002,11 +2249,14 @@ pub fn async_agent_cmd(
                 intel.learn(&format!("async:{}", id), "sync", "waiting", 0.1);
                 intel.save()?;
 
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                    "action": "sync",
-                    "agent_id": id,
-                    "status": "synchronizing"
-                }))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "action": "sync",
+                        "agent_id": id,
+                        "status": "synchronizing"
+                    }))?
+                );
             }
         }
         "complete" => {
@@ -2014,18 +2264,24 @@ pub fn async_agent_cmd(
                 intel.learn(&format!("async:{}", id), "complete", "finished", 1.0);
                 intel.save()?;
 
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                    "action": "complete",
-                    "agent_id": id,
-                    "status": "completed",
-                    "reward": 1.0
-                }))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "action": "complete",
+                        "agent_id": id,
+                        "status": "completed",
+                        "reward": 1.0
+                    }))?
+                );
             }
         }
         _ => {
-            println!("{}", serde_json::json!({
-                "error": format!("Unknown action: {}. Use spawn, sync, or complete.", action)
-            }));
+            println!(
+                "{}",
+                serde_json::json!({
+                    "error": format!("Unknown action: {}. Use spawn, sync, or complete.", action)
+                })
+            );
         }
     }
 
@@ -2036,11 +2292,11 @@ pub fn async_agent_cmd(
 
 /// Generate shell completions
 pub fn generate_completions(shell: ShellType) -> Result<()> {
-
     // We need to get the parent CLI struct, but since we're in a submodule,
     // we'll generate a standalone completions script
     let completions = match shell {
-        ShellType::Bash => r#"# Bash completion for ruvector hooks
+        ShellType::Bash => {
+            r#"# Bash completion for ruvector hooks
 _ruvector_hooks() {
     local cur prev commands
     COMPREPLY=()
@@ -2054,8 +2310,10 @@ _ruvector_hooks() {
     fi
 }
 complete -F _ruvector_hooks ruvector
-"#,
-        ShellType::Zsh => r#"#compdef ruvector
+"#
+        }
+        ShellType::Zsh => {
+            r#"#compdef ruvector
 
 _ruvector_hooks() {
     local -a commands
@@ -2105,8 +2363,10 @@ _ruvector() {
 }
 
 compdef _ruvector ruvector
-"#,
-        ShellType::Fish => r#"# Fish completion for ruvector hooks
+"#
+        }
+        ShellType::Fish => {
+            r#"# Fish completion for ruvector hooks
 complete -c ruvector -n "__fish_use_subcommand" -a hooks -d "Self-learning intelligence hooks"
 complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a init -d "Initialize hooks"
 complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a install -d "Install hooks into Claude settings"
@@ -2124,8 +2384,10 @@ complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a swarm-stats -d "S
 complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a completions -d "Generate completions"
 complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a compress -d "Compress storage"
 complete -c ruvector -n "__fish_seen_subcommand_from hooks" -a cache-stats -d "Show cache stats"
-"#,
-        ShellType::PowerShell => r#"# PowerShell completion for ruvector hooks
+"#
+        }
+        ShellType::PowerShell => {
+            r#"# PowerShell completion for ruvector hooks
 Register-ArgumentCompleter -Native -CommandName ruvector -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $commands = @(
@@ -2139,7 +2401,8 @@ Register-ArgumentCompleter -Native -CommandName ruvector -ScriptBlock {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
 }
-"#,
+"#
+        }
     };
 
     println!("{}", completions);
@@ -2206,7 +2469,10 @@ pub fn cache_stats(_config: &Config) -> Result<()> {
     if compressed_path.exists() {
         println!("  - Compression: {} (enabled)", "gzip".green());
     } else {
-        println!("  - Compression: {} (run 'hooks compress')", "disabled".yellow());
+        println!(
+            "  - Compression: {} (run 'hooks compress')",
+            "disabled".yellow()
+        );
     }
 
     Ok(())

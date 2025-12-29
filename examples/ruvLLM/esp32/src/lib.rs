@@ -30,6 +30,10 @@ pub mod model;
 pub mod attention;
 pub mod embedding;
 pub mod optimizations;
+pub mod ota;
+pub mod benchmark;
+pub mod diagnostics;
+pub mod models;
 
 #[cfg(feature = "federation")]
 pub mod federation;

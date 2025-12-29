@@ -97,16 +97,12 @@ fn bench_memory_footprint(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory");
 
     for &size in &[100, 500, 1000, 5000] {
-        group.bench_with_input(
-            BenchmarkId::new("create_network", size),
-            &size,
-            |b, &s| {
-                b.iter(|| {
-                    let network = EpropNetwork::new(100, s, 10);
-                    black_box(network);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("create_network", size), &size, |b, &s| {
+            b.iter(|| {
+                let network = EpropNetwork::new(100, s, 10);
+                black_box(network);
+            });
+        });
     }
 
     group.finish();

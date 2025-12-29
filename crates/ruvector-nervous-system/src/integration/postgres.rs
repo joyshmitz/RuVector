@@ -30,8 +30,8 @@ impl Default for PredictiveConfig {
     fn default() -> Self {
         Self {
             dimension: 128,
-            threshold: 0.1,          // 10% change triggers write
-            learning_rate: 0.1,      // 10% learning rate
+            threshold: 0.1,     // 10% change triggers write
+            learning_rate: 0.1, // 10% learning rate
             adaptive_threshold: true,
             target_compression: 0.1, // Target 10% writes (90% reduction)
         }

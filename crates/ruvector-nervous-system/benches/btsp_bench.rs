@@ -66,7 +66,9 @@ fn bench_associative_memory(c: &mut Criterion) {
 
     group.bench_function("store_one_shot", |b| {
         b.iter(|| {
-            memory.store_one_shot(black_box(&key), black_box(&value)).unwrap();
+            memory
+                .store_one_shot(black_box(&key), black_box(&value))
+                .unwrap();
         });
     });
 

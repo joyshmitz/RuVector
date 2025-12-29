@@ -24,14 +24,13 @@
 //! +------------------------------------------------------------------+
 //! ```
 
-use pgrx::prelude::*;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::collections::BinaryHeap;
-use std::cmp::Ordering as CmpOrdering;
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering as CmpOrdering;
+use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================================================
 // Task Types and Priority
@@ -74,22 +73,19 @@ impl std::fmt::Display for TaskType {
 }
 
 /// Task priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum TaskPriority {
     /// Critical priority - processed immediately
     Critical = 0,
     /// High priority
     High = 1,
     /// Medium priority (default)
+    #[default]
     Medium = 2,
     /// Low priority - background tasks
     Low = 3,
-}
-
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Medium
-    }
 }
 
 impl std::fmt::Display for TaskPriority {
@@ -403,7 +399,9 @@ impl TaskQueue {
                 if steal_count > 0 {
                     let stolen: Vec<_> = queue.drain(..steal_count).collect();
                     if !stolen.is_empty() {
-                        self.stats.stolen.fetch_add(stolen.len() as u64, Ordering::Relaxed);
+                        self.stats
+                            .stolen
+                            .fetch_add(stolen.len() as u64, Ordering::Relaxed);
                         return Some(stolen.into_iter().next().unwrap());
                     }
                 }
@@ -420,7 +418,9 @@ impl TaskQueue {
         }
 
         let completed = self.completed.read();
-        task.dependencies.iter().all(|dep_id| completed.contains(dep_id))
+        task.dependencies
+            .iter()
+            .all(|dep_id| completed.contains(dep_id))
     }
 
     /// Mark a task as completed
@@ -495,10 +495,7 @@ impl TaskQueue {
         let initial_len = queue.len();
 
         // Rebuild heap without the cancelled task
-        let remaining: Vec<_> = queue
-            .drain()
-            .filter(|pt| pt.task.id != task_id)
-            .collect();
+        let remaining: Vec<_> = queue.drain().filter(|pt| pt.task.id != task_id).collect();
 
         for pt in remaining {
             queue.push(pt);

@@ -3,10 +3,10 @@
 
 #[cfg(test)]
 mod memory_bounds_tests {
-    use ruvector_nervous_system::hdc::{Hypervector, HdcMemory};
+    use ruvector_nervous_system::eventbus::{DVSEvent, EventRingBuffer};
+    use ruvector_nervous_system::hdc::{HdcMemory, Hypervector};
     use ruvector_nervous_system::hopfield::ModernHopfield;
     use ruvector_nervous_system::plasticity::btsp::BTSPLayer;
-    use ruvector_nervous_system::eventbus::{DVSEvent, EventRingBuffer};
     use ruvector_nervous_system::routing::OscillatoryRouter;
     use std::mem::size_of;
 
@@ -18,19 +18,11 @@ mod memory_bounds_tests {
     fn verify_real_structure_sizes() {
         // Hypervector: 157 u64s = 1256 bytes (10,048 bits)
         let hv_size = size_of::<Hypervector>();
-        assert!(
-            hv_size <= 1280,
-            "Hypervector size {} > 1280 bytes",
-            hv_size
-        );
+        assert!(hv_size <= 1280, "Hypervector size {} > 1280 bytes", hv_size);
 
         // DVSEvent: should be minimal
         let event_size = size_of::<DVSEvent>();
-        assert!(
-            event_size <= 24,
-            "DVSEvent size {} > 24 bytes",
-            event_size
-        );
+        assert!(event_size <= 24, "DVSEvent size {} > 24 bytes", event_size);
 
         println!("Structure sizes:");
         println!("  Hypervector: {} bytes", hv_size);
@@ -111,7 +103,10 @@ mod memory_bounds_tests {
 
         // Should still work correctly
         let output = layer.forward(&pattern);
-        assert!(output.is_finite(), "Output should be finite after many updates");
+        assert!(
+            output.is_finite(),
+            "Output should be finite after many updates"
+        );
     }
 
     // ========================================================================

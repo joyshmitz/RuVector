@@ -4,10 +4,10 @@
 //! transitions. Operations are allowed, throttled, or blocked based on the
 //! current integrity state.
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 /// Integrity states representing system health levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -215,17 +215,17 @@ impl StatePermissions {
         Self {
             allow_reads: true,
             allow_single_insert: true,
-            allow_bulk_insert: false,  // No bulk inserts
+            allow_bulk_insert: false, // No bulk inserts
             allow_delete: true,
             allow_update: true,
             allow_index_rewire: false, // No index rewiring
             allow_compression: false,  // No compression
             allow_replication: true,
             allow_backup: true,
-            throttle_inserts_pct: 50,  // 50% throttle
+            throttle_inserts_pct: 50, // 50% throttle
             throttle_searches_pct: 0,
             max_concurrent_searches: Some(100),
-            pause_gnn_training: true,  // Pause training
+            pause_gnn_training: true, // Pause training
             pause_tier_management: false,
         }
     }
@@ -236,8 +236,8 @@ impl StatePermissions {
             allow_reads: true,
             allow_single_insert: true,
             allow_bulk_insert: false,
-            allow_delete: false,       // No deletes
-            allow_update: false,       // No updates
+            allow_delete: false, // No deletes
+            allow_update: false, // No updates
             allow_index_rewire: false,
             allow_compression: false,
             allow_replication: true,   // Keep replication
@@ -260,10 +260,10 @@ impl StatePermissions {
             allow_update: false,
             allow_index_rewire: false,
             allow_compression: false,
-            allow_replication: false,   // Stop replication
-            allow_backup: true,         // Allow backup for recovery
-            throttle_inserts_pct: 100,  // Block all inserts
-            throttle_searches_pct: 50,  // Heavy search throttle
+            allow_replication: false,  // Stop replication
+            allow_backup: true,        // Allow backup for recovery
+            throttle_inserts_pct: 100, // Block all inserts
+            throttle_searches_pct: 50, // Heavy search throttle
             max_concurrent_searches: Some(20),
             pause_gnn_training: true,
             pause_tier_management: true,
@@ -368,7 +368,7 @@ impl IntegrityGate {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
-                    .as_millis() as u64
+                    .as_millis() as u64,
             ),
         }
     }
@@ -455,38 +455,27 @@ impl IntegrityGate {
                 let within_limit = permissions.max_concurrent_searches.map_or(true, |max| {
                     self.concurrent_searches.load(Ordering::Relaxed) < max
                 });
-                (permissions.allow_reads && within_limit, permissions.throttle_searches_pct)
+                (
+                    permissions.allow_reads && within_limit,
+                    permissions.throttle_searches_pct,
+                )
             }
-            "insert" => {
-                (permissions.allow_single_insert, permissions.throttle_inserts_pct)
-            }
-            "bulk_insert" => {
-                (permissions.allow_bulk_insert, permissions.throttle_inserts_pct)
-            }
-            "delete" => {
-                (permissions.allow_delete, 0)
-            }
-            "update" => {
-                (permissions.allow_update, 0)
-            }
-            "index_build" | "index_rewire" => {
-                (permissions.allow_index_rewire, 0)
-            }
-            "compression" | "compact" => {
-                (permissions.allow_compression, 0)
-            }
-            "replication" | "replicate" => {
-                (permissions.allow_replication, 0)
-            }
-            "backup" => {
-                (permissions.allow_backup, 0)
-            }
-            "gnn_train" | "gnn_training" => {
-                (!permissions.pause_gnn_training, 0)
-            }
-            "tier_manage" | "tier_management" => {
-                (!permissions.pause_tier_management, 0)
-            }
+            "insert" => (
+                permissions.allow_single_insert,
+                permissions.throttle_inserts_pct,
+            ),
+            "bulk_insert" => (
+                permissions.allow_bulk_insert,
+                permissions.throttle_inserts_pct,
+            ),
+            "delete" => (permissions.allow_delete, 0),
+            "update" => (permissions.allow_update, 0),
+            "index_build" | "index_rewire" => (permissions.allow_index_rewire, 0),
+            "compression" | "compact" => (permissions.allow_compression, 0),
+            "replication" | "replicate" => (permissions.allow_replication, 0),
+            "backup" => (permissions.allow_backup, 0),
+            "gnn_train" | "gnn_training" => (!permissions.pause_gnn_training, 0),
+            "tier_manage" | "tier_management" => (!permissions.pause_tier_management, 0),
             _ => {
                 // Unknown operations allowed by default
                 (true, 0)
@@ -570,7 +559,8 @@ pub fn apply_throttle(throttle_pct: u8) -> bool {
     let random_val = (std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .subsec_nanos() % 100) as u8;
+        .subsec_nanos()
+        % 100) as u8;
 
     random_val >= throttle_pct
 }
@@ -580,7 +570,9 @@ static GATE_REGISTRY: once_cell::sync::Lazy<DashMap<i32, IntegrityGate>> =
     once_cell::sync::Lazy::new(DashMap::new);
 
 /// Get or create an integrity gate for a collection
-pub fn get_or_create_gate(collection_id: i32) -> dashmap::mapref::one::Ref<'static, i32, IntegrityGate> {
+pub fn get_or_create_gate(
+    collection_id: i32,
+) -> dashmap::mapref::one::Ref<'static, i32, IntegrityGate> {
     if !GATE_REGISTRY.contains_key(&collection_id) {
         GATE_REGISTRY.insert(collection_id, IntegrityGate::new(collection_id));
     }
@@ -588,7 +580,9 @@ pub fn get_or_create_gate(collection_id: i32) -> dashmap::mapref::one::Ref<'stat
 }
 
 /// Get an existing integrity gate
-pub fn get_gate(collection_id: i32) -> Option<dashmap::mapref::one::Ref<'static, i32, IntegrityGate>> {
+pub fn get_gate(
+    collection_id: i32,
+) -> Option<dashmap::mapref::one::Ref<'static, i32, IntegrityGate>> {
     GATE_REGISTRY.get(&collection_id)
 }
 
@@ -618,8 +612,14 @@ mod tests {
 
     #[test]
     fn test_state_parsing() {
-        assert_eq!(IntegrityState::from_str("normal"), Some(IntegrityState::Normal));
-        assert_eq!(IntegrityState::from_str("STRESS"), Some(IntegrityState::Stress));
+        assert_eq!(
+            IntegrityState::from_str("normal"),
+            Some(IntegrityState::Normal)
+        );
+        assert_eq!(
+            IntegrityState::from_str("STRESS"),
+            Some(IntegrityState::Stress)
+        );
         assert_eq!(IntegrityState::from_str("invalid"), None);
     }
 

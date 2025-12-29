@@ -13,9 +13,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use super::detector::{ProblemDetector, SystemMetrics};
-use super::engine::{HealingOutcome, RemediationEngine};
-use super::{get_healing_engine, HealingEngine};
+use super::detector::ProblemDetector;
+use super::engine::HealingOutcome;
+use super::get_healing_engine;
 
 // ============================================================================
 // Worker Configuration
@@ -276,10 +276,7 @@ impl HealingWorker {
 
         if config.log_status {
             if problems_found > 0 {
-                pgrx::log!(
-                    "Healing worker: {} problems detected",
-                    problems_found
-                );
+                pgrx::log!("Healing worker: {} problems detected", problems_found);
             } else {
                 pgrx::debug1!("Healing worker: no problems detected");
             }

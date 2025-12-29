@@ -27,10 +27,15 @@ pub fn ruvector_gcn_forward(
 ) -> JsonB {
     // Parse embeddings from JSON
     let embeddings: Vec<Vec<f32>> = match embeddings_json.0.as_array() {
-        Some(arr) => arr.iter()
-            .filter_map(|v| v.as_array().map(|a|
-                a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect()
-            ))
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| {
+                v.as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_f64().map(|f| f as f32))
+                        .collect()
+                })
+            })
             .collect(),
         None => return JsonB(serde_json::json!([])),
     };
@@ -70,10 +75,15 @@ pub fn ruvector_gcn_forward(
 pub fn ruvector_gnn_aggregate(messages_json: JsonB, method: String) -> Vec<f32> {
     // Parse messages from JSON
     let messages: Vec<Vec<f32>> = match messages_json.0.as_array() {
-        Some(arr) => arr.iter()
-            .filter_map(|v| v.as_array().map(|a|
-                a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect()
-            ))
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| {
+                v.as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_f64().map(|f| f as f32))
+                        .collect()
+                })
+            })
             .collect(),
         None => return vec![],
     };
@@ -146,10 +156,15 @@ pub fn ruvector_graphsage_forward(
 ) -> JsonB {
     // Parse embeddings from JSON
     let embeddings: Vec<Vec<f32>> = match embeddings_json.0.as_array() {
-        Some(arr) => arr.iter()
-            .filter_map(|v| v.as_array().map(|a|
-                a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect()
-            ))
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| {
+                v.as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_f64().map(|f| f as f32))
+                        .collect()
+                })
+            })
             .collect(),
         None => return JsonB(serde_json::json!([])),
     };
@@ -198,10 +213,15 @@ pub fn ruvector_gnn_batch_forward(
 ) -> JsonB {
     // Parse embeddings from JSON
     let embeddings_batch: Vec<Vec<f32>> = match embeddings_batch_json.0.as_array() {
-        Some(arr) => arr.iter()
-            .filter_map(|v| v.as_array().map(|a|
-                a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect()
-            ))
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| {
+                v.as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_f64().map(|f| f as f32))
+                        .collect()
+                })
+            })
             .collect(),
         None => return JsonB(serde_json::json!([])),
     };
@@ -218,9 +238,8 @@ pub fn ruvector_gnn_batch_forward(
         let num_nodes = graph_size as usize;
 
         // Extract embeddings for this graph
-        let graph_embeddings: Vec<Vec<f32>> = embeddings_batch
-            [node_offset..node_offset + num_nodes]
-            .to_vec();
+        let graph_embeddings: Vec<Vec<f32>> =
+            embeddings_batch[node_offset..node_offset + num_nodes].to_vec();
 
         // Extract edges for this graph (simplified - assumes edges come in pairs)
         let num_edges = edge_indices_batch
@@ -254,18 +273,22 @@ pub fn ruvector_gnn_batch_forward(
             .collect();
 
         // Apply GNN layer
-        let in_features = if graph_embeddings.is_empty() { 0 } else { graph_embeddings[0].len() };
+        let in_features = if graph_embeddings.is_empty() {
+            0
+        } else {
+            graph_embeddings[0].len()
+        };
         let out_features = out_dim as usize;
 
         let graph_result = match layer_type.to_lowercase().as_str() {
             "gcn" => {
                 let layer = GCNLayer::new(in_features, out_features);
                 layer.forward(&graph_embeddings, &edge_index, None)
-            },
+            }
             "sage" => {
                 let layer = GraphSAGELayer::new(in_features, out_features, 10);
                 layer.forward(&graph_embeddings, &edge_index)
-            },
+            }
             _ => graph_embeddings,
         };
 
@@ -278,27 +301,51 @@ pub fn ruvector_gnn_batch_forward(
     JsonB(serde_json::json!(result))
 }
 
-#[cfg(any(test, feature = "pg_test"))]
+#[cfg(feature = "pg_test")]
 #[pg_schema]
 mod tests {
     use super::*;
 
+    // Helper to convert Vec to JsonB
+    fn to_json(data: Vec<Vec<f32>>) -> JsonB {
+        JsonB(serde_json::json!(data))
+    }
+
+    // Helper to parse JsonB result to Vec
+    fn parse_result(json: &JsonB) -> Vec<Vec<f32>> {
+        json.0
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| {
+                        v.as_array().map(|a| {
+                            a.iter()
+                                .filter_map(|x| x.as_f64().map(|f| f as f32))
+                                .collect()
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     #[pg_test]
     fn test_ruvector_gcn_forward() {
-        let embeddings = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        let embeddings = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]]);
 
         let src = vec![0, 1, 2];
         let dst = vec![1, 2, 0];
 
         let result = ruvector_gcn_forward(embeddings, src, dst, None, 2);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].len(), 2);
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].len(), 2);
     }
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_sum() {
-        let messages = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let messages = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "sum".to_string());
 
@@ -307,7 +354,7 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_mean() {
-        let messages = vec![vec![2.0, 4.0], vec![4.0, 6.0]];
+        let messages = to_json(vec![vec![2.0, 4.0], vec![4.0, 6.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "mean".to_string());
 
@@ -316,7 +363,7 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_gnn_aggregate_max() {
-        let messages = vec![vec![1.0, 6.0], vec![5.0, 2.0]];
+        let messages = to_json(vec![vec![1.0, 6.0], vec![5.0, 2.0]]);
 
         let result = ruvector_gnn_aggregate(messages, "max".to_string());
 
@@ -325,15 +372,16 @@ mod tests {
 
     #[pg_test]
     fn test_ruvector_graphsage_forward() {
-        let embeddings = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        let embeddings = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]]);
 
         let src = vec![0, 1, 2];
         let dst = vec![1, 2, 0];
 
         let result = ruvector_graphsage_forward(embeddings, src, dst, 2, 2);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].len(), 2);
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].len(), 2);
     }
 
     #[pg_test]
@@ -352,24 +400,26 @@ mod tests {
 
     #[pg_test]
     fn test_empty_inputs() {
-        let empty_embeddings: Vec<Vec<f32>> = vec![];
+        let empty_embeddings = to_json(vec![]);
         let empty_src: Vec<i32> = vec![];
         let empty_dst: Vec<i32> = vec![];
 
         let result = ruvector_gcn_forward(empty_embeddings, empty_src, empty_dst, None, 4);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 0);
+        assert_eq!(parsed.len(), 0);
     }
 
     #[pg_test]
     fn test_weighted_gcn() {
-        let embeddings = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let embeddings = to_json(vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
         let src = vec![0];
         let dst = vec![1];
         let weights = Some(vec![2.0]);
 
         let result = ruvector_gcn_forward(embeddings, src, dst, weights, 2);
+        let parsed = parse_result(&result);
 
-        assert_eq!(result.len(), 2);
+        assert_eq!(parsed.len(), 2);
     }
 }

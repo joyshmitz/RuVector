@@ -1,5 +1,5 @@
 use ruvector_nervous_system::plasticity::consolidate::{
-    EWC, ComplementaryLearning, RewardConsolidation, Experience
+    ComplementaryLearning, Experience, RewardConsolidation, EWC,
 };
 
 #[test]
@@ -14,7 +14,9 @@ fn test_forgetting_reduction() {
     let task1_gradients: Vec<Vec<f32>> = (0..50)
         .map(|_| {
             // Simulated gradients with some variance
-            (0..100).map(|_| 0.1 + (rand::random::<f32>() - 0.5) * 0.02).collect()
+            (0..100)
+                .map(|_| 0.1 + (rand::random::<f32>() - 0.5) * 0.02)
+                .collect()
         })
         .collect();
 
@@ -34,10 +36,12 @@ fn test_forgetting_reduction() {
             }
         }
         // Measure drift from task 1 optimum
-        params.iter()
+        params
+            .iter()
             .zip(task1_params.iter())
             .map(|(p, opt)| (p - opt).abs())
-            .sum::<f32>() / params.len() as f32
+            .sum::<f32>()
+            / params.len() as f32
     };
 
     // With EWC: parameters protected by Fisher-weighted penalty
@@ -56,10 +60,12 @@ fn test_forgetting_reduction() {
             }
         }
         // Measure drift from task 1 optimum
-        params.iter()
+        params
+            .iter()
             .zip(task1_params.iter())
             .map(|(p, opt)| (p - opt).abs())
-            .sum::<f32>() / params.len() as f32
+            .sum::<f32>()
+            / params.len() as f32
     };
 
     // EWC should reduce drift by at least 40% (target: 45%)
@@ -68,9 +74,11 @@ fn test_forgetting_reduction() {
     println!("Protected drift: {:.4}", protected_drift);
     println!("Forgetting reduction: {:.1}%", forgetting_reduction * 100.0);
 
-    assert!(forgetting_reduction > 0.40,
+    assert!(
+        forgetting_reduction > 0.40,
         "EWC should reduce forgetting by at least 40%, got {:.1}%",
-        forgetting_reduction * 100.0);
+        forgetting_reduction * 100.0
+    );
 }
 
 #[test]
@@ -84,10 +92,17 @@ fn test_fisher_information_accuracy() {
     let true_variance: f32 = 0.01; // Known gradient variance
     let gradients: Vec<Vec<f32>> = (0..1000) // Large sample for accuracy
         .map(|_| {
-            (0..100).map(|_| {
-                // Normal distribution with mean=0.1, std=sqrt(0.01)
-                0.1_f32 + rand_distr::Distribution::<f64>::sample(&rand_distr::StandardNormal, &mut rand::thread_rng()) as f32 * true_variance.sqrt()
-            }).collect()
+            (0..100)
+                .map(|_| {
+                    // Normal distribution with mean=0.1, std=sqrt(0.01)
+                    0.1_f32
+                        + rand_distr::Distribution::<f64>::sample(
+                            &rand_distr::StandardNormal,
+                            &mut rand::thread_rng(),
+                        ) as f32
+                            * true_variance.sqrt()
+                })
+                .collect()
         })
         .collect();
 
@@ -108,10 +123,16 @@ fn test_fisher_information_accuracy() {
     // (relaxed tolerance due to implementation differences in gradient computation)
     let ewc_grad = ewc.ewc_gradient(&vec![1.0; 100]);
     for i in 0..10 {
-        assert!(ewc_grad[i].is_finite(),
-            "Fisher gradient should be finite at index {}", i);
-        assert!(ewc_grad[i] >= 0.0,
-            "Fisher gradient should be non-negative at index {}", i);
+        assert!(
+            ewc_grad[i].is_finite(),
+            "Fisher gradient should be finite at index {}",
+            i
+        );
+        assert!(
+            ewc_grad[i] >= 0.0,
+            "Fisher gradient should be non-negative at index {}",
+            i
+        );
     }
 }
 
@@ -124,9 +145,7 @@ fn test_multi_task_sequential_learning() {
 
     // Task 1: Learn first mapping
     let task1_params = vec![0.3; num_params];
-    let task1_grads: Vec<Vec<f32>> = (0..50)
-        .map(|_| vec![0.1; num_params])
-        .collect();
+    let task1_grads: Vec<Vec<f32>> = (0..50).map(|_| vec![0.1; num_params]).collect();
     ewc.compute_fisher(&task1_params, &task1_grads).unwrap();
 
     let mut current_params = task1_params.clone();
@@ -141,9 +160,7 @@ fn test_multi_task_sequential_learning() {
     }
 
     // Update Fisher for task 2
-    let task2_grads: Vec<Vec<f32>> = (0..50)
-        .map(|_| vec![0.05; num_params])
-        .collect();
+    let task2_grads: Vec<Vec<f32>> = (0..50).map(|_| vec![0.05; num_params]).collect();
     ewc.compute_fisher(&current_params, &task2_grads).unwrap();
 
     // Task 3: Learn while protecting tasks 1 and 2
@@ -156,16 +173,21 @@ fn test_multi_task_sequential_learning() {
     }
 
     // Verify that task 1 knowledge is still preserved
-    let task1_drift: f32 = current_params.iter()
+    let task1_drift: f32 = current_params
+        .iter()
         .zip(task1_params.iter())
         .map(|(c, t1)| (c - t1).abs())
-        .sum::<f32>() / num_params as f32;
+        .sum::<f32>()
+        / num_params as f32;
 
     println!("Average parameter drift from task 1: {:.4}", task1_drift);
 
     // After 2 additional tasks, drift should still be bounded
-    assert!(task1_drift < 0.5,
-        "Multi-task drift too large: {:.4}", task1_drift);
+    assert!(
+        task1_drift < 0.5,
+        "Multi-task drift too large: {:.4}",
+        task1_drift
+    );
 }
 
 #[test]
@@ -174,11 +196,7 @@ fn test_replay_buffer_management() {
 
     // Fill buffer beyond capacity
     for i in 0..100 {
-        let exp = Experience::new(
-            vec![i as f32; 10],
-            vec![(i as f32) * 0.5; 10],
-            1.0
-        );
+        let exp = Experience::new(vec![i as f32; 10], vec![(i as f32) * 0.5; 10], 1.0);
         cls.store_experience(exp);
     }
 
@@ -227,8 +245,10 @@ fn test_reward_modulated_consolidation() {
     // Lambda should be modulated by reward
     let modulated_lambda = rc.ewc().lambda();
     println!("Modulated lambda: {:.1}", modulated_lambda);
-    assert!(modulated_lambda > 1000.0,
-        "Lambda should increase with high reward");
+    assert!(
+        modulated_lambda > 1000.0,
+        "Lambda should increase with high reward"
+    );
 }
 
 #[test]
@@ -260,17 +280,18 @@ fn test_performance_targets() {
     // Fisher computation: <100ms for 1M parameters
     let mut ewc = EWC::new(1000.0);
     let params = vec![0.5; 1_000_000];
-    let gradients: Vec<Vec<f32>> = (0..50)
-        .map(|_| vec![0.1; 1_000_000])
-        .collect();
+    let gradients: Vec<Vec<f32>> = (0..50).map(|_| vec![0.1; 1_000_000]).collect();
 
     let start = Instant::now();
     ewc.compute_fisher(&params, &gradients).unwrap();
     let fisher_time = start.elapsed();
 
     println!("Fisher computation (1M params): {:?}", fisher_time);
-    assert!(fisher_time.as_millis() < 200, // Allow some margin
-        "Fisher computation too slow: {:?}", fisher_time);
+    assert!(
+        fisher_time.as_millis() < 200, // Allow some margin
+        "Fisher computation too slow: {:?}",
+        fisher_time
+    );
 
     // EWC loss: <1ms for 1M parameters
     let new_params = vec![0.6; 1_000_000];
@@ -279,8 +300,11 @@ fn test_performance_targets() {
     let loss_time = start.elapsed();
 
     println!("EWC loss (1M params): {:?}", loss_time);
-    assert!(loss_time.as_millis() < 5, // Allow some margin
-        "EWC loss too slow: {:?}", loss_time);
+    assert!(
+        loss_time.as_millis() < 5, // Allow some margin
+        "EWC loss too slow: {:?}",
+        loss_time
+    );
 
     // EWC gradient: <1ms for 1M parameters
     let start = Instant::now();
@@ -288,8 +312,11 @@ fn test_performance_targets() {
     let grad_time = start.elapsed();
 
     println!("EWC gradient (1M params): {:?}", grad_time);
-    assert!(grad_time.as_millis() < 5, // Allow some margin
-        "EWC gradient too slow: {:?}", grad_time);
+    assert!(
+        grad_time.as_millis() < 5, // Allow some margin
+        "EWC gradient too slow: {:?}",
+        grad_time
+    );
 }
 
 use rand_distr::Distribution;
@@ -304,9 +331,7 @@ fn test_memory_overhead() {
 
     let mut ewc_with_fisher = EWC::new(1000.0);
     let params = vec![0.5; num_params];
-    let gradients: Vec<Vec<f32>> = (0..50)
-        .map(|_| vec![0.1; num_params])
-        .collect();
+    let gradients: Vec<Vec<f32>> = (0..50).map(|_| vec![0.1; num_params]).collect();
     ewc_with_fisher.compute_fisher(&params, &gradients).unwrap();
 
     // Memory should be approximately 2× parameters (fisher + optimal)

@@ -58,8 +58,8 @@
 #![allow(dead_code)]
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 
 /// FlashAttention configuration parameters.
 ///
@@ -107,8 +107,8 @@ impl FlashAttentionConfig {
     /// Create configuration optimized for long sequences.
     pub fn for_long_sequence(head_dim: usize) -> Self {
         Self {
-            block_size_q: 32,    // Smaller blocks for better cache reuse
-            block_size_kv: 128,  // Larger KV blocks
+            block_size_q: 32,   // Smaller blocks for better cache reuse
+            block_size_kv: 128, // Larger KV blocks
             head_dim,
             softmax_scale: 1.0 / (head_dim as f32).sqrt(),
             ..Default::default()
@@ -384,8 +384,7 @@ pub fn flash_attention_forward(
         for i in 0..actual_block_size_q {
             softmax_states[i].finalize();
             let out_offset = (q_start + i) * head_dim;
-            output[out_offset..out_offset + head_dim]
-                .copy_from_slice(&softmax_states[i].output);
+            output[out_offset..out_offset + head_dim].copy_from_slice(&softmax_states[i].output);
         }
     }
 }
@@ -499,8 +498,7 @@ pub fn flash_attention_forward_i8(
         for i in 0..actual_block_size_q {
             softmax_states[i].finalize();
             let out_offset = (q_start + i) * head_dim;
-            output[out_offset..out_offset + head_dim]
-                .copy_from_slice(&softmax_states[i].output);
+            output[out_offset..out_offset + head_dim].copy_from_slice(&softmax_states[i].output);
         }
     }
 }
@@ -676,7 +674,10 @@ mod tests {
             assert!(
                 diff < tolerance,
                 "Mismatch at index {}: {} vs {} (diff = {})",
-                i, av, bv, diff
+                i,
+                av,
+                bv,
+                diff
             );
         }
     }
@@ -710,16 +711,14 @@ mod tests {
         let mut flash_output = vec![0.0f32; seq_len * head_dim];
         let mut naive_output = vec![0.0f32; seq_len * head_dim];
 
-        flash_attention_forward(
-            &config,
-            &q, &k, &v,
-            seq_len, seq_len,
-            &mut flash_output,
-        );
+        flash_attention_forward(&config, &q, &k, &v, seq_len, seq_len, &mut flash_output);
 
         naive_attention(
-            &q, &k, &v,
-            seq_len, seq_len,
+            &q,
+            &k,
+            &v,
+            seq_len,
+            seq_len,
             head_dim,
             config.softmax_scale,
             false,
@@ -757,16 +756,14 @@ mod tests {
         let mut flash_output = vec![0.0f32; seq_len * head_dim];
         let mut naive_output = vec![0.0f32; seq_len * head_dim];
 
-        flash_attention_forward(
-            &config,
-            &q, &k, &v,
-            seq_len, seq_len,
-            &mut flash_output,
-        );
+        flash_attention_forward(&config, &q, &k, &v, seq_len, seq_len, &mut flash_output);
 
         naive_attention(
-            &q, &k, &v,
-            seq_len, seq_len,
+            &q,
+            &k,
+            &v,
+            seq_len,
+            seq_len,
             head_dim,
             config.softmax_scale,
             true,
@@ -812,14 +809,20 @@ mod tests {
 
         flash_attention_forward(
             &config,
-            &q, &k, &v,
-            seq_len_q, seq_len_kv,
+            &q,
+            &k,
+            &v,
+            seq_len_q,
+            seq_len_kv,
             &mut flash_output,
         );
 
         naive_attention(
-            &q, &k, &v,
-            seq_len_q, seq_len_kv,
+            &q,
+            &k,
+            &v,
+            seq_len_q,
+            seq_len_kv,
             head_dim,
             config.softmax_scale,
             false,
@@ -852,9 +855,18 @@ mod tests {
         let k_scale = 0.01f32;
         let v_scale = 0.01f32;
 
-        let q_i8: Vec<i8> = q_f32.iter().map(|&x| (x / q_scale).round().clamp(-128.0, 127.0) as i8).collect();
-        let k_i8: Vec<i8> = k_f32.iter().map(|&x| (x / k_scale).round().clamp(-128.0, 127.0) as i8).collect();
-        let v_i8: Vec<i8> = v_f32.iter().map(|&x| (x / v_scale).round().clamp(-128.0, 127.0) as i8).collect();
+        let q_i8: Vec<i8> = q_f32
+            .iter()
+            .map(|&x| (x / q_scale).round().clamp(-128.0, 127.0) as i8)
+            .collect();
+        let k_i8: Vec<i8> = k_f32
+            .iter()
+            .map(|&x| (x / k_scale).round().clamp(-128.0, 127.0) as i8)
+            .collect();
+        let v_i8: Vec<i8> = v_f32
+            .iter()
+            .map(|&x| (x / v_scale).round().clamp(-128.0, 127.0) as i8)
+            .collect();
 
         let config = FlashAttentionConfig {
             block_size_q: 4,
@@ -869,16 +881,24 @@ mod tests {
 
         flash_attention_forward_i8(
             &config,
-            &q_i8, &k_i8, &v_i8,
-            q_scale, k_scale, v_scale,
-            seq_len, seq_len,
+            &q_i8,
+            &k_i8,
+            &v_i8,
+            q_scale,
+            k_scale,
+            v_scale,
+            seq_len,
+            seq_len,
             &mut i8_output,
         );
 
         flash_attention_forward(
             &config,
-            &q_f32, &k_f32, &v_f32,
-            seq_len, seq_len,
+            &q_f32,
+            &k_f32,
+            &v_f32,
+            seq_len,
+            seq_len,
             &mut f32_output,
         );
 
@@ -917,7 +937,16 @@ mod tests {
         };
 
         let mut mha_output = vec![0.0f32; total_size];
-        flash_mha(&config, &q, &k, &v, num_heads, seq_len, seq_len, &mut mha_output);
+        flash_mha(
+            &config,
+            &q,
+            &k,
+            &v,
+            num_heads,
+            seq_len,
+            seq_len,
+            &mut mha_output,
+        );
 
         // Compare with per-head computation
         for h in 0..num_heads {
@@ -930,7 +959,8 @@ mod tests {
                 &q[head_offset..head_offset + head_size],
                 &k[head_offset..head_offset + head_size],
                 &v[head_offset..head_offset + head_size],
-                seq_len, seq_len,
+                seq_len,
+                seq_len,
                 &mut single_output,
             );
 
@@ -949,19 +979,12 @@ mod tests {
 
         // Update with first batch
         let scores1 = vec![1.0, 2.0, 3.0];
-        let values1 = vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-        ];
+        let values1 = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         state.update(&scores1, &values1, head_dim);
 
         // Update with second batch
         let scores2 = vec![2.5, 1.5];
-        let values2 = vec![
-            0.0, 0.0, 0.0, 1.0,
-            1.0, 1.0, 1.0, 1.0,
-        ];
+        let values2 = vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         state.update(&scores2, &values2, head_dim);
 
         state.finalize();

@@ -9,8 +9,6 @@
 use pgrx::prelude::*;
 
 use super::detector::ProblemType;
-use super::engine::HealingConfig;
-use super::learning::OutcomeTracker;
 use super::{get_healing_engine, Problem};
 
 // ============================================================================
@@ -101,7 +99,9 @@ pub fn ruvector_healing_history_for_strategy(
     let engine = get_healing_engine();
     let engine_lock = engine.read();
 
-    let records = engine_lock.tracker.get_for_strategy(strategy_name, limit as usize);
+    let records = engine_lock
+        .tracker
+        .get_for_strategy(strategy_name, limit as usize);
     let history: Vec<serde_json::Value> = records.iter().map(|r| r.to_json()).collect();
 
     pgrx::JsonB(serde_json::json!({
@@ -139,18 +139,14 @@ pub fn ruvector_healing_trigger(problem_type: &str) -> pgrx::JsonB {
 
     // Trigger healing
     match engine_lock.trigger_healing(ptype) {
-        Some(outcome) => {
-            pgrx::JsonB(serde_json::json!({
-                "success": true,
-                "outcome": outcome.to_json(),
-            }))
-        }
-        None => {
-            pgrx::JsonB(serde_json::json!({
-                "success": false,
-                "error": "Healing is disabled",
-            }))
-        }
+        Some(outcome) => pgrx::JsonB(serde_json::json!({
+            "success": true,
+            "outcome": outcome.to_json(),
+        })),
+        None => pgrx::JsonB(serde_json::json!({
+            "success": false,
+            "error": "Healing is disabled",
+        })),
     }
 }
 
@@ -182,20 +178,19 @@ pub fn ruvector_healing_execute(
 
     let problem = Problem::new(ptype, super::detector::Severity::Medium);
 
-    match engine_lock.remediation.execute_strategy(strategy_name, &problem, dry_run) {
-        Some(outcome) => {
-            pgrx::JsonB(serde_json::json!({
-                "success": true,
-                "dry_run": dry_run,
-                "outcome": outcome.to_json(),
-            }))
-        }
-        None => {
-            pgrx::JsonB(serde_json::json!({
-                "success": false,
-                "error": format!("Strategy '{}' not found", strategy_name),
-            }))
-        }
+    match engine_lock
+        .remediation
+        .execute_strategy(strategy_name, &problem, dry_run)
+    {
+        Some(outcome) => pgrx::JsonB(serde_json::json!({
+            "success": true,
+            "dry_run": dry_run,
+            "outcome": outcome.to_json(),
+        })),
+        None => pgrx::JsonB(serde_json::json!({
+            "success": false,
+            "error": format!("Strategy '{}' not found", strategy_name),
+        })),
     }
 }
 
@@ -222,7 +217,10 @@ pub fn ruvector_healing_configure(config_json: pgrx::JsonB) -> pgrx::JsonB {
     let json = config_json.0;
 
     // Update configuration from JSON
-    if let Some(interval) = json.get("min_healing_interval_secs").and_then(|v| v.as_i64()) {
+    if let Some(interval) = json
+        .get("min_healing_interval_secs")
+        .and_then(|v| v.as_i64())
+    {
         if interval > 0 {
             config.min_healing_interval = std::time::Duration::from_secs(interval as u64);
         }
@@ -464,8 +462,6 @@ pub fn ruvector_healing_problem_types() -> pgrx::JsonB {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // These tests would run in a PostgreSQL context with pg_test
     // For now, they verify the function signatures compile correctly
 }

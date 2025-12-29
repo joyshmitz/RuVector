@@ -64,7 +64,10 @@ mod tests {
         let e = Error::BadConfig("invalid head count");
         assert!(e.to_string().contains("invalid head count"));
 
-        let e = Error::OutputTooSmall { needed: 100, provided: 50 };
+        let e = Error::OutputTooSmall {
+            needed: 100,
+            provided: 50,
+        };
         assert!(e.to_string().contains("100"));
         assert!(e.to_string().contains("50"));
     }
@@ -72,7 +75,11 @@ mod tests {
     #[test]
     fn test_error_recovery_classification() {
         assert!(Error::BadInput("test").is_recoverable());
-        assert!(Error::OutputTooSmall { needed: 1, provided: 0 }.is_recoverable());
+        assert!(Error::OutputTooSmall {
+            needed: 1,
+            provided: 0
+        }
+        .is_recoverable());
         assert!(!Error::BadConfig("test").is_recoverable());
         assert!(!Error::BadWeights("test").is_recoverable());
         assert!(!Error::UnsupportedMode("test").is_recoverable());

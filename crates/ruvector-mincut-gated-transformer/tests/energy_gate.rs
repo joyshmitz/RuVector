@@ -55,7 +55,10 @@ fn test_energy_lambda_correlation() {
     };
     let energy_low = energy_gate.compute_energy(&gate_low_lambda);
 
-    assert!(energy_high < energy_low, "High lambda should have lower energy");
+    assert!(
+        energy_high < energy_low,
+        "High lambda should have lower energy"
+    );
 }
 
 #[test]
@@ -105,5 +108,9 @@ fn test_decision_allow_stable() {
 
     assert_eq!(decision, GateDecision::Allow);
     // Confidence should be reasonable (relaxed from 0.5 to 0.3 for gradient-based system)
-    assert!(confidence > 0.3, "Should have reasonable confidence for stable state, got: {}", confidence);
+    assert!(
+        confidence > 0.3,
+        "Should have reasonable confidence for stable state, got: {}",
+        confidence
+    );
 }

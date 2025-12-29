@@ -274,9 +274,7 @@ impl SpikeDrivenAttention {
         // Sum spike polarities weighted by attention (saturating to prevent overflow)
         let mut contrib = 0i32;
         for &polarity in &v_train.polarities {
-            contrib = contrib.saturating_add(
-                (polarity as i32).saturating_mul(attention_weight)
-            );
+            contrib = contrib.saturating_add((polarity as i32).saturating_mul(attention_weight));
         }
 
         contrib

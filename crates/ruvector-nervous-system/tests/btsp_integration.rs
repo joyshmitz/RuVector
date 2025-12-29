@@ -42,7 +42,11 @@ fn test_associative_memory_with_embeddings() {
     for i in 0..10 {
         let key = vec![i as f32 / 10.0; 256];
         let retrieved = memory.retrieve(&key).unwrap();
-        assert_eq!(retrieved.len(), 128, "Retrieved vector should have correct dimension");
+        assert_eq!(
+            retrieved.len(),
+            128,
+            "Retrieved vector should have correct dimension"
+        );
     }
 }
 
@@ -52,7 +56,12 @@ fn test_interference_resistance() {
     let mut layer = BTSPLayer::new(100, 2000.0);
 
     let pattern1 = vec![1.0; 100];
-    let pattern2 = vec![0.0, 1.0].iter().cycle().take(100).copied().collect::<Vec<_>>();
+    let pattern2 = vec![0.0, 1.0]
+        .iter()
+        .cycle()
+        .take(100)
+        .copied()
+        .collect::<Vec<_>>();
 
     layer.one_shot_associate(&pattern1, 1.0);
     let initial = layer.forward(&pattern1);
@@ -62,14 +71,18 @@ fn test_interference_resistance() {
     let after_interference = layer.forward(&pattern1);
 
     // Should retain most of original association (relaxed tolerance)
-    assert!((initial - after_interference).abs() < 0.6,
-            "initial: {}, after: {}", initial, after_interference);
+    assert!(
+        (initial - after_interference).abs() < 0.6,
+        "initial: {}, after: {}",
+        initial,
+        after_interference
+    );
 }
 
 #[test]
 fn test_time_constant_effects() {
     // Short vs long time constants
-    let mut short = BTSPLayer::new(50, 500.0);  // 500ms
+    let mut short = BTSPLayer::new(50, 500.0); // 500ms
     let mut long = BTSPLayer::new(50, 5000.0); // 5s
 
     let pattern = vec![0.5; 50];
@@ -97,13 +110,20 @@ fn test_batch_storage_consistency() {
         })
         .collect();
 
-    let pair_refs: Vec<_> = pairs.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+    let pair_refs: Vec<_> = pairs
+        .iter()
+        .map(|(k, v)| (k.as_slice(), v.as_slice()))
+        .collect();
     memory.store_batch(&pair_refs).unwrap();
 
     // Verify dimensions are correct (batch interference makes exact recall difficult)
     for (key, _expected_value) in &pairs {
         let retrieved = memory.retrieve(key).unwrap();
-        assert_eq!(retrieved.len(), 32, "Retrieved vector should have correct dimension");
+        assert_eq!(
+            retrieved.len(),
+            32,
+            "Retrieved vector should have correct dimension"
+        );
     }
 }
 
@@ -137,6 +157,10 @@ fn test_scaling_to_large_dimensions() {
 
         // Verify layer handles large dimensions without panicking
         // Output is unbounded weighted sum (no clamping in forward pass)
-        assert!(output.is_finite(), "Output should be finite at size {}", size);
+        assert!(
+            output.is_finite(),
+            "Output should be finite at size {}",
+            size
+        );
     }
 }

@@ -27,7 +27,10 @@ impl<E: Event + Copy> ShardedEventBus<E> {
         shard_fn: impl Fn(&E) -> usize + Send + Sync + 'static,
     ) -> Self {
         assert!(num_shards > 0, "Must have at least one shard");
-        assert!(shard_capacity.is_power_of_two(), "Shard capacity must be power of 2");
+        assert!(
+            shard_capacity.is_power_of_two(),
+            "Shard capacity must be power of 2"
+        );
 
         let shards = (0..num_shards)
             .map(|_| EventRingBuffer::new(shard_capacity))
@@ -52,7 +55,10 @@ impl<E: Event + Copy> ShardedEventBus<E> {
     ///
     /// Panics if `window_size` is 0 (would cause division by zero).
     pub fn new_temporal(num_shards: usize, shard_capacity: usize, window_size: u64) -> Self {
-        assert!(window_size > 0, "window_size must be > 0 to avoid division by zero");
+        assert!(
+            window_size > 0,
+            "window_size must be > 0 to avoid division by zero"
+        );
         Self::new(num_shards, shard_capacity, move |event| {
             ((event.timestamp() / window_size) as usize) % num_shards
         })
@@ -64,7 +70,10 @@ impl<E: Event + Copy> ShardedEventBus<E> {
     ///
     /// Panics if `window_size` is 0 (would cause division by zero).
     pub fn new_hybrid(num_shards: usize, shard_capacity: usize, window_size: u64) -> Self {
-        assert!(window_size > 0, "window_size must be > 0 to avoid division by zero");
+        assert!(
+            window_size > 0,
+            "window_size must be > 0 to avoid division by zero"
+        );
         Self::new(num_shards, shard_capacity, move |event| {
             let spatial = event.source_id() as usize;
             let temporal = (event.timestamp() / window_size) as usize;
@@ -136,16 +145,15 @@ impl<E: Event + Copy> ShardedEventBus<E> {
             return 0.0;
         }
 
-        let total: f32 = self.shards.iter()
-            .map(|s| s.fill_ratio())
-            .sum();
+        let total: f32 = self.shards.iter().map(|s| s.fill_ratio()).sum();
 
         total / self.shards.len() as f32
     }
 
     /// Get max fill ratio across all shards
     pub fn max_fill_ratio(&self) -> f32 {
-        self.shards.iter()
+        self.shards
+            .iter()
             .map(|s| s.fill_ratio())
             .fold(0.0f32, |a, b| a.max(b))
     }
@@ -165,8 +173,8 @@ impl<E: Event + Copy> ShardedEventBus<E> {
 mod tests {
     use super::*;
     use crate::eventbus::event::DVSEvent;
-    use std::thread;
     use std::sync::Arc;
+    use std::thread;
 
     #[test]
     fn test_sharded_bus_creation() {
@@ -181,9 +189,9 @@ mod tests {
         let bus = ShardedEventBus::new_spatial(4, 256);
 
         // Events with same source_id % 4 should go to same shard
-        let event1 = DVSEvent::new(1000, 0, 0, true);  // shard 0
-        let event2 = DVSEvent::new(1001, 4, 0, true);  // shard 0
-        let event3 = DVSEvent::new(1002, 1, 0, true);  // shard 1
+        let event1 = DVSEvent::new(1000, 0, 0, true); // shard 0
+        let event2 = DVSEvent::new(1001, 4, 0, true); // shard 0
+        let event3 = DVSEvent::new(1002, 1, 0, true); // shard 1
 
         bus.push(event1).unwrap();
         bus.push(event2).unwrap();
@@ -201,9 +209,9 @@ mod tests {
         let bus = ShardedEventBus::new_temporal(4, 256, window_size);
 
         // Events in different time windows
-        let event1 = DVSEvent::new(500, 0, 0, true);    // window 0, shard 0
-        let event2 = DVSEvent::new(1500, 0, 0, true);   // window 1, shard 1
-        let event3 = DVSEvent::new(2500, 0, 0, true);   // window 2, shard 2
+        let event1 = DVSEvent::new(500, 0, 0, true); // window 0, shard 0
+        let event2 = DVSEvent::new(1500, 0, 0, true); // window 1, shard 1
+        let event3 = DVSEvent::new(2500, 0, 0, true); // window 2, shard 2
 
         bus.push(event1).unwrap();
         bus.push(event2).unwrap();
@@ -270,7 +278,8 @@ mod tests {
         let bus = ShardedEventBus::new_spatial(4, 16);
 
         // Fill shard 0 to 50%
-        for i in 0..7 {  // 7 events in capacity 16 ≈ 50%
+        for i in 0..7 {
+            // 7 events in capacity 16 ≈ 50%
             bus.push(DVSEvent::new(i, 0, 0, true)).unwrap();
         }
 
@@ -286,9 +295,9 @@ mod tests {
         // Shard by payload value
         let bus = ShardedEventBus::new(4, 256, |event: &DVSEvent| event.payload() as usize);
 
-        let event1 = DVSEvent::new(1000, 0, 0, true);   // shard 0
-        let event2 = DVSEvent::new(1001, 0, 5, true);   // shard 1
-        let event3 = DVSEvent::new(1002, 0, 10, true);  // shard 2
+        let event1 = DVSEvent::new(1000, 0, 0, true); // shard 0
+        let event2 = DVSEvent::new(1001, 0, 5, true); // shard 1
+        let event3 = DVSEvent::new(1002, 0, 10, true); // shard 2
 
         bus.push(event1).unwrap();
         bus.push(event2).unwrap();
@@ -337,7 +346,8 @@ mod tests {
         producer.join().unwrap();
 
         // Wait for all consumers and sum counts
-        let total: usize = consumer_handles.into_iter()
+        let total: usize = consumer_handles
+            .into_iter()
             .map(|h| h.join().unwrap())
             .sum();
 

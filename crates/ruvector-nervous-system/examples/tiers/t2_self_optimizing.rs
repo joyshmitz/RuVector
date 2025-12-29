@@ -38,9 +38,16 @@ pub enum StructuralEventType {
     /// Request completed
     RequestEnd { request_id: u64, success: bool },
     /// Component called another
-    Call { target: ComponentId, request_id: u64 },
+    Call {
+        target: ComponentId,
+        request_id: u64,
+    },
     /// Component received call result
-    CallReturn { source: ComponentId, request_id: u64, success: bool },
+    CallReturn {
+        source: ComponentId,
+        request_id: u64,
+        success: bool,
+    },
     /// Resource usage spike
     ResourceSpike { resource: String, value: f32 },
     /// Queue depth changed
@@ -88,7 +95,7 @@ pub struct CoordinationPattern {
 
 /// Reflex gate to prevent cascading failures
 pub struct CascadeReflex {
-    pub trigger_threshold: f32,  // Error rate threshold
+    pub trigger_threshold: f32, // Error rate threshold
     pub propagation_window_us: u64,
     pub recent_errors: VecDeque<(u64, ComponentId)>,
     pub circuit_breakers: HashMap<ComponentId, CircuitBreaker>,
@@ -158,8 +165,10 @@ impl CascadeReflex {
     /// Check for cascading failure pattern
     pub fn check(&mut self, event: &StructuralEvent) -> Option<StructuralWitness> {
         // Track errors
-        if matches!(&event.event_type, StructuralEventType::RequestEnd { success, .. } if !success) {
-            self.recent_errors.push_back((event.timestamp_us, event.component.clone()));
+        if matches!(&event.event_type, StructuralEventType::RequestEnd { success, .. } if !success)
+        {
+            self.recent_errors
+                .push_back((event.timestamp_us, event.component.clone()));
 
             // Record in circuit breaker
             self.circuit_breakers
@@ -169,8 +178,15 @@ impl CascadeReflex {
         }
 
         // Clean old errors
-        let cutoff = event.timestamp_us.saturating_sub(self.propagation_window_us);
-        while self.recent_errors.front().map(|e| e.0 < cutoff).unwrap_or(false) {
+        let cutoff = event
+            .timestamp_us
+            .saturating_sub(self.propagation_window_us);
+        while self
+            .recent_errors
+            .front()
+            .map(|e| e.0 < cutoff)
+            .unwrap_or(false)
+        {
             self.recent_errors.pop_front();
         }
 
@@ -185,27 +201,38 @@ impl CascadeReflex {
             let witness = StructuralWitness {
                 timestamp: event.timestamp_us,
                 trigger: "Cascade detected".to_string(),
-                component_states: affected.keys().map(|c| {
-                    (c.clone(), ComponentState {
-                        latency_p99_us: 0,
-                        error_rate: *affected.get(c).unwrap_or(&0) as f32 / 10.0,
-                        queue_depth: 0,
-                        circuit_state: self.circuit_breakers
-                            .get(c)
-                            .map(|cb| cb.state.clone())
-                            .unwrap_or(CircuitState::Closed),
+                component_states: affected
+                    .keys()
+                    .map(|c| {
+                        (
+                            c.clone(),
+                            ComponentState {
+                                latency_p99_us: 0,
+                                error_rate: *affected.get(c).unwrap_or(&0) as f32 / 10.0,
+                                queue_depth: 0,
+                                circuit_state: self
+                                    .circuit_breakers
+                                    .get(c)
+                                    .map(|cb| cb.state.clone())
+                                    .unwrap_or(CircuitState::Closed),
+                            },
+                        )
                     })
-                }).collect(),
-                causal_chain: self.recent_errors.iter()
-                    .map(|(_, c)| (c.clone(), StructuralEventType::RequestEnd {
-                        request_id: 0,
-                        success: false,
-                    }))
                     .collect(),
-                decision: format!(
-                    "Open circuit breakers for {} components",
-                    affected.len()
-                ),
+                causal_chain: self
+                    .recent_errors
+                    .iter()
+                    .map(|(_, c)| {
+                        (
+                            c.clone(),
+                            StructuralEventType::RequestEnd {
+                                request_id: 0,
+                                success: false,
+                            },
+                        )
+                    })
+                    .collect(),
+                decision: format!("Open circuit breakers for {} components", affected.len()),
                 action_taken: Some("SHED_LOAD".to_string()),
             };
 
@@ -240,7 +267,13 @@ impl PatternLearner {
     }
 
     /// Observe a call between components
-    pub fn observe_call(&mut self, caller: ComponentId, callee: ComponentId, request_id: u64, timestamp: u64) {
+    pub fn observe_call(
+        &mut self,
+        caller: ComponentId,
+        callee: ComponentId,
+        request_id: u64,
+        timestamp: u64,
+    ) {
         self.current_traces
             .entry(request_id)
             .or_default()
@@ -256,22 +289,25 @@ impl PatternLearner {
         }
 
         // Create pattern signature
-        let participants: Vec<ComponentId> = trace.iter()
+        let participants: Vec<ComponentId> = trace
+            .iter()
             .flat_map(|(_, from, to)| vec![from.clone(), to.clone()])
             .collect();
 
-        let sequence: Vec<(ComponentId, ComponentId)> = trace.iter()
+        let sequence: Vec<(ComponentId, ComponentId)> = trace
+            .iter()
             .map(|(_, from, to)| (from.clone(), to.clone()))
             .collect();
 
-        let total_latency = trace.last().map(|l| l.0).unwrap_or(0)
-            - trace.first().map(|f| f.0).unwrap_or(0);
+        let total_latency =
+            trace.last().map(|l| l.0).unwrap_or(0) - trace.first().map(|f| f.0).unwrap_or(0);
 
         let signature = format!("{:?}", sequence);
 
         // Update or create pattern
         let next_pattern_id = self.observed_sequences.len();
-        let pattern = self.observed_sequences
+        let pattern = self
+            .observed_sequences
             .entry(signature.clone())
             .or_insert_with(|| CoordinationPattern {
                 name: format!("Pattern_{}", next_pattern_id),
@@ -283,10 +319,9 @@ impl PatternLearner {
             });
 
         pattern.occurrences += 1;
-        pattern.expected_latency_us = (
-            (1.0 - self.learning_rate) * pattern.expected_latency_us as f32
-            + self.learning_rate * total_latency as f32
-        ) as u64;
+        pattern.expected_latency_us =
+            ((1.0 - self.learning_rate) * pattern.expected_latency_us as f32
+                + self.learning_rate * total_latency as f32) as u64;
 
         Some(pattern.name.clone())
     }
@@ -297,15 +332,16 @@ impl PatternLearner {
             return None;
         }
 
-        let sequence: Vec<(ComponentId, ComponentId)> = trace.iter()
+        let sequence: Vec<(ComponentId, ComponentId)> = trace
+            .iter()
             .map(|(_, from, to)| (from.clone(), to.clone()))
             .collect();
 
         let signature = format!("{:?}", sequence);
 
         if let Some(pattern) = self.observed_sequences.get(&signature) {
-            let latency = trace.last().map(|l| l.0).unwrap_or(0)
-                - trace.first().map(|f| f.0).unwrap_or(0);
+            let latency =
+                trace.last().map(|l| l.0).unwrap_or(0) - trace.first().map(|f| f.0).unwrap_or(0);
 
             let deviation = (latency as f32 - pattern.expected_latency_us as f32).abs()
                 / pattern.expected_latency_us as f32;
@@ -313,7 +349,10 @@ impl PatternLearner {
             if deviation > pattern.tolerance {
                 return Some(format!(
                     "{} latency deviation: expected {}us, got {}us ({:.0}%)",
-                    pattern.name, pattern.expected_latency_us, latency, deviation * 100.0
+                    pattern.name,
+                    pattern.expected_latency_us,
+                    latency,
+                    deviation * 100.0
                 ));
             }
         }
@@ -365,14 +404,21 @@ impl SelfOptimizingSystem {
                     event.timestamp_us,
                 );
             }
-            StructuralEventType::RequestEnd { request_id, success: true } => {
+            StructuralEventType::RequestEnd {
+                request_id,
+                success: true,
+            } => {
                 if let Some(pattern_name) = self.pattern_learner.complete_trace(*request_id) {
                     // Pattern learned/reinforced
-                    if self.pattern_learner.observed_sequences.get(&pattern_name)
+                    if self
+                        .pattern_learner
+                        .observed_sequences
+                        .get(&pattern_name)
                         .map(|p| p.occurrences == 10)
                         .unwrap_or(false)
                     {
-                        self.optimizations.push(format!("Learned pattern: {}", pattern_name));
+                        self.optimizations
+                            .push(format!("Learned pattern: {}", pattern_name));
                     }
                 }
             }
@@ -417,7 +463,10 @@ impl SelfOptimizingSystem {
 
     /// Get system health summary
     pub fn health_summary(&self) -> SystemHealth {
-        let open_circuits: Vec<_> = self.cascade_reflex.circuit_breakers.iter()
+        let open_circuits: Vec<_> = self
+            .cascade_reflex
+            .circuit_breakers
+            .iter()
             .filter(|(_, cb)| cb.state == CircuitState::Open)
             .map(|(id, _)| id.clone())
             .collect();
@@ -528,7 +577,10 @@ fn main() {
     }
 
     let health = system.health_summary();
-    println!("\n  Circuit breakers opened: {:?}", health.open_circuit_breakers);
+    println!(
+        "\n  Circuit breakers opened: {:?}",
+        health.open_circuit_breakers
+    );
     println!("  Witnesses logged: {}", health.recent_witnesses);
 
     println!("\n=== Key Benefits ===");
@@ -560,18 +612,8 @@ mod tests {
     fn test_pattern_learning() {
         let mut learner = PatternLearner::new();
 
-        learner.observe_call(
-            ComponentId("a".into()),
-            ComponentId("b".into()),
-            1,
-            0,
-        );
-        learner.observe_call(
-            ComponentId("b".into()),
-            ComponentId("c".into()),
-            1,
-            100,
-        );
+        learner.observe_call(ComponentId("a".into()), ComponentId("b".into()), 1, 0);
+        learner.observe_call(ComponentId("b".into()), ComponentId("c".into()), 1, 100);
 
         let pattern = learner.complete_trace(1);
         assert!(pattern.is_some());

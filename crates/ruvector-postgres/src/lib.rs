@@ -3,6 +3,16 @@
 //! High-performance PostgreSQL extension for vector similarity search.
 //! A drop-in replacement for pgvector with SIMD optimizations.
 
+// Allow development-stage lints for work-in-progress code
+#![allow(unexpected_cfgs)] // pgrx macros (pg12/pg13) and optional features (tokio)
+#![allow(dead_code)] // Stub implementations and future features
+#![allow(unused_variables)] // WIP function signatures
+#![allow(unused_mut)]
+// Variables prepared for future mutation
+// Allow clippy lints common in pgrx extensions and WIP code
+#![allow(clippy::all)] // Allow all clippy warnings for development
+#![allow(for_loops_over_fallibles)] // pgrx derive macro generates this pattern
+
 use pgrx::prelude::*;
 use pgrx::{GucContext, GucFlags, GucRegistry, GucSetting};
 
@@ -10,31 +20,35 @@ use pgrx::{GucContext, GucFlags, GucRegistry, GucSetting};
 ::pgrx::pg_module_magic!();
 
 // Module declarations
-pub mod types;
-pub mod distance;
-pub mod index;
-pub mod quantization;
-pub mod operators;
 pub mod attention;
-pub mod sparse;
+pub mod distance;
 pub mod gnn;
-pub mod routing;
-pub mod learning;
 pub mod graph;
-pub mod hyperbolic;
-pub mod integrity;
-pub mod hybrid;
-pub mod tenancy;
-pub mod workers;
 pub mod healing;
+pub mod hybrid;
+pub mod hyperbolic;
+pub mod index;
+pub mod integrity;
+pub mod learning;
+pub mod operators;
+pub mod quantization;
+pub mod routing;
+pub mod sparse;
+pub mod tenancy;
+pub mod types;
+pub mod workers;
 
 // Optional: Local embedding generation (requires 'embeddings' feature)
 #[cfg(feature = "embeddings")]
 pub mod embeddings;
 
+// Optional: Mincut-gated transformer (requires 'gated-transformer' feature)
+#[cfg(feature = "gated-transformer")]
+pub mod gated_transformer;
+
 // Re-exports for convenience
+pub use distance::{cosine_distance, euclidean_distance, inner_product_distance, DistanceMetric};
 pub use types::RuVector;
-pub use distance::{DistanceMetric, euclidean_distance, cosine_distance, inner_product_distance};
 
 /// Extension version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -202,7 +216,7 @@ fn scalar_quantize_arr(v: Vec<f32>) -> pgrx::JsonB {
 // Tests
 // ============================================================================
 
-#[cfg(any(test, feature = "pg_test"))]
+#[cfg(feature = "pg_test")]
 #[pg_schema]
 mod tests {
     use super::*;

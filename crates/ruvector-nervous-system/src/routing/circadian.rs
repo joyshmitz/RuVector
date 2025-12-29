@@ -89,22 +89,34 @@ pub struct PhaseModulation {
 impl PhaseModulation {
     /// No modulation (neutral)
     pub fn neutral() -> Self {
-        Self { velocity: 1.0, offset: 0.0 }
+        Self {
+            velocity: 1.0,
+            offset: 0.0,
+        }
     }
 
     /// Speed up phase progression
     pub fn accelerate(factor: f32) -> Self {
-        Self { velocity: factor.max(0.1), offset: 0.0 }
+        Self {
+            velocity: factor.max(0.1),
+            offset: 0.0,
+        }
     }
 
     /// Slow down phase progression
     pub fn decelerate(factor: f32) -> Self {
-        Self { velocity: (1.0 / factor.max(0.1)).min(10.0), offset: 0.0 }
+        Self {
+            velocity: (1.0 / factor.max(0.1)).min(10.0),
+            offset: 0.0,
+        }
     }
 
     /// Nudge phase forward by offset radians
     pub fn nudge_forward(radians: f32) -> Self {
-        Self { velocity: 1.0, offset: radians }
+        Self {
+            velocity: 1.0,
+            offset: radians,
+        }
     }
 }
 
@@ -396,17 +408,15 @@ impl CircadianController {
     /// Check decisions without latching (for inspection only)
     #[inline]
     pub fn peek_compute(&self) -> bool {
-        self.compute_latch.unwrap_or_else(|| {
-            matches!(self.state, CircadianPhase::Active | CircadianPhase::Dawn)
-        })
+        self.compute_latch
+            .unwrap_or_else(|| matches!(self.state, CircadianPhase::Active | CircadianPhase::Dawn))
     }
 
     /// Check decisions without latching (for inspection only)
     #[inline]
     pub fn peek_learn(&self) -> bool {
-        self.learn_latch.unwrap_or_else(|| {
-            self.state.allows_learning() && self.coherence > 0.3
-        })
+        self.learn_latch
+            .unwrap_or_else(|| self.state.allows_learning() && self.coherence > 0.3)
     }
 
     /// Check if system should react to an event
@@ -419,10 +429,10 @@ impl CircadianController {
     #[inline]
     pub fn should_react(&self, importance: f32) -> bool {
         let threshold = match self.state {
-            CircadianPhase::Active => 0.1,  // React to most events
-            CircadianPhase::Dawn => 0.3,    // Moderate threshold
-            CircadianPhase::Dusk => 0.5,    // Higher threshold
-            CircadianPhase::Rest => 0.8,    // Only critical events
+            CircadianPhase::Active => 0.1, // React to most events
+            CircadianPhase::Dawn => 0.3,   // Moderate threshold
+            CircadianPhase::Dusk => 0.5,   // Higher threshold
+            CircadianPhase::Rest => 0.8,   // Only critical events
         };
 
         importance > threshold && (self.coherence > 0.3 || importance > 0.9)
@@ -871,7 +881,10 @@ impl NervousSystemScorecard {
     /// Check if system is healthy (meeting all targets)
     pub fn is_healthy(&self, targets: &ScorecardTargets) -> bool {
         self.silence_ratio >= targets.min_silence_ratio
-            && self.ttd_p95_us.map(|p95| p95 <= targets.max_ttd_p95_us).unwrap_or(true)
+            && self
+                .ttd_p95_us
+                .map(|p95| p95 <= targets.max_ttd_p95_us)
+                .unwrap_or(true)
             && self.energy_per_spike <= targets.max_energy_per_spike
             && self.write_amplification <= targets.max_write_amplification
     }
@@ -927,10 +940,10 @@ pub struct ScorecardTargets {
 impl Default for ScorecardTargets {
     fn default() -> Self {
         Self {
-            min_silence_ratio: 0.7,        // At least 70% quiet
-            max_ttd_p95_us: 10_000,        // 10ms max P95
-            max_energy_per_spike: 100.0,   // 100 units max
-            max_write_amplification: 3.0,  // Max 3 writes per meaningful event
+            min_silence_ratio: 0.7,       // At least 70% quiet
+            max_ttd_p95_us: 10_000,       // 10ms max P95
+            max_energy_per_spike: 100.0,  // 100 units max
+            max_write_amplification: 3.0, // Max 3 writes per meaningful event
         }
     }
 }

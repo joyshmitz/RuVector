@@ -35,12 +35,12 @@
 //! +------------------------------------------------------------------+
 //! ```
 
+use parking_lot::RwLock;
 use pgrx::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Constants
@@ -245,7 +245,12 @@ impl WorkQueue {
             // Try to claim the slot
             if self
                 .tail
-                .compare_exchange_weak(tail, tail.wrapping_add(1), Ordering::AcqRel, Ordering::Relaxed)
+                .compare_exchange_weak(
+                    tail,
+                    tail.wrapping_add(1),
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                )
                 .is_ok()
             {
                 let slot = (tail % self.capacity as u64) as usize;
@@ -273,7 +278,12 @@ impl WorkQueue {
             // Try to claim this item
             if self
                 .head
-                .compare_exchange_weak(head, head.wrapping_add(1), Ordering::AcqRel, Ordering::Relaxed)
+                .compare_exchange_weak(
+                    head,
+                    head.wrapping_add(1),
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                )
                 .is_ok()
             {
                 let mut buffer = self.buffer.write();
@@ -396,7 +406,7 @@ impl LargePayloadSegment {
             return None;
         }
 
-        let slots_needed = (size + SLOT_SIZE - 1) / SLOT_SIZE;
+        let slots_needed = size.div_ceil(SLOT_SIZE);
 
         // Find contiguous free slots
         for start_slot in 0..=(NUM_SLOTS - slots_needed) {
@@ -442,7 +452,12 @@ impl LargePayloadSegment {
                 }
 
                 if self.alloc_bitmap[word]
-                    .compare_exchange_weak(current, current | mask, Ordering::AcqRel, Ordering::Relaxed)
+                    .compare_exchange_weak(
+                        current,
+                        current | mask,
+                        Ordering::AcqRel,
+                        Ordering::Relaxed,
+                    )
                     .is_ok()
                 {
                     break;
@@ -456,7 +471,7 @@ impl LargePayloadSegment {
     /// Free a previously allocated payload
     pub fn free(&self, payload_ref: &PayloadRef) {
         let start_slot = payload_ref.offset as usize / SLOT_SIZE;
-        let slots = (payload_ref.length as usize + SLOT_SIZE - 1) / SLOT_SIZE;
+        let slots = (payload_ref.length as usize).div_ceil(SLOT_SIZE);
 
         for slot in start_slot..(start_slot + slots) {
             let word = slot / 64;
@@ -575,7 +590,8 @@ impl GlobalStats {
     pub fn record_success(&self, processing_time_us: u64, bytes: u64) {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
         self.successful_requests.fetch_add(1, Ordering::Relaxed);
-        self.total_processing_time_us.fetch_add(processing_time_us, Ordering::Relaxed);
+        self.total_processing_time_us
+            .fetch_add(processing_time_us, Ordering::Relaxed);
         self.bytes_processed.fetch_add(bytes, Ordering::Relaxed);
     }
 
@@ -694,7 +710,11 @@ impl SharedMemoryLayout {
     }
 
     /// Update integrity permissions for a collection
-    pub fn update_integrity_permissions(&self, collection_id: i32, permissions: &IntegrityPermissions) {
+    pub fn update_integrity_permissions(
+        &self,
+        collection_id: i32,
+        permissions: &IntegrityPermissions,
+    ) {
         if (collection_id as usize) < MAX_COLLECTIONS {
             let mut states = self.integrity_states.write();
             states[collection_id as usize] = permissions.clone();
@@ -859,7 +879,8 @@ fn prepare_operation(
     shmem: &SharedMemoryLayout,
 ) -> Result<(Operation, Option<PayloadRef>), IpcError> {
     // Serialize to check size
-    let serialized = bincode::serialize(&operation).map_err(|e| IpcError::SerializationError(e.to_string()))?;
+    let serialized =
+        bincode::serialize(&operation).map_err(|e| IpcError::SerializationError(e.to_string()))?;
 
     if serialized.len() <= MAX_INLINE_SIZE {
         return Ok((operation, None));
@@ -875,7 +896,7 @@ fn prepare_operation(
     shmem
         .large_payload_segment
         .write(payload_ref.offset as usize, &serialized)
-        .map_err(|e| IpcError::SharedMemoryError(e))?;
+        .map_err(IpcError::SharedMemoryError)?;
 
     Ok((Operation::LargePayloadRef(payload_ref), Some(payload_ref)))
 }

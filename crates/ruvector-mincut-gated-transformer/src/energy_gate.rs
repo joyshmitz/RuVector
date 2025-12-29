@@ -155,7 +155,10 @@ impl EnergyGate {
             + self.config.partition_entropy_weight * partition_energy;
 
         // Normalize to [0, 1]
-        energy / (self.config.lambda_weight + self.config.boundary_penalty_weight + self.config.partition_entropy_weight)
+        energy
+            / (self.config.lambda_weight
+                + self.config.boundary_penalty_weight
+                + self.config.partition_entropy_weight)
     }
 
     /// Compute energy gradient for optimization.
@@ -182,7 +185,8 @@ impl EnergyGate {
 
         // d/d_partition
         let mut gate_partition_plus = *gate;
-        gate_partition_plus.partition_count = (gate.partition_count as f32 + epsilon).max(1.0) as u16;
+        gate_partition_plus.partition_count =
+            (gate.partition_count as f32 + epsilon).max(1.0) as u16;
         let energy_partition_plus = self.compute_energy(&gate_partition_plus);
         let d_partition = (energy_partition_plus - energy_0) / epsilon;
 
@@ -289,7 +293,9 @@ impl EnergyGate {
         let partition_contribution = gradient.d_partition.abs();
 
         // Select intervention based on dominant factor
-        if lambda_contribution > boundary_contribution && lambda_contribution > partition_contribution {
+        if lambda_contribution > boundary_contribution
+            && lambda_contribution > partition_contribution
+        {
             // Lambda is the main issue
             if gate.lambda < self.fallback_policy.lambda_min {
                 (GateDecision::QuarantineUpdates, GateReason::LambdaBelowMin)
@@ -351,7 +357,9 @@ impl EnergyGate {
             (GateDecision::FlushKv, 0.5)
         } else if gate.boundary_edges > self.fallback_policy.boundary_edges_max {
             (GateDecision::ReduceScope, 0.5)
-        } else if gate.boundary_concentration_q15 > self.fallback_policy.boundary_concentration_q15_max {
+        } else if gate.boundary_concentration_q15
+            > self.fallback_policy.boundary_concentration_q15_max
+        {
             (GateDecision::ReduceScope, 0.5)
         } else if gate.partition_count > self.fallback_policy.partitions_max {
             (GateDecision::ReduceScope, 0.5)
@@ -441,7 +449,7 @@ mod tests {
         let gate_stable = GatePacket {
             lambda: 250, // Very high lambda
             lambda_prev: 245,
-            boundary_edges: 2, // Very few boundary edges
+            boundary_edges: 2,                // Very few boundary edges
             boundary_concentration_q15: 2048, // Low concentration
             partition_count: 2,
             flags: 0,
@@ -527,7 +535,7 @@ mod tests {
         let gate_stable = GatePacket {
             lambda: 250, // Very high lambda
             lambda_prev: 245,
-            boundary_edges: 2, // Very few edges
+            boundary_edges: 2,                // Very few edges
             boundary_concentration_q15: 1024, // Very low concentration
             partition_count: 2,
             flags: 0,
@@ -538,9 +546,9 @@ mod tests {
         let gate_unstable = GatePacket {
             lambda: 30, // Low lambda
             lambda_prev: 100,
-            boundary_edges: 80, // Many boundary edges
+            boundary_edges: 80,                // Many boundary edges
             boundary_concentration_q15: 25000, // High concentration
-            partition_count: 8, // Many partitions
+            partition_count: 8,                // Many partitions
             flags: 0,
         };
         let energy_unstable = energy_gate.compute_energy(&gate_unstable);

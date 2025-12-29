@@ -42,9 +42,15 @@ fn main() {
     let mut pattern3 = vec![0.0; dimension];
     pattern3[2] = 1.0;
 
-    hopfield.store(pattern1.clone()).expect("Failed to store pattern1");
-    hopfield.store(pattern2.clone()).expect("Failed to store pattern2");
-    hopfield.store(pattern3.clone()).expect("Failed to store pattern3");
+    hopfield
+        .store(pattern1.clone())
+        .expect("Failed to store pattern1");
+    hopfield
+        .store(pattern2.clone())
+        .expect("Failed to store pattern2");
+    hopfield
+        .store(pattern3.clone())
+        .expect("Failed to store pattern3");
 
     println!("Stored {} patterns\n", hopfield.num_patterns());
 
@@ -61,12 +67,15 @@ fn main() {
     println!("Test 2: Noisy Retrieval");
     println!("-----------------------");
     let mut noisy_pattern = pattern1.clone();
-    noisy_pattern[0] = 0.95;  // Add noise
+    noisy_pattern[0] = 0.95; // Add noise
     noisy_pattern[10] = 0.05;
 
     let retrieved_noisy = hopfield.retrieve(&noisy_pattern).expect("Retrieval failed");
     let similarity_noisy = cosine_similarity(&pattern1, &retrieved_noisy);
-    println!("Noisy query similarity to original: {:.6}", similarity_noisy);
+    println!(
+        "Noisy query similarity to original: {:.6}",
+        similarity_noisy
+    );
     assert!(similarity_noisy > 0.90, "Noisy retrieval failed");
     println!("✓ Noise-tolerant retrieval works!\n");
 
@@ -74,7 +83,9 @@ fn main() {
     println!("Test 3: Top-K Retrieval");
     println!("-----------------------");
     let query = pattern1.clone();
-    let top_k = hopfield.retrieve_k(&query, 2).expect("Top-k retrieval failed");
+    let top_k = hopfield
+        .retrieve_k(&query, 2)
+        .expect("Top-k retrieval failed");
 
     println!("Top 2 patterns by attention:");
     for (i, (idx, _pattern, attention)) in top_k.iter().enumerate() {
@@ -87,8 +98,12 @@ fn main() {
     println!("Test 4: Capacity Demonstration");
     println!("--------------------------------");
     let capacity = hopfield.capacity();
-    println!("Theoretical capacity for {}D: 2^{} = {}",
-             dimension, dimension/2, capacity);
+    println!(
+        "Theoretical capacity for {}D: 2^{} = {}",
+        dimension,
+        dimension / 2,
+        capacity
+    );
     println!("✓ Capacity calculation works!\n");
 
     // Demonstrate beta parameter effect

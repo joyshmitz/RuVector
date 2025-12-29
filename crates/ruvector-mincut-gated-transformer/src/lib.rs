@@ -90,25 +90,25 @@
 #[cfg(feature = "no_std_gateway")]
 extern crate alloc;
 
-pub mod config;
-pub mod error;
-pub mod packets;
-pub mod q15;
-pub mod state;
-pub mod model;
-pub mod gate;
-pub mod spike;
-pub mod kernel;
 pub mod arena;
 pub mod attention;
-pub mod ffn;
-pub mod mod_routing;
+pub mod config;
 pub mod early_exit;
+pub mod error;
+pub mod ffn;
 pub mod flash_attention;
-pub mod speculative;
+pub mod gate;
+pub mod kernel;
 pub mod kv_cache;
-pub mod rope;
 pub mod mamba;
+pub mod mod_routing;
+pub mod model;
+pub mod packets;
+pub mod q15;
+pub mod rope;
+pub mod speculative;
+pub mod spike;
+pub mod state;
 
 #[cfg(feature = "trace")]
 pub mod trace;
@@ -123,45 +123,47 @@ pub mod sparse_attention;
 pub mod energy_gate;
 
 // Re-exports for convenient access
-pub use config::{TransformerConfig, GatePolicy};
+pub use arena::{calculate_arena_size, LayerWeights, WeightArena, WeightRef};
+pub use config::{GatePolicy, TransformerConfig};
+pub use early_exit::{CoherenceEarlyExit, EarlyExitConfig, EarlyExitDecision, ExitReason};
 pub use error::{Error, Result};
-pub use packets::{
-    GatePacket, SpikePacket, GateDecision, GateReason, Witness, InferInput, InferOutput, InferStats,
-};
-pub use q15::{Q15, q15_batch_mul, q15_batch_add, q15_batch_lerp, q15_dot, f32_to_q15_batch, q15_to_f32_batch};
-pub use state::RuntimeState;
-pub use model::{MincutGatedTransformer, QuantizedWeights, WeightsLoader};
-pub use gate::{GateController, TierDecision};
-pub use spike::SpikeScheduler;
-pub use arena::{WeightArena, WeightRef, LayerWeights, calculate_arena_size};
-pub use mod_routing::{
-    MincutDepthRouter, ModRoutingConfig, TokenRoute, RoutingStats,
-};
-pub use early_exit::{
-    CoherenceEarlyExit, EarlyExitConfig, EarlyExitDecision, ExitReason,
-};
 pub use flash_attention::{
-    FlashAttentionConfig, flash_attention_forward, flash_attention_forward_i8, flash_mha,
+    flash_attention_forward, flash_attention_forward_i8, flash_mha, FlashAttentionConfig,
 };
-pub use kv_cache::{QuantizedKVCache, HadamardTransform, QuantBits};
+pub use gate::{GateController, TierDecision};
+pub use kv_cache::{HadamardTransform, QuantBits, QuantizedKVCache};
+pub use mamba::{MambaConfig, MambaLayer, MambaState, MambaWeights};
+pub use mod_routing::{MincutDepthRouter, ModRoutingConfig, RoutingStats, TokenRoute};
+pub use model::{MincutGatedTransformer, QuantizedWeights, WeightsLoader};
+pub use packets::{
+    GateDecision, GatePacket, GateReason, InferInput, InferOutput, InferStats, SpikePacket, Witness,
+};
+pub use q15::{
+    f32_to_q15_batch, q15_batch_add, q15_batch_lerp, q15_batch_mul, q15_dot, q15_to_f32_batch, Q15,
+};
+pub use rope::{RopeConfig, RopeEmbedding, RopeScaling};
 pub use speculative::{
-    SpeculativeDecoder, SpeculativeConfig, DraftTree, DraftToken,
-    VerificationResult, generate_tree_attention_mask,
+    generate_tree_attention_mask, DraftToken, DraftTree, SpeculativeConfig, SpeculativeDecoder,
+    VerificationResult,
 };
-pub use rope::{RopeEmbedding, RopeConfig, RopeScaling};
-pub use mamba::{MambaLayer, MambaConfig, MambaState, MambaWeights};
+pub use spike::SpikeScheduler;
+pub use state::RuntimeState;
 
 #[cfg(feature = "trace")]
-pub use trace::{TraceState, TraceSnapshot, TraceCounters};
+pub use trace::{TraceCounters, TraceSnapshot, TraceState};
 
 #[cfg(feature = "spike_attention")]
 pub use attention::spike_driven::{SpikeDrivenAttention, SpikeDrivenConfig, SpikeTrain};
 
 #[cfg(feature = "spectral_pe")]
-pub use spectral::{SpectralPositionEncoder, SpectralPEConfig, SparseCSR, lanczos_sparse, power_iteration_sparse};
+pub use spectral::{
+    lanczos_sparse, power_iteration_sparse, SparseCSR, SpectralPEConfig, SpectralPositionEncoder,
+};
 
 #[cfg(feature = "sparse_attention")]
-pub use sparse_attention::{MincutSparseAttention, SparseMask, SparsityConfig, LambdaDensitySchedule};
+pub use sparse_attention::{
+    LambdaDensitySchedule, MincutSparseAttention, SparseMask, SparsityConfig,
+};
 
 #[cfg(feature = "energy_gate")]
 pub use energy_gate::{EnergyGate, EnergyGateConfig, EnergyGradient};
@@ -172,22 +174,17 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
-        MincutGatedTransformer, TransformerConfig, GatePolicy,
-        GatePacket, SpikePacket, GateDecision, GateReason, Witness,
-        InferInput, InferOutput, InferStats,
-        QuantizedWeights, WeightsLoader,
-        MincutDepthRouter, ModRoutingConfig, TokenRoute, RoutingStats,
-        CoherenceEarlyExit, EarlyExitConfig, EarlyExitDecision, ExitReason,
-        QuantizedKVCache, HadamardTransform, QuantBits,
-        SpeculativeDecoder, SpeculativeConfig, DraftTree, DraftToken,
-        VerificationResult, generate_tree_attention_mask,
-        RopeEmbedding, RopeConfig, RopeScaling,
-        MambaLayer, MambaConfig, MambaState, MambaWeights,
-        Error, Result,
+        generate_tree_attention_mask, CoherenceEarlyExit, DraftToken, DraftTree, EarlyExitConfig,
+        EarlyExitDecision, Error, ExitReason, GateDecision, GatePacket, GatePolicy, GateReason,
+        HadamardTransform, InferInput, InferOutput, InferStats, MambaConfig, MambaLayer,
+        MambaState, MambaWeights, MincutDepthRouter, MincutGatedTransformer, ModRoutingConfig,
+        QuantBits, QuantizedKVCache, QuantizedWeights, Result, RopeConfig, RopeEmbedding,
+        RopeScaling, RoutingStats, SpeculativeConfig, SpeculativeDecoder, SpikePacket, TokenRoute,
+        TransformerConfig, VerificationResult, WeightsLoader, Witness,
     };
 
     #[cfg(feature = "trace")]
-    pub use crate::{TraceSnapshot, TraceCounters};
+    pub use crate::{TraceCounters, TraceSnapshot};
 }
 
 /// Supported model configurations

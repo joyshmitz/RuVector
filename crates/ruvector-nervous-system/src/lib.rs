@@ -88,7 +88,7 @@ pub use eventbus::{
     BackpressureController, BackpressureState, DVSEvent, Event, EventRingBuffer, EventSurface,
     ShardedEventBus,
 };
-pub use hdc::{Hypervector, HdcMemory, HdcError};
+pub use hdc::{HdcError, HdcMemory, Hypervector};
 pub use hopfield::ModernHopfield;
 pub use plasticity::eprop::{EpropLIF, EpropNetwork, EpropSynapse, LearningSignal};
 pub use routing::{
@@ -96,7 +96,7 @@ pub use routing::{
     GlobalWorkspace, HysteresisTracker, NervousSystemMetrics, NervousSystemScorecard,
     OscillatoryRouter, PhaseModulation, PredictiveLayer, Representation, ScorecardTargets,
 };
-pub use separate::{DentateGyrus, SparseProjection, SparseBitVector};
+pub use separate::{DentateGyrus, SparseBitVector, SparseProjection};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NervousSystemError {
@@ -149,7 +149,11 @@ mod tests {
 
         // Binding produces ~0 similarity with original
         let bound = v1.bind(&v2);
-        assert!(bound.similarity(&v1) > -0.2, "bound similarity: {}", bound.similarity(&v1));
+        assert!(
+            bound.similarity(&v1) > -0.2,
+            "bound similarity: {}",
+            bound.similarity(&v1)
+        );
 
         // Memory
         let mut memory = HdcMemory::new();

@@ -188,11 +188,15 @@ impl TransformerConfig {
         }
 
         if self.window_degraded > self.window_normal {
-            return Err(Error::BadConfig("degraded window cannot exceed normal window"));
+            return Err(Error::BadConfig(
+                "degraded window cannot exceed normal window",
+            ));
         }
 
         if self.layers_degraded > self.layers {
-            return Err(Error::BadConfig("degraded layers cannot exceed total layers"));
+            return Err(Error::BadConfig(
+                "degraded layers cannot exceed total layers",
+            ));
         }
 
         if self.seq_len_degraded > self.seq_len_max {
@@ -285,7 +289,9 @@ impl GatePolicy {
         }
 
         if self.boundary_concentration_q15_max > 32767 {
-            return Err(Error::BadConfig("boundary_concentration_q15_max exceeds Q15 range"));
+            return Err(Error::BadConfig(
+                "boundary_concentration_q15_max exceeds Q15 range",
+            ));
         }
 
         if self.spike_rate_q15_max > 32767 {

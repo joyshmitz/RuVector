@@ -77,10 +77,28 @@ cd ruvector/examples/ruvLLM/esp32-flash
 ```powershell
 git clone https://github.com/ruvnet/ruvector
 cd ruvector\examples\ruvLLM\esp32-flash
-.\install.ps1             # Install deps (restart PowerShell after)
-.\install.ps1 build       # Build
-.\install.ps1 flash COM6  # Flash
+
+# One-time setup (installs espup, espflash, toolchain)
+.\scripts\windows\setup.ps1
+
+# Load environment (run in each new terminal)
+. .\scripts\windows\env.ps1
+
+# Build (auto-detects toolchain paths)
+.\scripts\windows\build.ps1
+
+# Flash (auto-detects COM port)
+.\scripts\windows\flash.ps1
+
+# Or specify port manually
+.\scripts\windows\flash.ps1 -Port COM6
 ```
+
+**Windows Features:**
+- ✅ Auto-detects ESP toolchain paths (no hardcoding)
+- ✅ Auto-detects COM ports
+- ✅ Dynamic libclang/Python path resolution
+- ✅ Single setup script for first-time users
 
 ### Option 3: Manual Build
 

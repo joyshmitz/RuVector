@@ -253,7 +253,8 @@ impl MincutComputer {
     ) -> Vec<WitnessEdge> {
         let partition_set: HashSet<_> = partition.iter().copied().collect();
 
-        graph.edges
+        graph
+            .edges
             .iter()
             .filter_map(|edge| {
                 let i = node_index.get(&edge.source_key())?;
@@ -351,10 +352,7 @@ impl MincutComputer {
             }
 
             // Check convergence
-            let diff: f64 = v.iter()
-                .zip(new_v.iter())
-                .map(|(a, b)| (a - b).abs())
-                .sum();
+            let diff: f64 = v.iter().zip(new_v.iter()).map(|(a, b)| (a - b).abs()).sum();
 
             v = new_v;
 
@@ -402,8 +400,8 @@ pub fn compute_mincut_with_lambda2(graph: &ContractedGraph) -> MincutResult {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::contracted_graph::ContractedGraphBuilder;
+    use super::*;
 
     #[test]
     fn test_mincut_empty_graph() {
@@ -460,15 +458,39 @@ mod tests {
         }
 
         // Create triangle with edges of capacity 1.0
-        graph.add_edge(ContractedEdge::new(
-            1, NodeType::Partition, 0, NodeType::Partition, 1, EdgeType::PartitionLink,
-        ).with_capacity(1.0));
-        graph.add_edge(ContractedEdge::new(
-            1, NodeType::Partition, 1, NodeType::Partition, 2, EdgeType::PartitionLink,
-        ).with_capacity(1.0));
-        graph.add_edge(ContractedEdge::new(
-            1, NodeType::Partition, 0, NodeType::Partition, 2, EdgeType::PartitionLink,
-        ).with_capacity(1.0));
+        graph.add_edge(
+            ContractedEdge::new(
+                1,
+                NodeType::Partition,
+                0,
+                NodeType::Partition,
+                1,
+                EdgeType::PartitionLink,
+            )
+            .with_capacity(1.0),
+        );
+        graph.add_edge(
+            ContractedEdge::new(
+                1,
+                NodeType::Partition,
+                1,
+                NodeType::Partition,
+                2,
+                EdgeType::PartitionLink,
+            )
+            .with_capacity(1.0),
+        );
+        graph.add_edge(
+            ContractedEdge::new(
+                1,
+                NodeType::Partition,
+                0,
+                NodeType::Partition,
+                2,
+                EdgeType::PartitionLink,
+            )
+            .with_capacity(1.0),
+        );
 
         let result = compute_mincut(&graph);
         // Mincut of a triangle is 2 (cut one node from the other two)

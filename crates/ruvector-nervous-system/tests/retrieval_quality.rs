@@ -3,8 +3,8 @@
 
 #[cfg(test)]
 mod retrieval_quality_tests {
-    use rand::{Rng, SeedableRng};
     use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
     use rand_distr::{Distribution, Normal, Uniform};
 
     // ========================================================================
@@ -13,9 +13,9 @@ mod retrieval_quality_tests {
 
     fn generate_uniform_vectors(n: usize, dims: usize, rng: &mut StdRng) -> Vec<Vec<f32>> {
         let dist = Uniform::new(-1.0, 1.0);
-        (0..n).map(|_| {
-            (0..dims).map(|_| dist.sample(rng)).collect()
-        }).collect()
+        (0..n)
+            .map(|_| (0..dims).map(|_| dist.sample(rng)).collect())
+            .collect()
     }
 
     fn generate_gaussian_clusters(
@@ -23,7 +23,7 @@ mod retrieval_quality_tests {
         k: usize,
         dims: usize,
         sigma: f32,
-        rng: &mut StdRng
+        rng: &mut StdRng,
     ) -> Vec<Vec<f32>> {
         // Generate k cluster centers
         let centers = generate_uniform_vectors(k, dims, rng);
@@ -34,9 +34,7 @@ mod retrieval_quality_tests {
 
         for i in 0..n {
             let center = &centers[i % k];
-            let point: Vec<f32> = center.iter().map(|&c| {
-                c + normal.sample(rng)
-            }).collect();
+            let point: Vec<f32> = center.iter().map(|&c| c + normal.sample(rng)).collect();
             vectors.push(point);
         }
 
@@ -49,15 +47,18 @@ mod retrieval_quality_tests {
     }
 
     fn flip_bits(bitvector: &[u64], flip_rate: f32, rng: &mut StdRng) -> Vec<u64> {
-        bitvector.iter().map(|&word| {
-            let mut result = word;
-            for bit in 0..64 {
-                if rng.gen::<f32>() < flip_rate {
-                    result ^= 1u64 << bit;
+        bitvector
+            .iter()
+            .map(|&word| {
+                let mut result = word;
+                for bit in 0..64 {
+                    if rng.gen::<f32>() < flip_rate {
+                        result ^= 1u64 << bit;
+                    }
                 }
-            }
-            result
-        }).collect()
+                result
+            })
+            .collect()
     }
 
     // ========================================================================
@@ -72,7 +73,10 @@ mod retrieval_quality_tests {
     }
 
     fn hamming_distance(a: &[u64], b: &[u64]) -> u32 {
-        a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum()
+        a.iter()
+            .zip(b.iter())
+            .map(|(x, y)| (x ^ y).count_ones())
+            .sum()
     }
 
     fn calculate_recall_at_k(results: &[Vec<usize>], ground_truth: &[Vec<usize>], k: usize) -> f32 {
@@ -103,24 +107,34 @@ mod retrieval_quality_tests {
         let queries: Vec<_> = vectors.iter().take(100).cloned().collect();
 
         // Exact k-NN (ground truth)
-        let ground_truth: Vec<Vec<usize>> = queries.iter().map(|query| {
-            let mut distances: Vec<_> = vectors.iter().enumerate()
-                .map(|(i, v)| (i, 1.0 - cosine_similarity(query, v)))
-                .collect();
-            distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-            distances.iter().take(k).map(|(i, _)| *i).collect()
-        }).collect();
+        let ground_truth: Vec<Vec<usize>> = queries
+            .iter()
+            .map(|query| {
+                let mut distances: Vec<_> = vectors
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i, 1.0 - cosine_similarity(query, v)))
+                    .collect();
+                distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                distances.iter().take(k).map(|(i, _)| *i).collect()
+            })
+            .collect();
 
         // HDC results (placeholder - will use actual HDC when implemented)
-        let hdc_results: Vec<Vec<usize>> = queries.iter().map(|query| {
-            // Placeholder: simulate HDC search
-            // In reality: hdc.encode_and_search(query, k)
-            let mut distances: Vec<_> = vectors.iter().enumerate()
-                .map(|(i, v)| (i, 1.0 - cosine_similarity(query, v)))
-                .collect();
-            distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-            distances.iter().take(k).map(|(i, _)| *i).collect()
-        }).collect();
+        let hdc_results: Vec<Vec<usize>> = queries
+            .iter()
+            .map(|query| {
+                // Placeholder: simulate HDC search
+                // In reality: hdc.encode_and_search(query, k)
+                let mut distances: Vec<_> = vectors
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i, 1.0 - cosine_similarity(query, v)))
+                    .collect();
+                distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                distances.iter().take(k).map(|(i, _)| *i).collect()
+            })
+            .collect();
 
         let recall_1 = calculate_recall_at_k(&hdc_results, &ground_truth, 1);
         let recall_10 = calculate_recall_at_k(&hdc_results, &ground_truth, 10);
@@ -137,9 +151,9 @@ mod retrieval_quality_tests {
         let dims = 10000; // 10K bit hypervector
 
         // Generate hypervectors (bit-packed)
-        let hypervectors: Vec<Vec<u64>> = (0..num_vectors).map(|_| {
-            (0..(dims + 63) / 64).map(|_| rng.gen()).collect()
-        }).collect();
+        let hypervectors: Vec<Vec<u64>> = (0..num_vectors)
+            .map(|_| (0..(dims + 63) / 64).map(|_| rng.gen()).collect())
+            .collect();
 
         let mut correct = 0;
         let num_tests = 100;
@@ -208,7 +222,11 @@ mod retrieval_quality_tests {
         }
 
         let accuracy = correct as f32 / patterns.len() as f32;
-        assert!(accuracy > 0.95, "Hopfield capacity test accuracy {} < 95%", accuracy);
+        assert!(
+            accuracy > 0.95,
+            "Hopfield capacity test accuracy {} < 95%",
+            accuracy
+        );
     }
 
     #[test]
@@ -242,7 +260,12 @@ mod retrieval_quality_tests {
 
             // Accuracy should degrade gracefully with noise
             if noise_level <= 0.10 {
-                assert!(accuracy > 0.95, "Accuracy {} < 95% at noise {}", accuracy, noise_level);
+                assert!(
+                    accuracy > 0.95,
+                    "Accuracy {} < 95% at noise {}",
+                    accuracy,
+                    noise_level
+                );
             }
         }
     }
@@ -266,7 +289,12 @@ mod retrieval_quality_tests {
             // let energy = hopfield.energy(&state);
             let energy = -state.iter().map(|x| x * x).sum::<f32>(); // Placeholder
 
-            assert!(energy <= prev_energy, "Energy increased: {} -> {}", prev_energy, energy);
+            assert!(
+                energy <= prev_energy,
+                "Energy increased: {} -> {}",
+                prev_energy,
+                energy
+            );
             prev_energy = energy;
         }
     }
@@ -285,12 +313,15 @@ mod retrieval_quality_tests {
 
         // Encode all patterns
         // let encoder = PatternSeparator::new(dims);
-        let encoded: Vec<Vec<f32>> = patterns.iter().map(|p| {
-            // encoder.encode(p)
-            // Placeholder: normalize
-            let norm: f32 = p.iter().map(|x| x * x).sum::<f32>().sqrt();
-            p.iter().map(|x| x / norm).collect()
-        }).collect();
+        let encoded: Vec<Vec<f32>> = patterns
+            .iter()
+            .map(|p| {
+                // encoder.encode(p)
+                // Placeholder: normalize
+                let norm: f32 = p.iter().map(|x| x * x).sum::<f32>().sqrt();
+                p.iter().map(|x| x / norm).collect()
+            })
+            .collect();
 
         // Check for collisions (cosine similarity > 0.95)
         let mut collisions = 0;
@@ -303,7 +334,11 @@ mod retrieval_quality_tests {
         }
 
         let collision_rate = collisions as f32 / (num_patterns * (num_patterns - 1) / 2) as f32;
-        assert!(collision_rate < 0.01, "Collision rate {} >= 1%", collision_rate);
+        assert!(
+            collision_rate < 0.01,
+            "Collision rate {} >= 1%",
+            collision_rate
+        );
     }
 
     #[test]
@@ -316,11 +351,14 @@ mod retrieval_quality_tests {
 
         // Encode patterns
         // let encoder = PatternSeparator::new(dims);
-        let encoded: Vec<Vec<f32>> = patterns.iter().map(|p| {
-            // encoder.encode(p)
-            let norm: f32 = p.iter().map(|x| x * x).sum::<f32>().sqrt();
-            p.iter().map(|x| x / norm).collect()
-        }).collect();
+        let encoded: Vec<Vec<f32>> = patterns
+            .iter()
+            .map(|p| {
+                // encoder.encode(p)
+                let norm: f32 = p.iter().map(|x| x * x).sum::<f32>().sqrt();
+                p.iter().map(|x| x / norm).collect()
+            })
+            .collect();
 
         // Measure average pairwise orthogonality
         let mut total_similarity = 0.0;
@@ -337,7 +375,11 @@ mod retrieval_quality_tests {
         let orthogonality_score = 1.0 - avg_similarity;
 
         // Target: >0.9 orthogonality (avg similarity <0.1)
-        assert!(orthogonality_score > 0.90, "Orthogonality {} < 0.90", orthogonality_score);
+        assert!(
+            orthogonality_score > 0.90,
+            "Orthogonality {} < 0.90",
+            orthogonality_score
+        );
     }
 
     // ========================================================================
@@ -373,7 +415,11 @@ mod retrieval_quality_tests {
         }
 
         let accuracy = correct as f32 / num_items as f32;
-        assert!(accuracy > 0.90, "One-shot learning accuracy {} < 90%", accuracy);
+        assert!(
+            accuracy > 0.90,
+            "One-shot learning accuracy {} < 90%",
+            accuracy
+        );
     }
 
     #[test]
@@ -404,9 +450,12 @@ mod retrieval_quality_tests {
             let accuracy = correct as f32 / patterns.len() as f32;
 
             // Accuracy should not drop more than 5% even with many patterns
-            assert!(accuracy > 0.90,
+            assert!(
+                accuracy > 0.90,
                 "Interference too high: accuracy {} < 90% with {} patterns",
-                accuracy, num_patterns);
+                accuracy,
+                num_patterns
+            );
         }
     }
 
@@ -426,13 +475,18 @@ mod retrieval_quality_tests {
         let queries: Vec<_> = vectors.iter().take(100).cloned().collect();
 
         // Exact k-NN
-        let exact_results = queries.iter().map(|q| {
-            let mut dists: Vec<_> = vectors.iter().enumerate()
-                .map(|(i, v)| (i, 1.0 - cosine_similarity(q, v)))
-                .collect();
-            dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-            dists.iter().take(k).map(|(i, _)| *i).collect()
-        }).collect::<Vec<Vec<usize>>>();
+        let exact_results = queries
+            .iter()
+            .map(|q| {
+                let mut dists: Vec<_> = vectors
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i, 1.0 - cosine_similarity(q, v)))
+                    .collect();
+                dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                dists.iter().take(k).map(|(i, _)| *i).collect()
+            })
+            .collect::<Vec<Vec<usize>>>();
 
         // HDC
         // let hdc_results = ...;

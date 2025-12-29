@@ -2,15 +2,12 @@
 //!
 //! Tests GEMM, INT4 quantization, arena allocation, and SIMD operations.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use ruvector_mincut_gated_transformer::arena::{calculate_arena_size, WeightArena};
 use ruvector_mincut_gated_transformer::kernel::{
-    qgemm_i8, qgemm_i8_simd,
-    layer_norm, rms_norm,
-    Timer, BenchStats, compute_gflops,
-    pack_int4, unpack_int4, quantize_f32_to_int4, dequantize_int4_to_f32,
-    Int4Weights, int4_gemv, int4_gemm,
+    compute_gflops, dequantize_int4_to_f32, int4_gemm, int4_gemv, layer_norm, pack_int4, qgemm_i8,
+    qgemm_i8_simd, quantize_f32_to_int4, rms_norm, unpack_int4, BenchStats, Int4Weights, Timer,
 };
-use ruvector_mincut_gated_transformer::arena::{WeightArena, calculate_arena_size};
 
 // ============================================================================
 // INT8 GEMM Benchmarks
@@ -31,29 +28,21 @@ fn bench_qgemm_i8_sizes(c: &mut Criterion) {
         let ops = 2 * m * n * k;
         group.throughput(Throughput::Elements(ops as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("scalar", size),
-            size,
-            |bench, _| {
-                let mut c_out = vec![0i32; m * n];
-                bench.iter(|| {
-                    qgemm_i8(m, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
-                    black_box(c_out[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("scalar", size), size, |bench, _| {
+            let mut c_out = vec![0i32; m * n];
+            bench.iter(|| {
+                qgemm_i8(m, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
+                black_box(c_out[0])
+            })
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("simd", size),
-            size,
-            |bench, _| {
-                let mut c_out = vec![0i32; m * n];
-                bench.iter(|| {
-                    qgemm_i8_simd(m, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
-                    black_box(c_out[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("simd", size), size, |bench, _| {
+            let mut c_out = vec![0i32; m * n];
+            bench.iter(|| {
+                qgemm_i8_simd(m, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
+                black_box(c_out[0])
+            })
+        });
     }
 
     group.finish();
@@ -72,17 +61,13 @@ fn bench_qgemv(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements((2 * n * k) as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |bench, _| {
-                let mut c_out = vec![0i32; n];
-                bench.iter(|| {
-                    qgemm_i8_simd(1, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
-                    black_box(c_out[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |bench, _| {
+            let mut c_out = vec![0i32; n];
+            bench.iter(|| {
+                qgemm_i8_simd(1, n, k, &a, 1.0 / 128.0, &b, &b_scales, None, &mut c_out);
+                black_box(c_out[0])
+            })
+        });
     }
 
     group.finish();
@@ -112,20 +97,18 @@ fn bench_int4_pack_unpack(c: &mut Criterion) {
 
     // Bulk operations
     for count in [256, 1024, 4096].iter() {
-        let values: Vec<f32> = (0..*count).map(|i| (i as f32 - *count as f32 / 2.0) / 100.0).collect();
+        let values: Vec<f32> = (0..*count)
+            .map(|i| (i as f32 - *count as f32 / 2.0) / 100.0)
+            .collect();
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("quantize", count),
-            count,
-            |bench, cnt| {
-                let mut packed = vec![0u8; (*cnt + 1) / 2];
-                bench.iter(|| {
-                    let scale = quantize_f32_to_int4(&values, &mut packed);
-                    black_box(scale)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("quantize", count), count, |bench, cnt| {
+            let mut packed = vec![0u8; (*cnt + 1) / 2];
+            bench.iter(|| {
+                let scale = quantize_f32_to_int4(&values, &mut packed);
+                black_box(scale)
+            })
+        });
 
         group.bench_with_input(
             BenchmarkId::new("dequantize", count),
@@ -186,17 +169,13 @@ fn bench_int4_gemv(c: &mut Criterion) {
         let ops = 2 * n * k;
         group.throughput(Throughput::Elements(ops as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |bench, sz| {
-                let mut y = vec![0.0f32; *sz];
-                bench.iter(|| {
-                    int4_gemv(&int4_w, &x, 1.0, &mut y);
-                    black_box(y[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |bench, sz| {
+            let mut y = vec![0.0f32; *sz];
+            bench.iter(|| {
+                int4_gemv(&int4_w, &x, 1.0, &mut y);
+                black_box(y[0])
+            })
+        });
     }
 
     group.finish();
@@ -240,7 +219,9 @@ fn bench_int4_memory_comparison(c: &mut Criterion) {
         let total_weights = n * k;
 
         // INT8 baseline
-        let weights_i8: Vec<i8> = (0..total_weights).map(|i| (i as i16 % 256 - 128) as i8).collect();
+        let weights_i8: Vec<i8> = (0..total_weights)
+            .map(|i| (i as i16 % 256 - 128) as i8)
+            .collect();
         let b_scales: Vec<f32> = vec![1.0 / 128.0; n];
         let x_i8: Vec<i8> = (0..k).map(|i| (i as i16 % 256 - 128) as i8).collect();
 
@@ -251,29 +232,31 @@ fn bench_int4_memory_comparison(c: &mut Criterion) {
         let int4_w = Int4Weights::from_f32(&weights_f32, n, k);
         let x_f32: Vec<f32> = (0..k).map(|i| i as f32 / k as f32).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("int8_gemv", size),
-            size,
-            |bench, sz| {
-                let mut y_i8 = vec![0i32; *sz];
-                bench.iter(|| {
-                    qgemm_i8_simd(1, n, k, &x_i8, 1.0 / 128.0, &weights_i8, &b_scales, None, &mut y_i8);
-                    black_box(y_i8[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("int8_gemv", size), size, |bench, sz| {
+            let mut y_i8 = vec![0i32; *sz];
+            bench.iter(|| {
+                qgemm_i8_simd(
+                    1,
+                    n,
+                    k,
+                    &x_i8,
+                    1.0 / 128.0,
+                    &weights_i8,
+                    &b_scales,
+                    None,
+                    &mut y_i8,
+                );
+                black_box(y_i8[0])
+            })
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("int4_gemv", size),
-            size,
-            |bench, sz| {
-                let mut y_f32 = vec![0.0f32; *sz];
-                bench.iter(|| {
-                    int4_gemv(&int4_w, &x_f32, 1.0, &mut y_f32);
-                    black_box(y_f32[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("int4_gemv", size), size, |bench, sz| {
+            let mut y_f32 = vec![0.0f32; *sz];
+            bench.iter(|| {
+                int4_gemv(&int4_w, &x_f32, 1.0, &mut y_f32);
+                black_box(y_f32[0])
+            })
+        });
     }
 
     group.finish();
@@ -287,35 +270,29 @@ fn bench_layer_norm(c: &mut Criterion) {
     let mut group = c.benchmark_group("layer_norm");
 
     for size in [128, 256, 512, 768].iter() {
-        let input: Vec<f32> = (0..*size).map(|i| (i as f32 - *size as f32 / 2.0) / 100.0).collect();
+        let input: Vec<f32> = (0..*size)
+            .map(|i| (i as f32 - *size as f32 / 2.0) / 100.0)
+            .collect();
         let gamma: Vec<f32> = vec![1.0f32; *size];
         let beta: Vec<f32> = vec![0.0f32; *size];
 
         group.throughput(Throughput::Elements(*size as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("layer_norm", size),
-            size,
-            |bench, sz| {
-                let mut output = vec![0.0f32; *sz];
-                bench.iter(|| {
-                    layer_norm(&input, &gamma, &beta, 1e-5, &mut output);
-                    black_box(output[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("layer_norm", size), size, |bench, sz| {
+            let mut output = vec![0.0f32; *sz];
+            bench.iter(|| {
+                layer_norm(&input, &gamma, &beta, 1e-5, &mut output);
+                black_box(output[0])
+            })
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("rms_norm", size),
-            size,
-            |bench, sz| {
-                let mut output = vec![0.0f32; *sz];
-                bench.iter(|| {
-                    rms_norm(&input, &gamma, 1e-5, &mut output);
-                    black_box(output[0])
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rms_norm", size), size, |bench, sz| {
+            let mut output = vec![0.0f32; *sz];
+            bench.iter(|| {
+                rms_norm(&input, &gamma, 1e-5, &mut output);
+                black_box(output[0])
+            })
+        });
     }
 
     group.finish();
@@ -457,11 +434,21 @@ fn bench_transformer_layer_simulation(c: &mut Criterion) {
     let hidden = 256;
     let ffn_hidden = hidden * 4;
 
-    let q_weights: Vec<i8> = (0..hidden * hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
-    let k_weights: Vec<i8> = (0..hidden * hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
-    let v_weights: Vec<i8> = (0..hidden * hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
-    let ffn_up: Vec<i8> = (0..hidden * ffn_hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
-    let ffn_down: Vec<i8> = (0..ffn_hidden * hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
+    let q_weights: Vec<i8> = (0..hidden * hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
+    let k_weights: Vec<i8> = (0..hidden * hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
+    let v_weights: Vec<i8> = (0..hidden * hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
+    let ffn_up: Vec<i8> = (0..hidden * ffn_hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
+    let ffn_down: Vec<i8> = (0..ffn_hidden * hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
 
     let q_scales: Vec<f32> = vec![1.0 / 128.0; hidden];
     let k_scales: Vec<f32> = vec![1.0 / 128.0; hidden];
@@ -469,16 +456,48 @@ fn bench_transformer_layer_simulation(c: &mut Criterion) {
     let ffn_up_scales: Vec<f32> = vec![1.0 / 128.0; ffn_hidden];
     let ffn_down_scales: Vec<f32> = vec![1.0 / 128.0; hidden];
 
-    let input: Vec<i8> = (0..hidden).map(|i| ((i as i16 % 256 - 128) as i8)).collect();
+    let input: Vec<i8> = (0..hidden)
+        .map(|i| ((i as i16 % 256 - 128) as i8))
+        .collect();
 
     group.bench_function("qkv_projection", |b| {
         let mut q_out = vec![0i32; hidden];
         let mut k_out = vec![0i32; hidden];
         let mut v_out = vec![0i32; hidden];
         b.iter(|| {
-            qgemm_i8_simd(1, hidden, hidden, &input, 1.0/128.0, &q_weights, &q_scales, None, &mut q_out);
-            qgemm_i8_simd(1, hidden, hidden, &input, 1.0/128.0, &k_weights, &k_scales, None, &mut k_out);
-            qgemm_i8_simd(1, hidden, hidden, &input, 1.0/128.0, &v_weights, &v_scales, None, &mut v_out);
+            qgemm_i8_simd(
+                1,
+                hidden,
+                hidden,
+                &input,
+                1.0 / 128.0,
+                &q_weights,
+                &q_scales,
+                None,
+                &mut q_out,
+            );
+            qgemm_i8_simd(
+                1,
+                hidden,
+                hidden,
+                &input,
+                1.0 / 128.0,
+                &k_weights,
+                &k_scales,
+                None,
+                &mut k_out,
+            );
+            qgemm_i8_simd(
+                1,
+                hidden,
+                hidden,
+                &input,
+                1.0 / 128.0,
+                &v_weights,
+                &v_scales,
+                None,
+                &mut v_out,
+            );
             black_box((q_out[0], k_out[0], v_out[0]))
         })
     });
@@ -487,9 +506,32 @@ fn bench_transformer_layer_simulation(c: &mut Criterion) {
         let mut ffn_mid = vec![0i32; ffn_hidden];
         let mut out = vec![0i32; hidden];
         b.iter(|| {
-            qgemm_i8_simd(1, ffn_hidden, hidden, &input, 1.0/128.0, &ffn_up, &ffn_up_scales, None, &mut ffn_mid);
-            let ffn_mid_i8: Vec<i8> = ffn_mid.iter().map(|&x| (x >> 8).clamp(-128, 127) as i8).collect();
-            qgemm_i8_simd(1, hidden, ffn_hidden, &ffn_mid_i8, 1.0/128.0, &ffn_down, &ffn_down_scales, None, &mut out);
+            qgemm_i8_simd(
+                1,
+                ffn_hidden,
+                hidden,
+                &input,
+                1.0 / 128.0,
+                &ffn_up,
+                &ffn_up_scales,
+                None,
+                &mut ffn_mid,
+            );
+            let ffn_mid_i8: Vec<i8> = ffn_mid
+                .iter()
+                .map(|&x| (x >> 8).clamp(-128, 127) as i8)
+                .collect();
+            qgemm_i8_simd(
+                1,
+                hidden,
+                ffn_hidden,
+                &ffn_mid_i8,
+                1.0 / 128.0,
+                &ffn_down,
+                &ffn_down_scales,
+                None,
+                &mut out,
+            );
             black_box(out[0])
         })
     });

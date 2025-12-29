@@ -4,8 +4,8 @@
 //! boundary token handling, and skip ratio calculations.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket,
-    InferInput, InferOutput, QuantizedWeights, GateDecision,
+    GateDecision, GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer,
+    QuantizedWeights, TransformerConfig,
 };
 
 fn create_transformer(config: TransformerConfig) -> MincutGatedTransformer {
@@ -120,8 +120,14 @@ fn test_routing_with_oscillating_lambda() {
     }
 
     // Large oscillations should trigger interventions
-    let interventions = decisions.iter().filter(|d| **d != GateDecision::Allow).count();
-    assert!(interventions > 0, "Expected some interventions, but all were Allow");
+    let interventions = decisions
+        .iter()
+        .filter(|d| **d != GateDecision::Allow)
+        .count();
+    assert!(
+        interventions > 0,
+        "Expected some interventions, but all were Allow"
+    );
 }
 
 // ============ Capacity Constraints ============
@@ -390,11 +396,11 @@ fn test_skip_ratio_with_mixed_activity() {
 #[test]
 fn test_lambda_drop_ratio_calculation() {
     let test_cases = vec![
-        (100u32, 100u32, 0u16),      // No drop
-        (100u32, 90u32, 3276u16),    // 10% drop
-        (100u32, 75u32, 8192u16),    // 25% drop
-        (100u32, 50u32, 16384u16),   // 50% drop
-        (100u32, 25u32, 24576u16),   // 75% drop
+        (100u32, 100u32, 0u16),    // No drop
+        (100u32, 90u32, 3276u16),  // 10% drop
+        (100u32, 75u32, 8192u16),  // 25% drop
+        (100u32, 50u32, 16384u16), // 50% drop
+        (100u32, 25u32, 24576u16), // 75% drop
     ];
 
     for (prev, curr, expected_ratio) in test_cases {
@@ -412,10 +418,11 @@ fn test_lambda_drop_ratio_calculation() {
         // Allow 10% tolerance for fixed-point arithmetic
         let tolerance = expected_ratio / 10;
         assert!(
-            ratio >= expected_ratio.saturating_sub(tolerance) &&
-            ratio <= expected_ratio + tolerance,
+            ratio >= expected_ratio.saturating_sub(tolerance)
+                && ratio <= expected_ratio + tolerance,
             "Drop ratio mismatch: expected ~{}, got {}",
-            expected_ratio, ratio
+            expected_ratio,
+            ratio
         );
     }
 }

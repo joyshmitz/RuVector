@@ -31,8 +31,8 @@
 #![cfg_attr(feature = "no_std_gateway", no_std)]
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::f32;
 
 /// Mamba layer configuration
@@ -184,13 +184,27 @@ impl MambaWeights {
 
         let mut weights = Self::empty(config);
 
-        for w in &mut weights.in_proj { *w = rand_f32(); }
-        for w in &mut weights.conv1d { *w = rand_f32(); }
-        for w in &mut weights.x_proj { *w = rand_f32(); }
-        for w in &mut weights.dt_proj { *w = rand_f32(); }
-        for w in &mut weights.a_log { *w = -rand_f32().abs() - 1.0; } // Negative for stability
-        for w in &mut weights.d { *w = rand_f32(); }
-        for w in &mut weights.out_proj { *w = rand_f32(); }
+        for w in &mut weights.in_proj {
+            *w = rand_f32();
+        }
+        for w in &mut weights.conv1d {
+            *w = rand_f32();
+        }
+        for w in &mut weights.x_proj {
+            *w = rand_f32();
+        }
+        for w in &mut weights.dt_proj {
+            *w = rand_f32();
+        }
+        for w in &mut weights.a_log {
+            *w = -rand_f32().abs() - 1.0;
+        } // Negative for stability
+        for w in &mut weights.d {
+            *w = rand_f32();
+        }
+        for w in &mut weights.out_proj {
+            *w = rand_f32();
+        }
 
         weights
     }
@@ -221,14 +235,20 @@ impl MambaLayer {
     pub fn forward_step(
         &self,
         weights: &MambaWeights,
-        x: &[f32],           // [d_model]
+        x: &[f32], // [d_model]
         state: &mut MambaState,
     ) -> Vec<f32> {
         debug_assert_eq!(x.len(), self.config.d_model);
 
         // Input projection: x -> (x_proj, z)
         let mut x_and_z = vec![0.0; self.d_inner * 2];
-        self.linear(x, &weights.in_proj, self.config.d_model, self.d_inner * 2, &mut x_and_z);
+        self.linear(
+            x,
+            &weights.in_proj,
+            self.config.d_model,
+            self.d_inner * 2,
+            &mut x_and_z,
+        );
 
         let (x_proj, z) = x_and_z.split_at(self.d_inner);
         let mut x_proj = x_proj.to_vec();
@@ -239,8 +259,13 @@ impl MambaLayer {
 
         // Compute input-dependent parameters
         let mut params = vec![0.0; self.config.dt_rank + self.config.d_state * 2];
-        self.linear(&x_proj, &weights.x_proj, self.d_inner,
-                   self.config.dt_rank + self.config.d_state * 2, &mut params);
+        self.linear(
+            &x_proj,
+            &weights.x_proj,
+            self.d_inner,
+            self.config.dt_rank + self.config.d_state * 2,
+            &mut params,
+        );
 
         let dt_proj_input = &params[..self.config.dt_rank];
         let b = &params[self.config.dt_rank..self.config.dt_rank + self.config.d_state];
@@ -248,7 +273,13 @@ impl MambaLayer {
 
         // Project dt
         let mut delta = vec![0.0; self.d_inner];
-        self.linear(dt_proj_input, &weights.dt_proj, self.config.dt_rank, self.d_inner, &mut delta);
+        self.linear(
+            dt_proj_input,
+            &weights.dt_proj,
+            self.config.dt_rank,
+            self.d_inner,
+            &mut delta,
+        );
 
         // Apply softplus: dt = softplus(delta)
         for d in &mut delta {
@@ -267,7 +298,13 @@ impl MambaLayer {
 
         // Output projection
         let mut result = vec![0.0; self.config.d_model];
-        self.linear(&output, &weights.out_proj, self.d_inner, self.config.d_model, &mut result);
+        self.linear(
+            &output,
+            &weights.out_proj,
+            self.d_inner,
+            self.config.d_model,
+            &mut result,
+        );
 
         result
     }
@@ -278,7 +315,7 @@ impl MambaLayer {
     pub fn forward_sequence(
         &self,
         weights: &MambaWeights,
-        x: &[f32],           // [seq_len, d_model]
+        x: &[f32], // [seq_len, d_model]
         seq_len: usize,
     ) -> Vec<f32> {
         debug_assert_eq!(x.len(), seq_len * self.config.d_model);
@@ -299,8 +336,8 @@ impl MambaLayer {
     /// Causal 1D convolution for single step
     fn causal_conv1d_step(
         &self,
-        x: &mut [f32],              // [d_inner]
-        conv_weights: &[f32],       // [d_inner, d_conv]
+        x: &mut [f32],        // [d_inner]
+        conv_weights: &[f32], // [d_inner, d_conv]
         state: &mut MambaState,
     ) {
         debug_assert_eq!(x.len(), self.d_inner);
@@ -318,8 +355,8 @@ impl MambaLayer {
             // Apply convolution
             let mut sum = 0.0;
             for j in 0..self.config.d_conv {
-                sum += state.conv_state[i * self.config.d_conv + j] *
-                       conv_weights[i * self.config.d_conv + j];
+                sum += state.conv_state[i * self.config.d_conv + j]
+                    * conv_weights[i * self.config.d_conv + j];
             }
             output[i] = sum;
         }
@@ -330,12 +367,12 @@ impl MambaLayer {
     /// Selective scan for single step (updates state)
     fn selective_scan_step(
         &self,
-        u: &[f32],              // Input [d_inner]
-        delta: &[f32],          // Time steps [d_inner]
-        a_log: &[f32],          // A matrix (log space) [d_inner, d_state]
-        b: &[f32],              // B matrix [d_state]
-        c: &[f32],              // C matrix [d_state]
-        d: &[f32],              // Skip connection [d_inner]
+        u: &[f32],     // Input [d_inner]
+        delta: &[f32], // Time steps [d_inner]
+        a_log: &[f32], // A matrix (log space) [d_inner, d_state]
+        b: &[f32],     // B matrix [d_state]
+        c: &[f32],     // C matrix [d_state]
+        d: &[f32],     // Skip connection [d_inner]
         state: &mut MambaState,
     ) -> Vec<f32> {
         let mut y = vec![0.0; self.d_inner];
@@ -381,9 +418,9 @@ impl MambaLayer {
     #[allow(dead_code)]
     fn discretize(
         &self,
-        a: &[f32],           // Continuous A [d_inner, d_state]
-        b: &[f32],           // Continuous B [d_inner, d_state]
-        delta: &[f32],       // Time steps [d_inner]
+        a: &[f32],     // Continuous A [d_inner, d_state]
+        b: &[f32],     // Continuous B [d_inner, d_state]
+        delta: &[f32], // Time steps [d_inner]
     ) -> (Vec<f32>, Vec<f32>) {
         let mut a_bar = vec![0.0; self.d_inner * self.config.d_state];
         let mut b_bar = vec![0.0; self.d_inner * self.config.d_state];
@@ -404,12 +441,12 @@ impl MambaLayer {
     #[allow(dead_code)]
     fn selective_scan(
         &self,
-        u: &[f32],           // Input [seq_len, d_inner]
-        delta: &[f32],       // Time steps [seq_len, d_inner]
-        a: &[f32],           // A matrix [d_inner, d_state]
-        b: &[f32],           // B matrix [seq_len, d_state]
-        c: &[f32],           // C matrix [seq_len, d_state]
-        d: &[f32],           // D matrix (skip) [d_inner]
+        u: &[f32],     // Input [seq_len, d_inner]
+        delta: &[f32], // Time steps [seq_len, d_inner]
+        a: &[f32],     // A matrix [d_inner, d_state]
+        b: &[f32],     // B matrix [seq_len, d_state]
+        c: &[f32],     // C matrix [seq_len, d_state]
+        d: &[f32],     // D matrix (skip) [d_inner]
         seq_len: usize,
     ) -> Vec<f32> {
         let mut y = vec![0.0; seq_len * self.d_inner];
@@ -622,8 +659,8 @@ mod tests {
 
         let x = vec![1.0, 2.0, 3.0];
         let w = vec![
-            1.0, 0.0, 0.0,  // First output: 1*1 + 2*0 + 3*0 = 1
-            0.0, 1.0, 0.0,  // Second output: 1*0 + 2*1 + 3*0 = 2
+            1.0, 0.0, 0.0, // First output: 1*1 + 2*0 + 3*0 = 1
+            0.0, 1.0, 0.0, // Second output: 1*0 + 2*1 + 3*0 = 2
         ];
         let mut out = vec![0.0; 2];
 

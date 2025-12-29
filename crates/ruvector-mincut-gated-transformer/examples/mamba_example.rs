@@ -6,9 +6,7 @@
 //! 3. Sequence processing
 //! 4. State persistence across timesteps
 
-use ruvector_mincut_gated_transformer::mamba::{
-    MambaLayer, MambaConfig, MambaState, MambaWeights,
-};
+use ruvector_mincut_gated_transformer::mamba::{MambaConfig, MambaLayer, MambaState, MambaWeights};
 
 fn main() {
     println!("=== Mamba State Space Model Example ===\n");
@@ -98,14 +96,20 @@ fn main() {
     state.reset();
     let out1_reset = layer.forward_step(&weights, &input1, &mut state);
     println!("  After reset: output[0] = {:.6}", out1_reset[0]);
-    println!("  Matches first: {}", (out1[0] - out1_reset[0]).abs() < 1e-5);
+    println!(
+        "  Matches first: {}",
+        (out1[0] - out1_reset[0]).abs() < 1e-5
+    );
     println!();
 
     // Performance characteristics
     println!("Performance Characteristics:");
     println!("  Complexity per step: O(N) vs O(N²) for attention");
     println!("  Memory per step: O(1) vs O(N) for attention");
-    println!("  State size: {} floats", state.h.len() + state.conv_state.len());
+    println!(
+        "  State size: {} floats",
+        state.h.len() + state.conv_state.len()
+    );
     println!();
 
     println!("=== Example Complete ===");

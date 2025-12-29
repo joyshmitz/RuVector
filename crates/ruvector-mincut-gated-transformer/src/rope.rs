@@ -26,8 +26,8 @@
 //! - Peng et al. 2023: YaRN: Efficient Context Window Extension
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::{Error, Result};
 
@@ -65,10 +65,7 @@ pub enum RopeScaling {
 
     /// YaRN (Yet another RoPE extensioN): combines NTK + attention scaling
     /// Best quality for extreme context extension (8k -> 128k)
-    YaRN {
-        scale: f32,
-        original_max_len: usize,
-    },
+    YaRN { scale: f32, original_max_len: usize },
 }
 
 /// Rotary Position Embeddings with precomputed sin/cos tables
@@ -479,7 +476,7 @@ mod tests {
             // Reverse rotation: use -sin instead of sin
             let q1 = q[i];
             let q2 = q[i + half_dim];
-            q[i] = q1 * cos + q2 * sin;      // Note: +sin for reverse
+            q[i] = q1 * cos + q2 * sin; // Note: +sin for reverse
             q[i + half_dim] = -q1 * sin + q2 * cos;
 
             let k1 = k[i];
@@ -490,8 +487,16 @@ mod tests {
 
         // Should recover original vectors
         for i in 0..64 {
-            assert_f32_near(q[i], q_orig[i], "Q should be restored after reverse rotation");
-            assert_f32_near(k[i], k_orig[i], "K should be restored after reverse rotation");
+            assert_f32_near(
+                q[i],
+                q_orig[i],
+                "Q should be restored after reverse rotation",
+            );
+            assert_f32_near(
+                k[i],
+                k_orig[i],
+                "K should be restored after reverse rotation",
+            );
         }
     }
 
@@ -516,7 +521,10 @@ mod tests {
 
         // NTK-aware should have different (larger) effective base
         let effective_base = RopeEmbedding::compute_effective_base(&ntk_config);
-        assert!(effective_base > base_config.base, "NTK should increase base frequency");
+        assert!(
+            effective_base > base_config.base,
+            "NTK should increase base frequency"
+        );
 
         // Angles at same relative position should be similar
         // pos=1024 in base ~= pos=2048 in NTK (both are middle of context)
@@ -528,7 +536,10 @@ mod tests {
         let ntk_cos = ntk_rope.get_cos(mid_ntk, 0);
 
         // They won't be exactly equal, but should be in similar range
-        assert!((base_cos - ntk_cos).abs() < 0.5, "NTK should preserve frequency characteristics");
+        assert!(
+            (base_cos - ntk_cos).abs() < 0.5,
+            "NTK should preserve frequency characteristics"
+        );
     }
 
     #[test]
@@ -568,11 +579,16 @@ mod tests {
             k2[i] = (i as f32) * 0.2;
         }
 
-        unscaled_rope.apply_rotary_pos_emb(&mut q2, &mut k2, &[50]).unwrap();
+        unscaled_rope
+            .apply_rotary_pos_emb(&mut q2, &mut k2, &[50])
+            .unwrap();
 
         // Results should be very similar
         for i in 0..64 {
-            assert!((q1[i] - q2[i]).abs() < 0.01, "Linear scaling should compress positions");
+            assert!(
+                (q1[i] - q2[i]).abs() < 0.01,
+                "Linear scaling should compress positions"
+            );
         }
     }
 
@@ -624,7 +640,8 @@ mod tests {
         let q_orig = q.clone();
 
         // Apply Q15 rotation
-        rope.apply_rotary_pos_emb_q15(&mut q, &mut k, &[10]).unwrap();
+        rope.apply_rotary_pos_emb_q15(&mut q, &mut k, &[10])
+            .unwrap();
 
         // Vectors should have changed
         let mut changed = false;
@@ -646,12 +663,19 @@ mod tests {
         let q_zero_orig = q_zero.clone();
         let k_zero_orig = k_zero.clone();
 
-        rope.apply_rotary_pos_emb_q15(&mut q_zero, &mut k_zero, &[0]).unwrap();
+        rope.apply_rotary_pos_emb_q15(&mut q_zero, &mut k_zero, &[0])
+            .unwrap();
 
         for i in 0..64 {
             // Allow small quantization error
-            assert!((q_zero[i] - q_zero_orig[i]).abs() <= 1, "Q15 should not change at pos=0");
-            assert!((k_zero[i] - k_zero_orig[i]).abs() <= 1, "Q15 should not change at pos=0");
+            assert!(
+                (q_zero[i] - q_zero_orig[i]).abs() <= 1,
+                "Q15 should not change at pos=0"
+            );
+            assert!(
+                (k_zero[i] - k_zero_orig[i]).abs() <= 1,
+                "Q15 should not change at pos=0"
+            );
         }
     }
 
@@ -677,7 +701,8 @@ mod tests {
             k[i] = (i as f32) * 0.02;
         }
 
-        rope.apply_rotary_pos_emb(&mut q, &mut k, &positions).unwrap();
+        rope.apply_rotary_pos_emb(&mut q, &mut k, &positions)
+            .unwrap();
 
         // First token (pos=0) should be unchanged
         for i in 0..64 {
@@ -739,7 +764,13 @@ mod tests {
         let angle_dim31 = rope.get_cos(pos, 31).acos();
 
         // Higher dimensions should have smaller angles (lower frequency)
-        assert!(angle_dim0 > angle_dim15, "Frequency should decay with dimension");
-        assert!(angle_dim15 > angle_dim31, "Frequency should decay with dimension");
+        assert!(
+            angle_dim0 > angle_dim15,
+            "Frequency should decay with dimension"
+        );
+        assert!(
+            angle_dim15 > angle_dim31,
+            "Frequency should decay with dimension"
+        );
     }
 }

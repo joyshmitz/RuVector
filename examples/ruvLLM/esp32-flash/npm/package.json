@@ -1,6 +1,6 @@
 {
   "name": "ruvllm-esp32",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "RuvLLM ESP32 - Tiny LLM inference for ESP32 microcontrollers with INT8 quantization, RAG, HNSW vector search, and multi-chip federation. Run AI on $4 hardware.",
   "keywords": [
     "esp32",
@@ -43,6 +43,7 @@
     "binaries/",
     "scripts/",
     "templates/",
+    "web-flasher/",
     "README.md"
   ],
   "scripts": {

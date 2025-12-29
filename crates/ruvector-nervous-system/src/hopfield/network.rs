@@ -1,7 +1,7 @@
 //! Core Modern Hopfield Network implementation
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize, Deserialize};
 
 /// Errors that can occur in Hopfield operations
 #[derive(Error, Debug, Clone, PartialEq)]
@@ -328,7 +328,10 @@ mod tests {
         let pattern = vec![1.0; 64];
 
         let result = hopfield.store(pattern);
-        assert!(matches!(result, Err(HopfieldError::DimensionMismatch(64, 128))));
+        assert!(matches!(
+            result,
+            Err(HopfieldError::DimensionMismatch(64, 128))
+        ));
     }
 
     #[test]

@@ -136,16 +136,11 @@ impl MultiHeadAttention {
         let q_heads = self.split_heads(query);
 
         // Split keys into heads
-        let k_heads: Vec<Vec<Vec<f32>>> = keys
-            .iter()
-            .map(|key| self.split_heads(key))
-            .collect();
+        let k_heads: Vec<Vec<Vec<f32>>> = keys.iter().map(|key| self.split_heads(key)).collect();
 
         // Split values into heads
-        let v_heads: Vec<Vec<Vec<f32>>> = values
-            .iter()
-            .map(|value| self.split_heads(value))
-            .collect();
+        let v_heads: Vec<Vec<Vec<f32>>> =
+            values.iter().map(|value| self.split_heads(value)).collect();
 
         // Process each head in parallel
         let head_outputs: Vec<Vec<f32>> = (0..self.num_heads)
@@ -171,10 +166,7 @@ impl MultiHeadAttention {
     pub fn attention_scores_all_heads(&self, query: &[f32], keys: &[&[f32]]) -> Vec<Vec<f32>> {
         let q_heads = self.split_heads(query);
 
-        let k_heads: Vec<Vec<Vec<f32>>> = keys
-            .iter()
-            .map(|key| self.split_heads(key))
-            .collect();
+        let k_heads: Vec<Vec<Vec<f32>>> = keys.iter().map(|key| self.split_heads(key)).collect();
 
         (0..self.num_heads)
             .into_par_iter()
@@ -218,7 +210,7 @@ impl Attention for MultiHeadAttention {
     }
 }
 
-#[cfg(any(test, feature = "pg_test"))]
+#[cfg(feature = "pg_test")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,7 +319,7 @@ mod tests {
     }
 }
 
-#[cfg(any(test, feature = "pg_test"))]
+#[cfg(feature = "pg_test")]
 #[pgrx::pg_schema]
 mod pg_tests {
     use super::*;

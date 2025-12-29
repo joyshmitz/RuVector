@@ -56,9 +56,10 @@ sparse = []         # Sparse vectors (BM25, SPLADE)
 graph = []          # Graph operations & Cypher
 routing = []        # Tiny Dancer AI routing
 embeddings = ["dep:fastembed"]  # Local embedding generation
+gated-transformer = ["dep:ruvector-mincut-gated-transformer"]  # Mincut-gated transformer
 
 # Feature bundles
-ai-complete = ["learning", "attention", "gnn", "routing"]
+ai-complete = ["learning", "attention", "gnn", "routing", "gated-transformer"]
 graph-complete = ["hyperbolic", "sparse", "graph"]
 all-features = ["ai-complete", "graph-complete", "embeddings"]
 
@@ -117,6 +118,9 @@ once_cell = "1.19"
 
 # Local embedding generation (optional)
 fastembed = { version = "5", optional = true }
+
+# Mincut-gated transformer (optional)
+ruvector-mincut-gated-transformer = { path = "../ruvector-mincut-gated-transformer", optional = true }
 
 # Optional: Use ruvector-core for shared implementations
 # Uncomment to link with existing ruvector-core crate

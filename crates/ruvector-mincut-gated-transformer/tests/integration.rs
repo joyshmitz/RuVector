@@ -4,8 +4,8 @@
 //! including tier transitions, early exit, and coherence-based interventions.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket, SpikePacket,
-    InferInput, InferOutput, QuantizedWeights, GateDecision, GateReason,
+    GateDecision, GatePacket, GatePolicy, GateReason, InferInput, InferOutput,
+    MincutGatedTransformer, QuantizedWeights, SpikePacket, TransformerConfig,
 };
 
 fn create_transformer(config: TransformerConfig) -> MincutGatedTransformer {
@@ -301,7 +301,10 @@ fn test_boundary_concentration_intervention() {
     transformer.infer(&input, &mut output).unwrap();
 
     assert_eq!(output.witness.decision, GateDecision::ReduceScope);
-    assert_eq!(output.witness.reason, GateReason::BoundaryConcentrationSpike);
+    assert_eq!(
+        output.witness.reason,
+        GateReason::BoundaryConcentrationSpike
+    );
     assert_eq!(output.stats.tier, 1);
 }
 

@@ -78,9 +78,21 @@ fn test_multiple_patterns() {
     let retrieved3 = hopfield.retrieve(&pattern3).unwrap();
 
     // Each should match its original (relaxed for softmax blending)
-    assert!(cosine_similarity(&pattern1, &retrieved1) > 0.5, "pattern1 sim: {}", cosine_similarity(&pattern1, &retrieved1));
-    assert!(cosine_similarity(&pattern2, &retrieved2) > 0.5, "pattern2 sim: {}", cosine_similarity(&pattern2, &retrieved2));
-    assert!(cosine_similarity(&pattern3, &retrieved3) > 0.5, "pattern3 sim: {}", cosine_similarity(&pattern3, &retrieved3));
+    assert!(
+        cosine_similarity(&pattern1, &retrieved1) > 0.5,
+        "pattern1 sim: {}",
+        cosine_similarity(&pattern1, &retrieved1)
+    );
+    assert!(
+        cosine_similarity(&pattern2, &retrieved2) > 0.5,
+        "pattern2 sim: {}",
+        cosine_similarity(&pattern2, &retrieved2)
+    );
+    assert!(
+        cosine_similarity(&pattern3, &retrieved3) > 0.5,
+        "pattern3 sim: {}",
+        cosine_similarity(&pattern3, &retrieved3)
+    );
 }
 
 #[test]
@@ -95,9 +107,7 @@ fn test_capacity_demonstration() {
 
     // Generate random patterns
     for _ in 0..num_patterns {
-        let pattern: Vec<f32> = (0..dimension)
-            .map(|_| rng.gen_range(-1.0..1.0))
-            .collect();
+        let pattern: Vec<f32> = (0..dimension).map(|_| rng.gen_range(-1.0..1.0)).collect();
         patterns.push(pattern.clone());
         hopfield.store(pattern).unwrap();
     }
@@ -214,9 +224,7 @@ fn test_with_random_patterns() {
 
     // Generate and store random patterns
     for _ in 0..num_patterns {
-        let pattern: Vec<f32> = (0..dimension)
-            .map(|_| rng.gen_range(-1.0..1.0))
-            .collect();
+        let pattern: Vec<f32> = (0..dimension).map(|_| rng.gen_range(-1.0..1.0)).collect();
         patterns.push(pattern.clone());
         hopfield.store(pattern).unwrap();
     }
@@ -254,9 +262,7 @@ fn test_comparison_with_baseline() {
 
     // Generate patterns
     for _ in 0..20 {
-        let pattern: Vec<f32> = (0..dimension)
-            .map(|_| rng.gen_range(-1.0..1.0))
-            .collect();
+        let pattern: Vec<f32> = (0..dimension).map(|_| rng.gen_range(-1.0..1.0)).collect();
         patterns.push(pattern.clone());
         hopfield.store(pattern).unwrap();
     }
@@ -293,16 +299,12 @@ fn test_performance_target() {
 
     // Store 1000 patterns
     for _ in 0..num_patterns {
-        let pattern: Vec<f32> = (0..dimension)
-            .map(|_| rng.gen_range(-1.0..1.0))
-            .collect();
+        let pattern: Vec<f32> = (0..dimension).map(|_| rng.gen_range(-1.0..1.0)).collect();
         hopfield.store(pattern).unwrap();
     }
 
     // Test retrieval time
-    let query: Vec<f32> = (0..dimension)
-        .map(|_| rng.gen_range(-1.0..1.0))
-        .collect();
+    let query: Vec<f32> = (0..dimension).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
     let start = Instant::now();
     let _retrieved = hopfield.retrieve(&query).unwrap();

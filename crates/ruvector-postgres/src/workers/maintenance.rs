@@ -28,16 +28,14 @@
 //! +------------------------------------------------------------------+
 //! ```
 
+use parking_lot::RwLock;
 use pgrx::prelude::*;
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 
-use super::lifecycle::{WorkerStatus, get_lifecycle_manager};
-use super::queue::{TaskType, TaskPriority, Task, get_task_queues};
+use super::lifecycle::{get_lifecycle_manager, WorkerStatus};
 
 // ============================================================================
 // Maintenance Configuration
@@ -77,8 +75,8 @@ impl Default for MaintenanceConfig {
             enable_compaction: true,
             enable_stats: true,
             enable_cleanup: true,
-            compaction_threshold: 0.15, // 15% fragmentation
-            tier_check_interval_secs: 3600, // 1 hour
+            compaction_threshold: 0.15,        // 15% fragmentation
+            tier_check_interval_secs: 3600,    // 1 hour
             cleanup_age_threshold_secs: 86400, // 24 hours
             max_cycle_duration_secs: 60,
         }
@@ -177,7 +175,7 @@ pub struct TierCandidate {
 // ============================================================================
 
 /// Maintenance operation statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MaintenanceStats {
     /// Total cycles completed
     pub cycles_completed: u64,
@@ -201,24 +199,6 @@ pub struct MaintenanceStats {
     pub last_cycle_duration_us: u64,
     /// Last cycle timestamp
     pub last_cycle_at: u64,
-}
-
-impl Default for MaintenanceStats {
-    fn default() -> Self {
-        Self {
-            cycles_completed: 0,
-            indexes_maintained: 0,
-            compactions_performed: 0,
-            bytes_reclaimed: 0,
-            tier_promotions: 0,
-            tier_demotions: 0,
-            stats_collections: 0,
-            cleanup_operations: 0,
-            total_time_us: 0,
-            last_cycle_duration_us: 0,
-            last_cycle_at: 0,
-        }
-    }
 }
 
 /// Atomic maintenance statistics
@@ -350,8 +330,8 @@ impl MaintenanceWorker {
 
     /// Perform a single maintenance cycle
     fn perform_maintenance_cycle(&mut self) -> Result<(), String> {
-        let cycle_deadline = Instant::now()
-            + Duration::from_secs(self.config.max_cycle_duration_secs);
+        let cycle_deadline =
+            Instant::now() + Duration::from_secs(self.config.max_cycle_duration_secs);
 
         // Find all RuVector indexes
         let indexes = self.find_ruvector_indexes()?;
@@ -385,8 +365,12 @@ impl MaintenanceWorker {
 
                     match self.compact_index(index) {
                         Ok(bytes) => {
-                            self.stats.compactions_performed.fetch_add(1, Ordering::Relaxed);
-                            self.stats.bytes_reclaimed.fetch_add(bytes, Ordering::Relaxed);
+                            self.stats
+                                .compactions_performed
+                                .fetch_add(1, Ordering::Relaxed);
+                            self.stats
+                                .bytes_reclaimed
+                                .fetch_add(bytes, Ordering::Relaxed);
                             maintained_count += 1;
                         }
                         Err(e) => {
@@ -401,7 +385,9 @@ impl MaintenanceWorker {
                 if let Err(e) = self.cleanup_index(index) {
                     pgrx::warning!("Cleanup failed for {}: {}", index.name, e);
                 } else {
-                    self.stats.cleanup_operations.fetch_add(1, Ordering::Relaxed);
+                    self.stats
+                        .cleanup_operations
+                        .fetch_add(1, Ordering::Relaxed);
                 }
             }
         }

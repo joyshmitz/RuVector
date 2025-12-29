@@ -546,7 +546,7 @@ pub extern "C" fn ruvector_send(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Dat
         let bytea_ptr = pg_sys::palloc(bytea_size) as *mut pg_sys::bytea;
 
         // Set size
-        pgrx::varlena::set_varsize_4b(bytea_ptr as *mut pg_sys::varlena, bytea_size as i32);
+        pgrx::varlena::set_varsize_4b(bytea_ptr, bytea_size as i32);
 
         // Copy data
         let bytea_data = pgrx::varlena::vardata_any(bytea_ptr as *const pg_sys::varlena) as *mut u8;

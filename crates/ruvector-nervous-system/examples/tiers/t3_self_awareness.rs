@@ -125,13 +125,15 @@ impl MetacognitiveMonitor {
 
         // Detect internal anomalies
         if self.state_history.len() > 10 {
-            let avg_confidence: f32 = self.state_history.iter()
-                .map(|s| s.confidence)
-                .sum::<f32>() / self.state_history.len() as f32;
+            let avg_confidence: f32 = self.state_history.iter().map(|s| s.confidence).sum::<f32>()
+                / self.state_history.len() as f32;
 
-            let std_dev: f32 = (self.state_history.iter()
+            let std_dev: f32 = (self
+                .state_history
+                .iter()
                 .map(|s| (s.confidence - avg_confidence).powi(2))
-                .sum::<f32>() / self.state_history.len() as f32)
+                .sum::<f32>()
+                / self.state_history.len() as f32)
                 .sqrt();
 
             let z_score = (state.confidence - avg_confidence).abs() / std_dev.max(0.01);
@@ -192,16 +194,19 @@ impl MetacognitiveMonitor {
                 let performance_remaining = cap.current_performance - 0.5; // Minimum acceptable
                 if cap.degradation_rate > 0.0 && performance_remaining > 0.0 {
                     let time_to_fail = (performance_remaining / cap.degradation_rate) as u64;
-                    self.self_model.time_to_degradation = Some(time_to_fail.min(
-                        self.self_model.time_to_degradation.unwrap_or(u64::MAX)
-                    ));
+                    self.self_model.time_to_degradation = Some(
+                        time_to_fail.min(self.self_model.time_to_degradation.unwrap_or(u64::MAX)),
+                    );
                 }
             }
         }
     }
 
     fn update_reliability(&mut self) {
-        let total_perf: f32 = self.self_model.capabilities.values()
+        let total_perf: f32 = self
+            .self_model
+            .capabilities
+            .values()
             .map(|c| c.current_performance / c.baseline_performance.max(0.01))
             .sum();
 
@@ -215,8 +220,16 @@ impl MetacognitiveMonitor {
             operating_mode: self.self_model.operating_mode.clone(),
             reliability: self.self_model.reliability_estimate,
             time_to_degradation: self.self_model.time_to_degradation,
-            capabilities_status: self.self_model.capabilities.iter()
-                .map(|(k, v)| (k.clone(), v.current_performance / v.baseline_performance.max(0.01)))
+            capabilities_status: self
+                .self_model
+                .capabilities
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v.current_performance / v.baseline_performance.max(0.01),
+                    )
+                })
                 .collect(),
             recommendation: self.generate_recommendation(),
         }
@@ -324,9 +337,8 @@ impl SelfAwareSystem {
 
         let values: Vec<_> = self.modules.values().collect();
         let avg: f32 = values.iter().copied().sum::<f32>() / values.len() as f32;
-        let variance: f32 = values.iter()
-            .map(|&v| (v - avg).powi(2))
-            .sum::<f32>() / values.len() as f32;
+        let variance: f32 =
+            values.iter().map(|&v| (v - avg).powi(2)).sum::<f32>() / values.len() as f32;
 
         1.0 - variance.sqrt()
     }
@@ -414,7 +426,9 @@ fn main() {
     for i in 0..20 {
         // Degrade one module progressively
         system.update_module("reasoning", 1.0 - i as f32 * 0.03);
-        system.monitor.update_capability("reasoning", 1.0 - i as f32 * 0.03);
+        system
+            .monitor
+            .update_capability("reasoning", 1.0 - i as f32 * 0.03);
 
         let event = system.step(0.8 - i as f32 * 0.01, 0.05 + i as f32 * 0.01);
 
@@ -427,7 +441,10 @@ fn main() {
     println!("\n  Self-assessment:");
     println!("    Mode: {:?}", assessment.operating_mode);
     println!("    Reliability: {:.1}%", assessment.reliability * 100.0);
-    println!("    Time to degradation: {:?}", assessment.time_to_degradation);
+    println!(
+        "    Time to degradation: {:?}",
+        assessment.time_to_degradation
+    );
     println!("    Capabilities: {:?}", assessment.capabilities_status);
     println!("\n  Expression: {}", system.express_uncertainty());
 
@@ -506,7 +523,10 @@ mod tests {
         }
 
         // Should predict degradation
-        assert!(monitor.self_model.capabilities.get("test")
+        assert!(monitor
+            .self_model
+            .capabilities
+            .get("test")
             .map(|c| c.degradation_rate > 0.0)
             .unwrap_or(false));
     }

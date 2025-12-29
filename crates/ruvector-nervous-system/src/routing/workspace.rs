@@ -4,7 +4,7 @@
 //! buffer where representations compete for broadcast to all modules.
 //! Implements attention and conscious access mechanisms.
 
-use std::collections::{VecDeque, HashMap};
+use std::collections::{HashMap, VecDeque};
 
 /// Module identifier (u16 for compact representation)
 pub type ModuleId = u16;
@@ -34,7 +34,12 @@ pub type Representation = WorkspaceItem;
 // Convenience methods for Representation compatibility
 impl Representation {
     /// Create a new representation (convenience method with usize source)
-    pub fn new_compat(content: Vec<f32>, salience: f32, source_module: usize, timestamp: u64) -> Self {
+    pub fn new_compat(
+        content: Vec<f32>,
+        salience: f32,
+        source_module: usize,
+        timestamp: u64,
+    ) -> Self {
         Self::new(content, salience, source_module as ModuleId, timestamp)
     }
 }
@@ -262,7 +267,12 @@ impl GlobalWorkspace {
     /// Returns true if request was queued successfully
     pub fn request_access(&mut self, request: AccessRequest) -> bool {
         // Check if module already has access
-        if self.module_locks.get(&request.module).copied().unwrap_or(false) {
+        if self
+            .module_locks
+            .get(&request.module)
+            .copied()
+            .unwrap_or(false)
+        {
             return false;
         }
 
@@ -285,7 +295,8 @@ impl GlobalWorkspace {
         self.buffer.retain(|item| !item.is_expired(self.timestamp));
 
         // Remove items below threshold
-        self.buffer.retain(|item| item.salience >= self.salience_threshold);
+        self.buffer
+            .retain(|item| item.salience >= self.salience_threshold);
     }
 
     /// Attempt to broadcast a representation to the workspace
@@ -330,7 +341,8 @@ impl GlobalWorkspace {
         }
 
         // Remove representations below threshold
-        self.buffer.retain(|rep| rep.salience >= self.salience_threshold);
+        self.buffer
+            .retain(|rep| rep.salience >= self.salience_threshold);
 
         // Return surviving items
         self.buffer.clone()
@@ -345,7 +357,11 @@ impl GlobalWorkspace {
     pub fn retrieve_top_k(&self, k: usize) -> Vec<Representation> {
         let mut reps = self.retrieve();
         // NaN-safe sorting: treat NaN salience as less than any value
-        reps.sort_by(|a, b| b.salience.partial_cmp(&a.salience).unwrap_or(std::cmp::Ordering::Less));
+        reps.sort_by(|a, b| {
+            b.salience
+                .partial_cmp(&a.salience)
+                .unwrap_or(std::cmp::Ordering::Less)
+        });
         reps.truncate(k);
         reps
     }
@@ -383,7 +399,9 @@ impl GlobalWorkspace {
     /// Get most salient representation
     pub fn most_salient(&self) -> Option<&Representation> {
         self.buffer.iter().max_by(|a, b| {
-            a.salience.partial_cmp(&b.salience).unwrap_or(std::cmp::Ordering::Less)
+            a.salience
+                .partial_cmp(&b.salience)
+                .unwrap_or(std::cmp::Ordering::Less)
         })
     }
 
@@ -768,12 +786,7 @@ mod tests {
 
     #[test]
     fn test_representation_creation() {
-        let rep = Representation::new(
-            vec![1.0, 2.0, 3.0],
-            0.8,
-            0,
-            100,
-        );
+        let rep = Representation::new(vec![1.0, 2.0, 3.0], 0.8, 0, 100);
 
         assert_eq!(rep.content.len(), 3);
         assert_eq!(rep.salience, 0.8);

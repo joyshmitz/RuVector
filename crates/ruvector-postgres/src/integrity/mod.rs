@@ -58,7 +58,13 @@ impl IntegrityManager {
         self.contracts.get(id)
     }
 
-    pub fn validate(&self, contract_id: &str, recall: f64, latency_ms: u64, mincut: f64) -> ValidationResult {
+    pub fn validate(
+        &self,
+        contract_id: &str,
+        recall: f64,
+        latency_ms: u64,
+        mincut: f64,
+    ) -> ValidationResult {
         let contract = self.contracts.get(contract_id).cloned().unwrap_or_default();
         let mut failures = Vec::new();
 
@@ -66,13 +72,22 @@ impl IntegrityManager {
             failures.push(format!("Recall {:.3} < {:.3}", recall, contract.min_recall));
         }
         if latency_ms > contract.max_latency_ms {
-            failures.push(format!("Latency {}ms > {}ms", latency_ms, contract.max_latency_ms));
+            failures.push(format!(
+                "Latency {}ms > {}ms",
+                latency_ms, contract.max_latency_ms
+            ));
         }
         if mincut < contract.min_mincut {
             failures.push(format!("Mincut {:.3} < {:.3}", mincut, contract.min_mincut));
         }
 
-        ValidationResult { passed: failures.is_empty(), recall, latency_ms, mincut, failures }
+        ValidationResult {
+            passed: failures.is_empty(),
+            recall,
+            latency_ms,
+            mincut,
+            failures,
+        }
     }
 
     pub fn list_contracts(&self) -> Vec<&IntegrityContract> {
@@ -81,17 +96,45 @@ impl IntegrityManager {
 }
 
 impl Default for IntegrityManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-static INTEGRITY_MANAGER: std::sync::OnceLock<Arc<RwLock<IntegrityManager>>> = std::sync::OnceLock::new();
+static INTEGRITY_MANAGER: std::sync::OnceLock<Arc<RwLock<IntegrityManager>>> =
+    std::sync::OnceLock::new();
 
 pub fn get_integrity_manager() -> Arc<RwLock<IntegrityManager>> {
-    INTEGRITY_MANAGER.get_or_init(|| Arc::new(RwLock::new(IntegrityManager::new()))).clone()
+    INTEGRITY_MANAGER
+        .get_or_init(|| Arc::new(RwLock::new(IntegrityManager::new())))
+        .clone()
+}
+
+// Submodule exports
+pub mod contracted_graph;
+pub mod events;
+pub mod gating;
+pub mod mincut;
+
+pub use mincut::{MincutConfig, MincutResult, WitnessEdge};
+
+/// Get current mincut for an index (used by gated_transformer module)
+pub fn get_current_mincut(_index_name: &str) -> Result<MincutResult, String> {
+    // TODO: Implement actual index mincut lookup
+    // For now, return a default result
+    Ok(MincutResult {
+        lambda_cut: 10.0,
+        lambda2: None,
+        witness_edges: vec![],
+        cut_partition: vec![],
+        computation_time_ms: 0,
+    })
 }
 
 pub fn stoer_wagner_mincut(n: usize, edges: &[(usize, usize, f64)]) -> f64 {
-    if n <= 1 || edges.is_empty() { return 0.0; }
+    if n <= 1 || edges.is_empty() {
+        return 0.0;
+    }
 
     let mut adj = vec![vec![0.0; n]; n];
     for &(u, v, w) in edges {
@@ -144,7 +187,11 @@ pub fn stoer_wagner_mincut(n: usize, edges: &[(usize, usize, f64)]) -> f64 {
 fn ruvector_integrity_status() -> pgrx::JsonB {
     let manager = get_integrity_manager();
     let reader = manager.read().unwrap();
-    let contracts: Vec<_> = reader.list_contracts().iter().map(|c| c.id.clone()).collect();
+    let contracts: Vec<_> = reader
+        .list_contracts()
+        .iter()
+        .map(|c| c.id.clone())
+        .collect();
     pgrx::JsonB(serde_json::json!({
         "enabled": true,
         "active_contracts": contracts.len(),
@@ -153,10 +200,20 @@ fn ruvector_integrity_status() -> pgrx::JsonB {
 }
 
 #[pg_extern]
-fn ruvector_integrity_create_contract(id: &str, name: &str, min_recall: f64, max_latency_ms: i64, min_mincut: f64) -> pgrx::JsonB {
+fn ruvector_integrity_create_contract(
+    id: &str,
+    name: &str,
+    min_recall: f64,
+    max_latency_ms: i64,
+    min_mincut: f64,
+) -> pgrx::JsonB {
     let contract = IntegrityContract {
-        id: id.to_string(), name: name.to_string(), min_recall,
-        max_latency_ms: max_latency_ms as u64, min_mincut, active: true,
+        id: id.to_string(),
+        name: name.to_string(),
+        min_recall,
+        max_latency_ms: max_latency_ms as u64,
+        min_mincut,
+        active: true,
     };
     let manager = get_integrity_manager();
     manager.write().unwrap().register_contract(contract.clone());
@@ -164,9 +221,17 @@ fn ruvector_integrity_create_contract(id: &str, name: &str, min_recall: f64, max
 }
 
 #[pg_extern]
-fn ruvector_integrity_validate(contract_id: &str, recall: f64, latency_ms: i64, mincut: f64) -> pgrx::JsonB {
+fn ruvector_integrity_validate(
+    contract_id: &str,
+    recall: f64,
+    latency_ms: i64,
+    mincut: f64,
+) -> pgrx::JsonB {
     let manager = get_integrity_manager();
-    let result = manager.read().unwrap().validate(contract_id, recall, latency_ms as u64, mincut);
+    let result = manager
+        .read()
+        .unwrap()
+        .validate(contract_id, recall, latency_ms as u64, mincut);
     pgrx::JsonB(serde_json::json!(result))
 }
 
@@ -176,7 +241,7 @@ fn ruvector_mincut(n: i32, edges_json: pgrx::JsonB) -> f64 {
     stoer_wagner_mincut(n as usize, &edges)
 }
 
-#[cfg(any(test, feature = "pg_test"))]
+#[cfg(feature = "pg_test")]
 #[pg_schema]
 mod tests {
     use super::*;

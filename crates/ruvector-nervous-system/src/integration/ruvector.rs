@@ -74,11 +74,7 @@ impl NervousConfig {
     }
 
     /// Set pattern separation parameters
-    pub fn with_pattern_separation(
-        mut self,
-        output_dim: usize,
-        k: usize,
-    ) -> Self {
+    pub fn with_pattern_separation(mut self, output_dim: usize, k: usize) -> Self {
         self.enable_pattern_separation = true;
         self.separation_output_dim = output_dim;
         self.separation_k = k;
@@ -250,7 +246,10 @@ impl NervousVectorIndex {
     /// Top-k results with hybrid scoring
     pub fn search_hybrid(&self, query: &[f32], k: usize) -> Vec<HybridSearchResult> {
         // Retrieve from Hopfield network (returns zero vector if empty or error)
-        let hopfield_result = self.hopfield.retrieve(query).unwrap_or_else(|_| vec![0.0; query.len()]);
+        let hopfield_result = self
+            .hopfield
+            .retrieve(query)
+            .unwrap_or_else(|_| vec![0.0; query.len()]);
 
         // Compute similarities to all stored vectors
         let mut results: Vec<HybridSearchResult> = self

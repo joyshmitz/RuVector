@@ -161,10 +161,11 @@ mod tests {
     #[test]
     fn test_empty_messages() {
         let messages: Vec<Vec<f32>> = vec![];
+        let empty: Vec<f32> = vec![];
 
-        assert_eq!(sum_aggregate(messages.clone()), vec![]);
-        assert_eq!(mean_aggregate(messages.clone()), vec![]);
-        assert_eq!(max_aggregate(messages), vec![]);
+        assert_eq!(sum_aggregate(messages.clone()), empty);
+        assert_eq!(mean_aggregate(messages.clone()), empty.clone());
+        assert_eq!(max_aggregate(messages), empty);
     }
 
     #[test]

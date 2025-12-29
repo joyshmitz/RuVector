@@ -64,9 +64,9 @@ impl Hypervector {
 
     /// Create from seed string (deterministic)
     pub fn from_seed(seed: &str) -> Self {
-        let hash = seed.bytes().fold(0u64, |acc, b| {
-            acc.wrapping_mul(31).wrapping_add(b as u64)
-        });
+        let hash = seed
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         Self::random(hash)
     }
 
@@ -105,7 +105,8 @@ impl Hypervector {
             let word_idx = bit_idx / 64;
             let bit_pos = bit_idx % 64;
 
-            let count: usize = vectors.iter()
+            let count: usize = vectors
+                .iter()
                 .filter(|v| (v.bits[word_idx] >> bit_pos) & 1 == 1)
                 .count();
 
@@ -188,13 +189,32 @@ impl ConceptMemory {
         };
 
         // Create role vectors for structured binding
-        mem.roles.insert("subject".to_string(), Hypervector::from_seed("role:subject"));
-        mem.roles.insert("predicate".to_string(), Hypervector::from_seed("role:predicate"));
-        mem.roles.insert("object".to_string(), Hypervector::from_seed("role:object"));
-        mem.roles.insert("modifier".to_string(), Hypervector::from_seed("role:modifier"));
-        mem.roles.insert("position_1".to_string(), Hypervector::from_seed("role:position_1"));
-        mem.roles.insert("position_2".to_string(), Hypervector::from_seed("role:position_2"));
-        mem.roles.insert("position_3".to_string(), Hypervector::from_seed("role:position_3"));
+        mem.roles.insert(
+            "subject".to_string(),
+            Hypervector::from_seed("role:subject"),
+        );
+        mem.roles.insert(
+            "predicate".to_string(),
+            Hypervector::from_seed("role:predicate"),
+        );
+        mem.roles
+            .insert("object".to_string(), Hypervector::from_seed("role:object"));
+        mem.roles.insert(
+            "modifier".to_string(),
+            Hypervector::from_seed("role:modifier"),
+        );
+        mem.roles.insert(
+            "position_1".to_string(),
+            Hypervector::from_seed("role:position_1"),
+        );
+        mem.roles.insert(
+            "position_2".to_string(),
+            Hypervector::from_seed("role:position_2"),
+        );
+        mem.roles.insert(
+            "position_3".to_string(),
+            Hypervector::from_seed("role:position_3"),
+        );
 
         mem
     }
@@ -232,7 +252,9 @@ impl ConceptMemory {
 
     /// Query: find best matching concept
     pub fn query(&self, hv: &Hypervector) -> Vec<(String, f32)> {
-        let mut results: Vec<_> = self.concepts.iter()
+        let mut results: Vec<_> = self
+            .concepts
+            .iter()
             .map(|(name, v)| (name.clone(), hv.similarity(v)))
             .collect();
 
@@ -271,9 +293,16 @@ pub fn compose_sequence(memory: &mut ConceptMemory, items: &[&str]) -> Hypervect
 }
 
 /// Compose a relation triple (subject, predicate, object)
-pub fn compose_triple(memory: &mut ConceptMemory, subject: &str, predicate: &str, object: &str) -> Hypervector {
+pub fn compose_triple(
+    memory: &mut ConceptMemory,
+    subject: &str,
+    predicate: &str,
+    object: &str,
+) -> Hypervector {
     let s = memory.get(subject).bind(memory.role("subject").unwrap());
-    let p = memory.get(predicate).bind(memory.role("predicate").unwrap());
+    let p = memory
+        .get(predicate)
+        .bind(memory.role("predicate").unwrap());
     let o = memory.get(object).bind(memory.role("object").unwrap());
 
     Hypervector::bundle(&[s, p, o])
@@ -313,9 +342,10 @@ fn main() {
 
     // Learn atomic concepts
     println!("Learning atomic concepts...");
-    let concepts = ["dog", "cat", "bird", "red", "blue", "big", "small",
-                    "run", "fly", "swim", "chase", "eat", "king", "queen",
-                    "man", "woman", "prince", "princess"];
+    let concepts = [
+        "dog", "cat", "bird", "red", "blue", "big", "small", "run", "fly", "swim", "chase", "eat",
+        "king", "queen", "man", "woman", "prince", "princess",
+    ];
 
     for concept in &concepts {
         memory.learn(concept);
@@ -329,9 +359,18 @@ fn main() {
     let blue_dog = compose_modifier(&mut memory, "blue", "dog");
     let red_cat = compose_modifier(&mut memory, "red", "cat");
 
-    println!("'red dog' vs 'blue dog' similarity: {:.3}", red_dog.similarity(&blue_dog));
-    println!("'red dog' vs 'red cat' similarity: {:.3}", red_dog.similarity(&red_cat));
-    println!("'blue dog' vs 'red cat' similarity: {:.3}", blue_dog.similarity(&red_cat));
+    println!(
+        "'red dog' vs 'blue dog' similarity: {:.3}",
+        red_dog.similarity(&blue_dog)
+    );
+    println!(
+        "'red dog' vs 'red cat' similarity: {:.3}",
+        red_dog.similarity(&red_cat)
+    );
+    println!(
+        "'blue dog' vs 'red cat' similarity: {:.3}",
+        blue_dog.similarity(&red_cat)
+    );
 
     // Query composed structure
     println!("\nQuerying 'red dog' for modifier role:");
@@ -346,8 +385,14 @@ fn main() {
     let seq2 = compose_sequence(&mut memory, &["run", "jump", "swim"]);
     let seq3 = compose_sequence(&mut memory, &["fly", "jump", "run"]);
 
-    println!("'run→jump→fly' vs 'run→jump→swim': {:.3}", seq1.similarity(&seq2));
-    println!("'run→jump→fly' vs 'fly→jump→run': {:.3}", seq1.similarity(&seq3));
+    println!(
+        "'run→jump→fly' vs 'run→jump→swim': {:.3}",
+        seq1.similarity(&seq2)
+    );
+    println!(
+        "'run→jump→fly' vs 'fly→jump→run': {:.3}",
+        seq1.similarity(&seq3)
+    );
     println!("  (Order matters: same elements, different sequence = different representation)");
 
     // Triple composition
@@ -357,14 +402,23 @@ fn main() {
     let triple2 = compose_triple(&mut memory, "cat", "chase", "bird");
     let triple3 = compose_triple(&mut memory, "dog", "eat", "cat");
 
-    println!("'dog chase cat' vs 'cat chase bird': {:.3}", triple1.similarity(&triple2));
-    println!("'dog chase cat' vs 'dog eat cat': {:.3}", triple1.similarity(&triple3));
+    println!(
+        "'dog chase cat' vs 'cat chase bird': {:.3}",
+        triple1.similarity(&triple2)
+    );
+    println!(
+        "'dog chase cat' vs 'dog eat cat': {:.3}",
+        triple1.similarity(&triple3)
+    );
 
     // Query subject from triple
     println!("\nQuerying 'dog chase cat' for subject:");
     let subject_query = query_role(&memory, &triple1, "subject");
     let subject_matches = memory.query(&subject_query);
-    println!("  Top matches: {:?}", &subject_matches[..3.min(subject_matches.len())]);
+    println!(
+        "  Top matches: {:?}",
+        &subject_matches[..3.min(subject_matches.len())]
+    );
 
     // Analogical reasoning
     println!("\n=== Analogical Reasoning ===");
@@ -372,7 +426,10 @@ fn main() {
 
     let answer = analogy(&mut memory, "king", "queen", "man");
     let analogy_matches = memory.query(&answer);
-    println!("  Top matches: {:?}", &analogy_matches[..5.min(analogy_matches.len())]);
+    println!(
+        "  Top matches: {:?}",
+        &analogy_matches[..5.min(analogy_matches.len())]
+    );
     println!("  Expected: 'woman' should be near the top");
 
     // Zero-shot composition
@@ -381,27 +438,42 @@ fn main() {
 
     // Multi-modifier composition
     let big = memory.get("big").bind(memory.role("modifier").unwrap());
-    let blue = memory.get("blue").bind(memory.role("modifier").unwrap()).permute(5);
+    let blue = memory
+        .get("blue")
+        .bind(memory.role("modifier").unwrap())
+        .permute(5);
     let cat = memory.get("cat").bind(memory.role("subject").unwrap());
     let big_blue_cat = Hypervector::bundle(&[big, blue, cat]);
 
     // Compare to similar compositions
     let small_red_dog = {
         let small = memory.get("small").bind(memory.role("modifier").unwrap());
-        let red = memory.get("red").bind(memory.role("modifier").unwrap()).permute(5);
+        let red = memory
+            .get("red")
+            .bind(memory.role("modifier").unwrap())
+            .permute(5);
         let dog = memory.get("dog").bind(memory.role("subject").unwrap());
         Hypervector::bundle(&[small, red, dog])
     };
 
     let big_blue_dog = {
         let big = memory.get("big").bind(memory.role("modifier").unwrap());
-        let blue = memory.get("blue").bind(memory.role("modifier").unwrap()).permute(5);
+        let blue = memory
+            .get("blue")
+            .bind(memory.role("modifier").unwrap())
+            .permute(5);
         let dog = memory.get("dog").bind(memory.role("subject").unwrap());
         Hypervector::bundle(&[big, blue, dog])
     };
 
-    println!("'big blue cat' vs 'small red dog': {:.3}", big_blue_cat.similarity(&small_red_dog));
-    println!("'big blue cat' vs 'big blue dog': {:.3}", big_blue_cat.similarity(&big_blue_dog));
+    println!(
+        "'big blue cat' vs 'small red dog': {:.3}",
+        big_blue_cat.similarity(&small_red_dog)
+    );
+    println!(
+        "'big blue cat' vs 'big blue dog': {:.3}",
+        big_blue_cat.similarity(&big_blue_dog)
+    );
     println!("  (Sharing modifiers increases similarity)");
 
     // Performance test
@@ -423,8 +495,14 @@ fn main() {
     }
     let sim_time = start.elapsed();
 
-    println!("Bind (XOR) time: {:.1}ns per op", bind_time.as_nanos() as f64 / iterations as f64);
-    println!("Similarity time: {:.1}ns per op", sim_time.as_nanos() as f64 / iterations as f64);
+    println!(
+        "Bind (XOR) time: {:.1}ns per op",
+        bind_time.as_nanos() as f64 / iterations as f64
+    );
+    println!(
+        "Similarity time: {:.1}ns per op",
+        sim_time.as_nanos() as f64 / iterations as f64
+    );
 
     println!("\n=== Key Benefits ===");
     println!("- Zero-shot: compose any combination of known concepts");

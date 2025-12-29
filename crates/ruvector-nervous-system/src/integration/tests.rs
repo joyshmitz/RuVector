@@ -85,9 +85,7 @@ fn test_collection_versioning_workflow() {
     versioning.update_parameters(&params_v1);
 
     // Simulate some learning
-    let gradients_v1: Vec<Vec<f32>> = (0..20)
-        .map(|_| vec![0.1; 50])
-        .collect();
+    let gradients_v1: Vec<Vec<f32>> = (0..20).map(|_| vec![0.1; 50]).collect();
 
     versioning.consolidate(&gradients_v1, 0).unwrap();
 
@@ -110,8 +108,7 @@ fn test_collection_versioning_workflow() {
 
 #[test]
 fn test_pattern_separation_collision_resistance() {
-    let config = NervousConfig::new(128)
-        .with_pattern_separation(10000, 200);
+    let config = NervousConfig::new(128).with_pattern_separation(10000, 200);
 
     let index = NervousVectorIndex::new(128, config);
 
@@ -166,16 +163,16 @@ fn test_hopfield_hopfield_convergence() {
     let mut index = NervousVectorIndex::new(32, config);
 
     // Store a pattern
-    let pattern = vec![1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
-                       1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
-                       1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
-                       1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
+    let pattern = vec![
+        1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
+        1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
+    ];
 
     index.insert(&pattern, None);
 
     // Query with noisy version
     let mut noisy = pattern.clone();
-    noisy[0] = -1.0;  // Flip 3 bits
+    noisy[0] = -1.0; // Flip 3 bits
     noisy[5] = 1.0;
     noisy[10] = -1.0;
 
@@ -185,15 +182,18 @@ fn test_hopfield_hopfield_convergence() {
     let mut matches = 0;
     if let Some(ref result) = retrieved {
         for i in 0..32.min(result.len()) {
-            if (result[i] > 0.0 && pattern[i] > 0.0) ||
-               (result[i] < 0.0 && pattern[i] < 0.0) {
+            if (result[i] > 0.0 && pattern[i] > 0.0) || (result[i] < 0.0 && pattern[i] < 0.0) {
                 matches += 1;
             }
         }
     }
 
     let accuracy = matches as f32 / 32.0;
-    assert!(accuracy > 0.8, "Hopfield retrieval accuracy: {:.1}%", accuracy * 100.0);
+    assert!(
+        accuracy > 0.8,
+        "Hopfield retrieval accuracy: {:.1}%",
+        accuracy * 100.0
+    );
 }
 
 #[test]
@@ -219,7 +219,11 @@ fn test_one_shot_learning_multiple_associations() {
         assert!(retrieved.is_some(), "Should retrieve something for key");
 
         let ret = retrieved.unwrap();
-        assert_eq!(ret.len(), 16, "Retrieved vector should have correct dimension");
+        assert_eq!(
+            ret.len(),
+            16,
+            "Retrieved vector should have correct dimension"
+        );
     }
 }
 

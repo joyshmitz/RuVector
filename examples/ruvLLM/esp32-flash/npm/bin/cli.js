@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const SUPPORTED_TARGETS = ['esp32', 'esp32s2', 'esp32s3', 'esp32c3', 'esp32c6'];
 
 // Colors for terminal output
@@ -94,13 +94,31 @@ function detectPort() {
 
     try {
         if (platform === 'win32') {
-            // Windows: Look for COM ports
-            const result = execSync('wmic path Win32_SerialPort get DeviceID', { encoding: 'utf8' });
-            const ports = result.split('\n').filter(line => line.includes('COM')).map(line => line.trim());
-            return ports[0] || 'COM3';
+            // Windows: Use PowerShell for better COM port detection
+            try {
+                const result = execSync(
+                    'powershell -Command "[System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object { [int]($_ -replace \'COM\', \'\') }"',
+                    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+                );
+                const ports = result.trim().split('\n').filter(p => p.match(/COM\d+/));
+                if (ports.length > 0) {
+                    return ports[0].trim();
+                }
+            } catch {
+                // Fallback to wmic
+                const result = execSync('wmic path Win32_SerialPort get DeviceID 2>nul', { encoding: 'utf8' });
+                const ports = result.split('\n').filter(line => line.includes('COM')).map(line => line.trim());
+                if (ports.length > 0) return ports[0];
+            }
+            return 'COM3';
         } else if (platform === 'darwin') {
             // macOS
-            const files = fs.readdirSync('/dev').filter(f => f.startsWith('cu.usbserial') || f.startsWith('cu.SLAB'));
+            const files = fs.readdirSync('/dev').filter(f =>
+                f.startsWith('cu.usbserial') ||
+                f.startsWith('cu.SLAB') ||
+                f.startsWith('cu.wchusbserial') ||
+                f.startsWith('cu.usbmodem')
+            );
             return files[0] ? `/dev/${files[0]}` : '/dev/cu.usbserial-0001';
         } else {
             // Linux
@@ -127,27 +145,52 @@ async function installToolchain() {
     const { platform } = detectPlatform();
 
     try {
-        // Install espup
-        logStep('Installing espup...');
         if (platform === 'win32') {
-            execSync('cargo install espup', { stdio: 'inherit' });
+            // Windows: Check if we have the PowerShell setup script
+            const scriptsDir = path.join(__dirname, '..', 'scripts', 'windows');
+            const setupScript = path.join(scriptsDir, 'setup.ps1');
+
+            if (fs.existsSync(setupScript)) {
+                logStep('Running Windows setup script...');
+                execSync(`powershell -ExecutionPolicy Bypass -File "${setupScript}"`, { stdio: 'inherit' });
+            } else {
+                // Fallback: manual installation
+                logStep('Installing espup...');
+
+                // Download espup for Windows
+                const espupUrl = 'https://github.com/esp-rs/espup/releases/latest/download/espup-x86_64-pc-windows-msvc.exe';
+                const espupPath = path.join(os.tmpdir(), 'espup.exe');
+
+                execSync(`powershell -Command "Invoke-WebRequest -Uri '${espupUrl}' -OutFile '${espupPath}'"`, { stdio: 'inherit' });
+
+                logStep('Running espup install...');
+                execSync(`"${espupPath}" install`, { stdio: 'inherit' });
+
+                // Install espflash
+                logStep('Installing espflash...');
+                execSync('cargo install espflash ldproxy', { stdio: 'inherit' });
+            }
+
+            logSuccess('Toolchain installed successfully!');
+            log('\nTo use the toolchain, run:', 'yellow');
+            log('  . .\\scripts\\windows\\env.ps1', 'cyan');
+
         } else {
-            execSync('curl -L https://github.com/esp-rs/espup/releases/latest/download/espup-x86_64-unknown-linux-gnu -o /tmp/espup && chmod +x /tmp/espup && /tmp/espup install', { stdio: 'inherit' });
-        }
+            // Linux/macOS
+            logStep('Installing espup...');
+            const arch = os.arch() === 'arm64' ? 'aarch64' : 'x86_64';
+            const binary = platform === 'darwin'
+                ? `espup-${arch}-apple-darwin`
+                : `espup-${arch}-unknown-linux-gnu`;
 
-        // Install espflash
-        logStep('Installing espflash...');
-        execSync('cargo install espflash ldproxy', { stdio: 'inherit' });
+            execSync(`curl -L https://github.com/esp-rs/espup/releases/latest/download/${binary} -o /tmp/espup && chmod +x /tmp/espup && /tmp/espup install`, { stdio: 'inherit' });
 
-        // Run espup install
-        logStep('Setting up ESP32 toolchain...');
-        execSync('espup install', { stdio: 'inherit' });
+            // Install espflash
+            logStep('Installing espflash...');
+            execSync('cargo install espflash ldproxy', { stdio: 'inherit' });
 
-        logSuccess('Toolchain installed successfully!');
-        log('\nPlease restart your terminal or run:', 'yellow');
-        if (platform === 'win32') {
-            log('  $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","User")', 'cyan');
-        } else {
+            logSuccess('Toolchain installed successfully!');
+            log('\nPlease restart your terminal or run:', 'yellow');
             log('  source $HOME/export-esp.sh', 'cyan');
         }
 
@@ -160,8 +203,9 @@ async function installToolchain() {
 
 async function build(options = {}) {
     const target = options.target || 'esp32';
-    const release = options.release || false;
+    const release = options.release !== false; // Default to release
     const features = options.features || '';
+    const { platform } = detectPlatform();
 
     logStep(`Building for ${target}${release ? ' (release)' : ''}...`);
 
@@ -175,12 +219,33 @@ async function build(options = {}) {
 
     const rustTarget = targetMap[target] || targetMap['esp32'];
 
-    let cmd = `cargo build --target ${rustTarget}`;
-    if (release) cmd += ' --release';
-    if (features) cmd += ` --features ${features}`;
-
     try {
-        execSync(cmd, { stdio: 'inherit', cwd: process.cwd() });
+        if (platform === 'win32') {
+            // Windows: Use PowerShell build script if available
+            const scriptsDir = path.join(__dirname, '..', 'scripts', 'windows');
+            const buildScript = path.join(scriptsDir, 'build.ps1');
+
+            if (fs.existsSync(buildScript)) {
+                let psArgs = `-ExecutionPolicy Bypass -File "${buildScript}" -Target "${rustTarget}"`;
+                if (release) psArgs += ' -Release';
+                if (features) psArgs += ` -Features "${features}"`;
+
+                execSync(`powershell ${psArgs}`, { stdio: 'inherit', cwd: process.cwd() });
+            } else {
+                // Fallback to direct cargo
+                let cmd = `cargo build --target ${rustTarget}`;
+                if (release) cmd += ' --release';
+                if (features) cmd += ` --features ${features}`;
+                execSync(cmd, { stdio: 'inherit', cwd: process.cwd() });
+            }
+        } else {
+            // Linux/macOS
+            let cmd = `cargo build --target ${rustTarget}`;
+            if (release) cmd += ' --release';
+            if (features) cmd += ` --features ${features}`;
+            execSync(cmd, { stdio: 'inherit', cwd: process.cwd() });
+        }
+
         logSuccess('Build completed!');
         return true;
     } catch (e) {
@@ -192,12 +257,39 @@ async function build(options = {}) {
 async function flash(port, options = {}) {
     const actualPort = port || detectPort();
     const target = options.target || 'esp32';
+    const { platform } = detectPlatform();
 
     logStep(`Flashing to ${actualPort}...`);
 
+    const targetMap = {
+        'esp32': 'xtensa-esp32-espidf',
+        'esp32s2': 'xtensa-esp32s2-espidf',
+        'esp32s3': 'xtensa-esp32s3-espidf',
+        'esp32c3': 'riscv32imc-esp-espidf',
+        'esp32c6': 'riscv32imac-esp-espidf'
+    };
+    const rustTarget = targetMap[target] || targetMap['esp32'];
+
     try {
-        const cmd = `espflash flash --monitor --port ${actualPort} target/xtensa-${target}-espidf/release/ruvllm-esp32`;
-        execSync(cmd, { stdio: 'inherit' });
+        if (platform === 'win32') {
+            // Windows: Use PowerShell flash script if available
+            const scriptsDir = path.join(__dirname, '..', 'scripts', 'windows');
+            const flashScript = path.join(scriptsDir, 'flash.ps1');
+
+            if (fs.existsSync(flashScript)) {
+                const psArgs = `-ExecutionPolicy Bypass -File "${flashScript}" -Port "${actualPort}" -Target "${rustTarget}"`;
+                execSync(`powershell ${psArgs}`, { stdio: 'inherit', cwd: process.cwd() });
+            } else {
+                // Fallback
+                const binary = `target\\${rustTarget}\\release\\ruvllm-esp32`;
+                execSync(`espflash flash --monitor --port ${actualPort} ${binary}`, { stdio: 'inherit' });
+            }
+        } else {
+            // Linux/macOS
+            const binary = `target/${rustTarget}/release/ruvllm-esp32`;
+            execSync(`espflash flash --monitor --port ${actualPort} ${binary}`, { stdio: 'inherit' });
+        }
+
         logSuccess('Flash completed!');
         return true;
     } catch (e) {

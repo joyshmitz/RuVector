@@ -93,7 +93,9 @@ pub fn quantize_f32_to_int4(values: &[f32], output: &mut [u8]) -> f32 {
 
     // Handle odd length
     if values.len() % 2 == 1 {
-        let v0 = (values[values.len() - 1] * inv_scale).round().clamp(-8.0, 7.0) as i8;
+        let v0 = (values[values.len() - 1] * inv_scale)
+            .round()
+            .clamp(-8.0, 7.0) as i8;
         output[pairs] = pack_int4(v0, 0);
     }
 
@@ -439,10 +441,7 @@ mod tests {
 
     #[test]
     fn test_int4_weights() {
-        let weights: Vec<f32> = vec![
-            1.0, -0.5, 0.25, -0.75,
-            0.0, 1.0, -1.0, 0.5,
-        ];
+        let weights: Vec<f32> = vec![1.0, -0.5, 0.25, -0.75, 0.0, 1.0, -1.0, 0.5];
         let int4_w = Int4Weights::from_f32(&weights, 2, 4);
 
         assert_eq!(int4_w.rows, 2);
@@ -465,11 +464,7 @@ mod tests {
 
     #[test]
     fn test_int4_gemv() {
-        let weights = vec![
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0,
-        ];
+        let weights = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
         let int4_w = Int4Weights::from_f32(&weights, 3, 3);
 
         let x = vec![1.0, 2.0, 3.0];

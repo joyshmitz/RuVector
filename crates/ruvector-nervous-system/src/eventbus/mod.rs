@@ -3,15 +3,15 @@
 //! Provides lock-free event queues, region-based sharding, and backpressure management
 //! for high-throughput event processing (10,000+ events/millisecond).
 
+pub mod backpressure;
 pub mod event;
 pub mod queue;
 pub mod shard;
-pub mod backpressure;
 
-pub use event::{Event, DVSEvent, EventSurface};
+pub use backpressure::{BackpressureController, BackpressureState};
+pub use event::{DVSEvent, Event, EventSurface};
 pub use queue::EventRingBuffer;
 pub use shard::ShardedEventBus;
-pub use backpressure::{BackpressureController, BackpressureState};
 
 #[cfg(test)]
 mod tests {
