@@ -74,11 +74,12 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        working-directory: npm/packages/cli
         run: |
-          # Install only CLI dependencies (no workspace lockfile)
-          rm -f package-lock.json
+          # Copy CLI package to temp location to avoid workspace interference
+          cp -r npm/packages/cli /tmp/cli
+          cd /tmp/cli
           npm install --ignore-scripts
+          cp -r node_modules $GITHUB_WORKSPACE/npm/packages/cli/
 
       - name: Build CLI
         working-directory: npm/packages/cli
@@ -191,7 +192,11 @@ jobs:
       - name: Build both CLIs
         run: |
           cargo build -p ruvector-cli --release
-          cd npm/packages/cli && rm -f package-lock.json && npm install --ignore-scripts && npm run build
+          # Install CLI deps in temp to avoid workspace interference
+          cp -r npm/packages/cli /tmp/cli
+          cd /tmp/cli && npm install --ignore-scripts && npm run build
+          cp -r /tmp/cli/node_modules npm/packages/cli/
+          cp -r /tmp/cli/dist npm/packages/cli/
 
       - name: Compare command counts
         run: |
