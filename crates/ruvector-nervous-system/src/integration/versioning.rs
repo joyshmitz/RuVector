@@ -350,12 +350,16 @@ mod tests {
     fn test_eligibility_state() {
         let mut state = EligibilityState::new(1000.0);
 
-        state.update(1.0, 100);  // Start at time 100
+        state.update(1.0, 100); // Start at time 100
         assert_eq!(state.trace(), 1.0);
 
         // After 1 time constant, should decay to ~0.37
-        state.update(0.0, 1100);  // 1000ms later
-        assert!(state.trace() > 0.3 && state.trace() < 0.4, "trace: {}", state.trace());
+        state.update(0.0, 1100); // 1000ms later
+        assert!(
+            state.trace() > 0.3 && state.trace() < 0.4,
+            "trace: {}",
+            state.trace()
+        );
     }
 
     #[test]
@@ -367,7 +371,7 @@ mod tests {
 
         // Set initial consolidation time
         schedule.last_consolidation = 1; // Mark as having consolidated once
-        // After 2+ hours, should consolidate
+                                         // After 2+ hours, should consolidate
         assert!(schedule.should_consolidate(7201));
 
         schedule.last_consolidation = 7200;
@@ -441,10 +445,8 @@ mod tests {
     #[test]
     fn test_ewc_integration() {
         let schedule = ConsolidationSchedule::default();
-        let mut versioning = CollectionVersioning::with_lambda(
-            CollectionVersioning::new(1, schedule),
-            1000.0,
-        );
+        let mut versioning =
+            CollectionVersioning::with_lambda(CollectionVersioning::new(1, schedule), 1000.0);
 
         versioning.bump_version();
         let params = vec![0.5; 20];

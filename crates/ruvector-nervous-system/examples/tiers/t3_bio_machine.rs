@@ -61,7 +61,10 @@ pub enum ActionType {
     /// Visual feedback
     Visual { indicator: String },
     /// Force assist
-    ForceAssist { direction: (f32, f32, f32), magnitude: f32 },
+    ForceAssist {
+        direction: (f32, f32, f32),
+        magnitude: f32,
+    },
 }
 
 /// Biological timing adapter - matches machine timing to neural rhythms
@@ -95,10 +98,10 @@ impl BiologicalTimingAdapter {
 
         // Update reaction time estimate
         self.reaction_time_ms =
-            self.reaction_time_ms * (1.0 - self.learning_rate)
-            + observed_rt * self.learning_rate;
+            self.reaction_time_ms * (1.0 - self.learning_rate) + observed_rt * self.learning_rate;
 
-        self.timing_history.push_back((stimulus_time, response_time));
+        self.timing_history
+            .push_back((stimulus_time, response_time));
         if self.timing_history.len() > 100 {
             self.timing_history.pop_front();
         }
@@ -106,7 +109,8 @@ impl BiologicalTimingAdapter {
         // Learn natural rhythm from inter-response intervals
         if self.timing_history.len() > 2 {
             let history: Vec<_> = self.timing_history.iter().cloned().collect();
-            let intervals: Vec<_> = history.windows(2)
+            let intervals: Vec<_> = history
+                .windows(2)
                 .map(|w| (w[1].1 - w[0].1) as f32)
                 .collect();
 
@@ -183,7 +187,8 @@ impl ReflexIntegrator {
 
     /// Learn user reflex pattern
     pub fn learn_user_reflex(&mut self, signal: &BioSignal, response_time: f32, response_mag: f32) {
-        let pattern = self.user_reflexes
+        let pattern = self
+            .user_reflexes
             .entry(format!("{:?}_{}", signal.signal_type, signal.channel))
             .or_insert_with(|| UserReflexPattern {
                 trigger_signal: signal.signal_type.clone(),
@@ -298,11 +303,13 @@ impl IntentDecoder {
 
     /// Learn intent from labeled example
     pub fn learn_intent(&mut self, intent_name: &str, signals: &[BioSignal]) {
-        let template: Vec<_> = signals.iter()
+        let template: Vec<_> = signals
+            .iter()
             .map(|s| (s.signal_type.clone(), s.amplitude, 0.2)) // Initial std = 0.2
             .collect();
 
-        let pattern = self.intent_patterns
+        let pattern = self
+            .intent_patterns
             .entry(intent_name.to_string())
             .or_insert_with(|| IntentPattern {
                 name: intent_name.to_string(),
@@ -336,7 +343,11 @@ impl IntentDecoder {
             let confidence = self.match_pattern(pattern);
 
             if confidence > self.confidence_threshold {
-                if best_match.as_ref().map(|(_, c)| confidence > *c).unwrap_or(true) {
+                if best_match
+                    .as_ref()
+                    .map(|(_, c)| confidence > *c)
+                    .unwrap_or(true)
+                {
                     best_match = Some((name.clone(), confidence));
                 }
             }
@@ -350,7 +361,9 @@ impl IntentDecoder {
             return 0.0;
         }
 
-        let recent: Vec<_> = self.signal_buffer.iter()
+        let recent: Vec<_> = self
+            .signal_buffer
+            .iter()
             .rev()
             .take(pattern.template.len())
             .collect();
@@ -461,7 +474,8 @@ impl BioMachineInterface {
             signal.timestamp_ms + response_time as u64,
         );
 
-        self.reflexes.learn_user_reflex(signal, response_time, signal.amplitude);
+        self.reflexes
+            .learn_user_reflex(signal, response_time, signal.amplitude);
 
         // Log adaptation
         if (old_rt - self.timing.reaction_time_ms).abs() > 5.0 {
@@ -525,19 +539,20 @@ fn main() {
         interface.intent.learn_intent("grip", &grip_signals);
 
         // Simulate release intent
-        let release_signals = vec![
-            BioSignal {
-                timestamp_ms: i * 1000,
-                signal_type: BioSignalType::EMG,
-                channel: 0,
-                amplitude: 0.2,
-                frequency: Some(50.0),
-            },
-        ];
+        let release_signals = vec![BioSignal {
+            timestamp_ms: i * 1000,
+            signal_type: BioSignalType::EMG,
+            channel: 0,
+            amplitude: 0.2,
+            frequency: Some(50.0),
+        }];
         interface.intent.learn_intent("release", &release_signals);
     }
 
-    println!("  Intents learned: {}", interface.intent.intent_patterns.len());
+    println!(
+        "  Intents learned: {}",
+        interface.intent.intent_patterns.len()
+    );
 
     // Simulate usage to adapt timing
     println!("\nAdapting to user timing...");
@@ -556,8 +571,10 @@ fn main() {
         interface.learn(&signal, response_time, true);
 
         if i % 10 == 0 {
-            println!("  Step {}: adapted RT = {:.1}ms",
-                i, interface.timing.reaction_time_ms);
+            println!(
+                "  Step {}: adapted RT = {:.1}ms",
+                i, interface.timing.reaction_time_ms
+            );
         }
     }
 
@@ -576,7 +593,10 @@ fn main() {
     }
 
     if let Some((intent, confidence)) = interface.intent.decode() {
-        println!("  Decoded intent: {} (confidence: {:.2})", intent, confidence);
+        println!(
+            "  Decoded intent: {} (confidence: {:.2})",
+            intent, confidence
+        );
     }
 
     // Test machine action generation
@@ -591,8 +611,11 @@ fn main() {
 
     if let Some(action) = interface.process(signal) {
         println!("  Action: {:?}", action.action_type);
-        println!("  Timing: delay={}ms, duration={}ms",
-            action.timestamp_ms - interface.timestamp, action.duration_ms);
+        println!(
+            "  Timing: delay={}ms, duration={}ms",
+            action.timestamp_ms - interface.timestamp,
+            action.duration_ms
+        );
     }
 
     // Change integration mode
@@ -601,7 +624,10 @@ fn main() {
 
     let status = interface.status();
     println!("\n=== Interface Status ===");
-    println!("  Adapted reaction time: {:.1}ms", status.adapted_reaction_time_ms);
+    println!(
+        "  Adapted reaction time: {:.1}ms",
+        status.adapted_reaction_time_ms
+    );
     println!("  Natural rhythm: {:.2}Hz", status.natural_rhythm_hz);
     println!("  Integration mode: {:?}", status.integration_mode);
     println!("  Known intents: {}", status.known_intents);
@@ -640,15 +666,13 @@ mod tests {
     fn test_intent_learning() {
         let mut decoder = IntentDecoder::new();
 
-        let signals = vec![
-            BioSignal {
-                timestamp_ms: 0,
-                signal_type: BioSignalType::EMG,
-                channel: 0,
-                amplitude: 0.8,
-                frequency: None,
-            },
-        ];
+        let signals = vec![BioSignal {
+            timestamp_ms: 0,
+            signal_type: BioSignalType::EMG,
+            channel: 0,
+            amplitude: 0.8,
+            frequency: None,
+        }];
 
         decoder.learn_intent("test", &signals);
         assert!(decoder.intent_patterns.contains_key("test"));

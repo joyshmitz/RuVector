@@ -203,10 +203,7 @@ impl RuntimeState {
         // Single allocation for all buffers, 64-byte aligned
         let buffer = vec![0u8; layout.total_size];
 
-        let kv_state = KvCacheState::new(
-            config.layers as usize,
-            config.seq_len_max as usize,
-        );
+        let kv_state = KvCacheState::new(config.layers as usize, config.seq_len_max as usize);
 
         let cached_logits = vec![0i32; config.logits as usize];
 
@@ -239,17 +236,14 @@ impl RuntimeState {
         // and alignment as u8 (both are 1 byte), making the pointer cast sound. The returned
         // slice's lifetime is tied to &mut self, preventing aliasing.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..end].as_mut_ptr() as *mut i8,
-                s * d,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..end].as_mut_ptr() as *mut i8, s * d)
         }
     }
 
     /// Get K buffer slice (i8)
     #[inline]
     pub fn k_buffer(&mut self) -> &mut [i8] {
-                let s = self.config.seq_len_max as usize;
+        let s = self.config.seq_len_max as usize;
         let d = self.config.hidden as usize;
         let start = self.layout.k_offset;
         let end = start + s * d;
@@ -259,17 +253,14 @@ impl RuntimeState {
         // and alignment as u8 (both are 1 byte), making the pointer cast sound. The returned
         // slice's lifetime is tied to &mut self, preventing aliasing.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..end].as_mut_ptr() as *mut i8,
-                s * d,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..end].as_mut_ptr() as *mut i8, s * d)
         }
     }
 
     /// Get V buffer slice (i8)
     #[inline]
     pub fn v_buffer(&mut self) -> &mut [i8] {
-                let s = self.config.seq_len_max as usize;
+        let s = self.config.seq_len_max as usize;
         let d = self.config.hidden as usize;
         let start = self.layout.v_offset;
         let end = start + s * d;
@@ -279,17 +270,14 @@ impl RuntimeState {
         // and alignment as u8 (both are 1 byte), making the pointer cast sound. The returned
         // slice's lifetime is tied to &mut self, preventing aliasing.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..end].as_mut_ptr() as *mut i8,
-                s * d,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..end].as_mut_ptr() as *mut i8, s * d)
         }
     }
 
     /// Get attention scores buffer (f32)
     #[inline]
     pub fn attn_scores_buffer(&mut self) -> &mut [f32] {
-                let h = self.config.heads as usize;
+        let h = self.config.heads as usize;
         let w = self.config.window_normal as usize;
         let start = self.layout.attn_scores_offset;
         let count = h * w;
@@ -299,17 +287,14 @@ impl RuntimeState {
         // The pointer is derived from a valid slice, and the count (h * w elements) fits
         // within the allocated region. The returned slice's lifetime is tied to &mut self.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..].as_mut_ptr() as *mut f32,
-                count,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..].as_mut_ptr() as *mut f32, count)
         }
     }
 
     /// Get FFN intermediate buffer (i32)
     #[inline]
     pub fn ffn_buffer(&mut self) -> &mut [i32] {
-                let ffn_int = self.config.ffn_intermediate() as usize;
+        let ffn_int = self.config.ffn_intermediate() as usize;
         let start = self.layout.ffn_intermediate_offset;
         // SAFETY: The buffer is properly sized by BufferLayout::compute() with sufficient
         // space for ffn_int * 4 bytes at ffn_intermediate_offset. The buffer is allocated
@@ -317,17 +302,14 @@ impl RuntimeState {
         // The pointer is derived from a valid slice, and the count (ffn_int elements) fits
         // within the allocated region. The returned slice's lifetime is tied to &mut self.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..].as_mut_ptr() as *mut i32,
-                ffn_int,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..].as_mut_ptr() as *mut i32, ffn_int)
         }
     }
 
     /// Get residual buffer (i8)
     #[inline]
     pub fn residual_buffer(&mut self) -> &mut [i8] {
-                let s = self.config.seq_len_max as usize;
+        let s = self.config.seq_len_max as usize;
         let d = self.config.hidden as usize;
         let start = self.layout.residual_offset;
         // SAFETY: The buffer is properly sized by BufferLayout::compute() with sufficient
@@ -336,35 +318,27 @@ impl RuntimeState {
         // a valid slice, and the count (s * d elements) fits within the allocated region.
         // The returned slice's lifetime is tied to &mut self, preventing aliasing.
         unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..].as_mut_ptr() as *mut i8,
-                s * d,
-            )
+            core::slice::from_raw_parts_mut(self.buffer[start..].as_mut_ptr() as *mut i8, s * d)
         }
     }
 
     /// Get norm temp buffer (f32)
     #[inline]
     pub fn norm_buffer(&mut self) -> &mut [f32] {
-                let d = self.config.hidden as usize;
+        let d = self.config.hidden as usize;
         let start = self.layout.norm_temp_offset;
         // SAFETY: The buffer is properly sized by BufferLayout::compute() with sufficient
         // space for d * 4 bytes at norm_temp_offset. The buffer is allocated with 64-byte
         // alignment (see line 169), which exceeds f32's 4-byte requirement. The pointer is
         // derived from a valid slice, and the count (d elements) fits within the allocated
         // region. The returned slice's lifetime is tied to &mut self, preventing aliasing.
-        unsafe {
-            core::slice::from_raw_parts_mut(
-                self.buffer[start..].as_mut_ptr() as *mut f32,
-                d,
-            )
-        }
+        unsafe { core::slice::from_raw_parts_mut(self.buffer[start..].as_mut_ptr() as *mut f32, d) }
     }
 
     /// Get K cache for a layer (i8)
     #[inline]
     pub fn k_cache(&mut self, layer: usize) -> &mut [i8] {
-                let s = self.config.seq_len_max as usize;
+        let s = self.config.seq_len_max as usize;
         let d = self.config.hidden as usize;
         let layer_size = s * d;
         let start = self.layout.k_cache_offset + layer * layer_size;
@@ -384,7 +358,7 @@ impl RuntimeState {
     /// Get V cache for a layer (i8)
     #[inline]
     pub fn v_cache(&mut self, layer: usize) -> &mut [i8] {
-                let s = self.config.seq_len_max as usize;
+        let s = self.config.seq_len_max as usize;
         let d = self.config.hidden as usize;
         let layer_size = s * d;
         let start = self.layout.v_cache_offset + layer * layer_size;

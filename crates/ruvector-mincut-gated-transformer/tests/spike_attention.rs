@@ -8,9 +8,7 @@
 
 #![cfg(feature = "spike_attention")]
 
-use ruvector_mincut_gated_transformer::{
-    SpikeDrivenAttention, SpikeDrivenConfig, SpikeTrain,
-};
+use ruvector_mincut_gated_transformer::{SpikeDrivenAttention, SpikeDrivenConfig, SpikeTrain};
 
 #[test]
 fn test_spike_train_basic_operations() {
@@ -76,16 +74,19 @@ fn test_spike_encoding_proportionality() {
 
     // Verify descending spike counts
     for i in 0..trains.len() - 1 {
-        assert!(trains[i].len() >= trains[i + 1].len(),
-                "Higher values should produce more spikes: {} vs {}",
-                trains[i].len(), trains[i + 1].len());
+        assert!(
+            trains[i].len() >= trains[i + 1].len(),
+            "Higher values should produce more spikes: {} vs {}",
+            trains[i].len(),
+            trains[i + 1].len()
+        );
     }
 }
 
 #[test]
 fn test_refractory_period_enforcement() {
     let config = SpikeDrivenConfig {
-        spike_threshold_q15: 4096,  // Low threshold for more spikes
+        spike_threshold_q15: 4096, // Low threshold for more spikes
         temporal_coding_steps: 20,
         binary_qkv: true,
         refractory_period: 5,
@@ -100,9 +101,12 @@ fn test_refractory_period_enforcement() {
         // Verify refractory period between consecutive spikes
         for i in 1..trains[0].times.len() {
             let time_diff = trains[0].times[i] - trains[0].times[i - 1];
-            assert!(time_diff > refractory_period,
-                    "Spikes should respect refractory period: diff={}, period={}",
-                    time_diff, refractory_period);
+            assert!(
+                time_diff > refractory_period,
+                "Spikes should respect refractory period: diff={}, period={}",
+                time_diff,
+                refractory_period
+            );
         }
     }
 }
@@ -186,12 +190,12 @@ fn test_coincidence_detection() {
     q_train.add_spike(5, 1);
 
     let mut k_coincident = SpikeTrain::new();
-    k_coincident.add_spike(0, 1);  // Matches q at time 0
-    k_coincident.add_spike(5, 1);  // Matches q at time 5
+    k_coincident.add_spike(0, 1); // Matches q at time 0
+    k_coincident.add_spike(5, 1); // Matches q at time 5
 
     let mut k_no_match = SpikeTrain::new();
-    k_no_match.add_spike(1, 1);  // No match
-    k_no_match.add_spike(3, 1);  // No match
+    k_no_match.add_spike(1, 1); // No match
+    k_no_match.add_spike(3, 1); // No match
 
     let mut v_train = SpikeTrain::new();
     v_train.add_spike(0, 1);
@@ -215,7 +219,7 @@ fn test_polarity_interaction() {
     q_pos.add_spike(0, 1);
 
     let mut k_pos = SpikeTrain::new();
-    k_pos.add_spike(0, 1);  // Same polarity
+    k_pos.add_spike(0, 1); // Same polarity
 
     let mut k_neg = SpikeTrain::new();
     k_neg.add_spike(0, -1); // Opposite polarity
@@ -301,7 +305,12 @@ fn test_energy_ratio_estimation() {
         let ratio = attn.energy_ratio(seq_len, hidden_dim);
 
         // Should show significant energy savings
-        assert!(ratio > 5.0, "Energy ratio should be > 5x for ({}, {})", seq_len, hidden_dim);
+        assert!(
+            ratio > 5.0,
+            "Energy ratio should be > 5x for ({}, {})",
+            seq_len,
+            hidden_dim
+        );
 
         // Should be finite and positive
         assert!(ratio.is_finite());
@@ -318,9 +327,12 @@ fn test_energy_ratio_scaling() {
     let ratio_small = attn.energy_ratio(16, 64);
     let ratio_large = attn.energy_ratio(128, 512);
 
-    assert!(ratio_large > ratio_small,
-            "Energy savings should increase with size: small={}, large={}",
-            ratio_small, ratio_large);
+    assert!(
+        ratio_large > ratio_small,
+        "Energy savings should increase with size: small={}, large={}",
+        ratio_small,
+        ratio_large
+    );
 }
 
 #[test]
@@ -339,8 +351,8 @@ fn test_binarization() {
 
     // Check specific mappings
     assert_eq!(binary[0], -1); // negative -> -1
-    assert_eq!(binary[3], 0);  // zero -> 0
-    assert_eq!(binary[6], 1);  // positive -> 1
+    assert_eq!(binary[3], 0); // zero -> 0
+    assert_eq!(binary[6], 1); // positive -> 1
 }
 
 #[test]
@@ -402,7 +414,7 @@ fn test_mismatched_dimensions() {
 fn test_high_temporal_resolution() {
     let config = SpikeDrivenConfig {
         spike_threshold_q15: 8192,
-        temporal_coding_steps: 32,  // High temporal resolution
+        temporal_coding_steps: 32, // High temporal resolution
         binary_qkv: false,
         refractory_period: 1,
     };

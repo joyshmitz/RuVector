@@ -254,7 +254,10 @@ mod tests {
         wta.compete(&inputs);
         wta.reset();
 
-        assert!(wta.membranes().iter().all(|&x| x == 0.0), "Membranes should be reset");
+        assert!(
+            wta.membranes().iter().all(|&x| x == 0.0),
+            "Membranes should be reset"
+        );
     }
 
     #[test]
@@ -275,6 +278,10 @@ mod tests {
         println!("Average WTA competition time: {:.2}μs", avg_micros);
 
         // Should be fast (relaxed for CI environments)
-        assert!(avg_micros < 100.0, "WTA should be fast (got {:.2}μs)", avg_micros);
+        assert!(
+            avg_micros < 100.0,
+            "WTA should be fast (got {:.2}μs)",
+            avg_micros
+        );
     }
 }

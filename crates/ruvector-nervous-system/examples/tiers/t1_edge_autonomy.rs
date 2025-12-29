@@ -55,10 +55,10 @@ pub enum ActuatorCommand {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
-    Safety,      // Immediate, preempts everything
-    Stability,   // Fast reflex response
-    Efficiency,  // Slower optimization
-    Background,  // When idle
+    Safety,     // Immediate, preempts everything
+    Stability,  // Fast reflex response
+    Efficiency, // Slower optimization
+    Background, // When idle
 }
 
 /// Reflex arc for immediate safety responses
@@ -124,10 +124,12 @@ impl StabilityController {
     /// Process sensor fusion for stability
     pub fn process(&mut self, readings: &[SensorReading]) -> Option<ControlAction> {
         // Extract relevant sensors
-        let accel = readings.iter()
+        let accel = readings
+            .iter()
             .find(|r| r.sensor_type == SensorType::Accelerometer)
             .map(|r| r.value);
-        let gyro = readings.iter()
+        let gyro = readings
+            .iter()
             .find(|r| r.sensor_type == SensorType::Gyroscope)
             .map(|r| r.value);
 
@@ -232,7 +234,11 @@ impl PolicyLoop {
     }
 
     /// Optimize for efficiency when safe
-    pub fn optimize(&mut self, readings: &[SensorReading], timestamp_us: u64) -> Option<ControlAction> {
+    pub fn optimize(
+        &mut self,
+        readings: &[SensorReading],
+        timestamp_us: u64,
+    ) -> Option<ControlAction> {
         let timestamp_ms = timestamp_us / 1000;
         if timestamp_ms < self.last_update + self.update_interval_ms {
             return None;
@@ -240,7 +246,8 @@ impl PolicyLoop {
         self.last_update = timestamp_ms;
 
         // Check battery level
-        let battery = readings.iter()
+        let battery = readings
+            .iter()
             .find(|r| r.sensor_type == SensorType::Battery)
             .map(|r| r.value)
             .unwrap_or(1.0);
@@ -323,7 +330,10 @@ impl EdgeAutonomySystem {
         // 3. Bullet-time activation check
         let urgency = self.compute_urgency(&readings);
         if self.bullet_time.should_activate(urgency, timestamp) {
-            println!("  Sample rate: {}Hz", self.bullet_time.current_sample_rate());
+            println!(
+                "  Sample rate: {}Hz",
+                self.bullet_time.current_sample_rate()
+            );
         }
 
         // 4. Policy optimization (only if stable)
@@ -338,7 +348,8 @@ impl EdgeAutonomySystem {
     }
 
     fn compute_urgency(&self, readings: &[SensorReading]) -> f32 {
-        readings.iter()
+        readings
+            .iter()
             .map(|r| r.value.abs() * (1.0 - r.confidence))
             .sum::<f32>()
             / readings.len().max(1) as f32
@@ -416,20 +427,21 @@ fn main() {
         ];
         let actions = system.process(readings);
         for action in actions {
-            println!("    Action: {:?} (deadline: {}us)", action.command, action.deadline_us);
+            println!(
+                "    Action: {:?} (deadline: {}us)",
+                action.command, action.deadline_us
+            );
         }
     }
 
     // Simulate collision (triggers safety reflex)
     println!("\nSimulating collision warning...");
-    let emergency = vec![
-        SensorReading {
-            timestamp_us: 200_000,
-            sensor_type: SensorType::Proximity,
-            value: 0.9, // Very close!
-            confidence: 0.99,
-        },
-    ];
+    let emergency = vec![SensorReading {
+        timestamp_us: 200_000,
+        sensor_type: SensorType::Proximity,
+        value: 0.9, // Very close!
+        confidence: 0.99,
+    }];
     let actions = system.process(emergency);
     println!("  Emergency response latency: <100us guaranteed");
 

@@ -73,7 +73,7 @@ impl Default for EarlyExitConfig {
         Self {
             exit_layer: 2, // Exit after layer 2 (out of 4)
             min_lambda_for_exit: 80,
-            min_lambda_stability_q15: 28000, // ~85% stability
+            min_lambda_stability_q15: 28000,       // ~85% stability
             max_boundary_concentration_q15: 16384, // 50% max concentration
             speculative_tokens: 4,
             verification_layers: 2,
@@ -282,7 +282,12 @@ impl CoherenceEarlyExit {
     /// Verify with tolerance for top-k matching.
     ///
     /// More lenient verification that checks if draft token is in top-k of full logits.
-    pub fn verify_speculation_topk(&self, draft_logits: &[i32], full_logits: &[i32], k: usize) -> bool {
+    pub fn verify_speculation_topk(
+        &self,
+        draft_logits: &[i32],
+        full_logits: &[i32],
+        k: usize,
+    ) -> bool {
         if draft_logits.len() != full_logits.len() || k == 0 {
             return false;
         }
@@ -372,11 +377,10 @@ impl CoherenceEarlyExit {
         let lambda_strength = ((gate.lambda as u64 * 32768) / 100).min(32767) as u16; // Normalize λ (assume max ~100)
         let boundary_dispersion = 32767 - gate.boundary_concentration_q15; // Invert concentration
 
-        let confidence = ((lambda_strength as u32 * 4
-            + stability as u32 * 4
-            + boundary_dispersion as u32 * 2)
-            / 10)
-        .min(32767) as u16;
+        let confidence =
+            ((lambda_strength as u32 * 4 + stability as u32 * 4 + boundary_dispersion as u32 * 2)
+                / 10)
+                .min(32767) as u16;
 
         // Check against minimum confidence
         if confidence < self.config.min_confidence_q15 {
@@ -534,7 +538,7 @@ mod tests {
         let controller = CoherenceEarlyExit::new(config, 4).unwrap();
 
         let gate = GatePacket {
-            lambda: 85, // Above minimum but unstable
+            lambda: 85,       // Above minimum but unstable
             lambda_prev: 100, // Large delta - unstable
             boundary_edges: 5,
             boundary_concentration_q15: 10000,

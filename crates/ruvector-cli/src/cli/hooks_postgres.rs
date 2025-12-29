@@ -52,7 +52,9 @@ impl PostgresConfig {
     /// Parse PostgreSQL connection URL
     pub fn from_url(url: &str) -> Option<Self> {
         // Parse postgres://user:password@host:port/dbname
-        let url = url.strip_prefix("postgres://").or_else(|| url.strip_prefix("postgresql://"))?;
+        let url = url
+            .strip_prefix("postgres://")
+            .or_else(|| url.strip_prefix("postgresql://"))?;
 
         let (auth, rest) = url.split_once('@')?;
         let (user, password) = if auth.contains(':') {
@@ -362,11 +364,16 @@ impl StorageBackend {
             match PostgresStorage::new(config).await {
                 Ok(pg) => return Ok(Self::Postgres(pg)),
                 Err(e) => {
-                    eprintln!("Warning: PostgreSQL unavailable ({}), using JSON fallback", e);
+                    eprintln!(
+                        "Warning: PostgreSQL unavailable ({}), using JSON fallback",
+                        e
+                    );
                 }
             }
         }
-        Ok(Self::Json(super::Intelligence::new(super::get_intelligence_path())))
+        Ok(Self::Json(super::Intelligence::new(
+            super::get_intelligence_path(),
+        )))
     }
 
     #[cfg(not(feature = "postgres"))]
@@ -381,7 +388,8 @@ mod tests {
 
     #[test]
     fn test_config_from_url() {
-        let config = PostgresConfig::from_url("postgres://user:pass@localhost:5432/ruvector").unwrap();
+        let config =
+            PostgresConfig::from_url("postgres://user:pass@localhost:5432/ruvector").unwrap();
         assert_eq!(config.host, "localhost");
         assert_eq!(config.port, 5432);
         assert_eq!(config.user, "user");
@@ -398,7 +406,10 @@ mod tests {
 
     #[test]
     fn test_config_from_url_with_query() {
-        let config = PostgresConfig::from_url("postgres://user:pass@localhost:5432/ruvector?sslmode=require").unwrap();
+        let config = PostgresConfig::from_url(
+            "postgres://user:pass@localhost:5432/ruvector?sslmode=require",
+        )
+        .unwrap();
         assert_eq!(config.dbname, "ruvector");
     }
 }

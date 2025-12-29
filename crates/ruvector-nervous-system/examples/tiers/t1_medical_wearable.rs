@@ -60,7 +60,10 @@ pub enum AlertType {
     /// Immediate attention needed
     Acute { condition: String },
     /// Trend requiring monitoring
-    Trend { direction: TrendDirection, duration_hours: f32 },
+    Trend {
+        direction: TrendDirection,
+        duration_hours: f32,
+    },
     /// Deviation from personal baseline
     PersonalAnomaly { baseline: f32, deviation: f32 },
     /// Lifestyle recommendation
@@ -275,7 +278,10 @@ impl MedicalWearableSystem {
             SignalType::Temperature,
             SignalType::SkinConductance,
         ] {
-            baselines.insert(signal_type.clone(), PersonalBaseline::new(signal_type.clone()));
+            baselines.insert(
+                signal_type.clone(),
+                PersonalBaseline::new(signal_type.clone()),
+            );
 
             let (target, tolerance) = match signal_type {
                 SignalType::HeartRate => (70.0, 15.0),
@@ -284,7 +290,10 @@ impl MedicalWearableSystem {
                 SignalType::SkinConductance => (5.0, 2.0),
                 _ => (0.0, 1.0),
             };
-            homeostasis.insert(signal_type.clone(), HomeostaticController::new(target, tolerance));
+            homeostasis.insert(
+                signal_type.clone(),
+                HomeostaticController::new(target, tolerance),
+            );
 
             let threshold = match signal_type {
                 SignalType::HeartRate => 3.0,
@@ -356,7 +365,10 @@ impl MedicalWearableSystem {
                             condition: format!("{:?} critical", signal.signal_type),
                         },
                         severity: AlertSeverity::Emergency,
-                        recommendation: format!("Immediate attention: response magnitude {:.1}", response),
+                        recommendation: format!(
+                            "Immediate attention: response magnitude {:.1}",
+                            response
+                        ),
                         confidence: 0.9,
                     };
                     self.alert_history.push(alert.clone());
@@ -387,16 +399,16 @@ impl MedicalWearableSystem {
 
     /// Get power savings from sparse encoding
     pub fn power_efficiency(&self) -> HashMap<SignalType, f32> {
-        self.encoders.iter()
-            .map(|(st, enc)| {
-                (st.clone(), enc.compression_ratio(self.samples_processed))
-            })
+        self.encoders
+            .iter()
+            .map(|(st, enc)| (st.clone(), enc.compression_ratio(self.samples_processed)))
             .collect()
     }
 
     /// Get personalization status
     pub fn personalization_status(&self) -> HashMap<SignalType, String> {
-        self.baselines.iter()
+        self.baselines
+            .iter()
             .map(|(st, bl)| {
                 let status = if bl.samples_seen < 10 {
                     "Initializing"
@@ -407,7 +419,10 @@ impl MedicalWearableSystem {
                 } else {
                     "Personalized"
                 };
-                (st.clone(), format!("{} ({} samples)", status, bl.samples_seen))
+                (
+                    st.clone(),
+                    format!("{} ({} samples)", status, bl.samples_seen),
+                )
             })
             .collect()
     }
@@ -537,10 +552,16 @@ mod tests {
         let mut controller = HomeostaticController::new(98.0, 3.0);
 
         // Within tolerance
-        assert!(matches!(controller.respond(97.0), HomeostasisResponse::Stable));
+        assert!(matches!(
+            controller.respond(97.0),
+            HomeostasisResponse::Stable
+        ));
 
         // Outside tolerance
-        assert!(matches!(controller.respond(85.0), HomeostasisResponse::Urgent(_)));
+        assert!(matches!(
+            controller.respond(85.0),
+            HomeostasisResponse::Urgent(_)
+        ));
     }
 
     #[test]

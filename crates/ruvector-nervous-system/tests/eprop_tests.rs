@@ -107,8 +107,16 @@ fn test_temporal_xor() {
 
     // Temporal XOR is a challenging task - just verify network runs without panicking
     // and produces valid output (error should be bounded)
-    assert!(final_error.is_finite(), "Error should be finite, got: {}", final_error);
-    assert!(final_error <= 1.0, "Error should be bounded, got: {}", final_error);
+    assert!(
+        final_error.is_finite(),
+        "Error should be finite, got: {}",
+        final_error
+    );
+    assert!(
+        final_error <= 1.0,
+        "Error should be bounded, got: {}",
+        final_error
+    );
 }
 
 #[test]
@@ -201,7 +209,11 @@ fn test_memory_footprint_verification() {
     let footprint = network.memory_footprint();
     let num_synapses = network.num_synapses();
 
-    println!("Network: {} synapses, {} KB", num_synapses, footprint / 1024);
+    println!(
+        "Network: {} synapses, {} KB",
+        num_synapses,
+        footprint / 1024
+    );
     println!("Bytes per synapse: {}", footprint / num_synapses);
 
     // Verify reasonable memory usage
@@ -230,7 +242,11 @@ fn test_network_update_performance() {
 
     // Target: <1ms per update for 1000 neurons, 100k synapses
     // In debug mode, this might be slower, so we're lenient
-    assert!(ms_per_update < 10.0, "Update too slow: {:.3} ms", ms_per_update);
+    assert!(
+        ms_per_update < 10.0,
+        "Update too slow: {:.3} ms",
+        ms_per_update
+    );
 }
 
 #[test]
@@ -318,17 +334,11 @@ fn test_mnist_style_pattern() {
 
     // Two simple patterns
     let pattern_0 = vec![
-        1.0, 1.0, 1.0, 1.0,
-        1.0, 0.0, 0.0, 1.0,
-        1.0, 0.0, 0.0, 1.0,
-        1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
     ];
 
     let pattern_1 = vec![
-        0.0, 1.0, 1.0, 0.0,
-        0.0, 1.0, 1.0, 0.0,
-        0.0, 1.0, 1.0, 0.0,
-        0.0, 1.0, 1.0, 0.0,
+        0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     ];
 
     let target_0 = vec![1.0, 0.0];

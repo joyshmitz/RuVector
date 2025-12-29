@@ -236,7 +236,6 @@ impl WeightArena {
 ///
 /// Total bytes needed for all weights
 pub fn calculate_arena_size(layers: usize, hidden: usize, ffn_mult: usize, _heads: usize) -> usize {
-
     // Per-layer weights (all i8):
     // - Q, K, V projections: 3 * hidden * hidden
     // - Output projection: hidden * hidden

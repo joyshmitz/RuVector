@@ -31,14 +31,14 @@
 //! index.learn_one_shot(&key, &value);
 //! ```
 
-pub mod ruvector;
 pub mod postgres;
+pub mod ruvector;
 pub mod versioning;
 
-pub use ruvector::{NervousVectorIndex, NervousConfig, HybridSearchResult};
-pub use postgres::{PredictiveWriter, PredictiveConfig};
+pub use postgres::{PredictiveConfig, PredictiveWriter};
+pub use ruvector::{HybridSearchResult, NervousConfig, NervousVectorIndex};
 pub use versioning::{
-    CollectionVersioning, ParameterVersion, EligibilityState, ConsolidationSchedule,
+    CollectionVersioning, ConsolidationSchedule, EligibilityState, ParameterVersion,
 };
 
 #[cfg(test)]

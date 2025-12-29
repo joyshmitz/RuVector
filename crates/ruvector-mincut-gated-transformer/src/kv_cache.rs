@@ -23,8 +23,8 @@
 //! - Speed: O(n log n) Hadamard transform overhead
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::f32;
 
 /// Quantization bit width for KV cache
@@ -178,7 +178,10 @@ impl QuantizedKVCache {
         max_seq_len: usize,
         bits: QuantBits,
     ) -> Self {
-        assert!(head_dim.is_power_of_two(), "head_dim must be power of 2 for Hadamard");
+        assert!(
+            head_dim.is_power_of_two(),
+            "head_dim must be power of 2 for Hadamard"
+        );
 
         let bytes_per_head = (max_seq_len * head_dim * bits as usize + 7) / 8;
 
@@ -359,7 +362,13 @@ impl QuantizedKVCache {
     /// # Returns
     ///
     /// Flattened vector of shape [len * head_dim]
-    pub fn get_keys_dequantized(&self, layer: usize, head: usize, start: usize, len: usize) -> Vec<f32> {
+    pub fn get_keys_dequantized(
+        &self,
+        layer: usize,
+        head: usize,
+        start: usize,
+        len: usize,
+    ) -> Vec<f32> {
         assert!(layer < self.num_layers);
         assert!(head < self.num_heads);
         assert!(start + len <= self.max_seq_len);
@@ -391,7 +400,13 @@ impl QuantizedKVCache {
     /// # Returns
     ///
     /// Flattened vector of shape [len * head_dim]
-    pub fn get_values_dequantized(&self, layer: usize, head: usize, start: usize, len: usize) -> Vec<f32> {
+    pub fn get_values_dequantized(
+        &self,
+        layer: usize,
+        head: usize,
+        start: usize,
+        len: usize,
+    ) -> Vec<f32> {
         assert!(layer < self.num_layers);
         assert!(head < self.num_heads);
         assert!(start + len <= self.max_seq_len);
@@ -450,7 +465,13 @@ impl QuantizedKVCache {
 
     /// Get cache configuration
     pub fn config(&self) -> (usize, usize, usize, usize, QuantBits) {
-        (self.num_layers, self.num_heads, self.head_dim, self.max_seq_len, self.bits)
+        (
+            self.num_layers,
+            self.num_heads,
+            self.head_dim,
+            self.max_seq_len,
+            self.bits,
+        )
     }
 }
 
@@ -484,8 +505,12 @@ mod tests {
         let energy_after: f32 = transformed.iter().map(|x| x * x).sum();
 
         // Hadamard should preserve L2 norm (energy)
-        assert!((energy_before - energy_after).abs() < 1e-4,
-                "Energy before: {}, after: {}", energy_before, energy_after);
+        assert!(
+            (energy_before - energy_after).abs() < 1e-4,
+            "Energy before: {}, after: {}",
+            energy_before,
+            energy_after
+        );
     }
 
     #[test]
@@ -507,10 +532,12 @@ mod tests {
         assert_eq!(dequantized.len(), 8);
 
         // Hadamard transform redistributes values, so check MSE instead of per-element error
-        let mse: f32 = data.iter()
+        let mse: f32 = data
+            .iter()
             .zip(dequantized.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / data.len() as f32;
+            .sum::<f32>()
+            / data.len() as f32;
 
         // 2-bit quantization with Hadamard should have reasonable MSE
         assert!(mse < 8.0, "MSE too high: {}", mse);
@@ -527,10 +554,12 @@ mod tests {
         assert_eq!(dequantized.len(), 8);
 
         // 4-bit should have better precision than 2-bit (lower MSE)
-        let mse: f32 = data.iter()
+        let mse: f32 = data
+            .iter()
             .zip(dequantized.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / data.len() as f32;
+            .sum::<f32>()
+            / data.len() as f32;
 
         assert!(mse < 3.0, "MSE too high: {}", mse);
     }
@@ -552,15 +581,19 @@ mod tests {
         assert_eq!(retrieved_values.len(), 16);
 
         // Verify reconstruction quality via MSE for first token
-        let key_mse: f32 = key.iter()
+        let key_mse: f32 = key
+            .iter()
             .zip(retrieved_keys[0..8].iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / 8.0;
+            .sum::<f32>()
+            / 8.0;
 
-        let value_mse: f32 = value.iter()
+        let value_mse: f32 = value
+            .iter()
             .zip(retrieved_values[0..8].iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / 8.0;
+            .sum::<f32>()
+            / 8.0;
 
         assert!(key_mse < 3.0, "Key MSE too high: {}", key_mse);
         assert!(value_mse < 3.0, "Value MSE too high: {}", value_mse);
@@ -579,7 +612,11 @@ mod tests {
         println!("Compression ratio: {:.1}x", ratio);
 
         // 2-bit should achieve ~16x compression
-        assert!(ratio > 14.0 && ratio < 18.0, "Expected ~16x compression, got {:.1}x", ratio);
+        assert!(
+            ratio > 14.0 && ratio < 18.0,
+            "Expected ~16x compression, got {:.1}x",
+            ratio
+        );
     }
 
     #[test]
@@ -624,8 +661,12 @@ mod tests {
         // Store different data for each layer/head
         for layer in 0..2 {
             for head in 0..4 {
-                let key: Vec<f32> = (0..16).map(|i| (layer * 100 + head * 10 + i) as f32).collect();
-                let value: Vec<f32> = (0..16).map(|i| (layer * 100 + head * 10 + i + 1000) as f32).collect();
+                let key: Vec<f32> = (0..16)
+                    .map(|i| (layer * 100 + head * 10 + i) as f32)
+                    .collect();
+                let value: Vec<f32> = (0..16)
+                    .map(|i| (layer * 100 + head * 10 + i + 1000) as f32)
+                    .collect();
 
                 cache.quantize_and_store_kv(layer, head, Some(0), &key, &value);
             }
@@ -648,12 +689,22 @@ mod tests {
                 let expected_value_mean = (layer * 100 + head * 10 + 1000) as f32 + 7.5;
 
                 // Mean should be preserved within reasonable error
-                assert!((key_mean - expected_key_mean).abs() < 20.0,
+                assert!(
+                    (key_mean - expected_key_mean).abs() < 20.0,
                     "Layer {} head {} key mean {} too far from expected {}",
-                    layer, head, key_mean, expected_key_mean);
-                assert!((value_mean - expected_value_mean).abs() < 20.0,
+                    layer,
+                    head,
+                    key_mean,
+                    expected_key_mean
+                );
+                assert!(
+                    (value_mean - expected_value_mean).abs() < 20.0,
                     "Layer {} head {} value mean {} too far from expected {}",
-                    layer, head, value_mean, expected_value_mean);
+                    layer,
+                    head,
+                    value_mean,
+                    expected_value_mean
+                );
             }
         }
     }
@@ -686,10 +737,12 @@ mod tests {
         let dequantized = cache.dequantize_vector(&quantized, min_val, max_val);
 
         // Calculate MSE
-        let mse: f32 = data.iter()
+        let mse: f32 = data
+            .iter()
             .zip(dequantized.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / data.len() as f32;
+            .sum::<f32>()
+            / data.len() as f32;
 
         println!("MSE: {}", mse);
         assert!(mse < 2.0, "Quantization error too high: MSE = {}", mse);
@@ -705,10 +758,12 @@ mod tests {
         let dequantized = cache.dequantize_vector(&quantized, min_val, max_val);
 
         // Most values should still be reasonable
-        let error: f32 = data.iter()
+        let error: f32 = data
+            .iter()
             .zip(dequantized.iter())
             .map(|(a, b)| (a - b).abs())
-            .sum::<f32>() / data.len() as f32;
+            .sum::<f32>()
+            / data.len() as f32;
 
         println!("Average absolute error with outlier: {}", error);
         // With Hadamard, error should be distributed more evenly

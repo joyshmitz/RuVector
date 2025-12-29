@@ -98,7 +98,8 @@ pub fn qgemm_i8(
     if a.len() < m.saturating_mul(k)
         || b.len() < n.saturating_mul(k)
         || out.len() < m.saturating_mul(n)
-        || b_row_scales.len() < n {
+        || b_row_scales.len() < n
+    {
         // Fill with zeros on invalid dimensions rather than panicking
         for v in out.iter_mut() {
             *v = 0;
@@ -113,7 +114,9 @@ pub fn qgemm_i8(
         if i + 1 < m {
             let next_row_ptr = a.as_ptr().wrapping_add((i + 1) * k);
             // SAFETY: prefetch is a hint, safe even with invalid addresses
-            unsafe { prefetch_t1(next_row_ptr); }
+            unsafe {
+                prefetch_t1(next_row_ptr);
+            }
         }
 
         for j in 0..n {
@@ -122,7 +125,9 @@ pub fn qgemm_i8(
             if j + 1 < n {
                 let next_b_row_ptr = b.as_ptr().wrapping_add((j + 1) * k);
                 // SAFETY: prefetch is a hint, safe even with invalid addresses
-                unsafe { prefetch_t0(next_b_row_ptr); }
+                unsafe {
+                    prefetch_t0(next_b_row_ptr);
+                }
             }
 
             // Use i64 accumulator to prevent overflow with large k
@@ -542,10 +547,10 @@ mod tests {
         // 2x3 * 4x3^T = 2x4
         let a: [i8; 6] = [1, 2, 3, 4, 5, 6];
         let b: [i8; 12] = [
-            1, 0, 0,  // row 0
-            0, 1, 0,  // row 1
-            0, 0, 1,  // row 2
-            1, 1, 1,  // row 3
+            1, 0, 0, // row 0
+            0, 1, 0, // row 1
+            0, 0, 1, // row 2
+            1, 1, 1, // row 3
         ];
         let scales: [f32; 4] = [1.0; 4];
         let mut out = [0i32; 8];
@@ -582,8 +587,8 @@ mod tests {
     fn test_qgemv() {
         let x: [i8; 3] = [1, 2, 3];
         let w: [i8; 6] = [
-            1, 0, 0,  // row 0
-            0, 1, 0,  // row 1
+            1, 0, 0, // row 0
+            0, 1, 0, // row 1
         ];
         let scales: [f32; 2] = [1.0; 2];
         let mut out = [0i32; 2];

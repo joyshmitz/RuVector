@@ -3,18 +3,18 @@
 //! Implements binary hypervectors with SIMD-optimized operations for
 //! ultra-fast pattern matching and associative memory.
 
-mod vector;
+mod memory;
 mod ops;
 mod similarity;
-mod memory;
+mod vector;
 
-pub use vector::{Hypervector, HdcError};
+pub use memory::HdcMemory;
 pub use ops::{bind, bind_multiple, bundle, invert, permute};
 pub use similarity::{
-    batch_similarities, cosine_similarity, find_similar, hamming_distance,
-    jaccard_similarity, normalized_hamming, pairwise_similarities, top_k_similar,
+    batch_similarities, cosine_similarity, find_similar, hamming_distance, jaccard_similarity,
+    normalized_hamming, pairwise_similarities, top_k_similar,
 };
-pub use memory::HdcMemory;
+pub use vector::{HdcError, Hypervector};
 
 /// Number of bits in a hypervector (10,000)
 pub const HYPERVECTOR_BITS: usize = 10_000;

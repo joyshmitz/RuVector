@@ -7,13 +7,13 @@
 //! 4. Memory usage patterns
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket,
-    InferInput, InferOutput, QuantizedWeights,
-    kernel::{qgemm_i8, qgemm_i8_simd},
     arena::WeightArena,
-    kv_cache::{QuantizedKVCache, QuantBits, HadamardTransform},
+    flash_attention::{flash_attention_forward, FlashAttentionConfig},
+    kernel::{qgemm_i8, qgemm_i8_simd},
+    kv_cache::{HadamardTransform, QuantBits, QuantizedKVCache},
     rope::{RopeConfig, RopeEmbedding, RopeScaling},
-    flash_attention::{FlashAttentionConfig, flash_attention_forward},
+    GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer, QuantizedWeights,
+    TransformerConfig,
 };
 use std::time::Instant;
 
@@ -54,7 +54,11 @@ fn test_e2e_inference_micro_config() {
     println!("E2E micro config: avg latency = {}µs", avg_latency_us);
 
     // Micro config should complete in <10ms per inference
-    assert!(avg_latency_us < 10_000, "Inference too slow: {}µs", avg_latency_us);
+    assert!(
+        avg_latency_us < 10_000,
+        "Inference too slow: {}µs",
+        avg_latency_us
+    );
 }
 
 #[test]
@@ -89,7 +93,11 @@ fn test_e2e_inference_baseline_config() {
     println!("E2E baseline config: avg latency = {}µs", avg_latency_us);
 
     // Baseline should complete in <50ms per inference
-    assert!(avg_latency_us < 50_000, "Inference too slow: {}µs", avg_latency_us);
+    assert!(
+        avg_latency_us < 50_000,
+        "Inference too slow: {}µs",
+        avg_latency_us
+    );
 }
 
 // ============================================================================
@@ -126,7 +134,10 @@ fn test_gemm_numerical_accuracy() {
     }
 
     let avg_diff = total_diff as f64 / (m * n) as f64;
-    println!("GEMM accuracy: max_diff={}, avg_diff={:.4}", max_diff, avg_diff);
+    println!(
+        "GEMM accuracy: max_diff={}, avg_diff={:.4}",
+        max_diff, avg_diff
+    );
 
     // SIMD should match scalar exactly for integer ops
     assert_eq!(max_diff, 0, "SIMD and scalar GEMM differ");
@@ -164,12 +175,21 @@ fn test_gemm_simd_speedup() {
     let speedup = scalar_time.as_nanos() as f64 / simd_time.as_nanos() as f64;
     let gflops = (2.0 * m as f64 * n as f64 * k as f64 * 10.0) / simd_time.as_secs_f64() / 1e9;
 
-    println!("GEMM 256x256x256: scalar={:?}, simd={:?}, speedup={:.2}x, GFLOPS={:.2}",
-             scalar_time / 10, simd_time / 10, speedup, gflops);
+    println!(
+        "GEMM 256x256x256: scalar={:?}, simd={:?}, speedup={:.2}x, GFLOPS={:.2}",
+        scalar_time / 10,
+        simd_time / 10,
+        speedup,
+        gflops
+    );
 
     // In virtualized environments without AVX2, SIMD may not be faster
     // Just verify it's not significantly slower (within 20% is acceptable)
-    assert!(speedup >= 0.8, "SIMD much slower than scalar: {:.2}x", speedup);
+    assert!(
+        speedup >= 0.8,
+        "SIMD much slower than scalar: {:.2}x",
+        speedup
+    );
 }
 
 // ============================================================================
@@ -184,7 +204,11 @@ fn test_kv_cache_quantization_quality_4bit() {
     let max_seq_len = 128;
 
     let mut cache = QuantizedKVCache::new(
-        num_layers, num_heads, head_dim, max_seq_len, QuantBits::Four,
+        num_layers,
+        num_heads,
+        head_dim,
+        max_seq_len,
+        QuantBits::Four,
     );
 
     // Generate realistic key/value vectors (Gaussian-like distribution)
@@ -198,7 +222,11 @@ fn test_kv_cache_quantization_quality_4bit() {
             .map(|i| {
                 let base = ((i as f32 + test_idx as f32 * 0.1).sin()) * 0.5;
                 // Add occasional outlier
-                if i % 17 == 0 { base * 3.0 } else { base }
+                if i % 17 == 0 {
+                    base * 3.0
+                } else {
+                    base
+                }
             })
             .collect();
 
@@ -211,11 +239,16 @@ fn test_kv_cache_quantization_quality_4bit() {
         let retrieved = cache.get_keys_dequantized(0, 0, test_idx, 1);
 
         // Compute error
-        let mse: f64 = key.iter().zip(retrieved.iter())
+        let mse: f64 = key
+            .iter()
+            .zip(retrieved.iter())
             .map(|(a, b)| (a - b).powi(2) as f64)
-            .sum::<f64>() / head_dim as f64;
+            .sum::<f64>()
+            / head_dim as f64;
 
-        let local_max_error = key.iter().zip(retrieved.iter())
+        let local_max_error = key
+            .iter()
+            .zip(retrieved.iter())
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, f32::max);
 
@@ -226,7 +259,10 @@ fn test_kv_cache_quantization_quality_4bit() {
     let avg_mse = total_mse / num_tests as f64;
     let rmse = avg_mse.sqrt();
 
-    println!("4-bit KV cache: RMSE={:.6}, max_error={:.6}", rmse, max_error);
+    println!(
+        "4-bit KV cache: RMSE={:.6}, max_error={:.6}",
+        rmse, max_error
+    );
 
     // 4-bit should have RMSE < 0.15 for normalized data
     assert!(rmse < 0.2, "4-bit RMSE too high: {:.6}", rmse);
@@ -239,9 +275,8 @@ fn test_kv_cache_quantization_quality_2bit() {
     let num_layers = 2;
     let max_seq_len = 128;
 
-    let mut cache = QuantizedKVCache::new(
-        num_layers, num_heads, head_dim, max_seq_len, QuantBits::Two,
-    );
+    let mut cache =
+        QuantizedKVCache::new(num_layers, num_heads, head_dim, max_seq_len, QuantBits::Two);
 
     let mut total_mse = 0.0f64;
     let mut max_error = 0.0f32;
@@ -259,11 +294,16 @@ fn test_kv_cache_quantization_quality_2bit() {
         cache.quantize_and_store_kv(0, 0, Some(test_idx), &key, &value);
         let retrieved = cache.get_keys_dequantized(0, 0, test_idx, 1);
 
-        let mse: f64 = key.iter().zip(retrieved.iter())
+        let mse: f64 = key
+            .iter()
+            .zip(retrieved.iter())
             .map(|(a, b)| (a - b).powi(2) as f64)
-            .sum::<f64>() / head_dim as f64;
+            .sum::<f64>()
+            / head_dim as f64;
 
-        let local_max_error = key.iter().zip(retrieved.iter())
+        let local_max_error = key
+            .iter()
+            .zip(retrieved.iter())
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, f32::max);
 
@@ -274,7 +314,10 @@ fn test_kv_cache_quantization_quality_2bit() {
     let avg_mse = total_mse / num_tests as f64;
     let rmse = avg_mse.sqrt();
 
-    println!("2-bit KV cache: RMSE={:.6}, max_error={:.6}", rmse, max_error);
+    println!(
+        "2-bit KV cache: RMSE={:.6}, max_error={:.6}",
+        rmse, max_error
+    );
 
     // 2-bit will have higher error but should be bounded
     // RotateKV paper claims <0.3 PPL degradation
@@ -287,9 +330,7 @@ fn test_hadamard_transform_preserves_energy() {
     let hadamard = HadamardTransform::new(dim);
 
     // Test with random-ish data
-    let original: Vec<f32> = (0..dim)
-        .map(|i| (i as f32 * 0.1).sin())
-        .collect();
+    let original: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.1).sin()).collect();
 
     let original_energy: f32 = original.iter().map(|x| x * x).sum();
 
@@ -302,12 +343,18 @@ fn test_hadamard_transform_preserves_energy() {
     let energy_ratio = transformed_energy / original_energy;
     println!("Hadamard energy ratio: {:.6}", energy_ratio);
 
-    assert!((energy_ratio - 1.0).abs() < 0.001, "Energy not preserved: {:.6}", energy_ratio);
+    assert!(
+        (energy_ratio - 1.0).abs() < 0.001,
+        "Energy not preserved: {:.6}",
+        energy_ratio
+    );
 
     // Test inverse
     hadamard.inverse(&mut transformed);
 
-    let max_diff = original.iter().zip(transformed.iter())
+    let max_diff = original
+        .iter()
+        .zip(transformed.iter())
         .map(|(a, b)| (a - b).abs())
         .fold(0.0f32, f32::max);
 
@@ -342,7 +389,8 @@ fn test_flash_attention_matches_naive() {
     for i in 0..seq_len {
         // Compute attention scores for position i
         let mut scores = vec![f32::NEG_INFINITY; seq_len];
-        for j in 0..=i { // Causal
+        for j in 0..=i {
+            // Causal
             let mut dot = 0.0f32;
             for d in 0..head_dim {
                 dot += q[i * head_dim + d] * k[j * head_dim + d];
@@ -351,8 +399,16 @@ fn test_flash_attention_matches_naive() {
         }
 
         // Softmax
-        let max_score = scores.iter().take(i + 1).cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_sum: f32 = scores.iter().take(i + 1).map(|s| (s - max_score).exp()).sum();
+        let max_score = scores
+            .iter()
+            .take(i + 1)
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let exp_sum: f32 = scores
+            .iter()
+            .take(i + 1)
+            .map(|s| (s - max_score).exp())
+            .sum();
 
         // Weighted sum
         for d in 0..head_dim {
@@ -387,10 +443,17 @@ fn test_flash_attention_matches_naive() {
     }
 
     let avg_diff = total_diff / (seq_len * head_dim) as f64;
-    println!("FlashAttention vs naive: max_diff={:.6}, avg_diff={:.9}", max_diff, avg_diff);
+    println!(
+        "FlashAttention vs naive: max_diff={:.6}, avg_diff={:.9}",
+        max_diff, avg_diff
+    );
 
     // Should be numerically very close
-    assert!(max_diff < 1e-4, "FlashAttention differs too much: max_diff={:.6}", max_diff);
+    assert!(
+        max_diff < 1e-4,
+        "FlashAttention differs too much: max_diff={:.6}",
+        max_diff
+    );
 }
 
 #[test]
@@ -420,7 +483,11 @@ fn test_flash_attention_memory_efficiency() {
     println!("FlashAttention 1024 seq_len: {:?}", elapsed);
 
     // Should complete without OOM and in reasonable time
-    assert!(elapsed.as_millis() < 1000, "FlashAttention too slow: {:?}", elapsed);
+    assert!(
+        elapsed.as_millis() < 1000,
+        "FlashAttention too slow: {:?}",
+        elapsed
+    );
 }
 
 // ============================================================================
@@ -441,7 +508,10 @@ fn test_rope_position_encoding_properties() {
     // Property 1: Different positions should have different cos/sin values
     let cos_42 = rope.get_cos(42, 0);
     let cos_100 = rope.get_cos(100, 0);
-    assert!((cos_42 - cos_100).abs() > 0.01, "Different positions have same cos");
+    assert!(
+        (cos_42 - cos_100).abs() > 0.01,
+        "Different positions have same cos"
+    );
 
     // Property 2: Cos and sin should be bounded
     for pos in 0..100 {
@@ -522,7 +592,10 @@ fn test_component_latencies() {
         }
         let hadamard_us = start.elapsed().as_nanos() / 1000;
 
-        println!("Size {}: GEMM={}µs, Hadamard={}ns", size, gemm_us, hadamard_us);
+        println!(
+            "Size {}: GEMM={}µs, Hadamard={}ns",
+            size, gemm_us, hadamard_us
+        );
     }
 }
 
@@ -558,11 +631,17 @@ fn test_arena_allocation_efficiency() {
     let overhead = size - weights_allocated;
     let overhead_pct = (overhead as f64 / size as f64) * 100.0;
 
-    println!("Arena: size={}, used={}, overhead={} ({:.1}%)",
-             size, weights_allocated, overhead, overhead_pct);
+    println!(
+        "Arena: size={}, used={}, overhead={} ({:.1}%)",
+        size, weights_allocated, overhead, overhead_pct
+    );
 
     // Overhead should be minimal (alignment padding)
-    assert!(overhead_pct < 5.0, "Arena overhead too high: {:.1}%", overhead_pct);
+    assert!(
+        overhead_pct < 5.0,
+        "Arena overhead too high: {:.1}%",
+        overhead_pct
+    );
 }
 
 #[test]
@@ -590,8 +669,14 @@ fn test_kv_cache_memory_compression() {
 
     println!("KV Cache memory (4L, 8H, 1024 seq):");
     println!("  FP32: {} bytes", fp32_size);
-    println!("  INT4: {} bytes ({:.1}x compression)", int4_total, compression_4bit);
-    println!("  INT2: {} bytes ({:.1}x compression)", int2_total, compression_2bit);
+    println!(
+        "  INT4: {} bytes ({:.1}x compression)",
+        int4_total, compression_4bit
+    );
+    println!(
+        "  INT2: {} bytes ({:.1}x compression)",
+        int2_total, compression_2bit
+    );
 
     assert!(compression_4bit > 7.0, "4-bit compression insufficient");
     assert!(compression_2bit > 14.0, "2-bit compression insufficient");
@@ -634,11 +719,10 @@ fn test_multiple_gate_decisions() {
 
         transformer.infer(&input, &mut output).unwrap();
 
-        println!("{}: decision={:?}, tier={}, layers={}",
-                 desc,
-                 output.witness.decision,
-                 output.stats.tier,
-                 output.stats.layers_executed);
+        println!(
+            "{}: decision={:?}, tier={}, layers={}",
+            desc, output.witness.decision, output.stats.tier, output.stats.layers_executed
+        );
 
         transformer.reset();
     }
@@ -661,7 +745,8 @@ fn test_deterministic_inference() {
     };
 
     // Run twice and verify identical results
-    let mut transformer1 = MincutGatedTransformer::new(config.clone(), policy.clone(), weights.clone()).unwrap();
+    let mut transformer1 =
+        MincutGatedTransformer::new(config.clone(), policy.clone(), weights.clone()).unwrap();
     let mut transformer2 = MincutGatedTransformer::new(config.clone(), policy, weights).unwrap();
 
     let input = InferInput::from_tokens(&tokens, gate);

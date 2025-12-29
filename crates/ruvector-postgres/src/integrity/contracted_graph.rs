@@ -111,11 +111,7 @@ pub struct ContractedNode {
 
 impl ContractedNode {
     /// Create a new contracted node
-    pub fn new(
-        collection_id: i32,
-        node_type: NodeType,
-        node_id: i64,
-    ) -> Self {
+    pub fn new(collection_id: i32, node_type: NodeType, node_id: i64) -> Self {
         Self {
             collection_id,
             node_type,
@@ -400,18 +396,12 @@ impl ContractedGraphBuilder {
     /// Add partition nodes
     pub fn add_partition_nodes(&mut self, count: usize, health_scores: Option<&[f32]>) {
         for i in 0..count {
-            let health = health_scores
-                .and_then(|h| h.get(i).copied())
-                .unwrap_or(1.0);
+            let health = health_scores.and_then(|h| h.get(i).copied()).unwrap_or(1.0);
 
-            let node = ContractedNode::new(
-                self.collection_id,
-                NodeType::Partition,
-                i as i64,
-            )
-            .with_name(format!("partition_{}", i))
-            .with_data(serde_json::json!({"index": i}))
-            .with_health(health);
+            let node = ContractedNode::new(self.collection_id, NodeType::Partition, i as i64)
+                .with_name(format!("partition_{}", i))
+                .with_data(serde_json::json!({"index": i}))
+                .with_health(health);
 
             self.nodes.push(node);
         }
@@ -420,18 +410,12 @@ impl ContractedGraphBuilder {
     /// Add centroid nodes (for IVFFlat)
     pub fn add_centroid_nodes(&mut self, count: usize, health_scores: Option<&[f32]>) {
         for i in 0..count {
-            let health = health_scores
-                .and_then(|h| h.get(i).copied())
-                .unwrap_or(1.0);
+            let health = health_scores.and_then(|h| h.get(i).copied()).unwrap_or(1.0);
 
-            let node = ContractedNode::new(
-                self.collection_id,
-                NodeType::Centroid,
-                i as i64,
-            )
-            .with_name(format!("centroid_{}", i))
-            .with_data(serde_json::json!({"list_id": i}))
-            .with_health(health);
+            let node = ContractedNode::new(self.collection_id, NodeType::Centroid, i as i64)
+                .with_name(format!("centroid_{}", i))
+                .with_data(serde_json::json!({"list_id": i}))
+                .with_health(health);
 
             self.nodes.push(node);
         }
@@ -441,21 +425,17 @@ impl ContractedGraphBuilder {
     pub fn add_shard_nodes(&mut self, count: usize, primary_index: usize) {
         for i in 0..count {
             let is_primary = i == primary_index;
-            let node = ContractedNode::new(
-                self.collection_id,
-                NodeType::Shard,
-                i as i64,
-            )
-            .with_name(if is_primary {
-                format!("primary_shard_{}", i)
-            } else {
-                format!("replica_shard_{}", i)
-            })
-            .with_data(serde_json::json!({
-                "type": if is_primary { "primary" } else { "replica" },
-                "index": i
-            }))
-            .with_health(1.0);
+            let node = ContractedNode::new(self.collection_id, NodeType::Shard, i as i64)
+                .with_name(if is_primary {
+                    format!("primary_shard_{}", i)
+                } else {
+                    format!("replica_shard_{}", i)
+                })
+                .with_data(serde_json::json!({
+                    "type": if is_primary { "primary" } else { "replica" },
+                    "index": i
+                }))
+                .with_health(1.0);
 
             self.nodes.push(node);
         }
@@ -464,14 +444,11 @@ impl ContractedGraphBuilder {
     /// Add external dependency nodes
     pub fn add_dependency_nodes(&mut self, dependencies: &[(&str, f32)]) {
         for (i, (name, health)) in dependencies.iter().enumerate() {
-            let node = ContractedNode::new(
-                self.collection_id,
-                NodeType::ExternalDependency,
-                i as i64,
-            )
-            .with_name(*name)
-            .with_data(serde_json::json!({"service": name}))
-            .with_health(*health);
+            let node =
+                ContractedNode::new(self.collection_id, NodeType::ExternalDependency, i as i64)
+                    .with_name(*name)
+                    .with_data(serde_json::json!({"service": name}))
+                    .with_health(*health);
 
             self.nodes.push(node);
         }
@@ -479,7 +456,8 @@ impl ContractedGraphBuilder {
 
     /// Add partition-to-partition edges (data flow)
     pub fn add_partition_links(&mut self) {
-        let partition_nodes: Vec<_> = self.nodes
+        let partition_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::Partition)
             .collect();
@@ -503,12 +481,14 @@ impl ContractedGraphBuilder {
 
     /// Add centroid-to-shard edges (routing)
     pub fn add_routing_links(&mut self) {
-        let centroid_nodes: Vec<_> = self.nodes
+        let centroid_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::Centroid)
             .collect();
 
-        let shard_nodes: Vec<_> = self.nodes
+        let shard_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::Shard)
             .collect();
@@ -532,12 +512,14 @@ impl ContractedGraphBuilder {
 
     /// Add shard-to-dependency edges
     pub fn add_dependency_links(&mut self) {
-        let shard_nodes: Vec<_> = self.nodes
+        let shard_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::Shard)
             .collect();
 
-        let dep_nodes: Vec<_> = self.nodes
+        let dep_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::ExternalDependency)
             .collect();
@@ -561,7 +543,8 @@ impl ContractedGraphBuilder {
 
     /// Add replication edges between shards
     pub fn add_replication_links(&mut self) {
-        let shard_nodes: Vec<_> = self.nodes
+        let shard_nodes: Vec<_> = self
+            .nodes
             .iter()
             .filter(|n| n.node_type == NodeType::Shard)
             .collect();
@@ -721,13 +704,22 @@ mod tests {
     fn test_node_type_display() {
         assert_eq!(NodeType::Partition.to_string(), "partition");
         assert_eq!(NodeType::Centroid.to_string(), "centroid");
-        assert_eq!(NodeType::ExternalDependency.to_string(), "external_dependency");
+        assert_eq!(
+            NodeType::ExternalDependency.to_string(),
+            "external_dependency"
+        );
     }
 
     #[test]
     fn test_edge_type_parsing() {
-        assert_eq!(EdgeType::from_str("partition_link"), Some(EdgeType::PartitionLink));
-        assert_eq!(EdgeType::from_str("routing_link"), Some(EdgeType::RoutingLink));
+        assert_eq!(
+            EdgeType::from_str("partition_link"),
+            Some(EdgeType::PartitionLink)
+        );
+        assert_eq!(
+            EdgeType::from_str("routing_link"),
+            Some(EdgeType::RoutingLink)
+        );
         assert_eq!(EdgeType::from_str("invalid"), None);
     }
 

@@ -4,9 +4,8 @@
 //! and anomaly scoring under mincut-gated coherence control.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy,
-    GatePacket, SpikePacket, GateDecision, InferInput, InferOutput,
-    QuantizedWeights,
+    GateDecision, GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer,
+    QuantizedWeights, SpikePacket, TransformerConfig,
 };
 
 fn main() {
@@ -54,7 +53,13 @@ fn main() {
         flags: 0,
     };
 
-    run_inference(&mut transformer, &config, gate_boundary, None, "boundary_spike");
+    run_inference(
+        &mut transformer,
+        &config,
+        gate_boundary,
+        None,
+        "boundary_spike",
+    );
 
     // Scenario 3: Lambda drop (flush KV)
     println!("\n--- Scenario 3: Lambda Drop (Flush KV) ---");
@@ -138,7 +143,13 @@ fn main() {
         flags: SpikePacket::FLAG_SPARSE_MASK,
     };
 
-    run_inference(&mut transformer, &config, gate_spike, Some(spike_active), "spike_active");
+    run_inference(
+        &mut transformer,
+        &config,
+        gate_spike,
+        Some(spike_active),
+        "spike_active",
+    );
 
     // Scenario 8: With spike packet (inactive - skip)
     println!("\n--- Scenario 8: Inactive Spike Packet (Skip) ---");
@@ -149,7 +160,13 @@ fn main() {
         ..Default::default()
     };
 
-    run_inference(&mut transformer, &config, gate_spike, Some(spike_inactive), "spike_inactive");
+    run_inference(
+        &mut transformer,
+        &config,
+        gate_spike,
+        Some(spike_inactive),
+        "spike_inactive",
+    );
 
     // Scenario 9: Spike storm
     println!("\n--- Scenario 9: Spike Storm (Freeze) ---");
@@ -160,7 +177,13 @@ fn main() {
         ..Default::default()
     };
 
-    run_inference(&mut transformer, &config, gate_spike, Some(spike_storm), "spike_storm");
+    run_inference(
+        &mut transformer,
+        &config,
+        gate_spike,
+        Some(spike_storm),
+        "spike_storm",
+    );
 
     println!("\n=== Example Complete ===");
 }
@@ -198,15 +221,31 @@ fn run_inference(
             println!("  Scenario: {}", scenario);
             println!("  Decision: {:?}", witness.decision);
             println!("  Reason: {:?}", witness.reason);
-            println!("  Lambda: {} -> {} (delta: {})",
-                witness.lambda_prev, witness.lambda, witness.lambda_delta);
-            println!("  Effective seq_len: {}, window: {}",
-                witness.effective_seq_len, witness.effective_window);
-            println!("  KV writes: {}, External writes: {}",
-                if witness.kv_writes_enabled == 1 { "enabled" } else { "disabled" },
-                if witness.external_writes_enabled == 1 { "enabled" } else { "disabled" });
-            println!("  Stats: tier={}, layers={}, skipped={}",
-                stats.tier, stats.layers_executed, stats.skipped);
+            println!(
+                "  Lambda: {} -> {} (delta: {})",
+                witness.lambda_prev, witness.lambda, witness.lambda_delta
+            );
+            println!(
+                "  Effective seq_len: {}, window: {}",
+                witness.effective_seq_len, witness.effective_window
+            );
+            println!(
+                "  KV writes: {}, External writes: {}",
+                if witness.kv_writes_enabled == 1 {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                if witness.external_writes_enabled == 1 {
+                    "enabled"
+                } else {
+                    "disabled"
+                }
+            );
+            println!(
+                "  Stats: tier={}, layers={}, skipped={}",
+                stats.tier, stats.layers_executed, stats.skipped
+            );
 
             // Demonstrate orchestrator decision logic
             print!("  Orchestrator action: ");

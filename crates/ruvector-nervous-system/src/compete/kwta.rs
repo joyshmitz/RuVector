@@ -79,11 +79,8 @@ impl KWTALayer {
         assert_eq!(inputs.len(), self.size, "Input size mismatch");
 
         // Create (index, value) pairs
-        let mut indexed: Vec<(usize, f32)> = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            inputs.iter().enumerate().map(|(i, &v)| (i, v)).collect();
 
         // Filter by threshold if set
         if let Some(threshold) = self.threshold {
@@ -116,11 +113,8 @@ impl KWTALayer {
     pub fn select_with_values(&self, inputs: &[f32]) -> Vec<(usize, f32)> {
         assert_eq!(inputs.len(), self.size, "Input size mismatch");
 
-        let mut indexed: Vec<(usize, f32)> = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            inputs.iter().enumerate().map(|(i, &v)| (i, v)).collect();
 
         // Filter by threshold if set
         if let Some(threshold) = self.threshold {
@@ -241,7 +235,10 @@ mod tests {
         assert_eq!(sparse[9], 9.0);
         assert_eq!(sparse[8], 8.0);
         assert_eq!(sparse[7], 7.0);
-        assert!(sparse[..7].iter().all(|&x| x == 0.0), "Non-winners should be zero");
+        assert!(
+            sparse[..7].iter().all(|&x| x == 0.0),
+            "Non-winners should be zero"
+        );
     }
 
     #[test]
@@ -253,7 +250,10 @@ mod tests {
 
         // Sum should be 1.0
         let sum: f32 = sparse.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "Normalized activations should sum to 1.0");
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "Normalized activations should sum to 1.0"
+        );
 
         // Winners should have proportional activations
         let expected_sum = 9.0 + 8.0 + 7.0; // Sum of top 3
@@ -309,7 +309,10 @@ mod tests {
 
         // Should select 3 winners from tied values
         assert_eq!(winners.len(), 3);
-        assert!(winners.iter().all(|(_, v)| *v == 1.0), "Should select from highest tier");
+        assert!(
+            winners.iter().all(|(_, v)| *v == 1.0),
+            "Should select from highest tier"
+        );
     }
 
     #[test]
@@ -341,7 +344,11 @@ mod tests {
         println!("Average K-WTA selection time: {:.2}μs", avg_micros);
 
         // Should complete in reasonable time (very relaxed for CI environments)
-        assert!(avg_micros < 10000.0, "K-WTA should be reasonably fast (got {:.2}μs)", avg_micros);
+        assert!(
+            avg_micros < 10000.0,
+            "K-WTA should be reasonably fast (got {:.2}μs)",
+            avg_micros
+        );
     }
 
     #[test]

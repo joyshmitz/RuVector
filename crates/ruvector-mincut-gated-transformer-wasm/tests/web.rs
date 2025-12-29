@@ -2,10 +2,8 @@
 //!
 //! Run with: wasm-pack test --node
 
+use ruvector_mincut_gated_transformer_wasm::{WasmGatePacket, WasmSpikePacket, WasmTransformer};
 use wasm_bindgen_test::*;
-use ruvector_mincut_gated_transformer_wasm::{
-    WasmTransformer, WasmGatePacket, WasmSpikePacket,
-};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

@@ -35,12 +35,11 @@
 //! console.log('Logits:', result.logits);
 //! ```
 
-use wasm_bindgen::prelude::*;
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy,
-    GatePacket, SpikePacket, GateDecision, GateReason, QuantizedWeights,
-    InferInput, InferOutput,
+    GateDecision, GatePacket, GatePolicy, GateReason, InferInput, InferOutput,
+    MincutGatedTransformer, QuantizedWeights, SpikePacket, TransformerConfig,
 };
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 pub fn init() {
@@ -157,7 +156,8 @@ impl WasmTransformer {
 
         let mut output = InferOutput::new(&mut self.logits_buffer);
 
-        self.inner.infer(&input, &mut output)
+        self.inner
+            .infer(&input, &mut output)
             .map_err(|e| JsValue::from_str(&format!("Inference failed: {}", e)))?;
 
         Ok(WasmInferResult::from_output(&output))
@@ -182,12 +182,12 @@ impl WasmTransformer {
         let gate_packet = gate.to_native();
         let spike_packet = spikes.to_native();
 
-        let input = InferInput::from_tokens(tokens, gate_packet)
-            .with_spikes(spike_packet);
+        let input = InferInput::from_tokens(tokens, gate_packet).with_spikes(spike_packet);
 
         let mut output = InferOutput::new(&mut self.logits_buffer);
 
-        self.inner.infer(&input, &mut output)
+        self.inner
+            .infer(&input, &mut output)
             .map_err(|e| JsValue::from_str(&format!("Inference failed: {}", e)))?;
 
         Ok(WasmInferResult::from_output(&output))

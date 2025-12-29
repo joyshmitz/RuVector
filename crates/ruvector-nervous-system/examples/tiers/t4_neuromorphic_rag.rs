@@ -80,8 +80,7 @@ impl MemoryEntry {
         let importance = (self.access_count as f32).ln_1p() / 10.0; // Log importance
 
         // Weighted combination with eligibility boost
-        (sim * 0.6 + temporal * 0.2 + importance * 0.1 + self.eligibility * 0.1)
-            .clamp(0.0, 1.0)
+        (sim * 0.6 + temporal * 0.2 + importance * 0.1 + self.eligibility * 0.1).clamp(0.0, 1.0)
     }
 }
 
@@ -134,7 +133,8 @@ impl SparseEncoder {
         let mut indexed: Vec<(usize, u32)> = counts.into_iter().enumerate().collect();
         indexed.sort_by(|a, b| b.1.cmp(&a.1));
 
-        indexed.into_iter()
+        indexed
+            .into_iter()
             .take(k)
             .filter(|(_, count)| *count > 0)
             .map(|(idx, _)| idx as u32)
@@ -338,9 +338,10 @@ impl NeuromorphicMemory {
         let elapsed = start.elapsed().as_micros() as f64;
 
         self.stats.retrievals_performed += 1;
-        self.stats.avg_retrieval_time_us =
-            (self.stats.avg_retrieval_time_us * (self.stats.retrievals_performed - 1) as f64
-                + elapsed) / self.stats.retrievals_performed as f64;
+        self.stats.avg_retrieval_time_us = (self.stats.avg_retrieval_time_us
+            * (self.stats.retrievals_performed - 1) as f64
+            + elapsed)
+            / self.stats.retrievals_performed as f64;
 
         Some(results)
     }
@@ -350,7 +351,8 @@ impl NeuromorphicMemory {
         let query_code = self.encoder.encode(query);
 
         // Score all memories
-        let mut scored: Vec<(usize, f32)> = self.memories
+        let mut scored: Vec<(usize, f32)> = self
+            .memories
             .iter()
             .enumerate()
             .map(|(i, m)| (i, m.retrieval_score(&query_code, self.timestamp)))
@@ -367,11 +369,7 @@ impl NeuromorphicMemory {
             .map(|(i, score)| {
                 self.memories[i].access_count += 1;
                 self.memories[i].eligibility = 1.0; // Spike on access
-                (
-                    self.memories[i].id,
-                    self.memories[i].content.clone(),
-                    score,
-                )
+                (self.memories[i].id, self.memories[i].content.clone(), score)
             })
             .collect();
 
@@ -499,26 +497,33 @@ fn main() {
     println!("Processing queries with coherence gating...\n");
 
     let queries = [
-        ("What is HDC?", 0.9),                        // High confidence - no retrieval
-        ("How does memory work?", 0.8),               // High - no retrieval
-        ("Tell me about BTSP learning", 0.5),         // Low - trigger retrieval
-        ("What about oscillators?", 0.4),             // Very low - retrieve
-        ("How many items in workspace?", 0.6),        // Medium-low - retrieve
-        ("Explain the nervous system", 0.3),          // Very low - retrieve
-        ("What is pattern separation?", 0.85),        // High - no retrieval
-        ("Circadian phases?", 0.4),                   // Low - retrieve
+        ("What is HDC?", 0.9),                 // High confidence - no retrieval
+        ("How does memory work?", 0.8),        // High - no retrieval
+        ("Tell me about BTSP learning", 0.5),  // Low - trigger retrieval
+        ("What about oscillators?", 0.4),      // Very low - retrieve
+        ("How many items in workspace?", 0.6), // Medium-low - retrieve
+        ("Explain the nervous system", 0.3),   // Very low - retrieve
+        ("What is pattern separation?", 0.85), // High - no retrieval
+        ("Circadian phases?", 0.4),            // Low - retrieve
     ];
 
     for (query, confidence) in queries {
         let result = rag.process(query, confidence);
 
         println!("Query: \"{}\"", query);
-        println!("  Confidence: {:.2}, Coherence: {:.2}", confidence, result.coherence);
+        println!(
+            "  Confidence: {:.2}, Coherence: {:.2}",
+            confidence, result.coherence
+        );
         if result.retrieval_performed {
             println!("  RETRIEVED {} memories:", result.retrieved_memories.len());
             for (id, content, score) in &result.retrieved_memories {
-                println!("    [{:.2}] #{}: {}...",
-                    score, id, &content[..content.len().min(60)]);
+                println!(
+                    "    [{:.2}] #{}: {}...",
+                    score,
+                    id,
+                    &content[..content.len().min(60)]
+                );
             }
         } else {
             println!("  Skipped retrieval (coherence sufficient)");
@@ -539,7 +544,10 @@ fn main() {
     println!("Avg retrieval time: {:.1}μs", stats.avg_retrieval_time_us);
 
     println!("\n=== Key Benefits ===");
-    println!("- Coherence gating: {:.0}% of queries didn't need retrieval", stats.skip_ratio() * 100.0);
+    println!(
+        "- Coherence gating: {:.0}% of queries didn't need retrieval",
+        stats.skip_ratio() * 100.0
+    );
     println!("- Sparse encoding: 2% active dimensions → 50x faster similarity");
     println!("- Temporal decay: Recent memories prioritized automatically");
     println!("- Eligibility traces: Accessed memories stay accessible");

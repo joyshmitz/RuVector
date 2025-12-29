@@ -3,11 +3,11 @@
 
 #[cfg(test)]
 mod throughput_tests {
-    use std::time::{Duration, Instant};
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use rand::{Rng, SeedableRng};
     use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
     // ========================================================================
     // Helper Structures
@@ -111,23 +111,25 @@ mod throughput_tests {
             let test_duration = Duration::from_secs(5);
             // let bus = Arc::new(EventBus::new(1000));
 
-            let handles: Vec<_> = (0..num_threads).map(|_| {
-                let counter = Arc::clone(&counter);
-                // let bus = Arc::clone(&bus);
+            let handles: Vec<_> = (0..num_threads)
+                .map(|_| {
+                    let counter = Arc::clone(&counter);
+                    // let bus = Arc::clone(&bus);
 
-                thread::spawn(move || {
-                    let start = Instant::now();
-                    let mut local_count = 0u64;
+                    thread::spawn(move || {
+                        let start = Instant::now();
+                        let mut local_count = 0u64;
 
-                    while start.elapsed() < test_duration {
-                        // bus.publish(Event::new("test", vec![0.0; 128]));
-                        let _result = vec![0.0f32; 128]; // Placeholder
-                        local_count += 1;
-                    }
+                        while start.elapsed() < test_duration {
+                            // bus.publish(Event::new("test", vec![0.0; 128]));
+                            let _result = vec![0.0f32; 128]; // Placeholder
+                            local_count += 1;
+                        }
 
-                    counter.fetch_add(local_count, Ordering::Relaxed);
+                        counter.fetch_add(local_count, Ordering::Relaxed);
+                    })
                 })
-            }).collect();
+                .collect();
 
             for handle in handles {
                 handle.join().unwrap();
@@ -172,7 +174,10 @@ mod throughput_tests {
         stats.report();
 
         // Should gracefully handle saturation without panic
-        assert!(stats.operations > 0, "No operations completed under backpressure");
+        assert!(
+            stats.operations > 0,
+            "No operations completed under backpressure"
+        );
     }
 
     // ========================================================================
@@ -226,7 +231,9 @@ mod throughput_tests {
             let op_start = Instant::now();
 
             // Hamming distance (SIMD accelerated)
-            let _dist: u32 = a.iter().zip(b.iter())
+            let _dist: u32 = a
+                .iter()
+                .zip(b.iter())
                 .map(|(x, y)| (x ^ y).count_ones())
                 .sum();
 
@@ -425,13 +432,20 @@ mod throughput_tests {
         // Memory should stabilize (not grow linearly)
         // This is a simplified check - real impl would use memory profiling
         if memory_samples.len() >= 3 {
-            let first_half_avg = memory_samples[..memory_samples.len()/2].iter().sum::<u64>() as f64
-                / (memory_samples.len()/2) as f64;
-            let second_half_avg = memory_samples[memory_samples.len()/2..].iter().sum::<u64>() as f64
-                / (memory_samples.len() - memory_samples.len()/2) as f64;
+            let first_half_avg = memory_samples[..memory_samples.len() / 2]
+                .iter()
+                .sum::<u64>() as f64
+                / (memory_samples.len() / 2) as f64;
+            let second_half_avg = memory_samples[memory_samples.len() / 2..]
+                .iter()
+                .sum::<u64>() as f64
+                / (memory_samples.len() - memory_samples.len() / 2) as f64;
 
             // Growth should be sub-linear
-            println!("First half avg: {:.0}, Second half avg: {:.0}", first_half_avg, second_half_avg);
+            println!(
+                "First half avg: {:.0}, Second half avg: {:.0}",
+                first_half_avg, second_half_avg
+            );
         }
     }
 
@@ -446,7 +460,9 @@ mod throughput_tests {
         let test_duration = Duration::from_secs(30);
 
         println!("Starting CPU profiling...");
-        println!("Run with: cargo test --release cpu_utilization_profiling -- --ignored --nocapture");
+        println!(
+            "Run with: cargo test --release cpu_utilization_profiling -- --ignored --nocapture"
+        );
 
         let start = Instant::now();
         let mut operations = 0u64;
@@ -461,14 +477,20 @@ mod throughput_tests {
 
             // WTA competition
             let inputs: Vec<f32> = (0..1000).map(|_| rand::random()).collect();
-            let _winner = inputs.iter().enumerate()
+            let _winner = inputs
+                .iter()
+                .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                .unwrap().0;
+                .unwrap()
+                .0;
 
             operations += 1;
         }
 
         println!("Operations completed: {}", operations);
-        println!("Ops/sec: {:.0}", operations as f64 / test_duration.as_secs_f64());
+        println!(
+            "Ops/sec: {:.0}",
+            operations as f64 / test_duration.as_secs_f64()
+        );
     }
 }

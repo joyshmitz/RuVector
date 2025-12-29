@@ -241,7 +241,8 @@ impl DreamingAgent {
     /// Advance time and run consolidation
     pub fn tick(&mut self, dt_seconds: u64) {
         self.timestamp += dt_seconds;
-        self.cycle_phase = (self.cycle_phase + dt_seconds as f32 / (self.cycle_hours * 3600.0)) % 1.0;
+        self.cycle_phase =
+            (self.cycle_phase + dt_seconds as f32 / (self.cycle_hours * 3600.0)) % 1.0;
         self.phase = SwarmPhase::from_normalized_time(self.cycle_phase);
 
         // Process based on phase
@@ -265,7 +266,9 @@ impl DreamingAgent {
     /// Light sleep: local replay of recent experiences
     fn light_sleep_consolidation(&mut self) {
         // Select experiences for replay by priority
-        let mut to_replay: Vec<_> = self.consolidating.iter()
+        let mut to_replay: Vec<_> = self
+            .consolidating
+            .iter()
             .enumerate()
             .map(|(i, trace)| (i, trace.experience.replay_priority(self.timestamp, 8.0)))
             .collect();
@@ -298,7 +301,9 @@ impl DreamingAgent {
     fn integrate_transfers(&mut self) {
         while let Some(exp) = self.inbox.pop() {
             // Check if we already have this experience
-            let dominated = self.consolidating.iter()
+            let dominated = self
+                .consolidating
+                .iter()
                 .any(|t| self.experiences_similar(&t.experience, &exp));
 
             if !dominated {
@@ -308,7 +313,9 @@ impl DreamingAgent {
                 self.stats.memories_received_from_peers += 1;
             } else {
                 // Validate existing similar memory - find index first to avoid borrow conflict
-                let idx = self.consolidating.iter()
+                let idx = self
+                    .consolidating
+                    .iter()
                     .position(|t| Self::experiences_similar_static(&t.experience, &exp));
                 if let Some(i) = idx {
                     self.consolidating[i].validate();
@@ -327,7 +334,9 @@ impl DreamingAgent {
         let set_b: HashSet<_> = b.observation.iter().collect();
         let intersection = set_a.intersection(&set_b).count();
         let union = set_a.union(&set_b).count();
-        if union == 0 { return true; }
+        if union == 0 {
+            return true;
+        }
         (intersection as f32 / union as f32) > 0.8
     }
 
@@ -350,9 +359,15 @@ impl DreamingAgent {
         // Limit long-term memory
         while self.long_term.len() > 500 {
             // Remove weakest
-            let weakest = self.long_term.iter()
+            let weakest = self
+                .long_term
+                .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.strength.partial_cmp(&b.1.strength).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1.strength
+                        .partial_cmp(&b.1.strength)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i);
             if let Some(idx) = weakest {
                 self.long_term.remove(idx);
@@ -432,8 +447,18 @@ impl CollectiveDream {
     fn synchronize_phases(&mut self) {
         // Compute mean phase
         let n = self.agents.len() as f32;
-        let mean_sin: f32 = self.agents.iter().map(|a| (a.cycle_phase * 2.0 * PI).sin()).sum::<f32>() / n;
-        let mean_cos: f32 = self.agents.iter().map(|a| (a.cycle_phase * 2.0 * PI).cos()).sum::<f32>() / n;
+        let mean_sin: f32 = self
+            .agents
+            .iter()
+            .map(|a| (a.cycle_phase * 2.0 * PI).sin())
+            .sum::<f32>()
+            / n;
+        let mean_cos: f32 = self
+            .agents
+            .iter()
+            .map(|a| (a.cycle_phase * 2.0 * PI).cos())
+            .sum::<f32>()
+            / n;
         let _mean_phase = mean_sin.atan2(mean_cos) / (2.0 * PI);
 
         // Each agent adjusts toward mean
@@ -448,8 +473,16 @@ impl CollectiveDream {
     /// Get synchronization order parameter
     pub fn synchronization(&self) -> f32 {
         let n = self.agents.len() as f32;
-        let sum_sin: f32 = self.agents.iter().map(|a| (a.cycle_phase * 2.0 * PI).sin()).sum();
-        let sum_cos: f32 = self.agents.iter().map(|a| (a.cycle_phase * 2.0 * PI).cos()).sum();
+        let sum_sin: f32 = self
+            .agents
+            .iter()
+            .map(|a| (a.cycle_phase * 2.0 * PI).sin())
+            .sum();
+        let sum_cos: f32 = self
+            .agents
+            .iter()
+            .map(|a| (a.cycle_phase * 2.0 * PI).cos())
+            .sum();
         (sum_sin * sum_sin + sum_cos * sum_cos).sqrt() / n
     }
 
@@ -463,7 +496,14 @@ impl CollectiveDream {
     }
 
     /// Generate a collective experience for the swarm
-    pub fn swarm_experience(&mut self, agent_id: usize, obs: Vec<u32>, action: &str, outcome: f32, surprise: f32) {
+    pub fn swarm_experience(
+        &mut self,
+        agent_id: usize,
+        obs: Vec<u32>,
+        action: &str,
+        outcome: f32,
+        surprise: f32,
+    ) {
         if agent_id < self.agents.len() {
             self.agents[agent_id].experience(obs, action, outcome, surprise);
         }
@@ -569,7 +609,10 @@ fn main() {
     println!("Replays performed: {}", stats.replays_performed);
     println!("Memories consolidated: {}", stats.memories_consolidated);
     println!("Memories transferred: {}", stats.memories_transferred);
-    println!("Memories from peers: {}", stats.memories_received_from_peers);
+    println!(
+        "Memories from peers: {}",
+        stats.memories_received_from_peers
+    );
     println!("Total long-term memories: {}", swarm.total_consolidated());
     println!("Final synchronization: {:.2}", swarm.synchronization());
 
@@ -607,7 +650,7 @@ mod tests {
 
         // Advance to sleep
         agent.tick(2400); // 40 minutes
-        // Should be in some sleep phase
+                          // Should be in some sleep phase
         assert!(!matches!(agent.phase, SwarmPhase::Awake));
     }
 

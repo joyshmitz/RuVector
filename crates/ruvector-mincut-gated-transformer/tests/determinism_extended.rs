@@ -3,8 +3,8 @@
 //! Tests determinism across all configurations, features, and edge cases.
 
 use ruvector_mincut_gated_transformer::{
-    MincutGatedTransformer, TransformerConfig, GatePolicy, GatePacket, SpikePacket,
-    InferInput, InferOutput, QuantizedWeights, GateDecision,
+    GateDecision, GatePacket, GatePolicy, InferInput, InferOutput, MincutGatedTransformer,
+    QuantizedWeights, SpikePacket, TransformerConfig,
 };
 
 fn create_transformer(config: TransformerConfig, policy: GatePolicy) -> MincutGatedTransformer {
@@ -556,8 +556,14 @@ fn test_stats_reproducibility() {
 
     // All stats should be identical
     for i in 1..stats_list.len() {
-        assert_eq!(stats_list[0].effective_seq_len, stats_list[i].effective_seq_len);
-        assert_eq!(stats_list[0].effective_window, stats_list[i].effective_window);
+        assert_eq!(
+            stats_list[0].effective_seq_len,
+            stats_list[i].effective_seq_len
+        );
+        assert_eq!(
+            stats_list[0].effective_window,
+            stats_list[i].effective_window
+        );
         assert_eq!(stats_list[0].layers_executed, stats_list[i].layers_executed);
         assert_eq!(stats_list[0].tier, stats_list[i].tier);
         assert_eq!(stats_list[0].qgemm_calls, stats_list[i].qgemm_calls);

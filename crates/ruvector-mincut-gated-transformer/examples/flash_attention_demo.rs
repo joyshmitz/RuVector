@@ -3,7 +3,7 @@
 //! Shows how to use FlashAttention-style tiled attention for CPU inference.
 
 use ruvector_mincut_gated_transformer::flash_attention::{
-    FlashAttentionConfig, flash_attention_forward, flash_attention_forward_i8, flash_mha,
+    flash_attention_forward, flash_attention_forward_i8, flash_mha, FlashAttentionConfig,
 };
 
 fn main() {
@@ -38,15 +38,7 @@ fn main() {
 
         let mut output = vec![0.0f32; seq_len * head_dim];
 
-        flash_attention_forward(
-            &config,
-            &q,
-            &k,
-            &v,
-            seq_len,
-            seq_len,
-            &mut output,
-        );
+        flash_attention_forward(&config, &q, &k, &v, seq_len, seq_len, &mut output);
 
         println!("  ✓ Computed attention output: {} elements", output.len());
         println!("  ✓ First 5 output values: {:?}\n", &output[0..5]);
@@ -61,15 +53,9 @@ fn main() {
         let head_dim = 64;
 
         let total_size = num_heads * seq_len * head_dim;
-        let q: Vec<f32> = (0..total_size)
-            .map(|i| ((i % 100) as f32) * 0.01)
-            .collect();
-        let k: Vec<f32> = (0..total_size)
-            .map(|i| ((i % 100) as f32) * 0.01)
-            .collect();
-        let v: Vec<f32> = (0..total_size)
-            .map(|i| ((i % 100) as f32) * 0.01)
-            .collect();
+        let q: Vec<f32> = (0..total_size).map(|i| ((i % 100) as f32) * 0.01).collect();
+        let k: Vec<f32> = (0..total_size).map(|i| ((i % 100) as f32) * 0.01).collect();
+        let v: Vec<f32> = (0..total_size).map(|i| ((i % 100) as f32) * 0.01).collect();
 
         let mut output = vec![0.0f32; total_size];
 
@@ -84,7 +70,10 @@ fn main() {
             &mut output,
         );
 
-        println!("  ✓ Computed multi-head attention: {} elements", output.len());
+        println!(
+            "  ✓ Computed multi-head attention: {} elements",
+            output.len()
+        );
         println!("  ✓ Output per head: {} elements", seq_len * head_dim);
         println!("  ✓ First 5 output values: {:?}\n", &output[0..5]);
     }
@@ -151,8 +140,14 @@ fn main() {
         println!("Example 4: Optimized config for long sequences (512 tokens)");
 
         let long_config = FlashAttentionConfig::for_long_sequence(64);
-        println!("  Block size (Q): {} (smaller for cache reuse)", long_config.block_size_q);
-        println!("  Block size (KV): {} (larger for efficiency)", long_config.block_size_kv);
+        println!(
+            "  Block size (Q): {} (smaller for cache reuse)",
+            long_config.block_size_q
+        );
+        println!(
+            "  Block size (KV): {} (larger for efficiency)",
+            long_config.block_size_kv
+        );
 
         let seq_len = 512;
         let head_dim = 64;
@@ -169,15 +164,7 @@ fn main() {
 
         let mut output = vec![0.0f32; seq_len * head_dim];
 
-        flash_attention_forward(
-            &long_config,
-            &q,
-            &k,
-            &v,
-            seq_len,
-            seq_len,
-            &mut output,
-        );
+        flash_attention_forward(&long_config, &q, &k, &v, seq_len, seq_len, &mut output);
 
         println!("  ✓ Computed attention for {} tokens", seq_len);
         println!("  ✓ Memory efficient: O(n) instead of O(n²)");

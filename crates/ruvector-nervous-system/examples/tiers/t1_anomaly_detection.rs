@@ -42,11 +42,20 @@ pub struct AnomalyAlert {
 #[derive(Clone, Debug)]
 pub enum AnomalyType {
     /// Value outside learned bounds
-    ValueAnomaly { expected_range: (f32, f32), actual: f32 },
+    ValueAnomaly {
+        expected_range: (f32, f32),
+        actual: f32,
+    },
     /// Temporal pattern violation
-    TemporalAnomaly { expected_interval_ms: u64, actual_interval_ms: u64 },
+    TemporalAnomaly {
+        expected_interval_ms: u64,
+        actual_interval_ms: u64,
+    },
     /// Structural change in event relationships
-    StructuralAnomaly { pattern_signature: u64, deviation: f32 },
+    StructuralAnomaly {
+        pattern_signature: u64,
+        deviation: f32,
+    },
     /// Cascade detected across multiple sources
     CascadeAnomaly { affected_sources: Vec<u16> },
 }
@@ -183,8 +192,8 @@ impl TemporalPatternDetector {
 
         // Update expected interval (online learning)
         if self.interval_history.len() > 10 {
-            let avg: u64 = self.interval_history.iter().sum::<u64>()
-                / self.interval_history.len() as u64;
+            let avg: u64 =
+                self.interval_history.iter().sum::<u64>() / self.interval_history.len() as u64;
             self.expected_interval_ms = (self.expected_interval_ms + avg) / 2;
         }
 
@@ -273,17 +282,26 @@ impl AnomalyDetectionSystem {
         self.check_cascade(event.timestamp)
     }
 
-    fn create_alert(&mut self, event: TelemetryEvent, anomaly_type: AnomalyType, severity: f32) -> AnomalyAlert {
+    fn create_alert(
+        &mut self,
+        event: TelemetryEvent,
+        anomaly_type: AnomalyType,
+        severity: f32,
+    ) -> AnomalyAlert {
         let witness = WitnessLog {
             trigger_timestamp: event.timestamp,
             reflex_gate_id: event.source_id as u32,
             input_snapshot: vec![event.value],
-            threshold_at_trigger: self.thresholds
+            threshold_at_trigger: self
+                .thresholds
                 .get(event.metric_id as usize % self.thresholds.len())
                 .map(|t| t.current)
                 .unwrap_or(1.0),
             decision_path: vec![
-                format!("Event received: source={}, metric={}", event.source_id, event.metric_id),
+                format!(
+                    "Event received: source={}, metric={}",
+                    event.source_id, event.metric_id
+                ),
                 format!("Anomaly type: {:?}", anomaly_type),
                 format!("Severity: {:.2}", severity),
             ],
@@ -312,7 +330,8 @@ impl AnomalyDetectionSystem {
     fn check_cascade(&self, timestamp: u64) -> Option<AnomalyAlert> {
         // Check if multiple sources alerted within 100ms window
         let window_start = timestamp.saturating_sub(100);
-        let recent: Vec<_> = self.recent_alerts
+        let recent: Vec<_> = self
+            .recent_alerts
             .iter()
             .filter(|a| a.event.timestamp >= window_start)
             .collect();
@@ -323,7 +342,9 @@ impl AnomalyDetectionSystem {
 
             Some(AnomalyAlert {
                 event: event.clone(),
-                anomaly_type: AnomalyType::CascadeAnomaly { affected_sources: affected },
+                anomaly_type: AnomalyType::CascadeAnomaly {
+                    affected_sources: affected,
+                },
                 severity: 0.95,
                 witness_log: WitnessLog {
                     trigger_timestamp: timestamp,

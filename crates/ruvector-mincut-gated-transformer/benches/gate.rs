@@ -2,11 +2,9 @@
 //!
 //! Measures the cost of gate evaluation separate from inference.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ruvector_mincut_gated_transformer::{
-    GatePolicy, GatePacket, SpikePacket,
-    gate::GateController,
-    spike::SpikeScheduler,
+    gate::GateController, spike::SpikeScheduler, GatePacket, GatePolicy, SpikePacket,
 };
 
 fn bench_gate_evaluation(c: &mut Criterion) {
@@ -159,7 +157,9 @@ fn bench_spike_scheduler(c: &mut Criterion) {
         novelty_q15: 15000,
         top_len: 8,
         top_idx: [1, 5, 10, 15, 20, 25, 30, 35, 0, 0, 0, 0, 0, 0, 0, 0],
-        top_w_q15: [16384, 8192, 4096, 2048, 1024, 512, 256, 128, 0, 0, 0, 0, 0, 0, 0, 0],
+        top_w_q15: [
+            16384, 8192, 4096, 2048, 1024, 512, 256, 128, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
         flags: SpikePacket::FLAG_SPARSE_MASK,
     };
 

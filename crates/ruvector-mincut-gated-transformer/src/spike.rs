@@ -254,7 +254,7 @@ mod tests {
         let scheduler = SpikeScheduler::new();
         let spike = SpikePacket {
             fired: 1,
-            rate_q15: 20000, // High rate
+            rate_q15: 20000,    // High rate
             novelty_q15: 20000, // High novelty
             ..Default::default()
         };
@@ -284,7 +284,7 @@ mod tests {
         let scheduler = SpikeScheduler::new();
         let spike = SpikePacket {
             fired: 1,
-            rate_q15: 20000, // Would be tier 0
+            rate_q15: 20000,   // Would be tier 0
             novelty_q15: 2000, // Low novelty
             ..Default::default()
         };
@@ -350,9 +350,9 @@ mod tests {
             },
             top_w_q15: {
                 let mut arr = [0u16; 16];
-                arr[0] = 8192;  // 0.25
+                arr[0] = 8192; // 0.25
                 arr[1] = 16384; // 0.5
-                arr[2] = 4096;  // 0.125
+                arr[2] = 4096; // 0.125
                 arr
             },
             ..Default::default()

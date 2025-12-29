@@ -152,7 +152,12 @@ impl SparseCSR {
             }
         }
 
-        Self { n, row_ptr, col_idx, values }
+        Self {
+            n,
+            row_ptr,
+            col_idx,
+            values,
+        }
     }
 }
 
@@ -200,7 +205,6 @@ impl Default for SpectralPositionEncoder {
 }
 
 impl SpectralPositionEncoder {
-
     /// Compute graph Laplacian from boundary edges.
     ///
     /// Laplacian L = D - A, where:
@@ -247,18 +251,18 @@ impl SpectralPositionEncoder {
     /// Compute normalized Laplacian for better numerical stability.
     ///
     /// L_norm = D^(-1/2) * L * D^(-1/2)
-    pub fn compute_normalized_laplacian(&self, boundary_edges: &[(u16, u16)], n: usize) -> Vec<f32> {
+    pub fn compute_normalized_laplacian(
+        &self,
+        boundary_edges: &[(u16, u16)],
+        n: usize,
+    ) -> Vec<f32> {
         let mut laplacian = self.compute_laplacian(boundary_edges, n);
         let mut degree_sqrt_inv = vec![0.0f32; n];
 
         // Compute D^(-1/2)
         for i in 0..n {
             let deg = laplacian[i * n + i];
-            degree_sqrt_inv[i] = if deg > 0.0 {
-                1.0 / deg.sqrt()
-            } else {
-                0.0
-            };
+            degree_sqrt_inv[i] = if deg > 0.0 { 1.0 / deg.sqrt() } else { 0.0 };
         }
 
         // Normalize: L_norm = D^(-1/2) * L * D^(-1/2)
@@ -452,7 +456,9 @@ pub fn power_iteration(matrix: &[f32], n: usize, num_iters: u16) -> Vec<f32> {
     }
 
     // Initialize with random-like vector
-    let mut v: Vec<f32> = (0..n).map(|i| ((i * 7 + 13) % 100) as f32 / 100.0).collect();
+    let mut v: Vec<f32> = (0..n)
+        .map(|i| ((i * 7 + 13) % 100) as f32 / 100.0)
+        .collect();
 
     // Power iteration
     for _ in 0..num_iters {
@@ -501,7 +507,9 @@ pub fn power_iteration_sparse(csr: &SparseCSR, num_iters: u16) -> Vec<f32> {
     }
 
     // Initialize with deterministic pseudo-random vector
-    let mut v: Vec<f32> = (0..n).map(|i| ((i * 7 + 13) % 100) as f32 / 100.0).collect();
+    let mut v: Vec<f32> = (0..n)
+        .map(|i| ((i * 7 + 13) % 100) as f32 / 100.0)
+        .collect();
     let mut v_new = vec![0.0f32; n];
 
     for _ in 0..num_iters {
@@ -556,7 +564,9 @@ pub fn lanczos_sparse(csr: &SparseCSR, k: usize, max_iters: u16) -> Vec<(f32, Ve
     let max_iters = (max_iters as usize).max(k * 3).min(n);
 
     // Initialize starting vector (normalized)
-    let mut q: Vec<f32> = (0..n).map(|i| ((i * 7 + 13) % 100) as f32 / 100.0).collect();
+    let mut q: Vec<f32> = (0..n)
+        .map(|i| ((i * 7 + 13) % 100) as f32 / 100.0)
+        .collect();
     let norm = q.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 1e-10 {
         for x in &mut q {
@@ -570,7 +580,7 @@ pub fn lanczos_sparse(csr: &SparseCSR, k: usize, max_iters: u16) -> Vec<(f32, Ve
 
     // Tridiagonal matrix elements
     let mut alpha: Vec<f32> = Vec::with_capacity(max_iters); // Diagonal
-    let mut beta: Vec<f32> = Vec::with_capacity(max_iters);  // Off-diagonal
+    let mut beta: Vec<f32> = Vec::with_capacity(max_iters); // Off-diagonal
 
     let mut r = vec![0.0f32; n];
     let mut q_prev = vec![0.0f32; n];
@@ -580,7 +590,11 @@ pub fn lanczos_sparse(csr: &SparseCSR, k: usize, max_iters: u16) -> Vec<(f32, Ve
         csr.spmv(&lanczos_vecs[j], &mut r);
 
         // α_j = q_j^T * r
-        let alpha_j: f32 = lanczos_vecs[j].iter().zip(r.iter()).map(|(qi, ri)| qi * ri).sum();
+        let alpha_j: f32 = lanczos_vecs[j]
+            .iter()
+            .zip(r.iter())
+            .map(|(qi, ri)| qi * ri)
+            .sum();
         alpha.push(alpha_j);
 
         // r = r - α_j * q_j
@@ -712,7 +726,11 @@ fn tridiagonal_eigenvalues(alpha: &[f32], beta: &[f32], max_iters: u16) -> Vec<f
     }
 
     // Sort eigenvalues by absolute value (smallest first for Laplacian)
-    d.sort_by(|a, b| a.abs().partial_cmp(&b.abs()).unwrap_or(core::cmp::Ordering::Equal));
+    d.sort_by(|a, b| {
+        a.abs()
+            .partial_cmp(&b.abs())
+            .unwrap_or(core::cmp::Ordering::Equal)
+    });
     d
 }
 
@@ -870,10 +888,7 @@ mod tests {
     fn test_encode_positions() {
         let encoder = SpectralPositionEncoder::default();
 
-        let eigenvectors = vec![
-            vec![0.1, 0.2, 0.3, 0.4],
-            vec![0.5, 0.6, 0.7, 0.8],
-        ];
+        let eigenvectors = vec![vec![0.1, 0.2, 0.3, 0.4], vec![0.5, 0.6, 0.7, 0.8]];
 
         let encoding = encoder.encode_positions(&eigenvectors);
 

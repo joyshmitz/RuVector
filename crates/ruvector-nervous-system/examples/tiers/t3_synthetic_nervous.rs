@@ -181,8 +181,8 @@ impl ZoneHomeostasis {
     /// Learn from occupancy patterns
     pub fn learn_occupancy(&mut self, hour: usize, occupancy: f32) {
         if self.learning_enabled && hour < 24 {
-            self.occupancy_pattern[hour] =
-                self.occupancy_pattern[hour] * (1.0 - self.adaptation_rate)
+            self.occupancy_pattern[hour] = self.occupancy_pattern[hour]
+                * (1.0 - self.adaptation_rate)
                 + occupancy * self.adaptation_rate;
         }
     }
@@ -197,11 +197,16 @@ impl ZoneHomeostasis {
     }
 
     /// Compute zone-level action based on aggregate readings
-    pub fn compute_action(&self, readings: &[EnvironmentReading], hour: usize) -> Vec<EnvironmentAction> {
+    pub fn compute_action(
+        &self,
+        readings: &[EnvironmentReading],
+        hour: usize,
+    ) -> Vec<EnvironmentAction> {
         let mut actions = Vec::new();
 
         // Filter readings for this zone
-        let zone_readings: Vec<_> = readings.iter()
+        let zone_readings: Vec<_> = readings
+            .iter()
             .filter(|r| self.locations.contains(&r.location))
             .collect();
 
@@ -210,13 +215,14 @@ impl ZoneHomeostasis {
         }
 
         // Average temperature
-        let temp_readings: Vec<_> = zone_readings.iter()
+        let temp_readings: Vec<_> = zone_readings
+            .iter()
             .filter(|r| r.sensor_type == EnvironmentSensor::Temperature)
             .collect();
 
         if !temp_readings.is_empty() {
-            let avg_temp: f32 = temp_readings.iter().map(|r| r.value).sum::<f32>()
-                / temp_readings.len() as f32;
+            let avg_temp: f32 =
+                temp_readings.iter().map(|r| r.value).sum::<f32>() / temp_readings.len() as f32;
 
             // Adjust target based on predicted occupancy
             let predicted_occ = self.predict_occupancy(hour);
@@ -248,7 +254,8 @@ impl ZoneHomeostasis {
         }
 
         // Light based on occupancy
-        let occupancy_readings: Vec<_> = zone_readings.iter()
+        let occupancy_readings: Vec<_> = zone_readings
+            .iter()
             .filter(|r| r.sensor_type == EnvironmentSensor::Occupancy)
             .collect();
 
@@ -307,7 +314,9 @@ impl EnvironmentWorkspace {
     pub fn broadcast(&mut self, item: WorkspaceItem) {
         if self.items.len() >= self.capacity {
             // Remove lowest salience
-            if let Some(min_idx) = self.items.iter()
+            if let Some(min_idx) = self
+                .items
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.salience.partial_cmp(&b.salience).unwrap())
                 .map(|(i, _)| i)
@@ -321,9 +330,7 @@ impl EnvironmentWorkspace {
     /// Detect emergent patterns
     pub fn detect_patterns(&mut self) -> Option<EmergentPolicy> {
         // Look for repeated sequences in workspace
-        let observations: Vec<_> = self.items.iter()
-            .map(|i| i.observation.clone())
-            .collect();
+        let observations: Vec<_> = self.items.iter().map(|i| i.observation.clone()).collect();
 
         if observations.len() < 3 {
             return None;
@@ -343,7 +350,11 @@ impl EnvironmentWorkspace {
             };
 
             // Check if already known
-            if !self.policies.iter().any(|p| p.trigger_pattern == last.clone()) {
+            if !self
+                .policies
+                .iter()
+                .any(|p| p.trigger_pattern == last.clone())
+            {
                 self.policies.push(policy.clone());
                 return Some(policy);
             }
@@ -383,11 +394,13 @@ impl SyntheticNervousSystem {
     /// Add a zone
     pub fn add_zone(&mut self, zone_id: &str, locations: Vec<&str>) {
         let zone = ZoneId(zone_id.to_string());
-        let locs: Vec<_> = locations.iter()
+        let locs: Vec<_> = locations
+            .iter()
             .map(|l| LocationId(l.to_string()))
             .collect();
 
-        self.zones.insert(zone.clone(), ZoneHomeostasis::new(zone, locs));
+        self.zones
+            .insert(zone.clone(), ZoneHomeostasis::new(zone, locs));
     }
 
     /// Add a local reflex
@@ -441,7 +454,9 @@ impl SyntheticNervousSystem {
                 // Significant observation
                 self.workspace.broadcast(WorkspaceItem {
                     zone: ZoneId("global".to_string()),
-                    observation: format!("{:?}_{}", reading.sensor_type,
+                    observation: format!(
+                        "{:?}_{}",
+                        reading.sensor_type,
                         if reading.value > 0.5 { "high" } else { "low" }
                     ),
                     salience: reading.value.abs(),
@@ -452,8 +467,10 @@ impl SyntheticNervousSystem {
 
         // Detect emergent patterns
         if let Some(policy) = self.workspace.detect_patterns() {
-            println!("  [EMERGENT] New policy: {} (confidence: {:.2})",
-                policy.name, policy.confidence);
+            println!(
+                "  [EMERGENT] New policy: {} (confidence: {:.2})",
+                policy.name, policy.confidence
+            );
         }
 
         for action in &actions {
@@ -467,12 +484,17 @@ impl SyntheticNervousSystem {
     pub fn status(&self) -> EnvironmentStatus {
         let learned_patterns = self.workspace.policies.len();
 
-        let zone_states: HashMap<_, _> = self.zones.iter()
+        let zone_states: HashMap<_, _> = self
+            .zones
+            .iter()
             .map(|(id, zone)| {
-                (id.clone(), ZoneState {
-                    target_temp: zone.target_temperature,
-                    occupancy_learned: zone.occupancy_pattern.iter().sum::<f32>() > 0.0,
-                })
+                (
+                    id.clone(),
+                    ZoneState {
+                        target_temp: zone.target_temperature,
+                        occupancy_learned: zone.occupancy_pattern.iter().sum::<f32>() > 0.0,
+                    },
+                )
             })
             .collect();
 
@@ -517,15 +539,21 @@ fn main() {
     building.add_reflex(LocalEnvironmentReflex::new(
         LocationId("room_101".to_string()),
         EnvironmentSensor::Temperature,
-        18.0, 28.0,
-        EnvironmentActuator::HVAC { mode: HVACMode::Heating(3.0) },
-        EnvironmentActuator::HVAC { mode: HVACMode::Cooling(3.0) },
+        18.0,
+        28.0,
+        EnvironmentActuator::HVAC {
+            mode: HVACMode::Heating(3.0),
+        },
+        EnvironmentActuator::HVAC {
+            mode: HVACMode::Cooling(3.0),
+        },
     ));
 
     building.add_reflex(LocalEnvironmentReflex::new(
         LocationId("entrance".to_string()),
         EnvironmentSensor::Motion,
-        0.0, 0.5,
+        0.0,
+        0.5,
         EnvironmentActuator::Lighting { brightness: 0.2 },
         EnvironmentActuator::Lighting { brightness: 1.0 },
     ));
@@ -562,15 +590,24 @@ fn main() {
                     timestamp,
                     location: LocationId("entrance".to_string()),
                     sensor_type: EnvironmentSensor::Motion,
-                    value: if occupied && minute % 15 == 0 { 1.0 } else { 0.0 },
+                    value: if occupied && minute % 15 == 0 {
+                        1.0
+                    } else {
+                        0.0
+                    },
                 },
             ];
 
             let actions = building.process(readings);
 
             if hour % 4 == 0 && minute == 0 {
-                println!("  Hour {}: {} actions, temp={:.1}°C, occupied={}",
-                    hour, actions.len(), temp, occupied);
+                println!(
+                    "  Hour {}: {} actions, temp={:.1}°C, occupied={}",
+                    hour,
+                    actions.len(),
+                    temp,
+                    occupied
+                );
             }
         }
     }
@@ -582,8 +619,10 @@ fn main() {
     println!("  Emergent policies learned: {}", status.learned_patterns);
     println!("  Zone states:");
     for (zone, state) in &status.zone_states {
-        println!("    {:?}: target={:.1}°C, occupancy_learned={}",
-            zone.0, state.target_temp, state.occupancy_learned);
+        println!(
+            "    {:?}: target={:.1}°C, occupancy_learned={}",
+            zone.0, state.target_temp, state.occupancy_learned
+        );
     }
 
     println!("\n=== Key Benefits ===");
@@ -604,9 +643,14 @@ mod tests {
         let mut reflex = LocalEnvironmentReflex::new(
             LocationId("test".to_string()),
             EnvironmentSensor::Temperature,
-            18.0, 28.0,
-            EnvironmentActuator::HVAC { mode: HVACMode::Heating(1.0) },
-            EnvironmentActuator::HVAC { mode: HVACMode::Cooling(1.0) },
+            18.0,
+            28.0,
+            EnvironmentActuator::HVAC {
+                mode: HVACMode::Heating(1.0),
+            },
+            EnvironmentActuator::HVAC {
+                mode: HVACMode::Cooling(1.0),
+            },
         );
 
         // Cold triggers heating

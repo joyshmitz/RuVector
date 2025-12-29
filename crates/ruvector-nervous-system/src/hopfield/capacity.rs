@@ -257,10 +257,7 @@ mod tests {
     #[test]
     fn test_separation_ratio_close_patterns() {
         // Two patterns very close together
-        let patterns = vec![
-            vec![1.0, 0.0],
-            vec![1.01, 0.0],
-        ];
+        let patterns = vec![vec![1.0, 0.0], vec![1.01, 0.0]];
 
         let ratio = separation_ratio(&patterns);
 
@@ -277,10 +274,7 @@ mod tests {
 
     #[test]
     fn test_estimate_accuracy_range() {
-        let patterns = vec![
-            vec![1.0, 0.0, 0.0],
-            vec![0.0, 1.0, 0.0],
-        ];
+        let patterns = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
 
         for beta in [0.1, 0.5, 1.0, 2.0, 5.0, 10.0] {
             let accuracy = estimate_accuracy(beta, &patterns);
@@ -290,10 +284,7 @@ mod tests {
 
     #[test]
     fn test_estimate_accuracy_increases_with_beta() {
-        let patterns = vec![
-            vec![1.0, 0.0, 0.0],
-            vec![0.0, 1.0, 0.0],
-        ];
+        let patterns = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
 
         let acc_low = estimate_accuracy(0.5, &patterns);
         let acc_high = estimate_accuracy(5.0, &patterns);

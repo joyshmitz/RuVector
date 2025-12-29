@@ -224,12 +224,15 @@ impl BenchStats {
             return 0.0;
         }
         let mean = self.mean_ns();
-        let variance: f64 = self.samples.iter()
+        let variance: f64 = self
+            .samples
+            .iter()
             .map(|&s| {
                 let diff = s as f64 - mean;
                 diff * diff
             })
-            .sum::<f64>() / (self.samples.len() - 1) as f64;
+            .sum::<f64>()
+            / (self.samples.len() - 1) as f64;
         variance.sqrt()
     }
 

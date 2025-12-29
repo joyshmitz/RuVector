@@ -37,8 +37,8 @@
 //! ```
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 /// Speculative decoding configuration
@@ -127,7 +127,8 @@ impl DraftTree {
         }
 
         // Find all leaf nodes
-        let leaf_indices: Vec<usize> = self.tokens
+        let leaf_indices: Vec<usize> = self
+            .tokens
             .iter()
             .enumerate()
             .filter(|(idx, _)| {
@@ -296,10 +297,7 @@ impl SpeculativeDecoder {
                 }
 
                 let draft_token = &draft_tree.tokens[token_idx];
-                let target_probs = self.softmax_with_temperature(
-                    &target_logits[step],
-                    temperature,
-                );
+                let target_probs = self.softmax_with_temperature(&target_logits[step], temperature);
 
                 // Get draft and target probabilities
                 let draft_prob = draft_token.confidence;
@@ -333,10 +331,7 @@ impl SpeculativeDecoder {
             }
 
             let draft_token = &draft_tree.tokens[token_idx];
-            let target_probs = self.softmax_with_temperature(
-                &target_logits[step],
-                temperature,
-            );
+            let target_probs = self.softmax_with_temperature(&target_logits[step], temperature);
 
             let draft_prob = draft_token.confidence;
             let target_prob = target_probs
@@ -442,16 +437,11 @@ impl SpeculativeDecoder {
         let probs = self.softmax_with_temperature(logits, 1.0);
 
         // Get top-k indices with their probabilities
-        let mut indexed_probs: Vec<(usize, f32)> = probs
-            .iter()
-            .enumerate()
-            .map(|(i, &p)| (i, p))
-            .collect();
+        let mut indexed_probs: Vec<(usize, f32)> =
+            probs.iter().enumerate().map(|(i, &p)| (i, p)).collect();
 
         // Sort by probability (descending)
-        indexed_probs.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal)
-        });
+        indexed_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         // Take top-k and create draft tokens
         indexed_probs
@@ -643,10 +633,7 @@ mod tests {
 
         let decoder = SpeculativeDecoder::new(config);
 
-        let draft_logits = vec![
-            vec![1.0, 0.8, 0.0, 0.0, 0.0],
-            vec![0.9, 0.7, 0.0, 0.0, 0.0],
-        ];
+        let draft_logits = vec![vec![1.0, 0.8, 0.0, 0.0, 0.0], vec![0.9, 0.7, 0.0, 0.0, 0.0]];
 
         // High λ should give higher confidence
         let tree_high = decoder.generate_draft_tree(250, 240, &draft_logits);
@@ -655,13 +642,11 @@ mod tests {
         let tree_low = decoder.generate_draft_tree(50, 60, &draft_logits);
 
         // High λ tokens should have higher confidence
-        let avg_conf_high: f32 = tree_high.tokens.iter()
-            .map(|t| t.confidence)
-            .sum::<f32>() / tree_high.tokens.len() as f32;
+        let avg_conf_high: f32 = tree_high.tokens.iter().map(|t| t.confidence).sum::<f32>()
+            / tree_high.tokens.len() as f32;
 
-        let avg_conf_low: f32 = tree_low.tokens.iter()
-            .map(|t| t.confidence)
-            .sum::<f32>() / tree_low.tokens.len() as f32;
+        let avg_conf_low: f32 = tree_low.tokens.iter().map(|t| t.confidence).sum::<f32>()
+            / tree_low.tokens.len() as f32;
 
         assert!(avg_conf_high > avg_conf_low);
     }

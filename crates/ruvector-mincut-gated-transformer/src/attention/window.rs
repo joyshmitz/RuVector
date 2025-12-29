@@ -367,29 +367,17 @@ pub fn qkv_projection(
 ) {
     // Q projection: [seq_len, hidden] @ [hidden, hidden]^T
     qgemm_i8(
-        seq_len, hidden, hidden,
-        input, 1.0,
-        wq, wq_scales,
-        None,
-        q_out,
+        seq_len, hidden, hidden, input, 1.0, wq, wq_scales, None, q_out,
     );
 
     // K projection
     qgemm_i8(
-        seq_len, hidden, hidden,
-        input, 1.0,
-        wk, wk_scales,
-        None,
-        k_out,
+        seq_len, hidden, hidden, input, 1.0, wk, wk_scales, None, k_out,
     );
 
     // V projection
     qgemm_i8(
-        seq_len, hidden, hidden,
-        input, 1.0,
-        wv, wv_scales,
-        None,
-        v_out,
+        seq_len, hidden, hidden, input, 1.0, wv, wv_scales, None, v_out,
     );
 }
 

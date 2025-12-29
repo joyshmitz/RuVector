@@ -40,10 +40,7 @@ pub fn softmax(values: &[f32], beta: f32) -> Vec<f32> {
     }
 
     // Find max for numerical stability
-    let max_val = values
-        .iter()
-        .copied()
-        .fold(f32::NEG_INFINITY, f32::max);
+    let max_val = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
     // Compute exp(x * β - max * β) for stability
     let exp_values: Vec<f32> = values
@@ -93,11 +90,7 @@ pub fn softmax(values: &[f32], beta: f32) -> Vec<f32> {
 /// // First pattern should have highest attention
 /// assert!(attention[0] > attention[1]);
 /// ```
-pub fn compute_attention(
-    patterns: &[Vec<f32>],
-    query: &[f32],
-    beta: f32,
-) -> (Vec<f32>, Vec<f32>) {
+pub fn compute_attention(patterns: &[Vec<f32>], query: &[f32], beta: f32) -> (Vec<f32>, Vec<f32>) {
     // Compute similarities: s_i = patterns[i] · query
     let similarities: Vec<f32> = patterns
         .iter()
@@ -209,10 +202,7 @@ mod tests {
 
     #[test]
     fn test_compute_attention_identical_patterns() {
-        let patterns = vec![
-            vec![1.0, 1.0, 1.0],
-            vec![1.0, 1.0, 1.0],
-        ];
+        let patterns = vec![vec![1.0, 1.0, 1.0], vec![1.0, 1.0, 1.0]];
         let query = vec![1.0, 1.0, 1.0];
 
         let (attention, similarities) = compute_attention(&patterns, &query, 1.0);
@@ -228,10 +218,7 @@ mod tests {
 
     #[test]
     fn test_compute_attention_beta_effect() {
-        let patterns = vec![
-            vec![1.0, 0.0],
-            vec![0.5, 0.5],
-        ];
+        let patterns = vec![vec![1.0, 0.0], vec![0.5, 0.5]];
         let query = vec![1.0, 0.0];
 
         // Low beta - more diffuse attention

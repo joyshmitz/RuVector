@@ -59,7 +59,10 @@ impl BackpressureController {
     /// * `low` - Low watermark (0.0-1.0), typically 0.2-0.3
     pub fn new(high: f32, low: f32) -> Self {
         assert!(high > low, "High watermark must be greater than low");
-        assert!((0.0..=1.0).contains(&high), "High watermark must be in [0,1]");
+        assert!(
+            (0.0..=1.0).contains(&high),
+            "High watermark must be in [0,1]"
+        );
         assert!((0.0..=1.0).contains(&low), "Low watermark must be in [0,1]");
 
         Self {
@@ -96,7 +99,8 @@ impl BackpressureController {
     /// * `queue_fill` - Current queue fill ratio (0.0-1.0)
     pub fn update(&self, queue_fill: f32) {
         let pressure = (queue_fill * 100.0) as u32;
-        self.current_pressure.store(pressure.min(100), Ordering::Relaxed);
+        self.current_pressure
+            .store(pressure.min(100), Ordering::Relaxed);
 
         let new_state = if queue_fill >= self.high_watermark {
             BackpressureState::Drop
@@ -128,7 +132,8 @@ impl BackpressureController {
     /// Reset to normal state
     pub fn reset(&self) {
         self.current_pressure.store(0, Ordering::Relaxed);
-        self.state.store(BackpressureState::Normal as u8, Ordering::Relaxed);
+        self.state
+            .store(BackpressureState::Normal as u8, Ordering::Relaxed);
     }
 
     /// Check if in normal state
@@ -302,10 +307,9 @@ mod tests {
 
         // Should be in valid state
         let state = controller.get_state();
-        assert!(matches!(state,
-            BackpressureState::Normal |
-            BackpressureState::Throttle |
-            BackpressureState::Drop
+        assert!(matches!(
+            state,
+            BackpressureState::Normal | BackpressureState::Throttle | BackpressureState::Drop
         ));
     }
 

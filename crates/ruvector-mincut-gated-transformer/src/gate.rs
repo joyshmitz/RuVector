@@ -20,7 +20,7 @@
 //! - Kreuzer, D., et al. (2021). Spectral Attention. NeurIPS 2021.
 
 use crate::config::GatePolicy;
-use crate::packets::{GatePacket, SpikePacket, GateDecision, GateReason};
+use crate::packets::{GateDecision, GatePacket, GateReason, SpikePacket};
 
 #[cfg(feature = "energy_gate")]
 use crate::energy_gate::{EnergyGate, EnergyGateConfig};
@@ -263,10 +263,8 @@ impl GateController {
         // Check lambda drop
         let drop_ratio = gate.drop_ratio_q15();
         if drop_ratio > self.policy.drop_ratio_q15_max {
-            return self.tier_with_intervention(
-                GateDecision::FlushKv,
-                GateReason::LambdaDroppedFast,
-            );
+            return self
+                .tier_with_intervention(GateDecision::FlushKv, GateReason::LambdaDroppedFast);
         }
 
         // Check boundary conditions
@@ -384,7 +382,12 @@ impl GateController {
             ),
             GateDecision::FreezeWrites => (2, 1, self.seq_len_safe, 4),
             GateDecision::QuarantineUpdates => (2, 1, self.seq_len_safe, 4),
-            GateDecision::Allow => (0, self.layers_normal, self.seq_len_normal, self.window_normal),
+            GateDecision::Allow => (
+                0,
+                self.layers_normal,
+                self.seq_len_normal,
+                self.window_normal,
+            ),
         };
 
         TierDecision {

@@ -1,6 +1,6 @@
 //! HDC operations: binding, bundling, permutation
 
-use super::vector::{Hypervector, HdcError};
+use super::vector::{HdcError, Hypervector};
 use super::HYPERVECTOR_U64_LEN;
 
 /// Binds two hypervectors using XOR

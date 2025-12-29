@@ -251,7 +251,10 @@ impl SwarmNode {
                     });
                 }
             }
-            MessageContent::Vote { proposal_id, support } => {
+            MessageContent::Vote {
+                proposal_id,
+                support,
+            } => {
                 if let Some(decision) = self.pending_decisions.get_mut(&proposal_id) {
                     decision.record_vote(msg.from, support);
                 }
@@ -373,7 +376,8 @@ impl SwarmNetwork {
 
     /// Count nodes that would respond to coordination
     pub fn responsive_nodes(&self, threshold: f32) -> usize {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.coherence.is_synchronized(threshold))
             .count()
     }
@@ -395,7 +399,10 @@ fn main() {
     let mut swarm = SwarmNetwork::new(100, 0.2);
 
     println!("Swarm initialized: {} nodes", swarm.nodes.len());
-    println!("Initial synchronization: {:.2}", swarm.synchronization_order_parameter());
+    println!(
+        "Initial synchronization: {:.2}",
+        swarm.synchronization_order_parameter()
+    );
 
     // Let the swarm synchronize
     println!("\nPhase synchronization emerging...");
@@ -412,8 +419,14 @@ fn main() {
         }
     }
 
-    println!("\nFinal synchronization: {:.2}", swarm.synchronization_order_parameter());
-    println!("Nodes ready for coordination: {}", swarm.responsive_nodes(0.7));
+    println!(
+        "\nFinal synchronization: {:.2}",
+        swarm.synchronization_order_parameter()
+    );
+    println!(
+        "Nodes ready for coordination: {}",
+        swarm.responsive_nodes(0.7)
+    );
 
     // Inject local event - triggers local reflex
     println!("\nInjecting local event at node 5...");
@@ -421,17 +434,16 @@ fn main() {
     swarm.step(0.1);
 
     // Check for local decisions
-    let decisions: usize = swarm.message_queue.iter()
+    let decisions: usize = swarm
+        .message_queue
+        .iter()
         .filter(|m| matches!(m.content, MessageContent::LocalDecision { .. }))
         .count();
     println!("  Local decisions triggered: {}", decisions);
 
     // Simulate partial failure
     println!("\nSimulating partial failure (removing 30% of nodes)...");
-    let nodes_to_remove: Vec<NodeId> = swarm.nodes.keys()
-        .take(30)
-        .cloned()
-        .collect();
+    let nodes_to_remove: Vec<NodeId> = swarm.nodes.keys().take(30).cloned().collect();
 
     for node_id in nodes_to_remove {
         swarm.nodes.remove(&node_id);
@@ -454,7 +466,10 @@ fn main() {
         }
     }
 
-    println!("\nPost-failure synchronization: {:.2}", swarm.synchronization_order_parameter());
+    println!(
+        "\nPost-failure synchronization: {:.2}",
+        swarm.synchronization_order_parameter()
+    );
     println!("System continues operating with reduced capacity");
 
     println!("\n=== Key Benefits ===");
