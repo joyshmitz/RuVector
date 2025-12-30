@@ -50,13 +50,9 @@ fn main() {
     // Get children
     println!("\nNode Children:");
     for node_id in 0..5 {
-        let children = dag.get_children(node_id);
+        let children = dag.children(node_id);
         println!("  Node {}: {:?}", node_id, children);
     }
-
-    // Serialize to JSON
-    let json = dag.to_json().unwrap();
-    println!("\nJSON (first 200 chars):\n{}", &json[..json.len().min(200)]);
 
     // Demonstrate iterators
     println!("\nDFS Traversal:");

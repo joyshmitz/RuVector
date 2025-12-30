@@ -41,7 +41,7 @@ impl MlKem768 {
     }
 
     /// Encapsulate a shared secret for a recipient
-    pub fn encapsulate(pk: &MlKem768PublicKey) -> Result<EncapsulatedKey, KemError> {
+    pub fn encapsulate(_pk: &MlKem768PublicKey) -> Result<EncapsulatedKey, KemError> {
         // In real implementation, would use ml-kem encapsulation
         let mut ciphertext = [0u8; ML_KEM_768_CIPHERTEXT_SIZE];
         let mut shared_secret = [0u8; SHARED_SECRET_SIZE];

@@ -64,9 +64,9 @@ impl AttentionCache {
 
         // Hash edges structure
         let mut edge_list: Vec<(usize, usize)> = Vec::new();
-        for (from, children) in dag.edges() {
-            for child in children {
-                edge_list.push((*from, *child));
+        for node_id in dag.node_ids() {
+            for &child in dag.children(node_id) {
+                edge_list.push((node_id, child));
             }
         }
         edge_list.sort_unstable();
@@ -205,16 +205,12 @@ mod tests {
     fn create_test_dag(n: usize) -> QueryDag {
         let mut dag = QueryDag::new();
         for i in 0..n {
-            dag.add_node(OperatorNode {
-                id: i,
-                op_type: OperatorType::Scan,
-                cost: (i + 1) as f64,
-                selectivity: 1.0,
-                metadata: HashMap::new(),
-            });
+            let mut node = OperatorNode::new(i, OperatorType::Scan);
+            node.estimated_cost = (i + 1) as f64;
+            dag.add_node(node);
         }
         if n > 1 {
-            dag.add_edge(0, 1);
+            let _ = dag.add_edge(0, 1);
         }
         dag
     }

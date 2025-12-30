@@ -68,20 +68,24 @@ impl HierarchicalLorentzAttention {
 
     /// Compute hierarchical depth for each node
     fn compute_depths(&self, dag: &QueryDag) -> Vec<usize> {
-        let n = dag.nodes.len();
+        let n = dag.node_count();
         let mut depths = vec![0; n];
         let mut adj_list: HashMap<usize, Vec<usize>> = HashMap::new();
 
         // Build adjacency list
-        for &(from, to) in &dag.edges {
-            adj_list.entry(from).or_insert_with(Vec::new).push(to);
+        for node_id in dag.node_ids() {
+            for &child in dag.children(node_id) {
+                adj_list.entry(node_id).or_insert_with(Vec::new).push(child);
+            }
         }
 
         // Find root nodes (nodes with no incoming edges)
         let mut has_incoming = vec![false; n];
-        for &(_, to) in &dag.edges {
-            if to < n {
-                has_incoming[to] = true;
+        for node_id in dag.node_ids() {
+            for &child in dag.children(node_id) {
+                if child < n {
+                    has_incoming[child] = true;
+                }
             }
         }
 
@@ -158,11 +162,11 @@ impl HierarchicalLorentzAttention {
 
 impl DagAttentionMechanism for HierarchicalLorentzAttention {
     fn forward(&self, dag: &QueryDag) -> Result<AttentionScores, AttentionError> {
-        if dag.nodes.is_empty() {
+        if dag.node_count() == 0 {
             return Err(AttentionError::InvalidDag("Empty DAG".to_string()));
         }
 
-        let n = dag.nodes.len();
+        let n = dag.node_count();
 
         // Step 1: Compute hierarchical depths
         let depths = self.compute_depths(dag);
@@ -251,21 +255,15 @@ mod tests {
         let attention = HierarchicalLorentzAttention::new(config);
 
         let mut dag = QueryDag::new();
-        dag.add_node(OperatorNode {
-            id: 0,
-            op_type: OperatorType::Scan,
-            cost: 1.0,
-            selectivity: 1.0,
-            metadata: HashMap::new(),
-        });
-        dag.add_node(OperatorNode {
-            id: 1,
-            op_type: OperatorType::Filter,
-            cost: 2.0,
-            selectivity: 0.5,
-            metadata: HashMap::new(),
-        });
-        dag.add_edge(0, 1);
+        let mut node0 = OperatorNode::new(0, OperatorType::Scan);
+        node0.estimated_cost = 1.0;
+        dag.add_node(node0);
+
+        let mut node1 = OperatorNode::new(1, OperatorType::Filter { predicate: "x > 0".to_string() });
+        node1.estimated_cost = 2.0;
+        dag.add_node(node1);
+
+        dag.add_edge(0, 1).unwrap();
 
         let result = attention.forward(&dag).unwrap();
         assert_eq!(result.scores.len(), 2);

@@ -47,8 +47,9 @@ impl ParallelBranchAttention {
 
         // Build parent-child relationships from adjacency
         for node_id in dag.node_ids() {
-            if let Some(children) = dag.get_children(node_id) {
-                for child in children {
+            let children = dag.children(node_id);
+            if !children.is_empty() {
+                for &child in children {
                     children_of.entry(node_id).or_insert_with(Vec::new).push(child);
                     parents_of.entry(child).or_insert_with(Vec::new).push(node_id);
                 }
@@ -68,7 +69,7 @@ impl ParallelBranchAttention {
                     for &child in children {
                         if !visited.contains(&child) {
                             // Check if this child has edges to any siblings
-                            let child_children = dag.get_children(child).unwrap_or_default();
+                            let child_children = dag.children(child);
                             let has_sibling_edge = children.iter().any(|&other| {
                                 other != child && child_children.contains(&other)
                             });
@@ -151,7 +152,7 @@ impl ParallelBranchAttention {
 
     /// Compute attention scores based on parallel branch analysis
     fn compute_branch_attention(&self, dag: &QueryDag, branches: &[Vec<usize>]) -> Vec<f32> {
-        let n = dag.nodes.len();
+        let n = dag.node_count();
         let mut scores = vec![0.0; n];
 
         // Base score for nodes not in any branch
@@ -179,14 +180,16 @@ impl ParallelBranchAttention {
         }
 
         // Apply sync penalty to nodes that synchronize branches
-        for &(from, to) in &dag.edges {
-            if from < n && to < n {
-                // Check if this edge connects different branches
-                let from_branch = branches.iter().position(|b| b.iter().any(|&x| x == from));
-                let to_branch = branches.iter().position(|b| b.iter().any(|&x| x == to));
+        for from in dag.node_ids() {
+            for &to in dag.children(from) {
+                if from < n && to < n {
+                    // Check if this edge connects different branches
+                    let from_branch = branches.iter().position(|b| b.iter().any(|&x| x == from));
+                    let to_branch = branches.iter().position(|b| b.iter().any(|&x| x == to));
 
-                if from_branch.is_some() && to_branch.is_some() && from_branch != to_branch {
-                    scores[to] *= 1.0 - self.config.sync_penalty;
+                    if from_branch.is_some() && to_branch.is_some() && from_branch != to_branch {
+                        scores[to] *= 1.0 - self.config.sync_penalty;
+                    }
                 }
             }
         }
@@ -211,7 +214,7 @@ impl ParallelBranchAttention {
 
 impl DagAttentionMechanism for ParallelBranchAttention {
     fn forward(&self, dag: &QueryDag) -> Result<AttentionScores, AttentionError> {
-        if dag.nodes.is_empty() {
+        if dag.node_count() == 0 {
             return Err(AttentionError::InvalidDag("Empty DAG".to_string()));
         }
 
@@ -253,20 +256,14 @@ mod tests {
 
         let mut dag = QueryDag::new();
         for i in 0..4 {
-            dag.add_node(OperatorNode {
-                id: i,
-                op_type: OperatorType::Scan,
-                cost: 1.0,
-                selectivity: 1.0,
-                metadata: HashMap::new(),
-            });
+            dag.add_node(OperatorNode::new(i, OperatorType::Scan));
         }
 
         // Create parallel branches: 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3
-        dag.add_edge(0, 1);
-        dag.add_edge(0, 2);
-        dag.add_edge(1, 3);
-        dag.add_edge(2, 3);
+        dag.add_edge(0, 1).unwrap();
+        dag.add_edge(0, 2).unwrap();
+        dag.add_edge(1, 3).unwrap();
+        dag.add_edge(2, 3).unwrap();
 
         let branches = attention.detect_branches(&dag);
         assert!(!branches.is_empty());
@@ -279,16 +276,12 @@ mod tests {
 
         let mut dag = QueryDag::new();
         for i in 0..3 {
-            dag.add_node(OperatorNode {
-                id: i,
-                op_type: OperatorType::Scan,
-                cost: (i + 1) as f64,
-                selectivity: 1.0,
-                metadata: HashMap::new(),
-            });
+            let mut node = OperatorNode::new(i, OperatorType::Scan);
+            node.estimated_cost = (i + 1) as f64;
+            dag.add_node(node);
         }
-        dag.add_edge(0, 1);
-        dag.add_edge(0, 2);
+        dag.add_edge(0, 1).unwrap();
+        dag.add_edge(0, 2).unwrap();
 
         let result = attention.forward(&dag).unwrap();
         assert_eq!(result.scores.len(), 3);

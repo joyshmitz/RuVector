@@ -117,6 +117,10 @@ impl DagSonaEngine {
                 OperatorType::Rerank { .. } => 14,
                 OperatorType::Materialize => 15,
                 OperatorType::Result => 16,
+                #[allow(deprecated)]
+                OperatorType::Scan => 0, // Treat as SeqScan
+                #[allow(deprecated)]
+                OperatorType::Join => 4, // Treat as NestedLoopJoin
             };
             if type_idx < type_counts.len() {
                 type_counts[type_idx] += 1;
@@ -266,6 +270,10 @@ impl DagSonaEngine {
                 }
                 OperatorType::Materialize => 15u8.hash(&mut hasher),
                 OperatorType::Result => 16u8.hash(&mut hasher),
+                #[allow(deprecated)]
+                OperatorType::Scan => 0u8.hash(&mut hasher),
+                #[allow(deprecated)]
+                OperatorType::Join => 4u8.hash(&mut hasher),
             }
         }
 

@@ -364,7 +364,7 @@ impl FederatedNode {
         let diff: f64 = a.iter().zip(b.iter())
             .map(|(x, y)| (x - y).abs())
             .sum();
-        diff / a.len() as f64 < 0.1
+        (diff / a.len() as f64) < 0.1
     }
 
     fn is_already_federated(&self, signature: &[f64]) -> bool {

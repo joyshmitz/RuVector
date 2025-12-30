@@ -1,6 +1,6 @@
 //! MinCut Gated Attention: Gates attention by graph cut criticality
 
-use super::{AttentionError, AttentionScores, DagAttention};
+use super::trait_def::{AttentionError, AttentionScores, DagAttentionMechanism};
 use crate::dag::QueryDag;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -162,19 +162,19 @@ impl MinCutGatedAttention {
     }
 }
 
-impl DagAttention for MinCutGatedAttention {
+impl DagAttentionMechanism for MinCutGatedAttention {
     fn forward(&self, dag: &QueryDag) -> Result<AttentionScores, AttentionError> {
         if dag.node_count() == 0 {
-            return Err(AttentionError::EmptyDag);
+            return Err(AttentionError::InvalidDag("Empty DAG".to_string()));
         }
 
         let cut_nodes = self.compute_min_cut(dag);
-        let mut scores = HashMap::new();
+        let n = dag.node_count();
+        let mut score_vec = vec![0.0; n];
         let mut total = 0.0f32;
 
         // Gate attention based on whether node is in cut
-        let node_ids: Vec<usize> = (0..dag.node_count()).collect();
-        for node_id in node_ids {
+        for node_id in 0..n {
             if dag.get_node(node_id).is_none() {
                 continue;
             }
@@ -189,34 +189,18 @@ impl DagAttention for MinCutGatedAttention {
                 self.config.gate_threshold
             };
 
-            scores.insert(node_id, score);
+            score_vec[node_id] = score;
             total += score;
         }
 
         // Normalize to sum to 1
         if total > 0.0 {
-            for score in scores.values_mut() {
+            for score in score_vec.iter_mut() {
                 *score /= total;
             }
         }
 
-        Ok(scores)
-    }
-
-    fn update(&mut self, _dag: &QueryDag, execution_times: &HashMap<usize, f64>) {
-        // Could adjust gate threshold based on execution time distribution
-        if !execution_times.is_empty() {
-            let max_time = execution_times.values().fold(0.0f64, |a, &b| a.max(b));
-            let min_time = execution_times.values().fold(f64::INFINITY, |a, &b| a.min(b));
-
-            if max_time > 0.0 && min_time > 0.0 {
-                // Adjust threshold based on variance
-                let ratio = max_time / min_time;
-                if ratio > 3.0 {
-                    self.config.gate_threshold = (self.config.gate_threshold * 0.9).max(0.1);
-                }
-            }
-        }
+        Ok(AttentionScores::new(score_vec))
     }
 
     fn name(&self) -> &'static str {
@@ -226,6 +210,7 @@ impl DagAttention for MinCutGatedAttention {
     fn complexity(&self) -> &'static str {
         "O(n * e^2)"
     }
+
 }
 
 #[cfg(test)]
@@ -254,11 +239,11 @@ mod tests {
         let scores = attention.forward(&dag).unwrap();
 
         // Check normalization
-        let sum: f32 = scores.values().sum();
+        let sum: f32 = scores.scores.iter().sum();
         assert!((sum - 1.0).abs() < 1e-5);
 
         // All scores should be in [0, 1]
-        for &score in scores.values() {
+        for &score in &scores.scores {
             assert!(score >= 0.0 && score <= 1.0);
         }
     }

@@ -5,6 +5,7 @@ use ruvector_dag::{
     TopologicalAttention, CausalConeAttention, CriticalPathAttention, MinCutGatedAttention,
     DagAttention,
 };
+use ruvector_dag::attention::DagAttentionMechanism;
 use std::time::Instant;
 
 fn create_sample_dag() -> QueryDag {
@@ -126,12 +127,12 @@ fn main() {
     println!("4. MinCutGatedAttention");
     let mincut = MinCutGatedAttention::with_defaults();
     let start = Instant::now();
-    let scores = mincut.forward(&dag).unwrap();
+    let result = mincut.forward(&dag).unwrap();
     let elapsed = start.elapsed();
     println!("   Time: {:?}", elapsed);
     println!("   Complexity: {}", mincut.complexity());
-    println!("   Score sum: {:.6}", scores.values().sum::<f32>());
-    println!("   Max score: {:.6}\n", scores.values().fold(0.0f32, |a, &b| a.max(b)));
+    println!("   Score sum: {:.6}", result.scores.iter().sum::<f32>());
+    println!("   Max score: {:.6}\n", result.scores.iter().fold(0.0f32, |a, b| a.max(*b)));
 
     println!("All attention mechanisms completed successfully!");
 }

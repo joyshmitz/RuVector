@@ -30,7 +30,7 @@ fn main() {
     println!("\nAttention scores:");
     for (node_id, score) in &scores {
         let node = dag.get_node(*node_id).unwrap();
-        println!("  Node {}: {:.4} - {:?}", node_id, score, node.operator);
+        println!("  Node {}: {:.4} - {:?}", node_id, score, node.op_type);
     }
 
     let sum: f32 = scores.values().sum();
@@ -41,15 +41,16 @@ fn main() {
     println!("Focuses on downstream dependencies");
 
     let causal = CausalConeAttention::new(CausalConeConfig {
-        cone_depth: 3,
-        decay_factor: 0.85,
+        time_window_ms: 1000,
+        future_discount: 0.85,
+        ancestor_weight: 0.5,
     });
 
     let causal_scores = causal.forward(&dag).unwrap();
     println!("\nCausal cone scores:");
     for (node_id, score) in &causal_scores {
         let node = dag.get_node(*node_id).unwrap();
-        println!("  Node {}: {:.4} - {:?}", node_id, score, node.operator);
+        println!("  Node {}: {:.4} - {:?}", node_id, score, node.op_type);
     }
 
     // Compare mechanisms

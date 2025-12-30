@@ -53,11 +53,12 @@ fn main() {
 
         if i % 10 == 9 {
             let result = orchestrator.run_cycle();
+            let failures = result.repairs_attempted - result.repairs_succeeded;
             println!("Cycle {}: {} anomalies, {} repairs, {} failures",
                 i + 1,
                 result.anomalies_detected,
                 result.repairs_succeeded,
-                result.repairs_failed);
+                failures);
         }
     }
 
@@ -80,7 +81,7 @@ fn main() {
     println!("\nAfter anomalies:");
     println!("  Detected: {}", result.anomalies_detected);
     println!("  Repairs succeeded: {}", result.repairs_succeeded);
-    println!("  Repairs failed: {}", result.repairs_failed);
+    println!("  Repairs failed: {}", result.repairs_attempted - result.repairs_succeeded);
     println!("  Health Score: {:.2}", orchestrator.health_score());
 
     // Recovery phase
@@ -113,7 +114,6 @@ fn main() {
     let result = checker.check_health(&healthy_index);
     println!("\nHealthy HNSW index:");
     println!("  Status: {:?}", result.status);
-    println!("  Score: {:.2}", result.score);
     println!("  Issues: {}", result.issues.len());
 
     let fragmented_index = IndexHealth {
@@ -128,7 +128,6 @@ fn main() {
     let result = checker.check_health(&fragmented_index);
     println!("\nFragmented IVF-Flat index:");
     println!("  Status: {:?}", result.status);
-    println!("  Score: {:.2}", result.score);
     println!("  Issues: {:?}", result.issues);
     println!("  Recommendations:");
     for rec in &result.recommendations {

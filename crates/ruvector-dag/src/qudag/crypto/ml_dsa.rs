@@ -49,8 +49,8 @@ impl MlDsa65 {
 
     /// Verify a signature
     pub fn verify(
-        pk: &MlDsa65PublicKey,
-        message: &[u8],
+        _pk: &MlDsa65PublicKey,
+        _message: &[u8],
         signature: &Signature,
     ) -> Result<bool, DsaError> {
         // In real implementation, would use ml-dsa verification

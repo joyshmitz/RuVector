@@ -249,13 +249,8 @@ mod tests {
         let mut selector = AttentionSelector::new(mechanisms, SelectorConfig::default());
 
         let mut dag = QueryDag::new();
-        dag.add_node(OperatorNode {
-            id: 0,
-            op_type: OperatorType::Scan,
-            cost: 1.0,
-            selectivity: 1.0,
-            metadata: HashMap::new(),
-        });
+        let node = OperatorNode::new(0, OperatorType::Scan);
+        dag.add_node(node);
 
         let (scores, idx) = selector.forward(&dag).unwrap();
         assert_eq!(scores.scores.len(), 1);

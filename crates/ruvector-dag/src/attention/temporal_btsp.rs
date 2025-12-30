@@ -79,14 +79,16 @@ impl TemporalBTSPAttention {
 
     /// Compute base attention from topology
     fn compute_topology_attention(&self, dag: &QueryDag) -> Vec<f32> {
-        let n = dag.nodes.len();
+        let n = dag.node_count();
         let mut scores = vec![self.config.baseline_attention; n];
 
-        // Simple heuristic: nodes with higher cost and lower selectivity get more attention
-        for (i, node) in dag.nodes.iter().enumerate() {
-            let cost_factor = (node.cost as f32 / 100.0).min(1.0);
-            let selectivity_factor = 1.0 - node.selectivity as f32;
-            scores[i] = 0.5 * cost_factor + 0.5 * selectivity_factor;
+        // Simple heuristic: nodes with higher cost get more attention
+        for node in dag.nodes() {
+            if node.id < n {
+                let cost_factor = (node.estimated_cost as f32 / 100.0).min(1.0);
+                let rows_factor = (node.estimated_rows as f32 / 1000.0).min(1.0);
+                scores[node.id] = 0.5 * cost_factor + 0.5 * rows_factor;
+            }
         }
 
         scores
@@ -180,12 +182,12 @@ impl DagAttentionMechanism for TemporalBTSPAttention {
 
         // Update eligibility traces based on execution feedback
         for (node_id, &exec_time) in execution_times {
-            if *node_id >= dag.nodes.len() {
-                continue;
-            }
+            let node = match dag.get_node(*node_id) {
+                Some(n) => n,
+                None => continue,
+            };
 
-            let node = &dag.nodes[*node_id];
-            let expected_time = node.cost;
+            let expected_time = node.estimated_cost;
 
             // Compute reward signal: positive if faster than expected, negative if slower
             let time_ratio = exec_time / expected_time.max(0.001);
@@ -208,7 +210,7 @@ impl DagAttentionMechanism for TemporalBTSPAttention {
 
         // Decay traces for nodes that weren't executed
         let executed_nodes: std::collections::HashSet<_> = execution_times.keys().collect();
-        for node_id in 0..dag.nodes.len() {
+        for node_id in 0..dag.node_count() {
             if !executed_nodes.contains(&node_id) {
                 self.update_eligibility(node_id, 0.0);
             }
@@ -261,13 +263,9 @@ mod tests {
 
         let mut dag = QueryDag::new();
         for i in 0..3 {
-            dag.add_node(OperatorNode {
-                id: i,
-                op_type: OperatorType::Scan,
-                cost: 10.0,
-                selectivity: 0.5,
-                metadata: HashMap::new(),
-            });
+            let mut node = OperatorNode::new(i, OperatorType::Scan);
+            node.estimated_cost = 10.0;
+            dag.add_node(node);
         }
 
         // Initial forward pass

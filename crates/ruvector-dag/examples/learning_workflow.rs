@@ -82,11 +82,12 @@ fn main() {
     // Demonstrate metrics
     if let Some(first) = drained.first() {
         println!("\nSample trajectory:");
-        println!("  Query ID: {}", first.query_id());
-        println!("  Mechanism: {}", first.mechanism());
-        println!("  Execution time: {:.2}ms", first.execution_time());
-        println!("  Baseline time: {:.2}ms", first.baseline_time());
-        println!("  Improvement: {:.1}%", first.improvement_percentage());
+        println!("  Query hash: {}", first.query_hash);
+        println!("  Mechanism: {}", first.attention_mechanism);
+        println!("  Execution time: {:.2}ms", first.execution_time_ms);
+        let baseline = first.execution_time_ms / first.improvement_ratio as f64;
+        println!("  Baseline time: {:.2}ms", baseline);
+        println!("  Improvement ratio: {:.3}", first.improvement_ratio);
     }
 
     println!("\n=== Example Complete ===");
@@ -105,8 +106,8 @@ fn create_random_dag(seed: usize) -> QueryDag {
                 OperatorType::SeqScan { table: format!("table_{}", seed) }
             } else {
                 OperatorType::HnswScan {
-                    index_name: format!("idx_{}", seed),
-                    k: 64
+                    index: format!("idx_{}", seed),
+                    ef_search: 64
                 }
             }
         } else if i == node_count - 1 {
@@ -119,7 +120,8 @@ fn create_random_dag(seed: usize) -> QueryDag {
                     predicate: format!("col{} > {}", i, seed * 10)
                 },
                 1 => OperatorType::Sort {
-                    columns: vec![format!("col{}", i)]
+                    keys: vec![format!("col{}", i)],
+                    descending: vec![false]
                 },
                 2 => OperatorType::Limit { count: 10 + (seed * i) },
                 _ => OperatorType::NestedLoopJoin,

@@ -46,3 +46,31 @@ name = "learning_workflow"
 
 [[example]]
 name = "self_healing"
+
+[[example]]
+name = "synthetic_reflex_organism"
+path = "examples/exotic/synthetic_reflex_organism.rs"
+
+[[example]]
+name = "timing_synchronization"
+path = "examples/exotic/timing_synchronization.rs"
+
+[[example]]
+name = "coherence_safety"
+path = "examples/exotic/coherence_safety.rs"
+
+[[example]]
+name = "artificial_instincts"
+path = "examples/exotic/artificial_instincts.rs"
+
+[[example]]
+name = "living_simulation"
+path = "examples/exotic/living_simulation.rs"
+
+[[example]]
+name = "thought_integrity"
+path = "examples/exotic/thought_integrity.rs"
+
+[[example]]
+name = "federated_coherence"
+path = "examples/exotic/federated_coherence.rs"
