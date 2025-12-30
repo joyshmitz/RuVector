@@ -2353,7 +2353,8 @@ hooksCmd.command('init')
       'Bash(rm -rf /)',
       'Bash(sudo rm:*)',
       'Bash(chmod 777:*)',
-      'Bash(:(){ :|:& };:)'
+      'Bash(mkfs:*)',
+      'Bash(dd if=/dev/zero:*)'
     ];
     console.log(chalk.blue('  ✓ Permissions configured (project-specific)'));
   }
@@ -2994,6 +2995,283 @@ hooksCmd.command('import')
       console.error(chalk.red(`❌ Failed to import: ${e.message}`));
       process.exit(1);
     }
+  });
+
+// Pretrain - analyze repo and bootstrap learning with agent swarm
+hooksCmd.command('pretrain')
+  .description('Pretrain intelligence by analyzing the repository with agent swarm')
+  .option('--depth <n>', 'Git history depth to analyze', '100')
+  .option('--workers <n>', 'Number of parallel analysis workers', '4')
+  .option('--skip-git', 'Skip git history analysis')
+  .option('--skip-files', 'Skip file structure analysis')
+  .option('--verbose', 'Show detailed progress')
+  .action(async (opts) => {
+    const { execSync, spawn } = require('child_process');
+    console.log(chalk.bold.cyan('\n🧠 RuVector Pretrain - Repository Intelligence Bootstrap\n'));
+
+    const intel = new Intelligence();
+    const startTime = Date.now();
+    const stats = { files: 0, patterns: 0, memories: 0, coedits: 0 };
+
+    // Agent types for different file patterns
+    const agentMapping = {
+      // Rust
+      '.rs': 'rust-developer',
+      'Cargo.toml': 'rust-developer',
+      'Cargo.lock': 'rust-developer',
+      // JavaScript/TypeScript
+      '.js': 'javascript-developer',
+      '.jsx': 'react-developer',
+      '.ts': 'typescript-developer',
+      '.tsx': 'react-developer',
+      '.mjs': 'javascript-developer',
+      '.cjs': 'javascript-developer',
+      'package.json': 'node-developer',
+      // Python
+      '.py': 'python-developer',
+      'requirements.txt': 'python-developer',
+      'pyproject.toml': 'python-developer',
+      'setup.py': 'python-developer',
+      // Go
+      '.go': 'go-developer',
+      'go.mod': 'go-developer',
+      // Web
+      '.html': 'frontend-developer',
+      '.css': 'frontend-developer',
+      '.scss': 'frontend-developer',
+      '.vue': 'vue-developer',
+      '.svelte': 'svelte-developer',
+      // Config
+      '.json': 'config-specialist',
+      '.yaml': 'config-specialist',
+      '.yml': 'config-specialist',
+      '.toml': 'config-specialist',
+      // Docs
+      '.md': 'documentation-specialist',
+      '.mdx': 'documentation-specialist',
+      // Tests
+      '.test.js': 'test-engineer',
+      '.test.ts': 'test-engineer',
+      '.spec.js': 'test-engineer',
+      '.spec.ts': 'test-engineer',
+      '_test.go': 'test-engineer',
+      '_test.rs': 'test-engineer',
+      // DevOps
+      'Dockerfile': 'devops-engineer',
+      'docker-compose.yml': 'devops-engineer',
+      '.github/workflows': 'cicd-engineer',
+      'Makefile': 'devops-engineer',
+      // SQL
+      '.sql': 'database-specialist',
+    };
+
+    // Phase 1: Analyze file structure
+    if (!opts.skipFiles) {
+      console.log(chalk.yellow('📁 Phase 1: Analyzing file structure...\n'));
+
+      try {
+        // Get all files in repo
+        const files = execSync('git ls-files 2>/dev/null || find . -type f -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./target/*"',
+          { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }).trim().split('\n').filter(f => f);
+
+        const filesByType = {};
+        const dirPatterns = {};
+
+        files.forEach(file => {
+          stats.files++;
+          const ext = path.extname(file);
+          const basename = path.basename(file);
+          const dir = path.dirname(file);
+
+          // Determine agent for this file
+          let agent = 'coder'; // default
+          if (agentMapping[basename]) {
+            agent = agentMapping[basename];
+          } else if (agentMapping[ext]) {
+            agent = agentMapping[ext];
+          } else if (file.includes('.test.') || file.includes('.spec.') || file.includes('_test.')) {
+            agent = 'test-engineer';
+          } else if (file.includes('.github/workflows')) {
+            agent = 'cicd-engineer';
+          }
+
+          // Track file types
+          filesByType[ext] = (filesByType[ext] || 0) + 1;
+
+          // Track directory patterns
+          const parts = dir.split('/');
+          if (parts[0]) {
+            dirPatterns[parts[0]] = dirPatterns[parts[0]] || { count: 0, agents: {} };
+            dirPatterns[parts[0]].count++;
+            dirPatterns[parts[0]].agents[agent] = (dirPatterns[parts[0]].agents[agent] || 0) + 1;
+          }
+
+          // Create Q-learning pattern for this file type
+          const state = `edit:${ext || 'unknown'}`;
+          if (!intel.data.patterns[state]) {
+            intel.data.patterns[state] = {};
+          }
+          intel.data.patterns[state][agent] = (intel.data.patterns[state][agent] || 0) + 0.5;
+          stats.patterns++;
+        });
+
+        // Log summary
+        if (opts.verbose) {
+          console.log(chalk.dim('  File types found:'));
+          Object.entries(filesByType).sort((a, b) => b[1] - a[1]).slice(0, 10).forEach(([ext, count]) => {
+            console.log(chalk.dim(`    ${ext || '(no ext)'}: ${count} files`));
+          });
+        }
+        console.log(chalk.green(`  ✓ Analyzed ${stats.files} files`));
+        console.log(chalk.green(`  ✓ Created ${Object.keys(intel.data.patterns).length} routing patterns`));
+
+      } catch (e) {
+        console.log(chalk.yellow(`  ⚠ File analysis skipped: ${e.message}`));
+      }
+    }
+
+    // Phase 2: Analyze git history for co-edit patterns
+    if (!opts.skipGit) {
+      console.log(chalk.yellow('\n📜 Phase 2: Analyzing git history for co-edit patterns...\n'));
+
+      try {
+        // Get commits with files changed
+        const gitLog = execSync(
+          `git log --name-only --pretty=format:"COMMIT:%H" -n ${opts.depth} 2>/dev/null`,
+          { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
+        );
+
+        const commits = gitLog.split('COMMIT:').filter(c => c.trim());
+        const coEditMap = {};
+
+        commits.forEach(commit => {
+          const lines = commit.trim().split('\n').filter(l => l && !l.startsWith('COMMIT:'));
+          const files = lines.slice(1).filter(f => f.trim()); // Skip the hash
+
+          // Track which files are edited together
+          files.forEach(file1 => {
+            files.forEach(file2 => {
+              if (file1 !== file2) {
+                const key = [file1, file2].sort().join('|');
+                coEditMap[key] = (coEditMap[key] || 0) + 1;
+              }
+            });
+          });
+        });
+
+        // Find strong co-edit patterns (files edited together 3+ times)
+        const strongPatterns = Object.entries(coEditMap)
+          .filter(([, count]) => count >= 3)
+          .sort((a, b) => b[1] - a[1]);
+
+        // Store as sequence patterns
+        strongPatterns.slice(0, 100).forEach(([key, count]) => {
+          const [file1, file2] = key.split('|');
+          if (!intel.data.sequences) intel.data.sequences = {};
+          if (!intel.data.sequences[file1]) intel.data.sequences[file1] = [];
+
+          const existing = intel.data.sequences[file1].find(s => s.file === file2);
+          if (existing) {
+            existing.score += count;
+          } else {
+            intel.data.sequences[file1].push({ file: file2, score: count });
+          }
+          stats.coedits++;
+        });
+
+        console.log(chalk.green(`  ✓ Analyzed ${commits.length} commits`));
+        console.log(chalk.green(`  ✓ Found ${strongPatterns.length} co-edit patterns`));
+
+        if (opts.verbose && strongPatterns.length > 0) {
+          console.log(chalk.dim('  Top co-edit patterns:'));
+          strongPatterns.slice(0, 5).forEach(([key, count]) => {
+            const [f1, f2] = key.split('|');
+            console.log(chalk.dim(`    ${path.basename(f1)} ↔ ${path.basename(f2)}: ${count} times`));
+          });
+        }
+
+      } catch (e) {
+        console.log(chalk.yellow(`  ⚠ Git analysis skipped: ${e.message}`));
+      }
+    }
+
+    // Phase 3: Create vector memories from important files
+    console.log(chalk.yellow('\n💾 Phase 3: Creating vector memories from key files...\n'));
+
+    try {
+      const importantFiles = [
+        'README.md', 'CLAUDE.md', 'package.json', 'Cargo.toml',
+        'pyproject.toml', 'go.mod', '.claude/settings.json'
+      ];
+
+      for (const filename of importantFiles) {
+        const filePath = path.join(process.cwd(), filename);
+        if (fs.existsSync(filePath)) {
+          try {
+            const content = fs.readFileSync(filePath, 'utf-8').slice(0, 2000); // First 2KB
+            intel.data.memories = intel.data.memories || [];
+            intel.data.memories.push({
+              content: `[${filename}] ${content.replace(/\n/g, ' ').slice(0, 500)}`,
+              type: 'project',
+              created: new Date().toISOString(),
+              embedding: intel.simpleEmbed ? intel.simpleEmbed(content) : null
+            });
+            stats.memories++;
+            if (opts.verbose) console.log(chalk.dim(`    ✓ ${filename}`));
+          } catch (e) { /* skip unreadable files */ }
+        }
+      }
+
+      console.log(chalk.green(`  ✓ Created ${stats.memories} memory entries`));
+
+    } catch (e) {
+      console.log(chalk.yellow(`  ⚠ Memory creation skipped: ${e.message}`));
+    }
+
+    // Phase 4: Analyze directory structure for agent recommendations
+    console.log(chalk.yellow('\n🗂️  Phase 4: Building directory-agent mappings...\n'));
+
+    try {
+      const dirs = execSync('find . -type d -maxdepth 2 -not -path "./.git*" -not -path "./node_modules*" -not -path "./target*" 2>/dev/null || echo "."',
+        { encoding: 'utf-8' }).trim().split('\n');
+
+      const dirAgentMap = {};
+      dirs.forEach(dir => {
+        const name = path.basename(dir);
+        // Infer agent from directory name
+        if (['src', 'lib', 'core'].includes(name)) dirAgentMap[dir] = 'coder';
+        else if (['test', 'tests', '__tests__', 'spec'].includes(name)) dirAgentMap[dir] = 'test-engineer';
+        else if (['docs', 'documentation'].includes(name)) dirAgentMap[dir] = 'documentation-specialist';
+        else if (['scripts', 'bin'].includes(name)) dirAgentMap[dir] = 'devops-engineer';
+        else if (['components', 'views', 'pages'].includes(name)) dirAgentMap[dir] = 'frontend-developer';
+        else if (['api', 'routes', 'handlers'].includes(name)) dirAgentMap[dir] = 'backend-developer';
+        else if (['models', 'entities', 'schemas'].includes(name)) dirAgentMap[dir] = 'database-specialist';
+        else if (['.github', '.gitlab', 'ci'].includes(name)) dirAgentMap[dir] = 'cicd-engineer';
+      });
+
+      // Store directory patterns
+      intel.data.dirPatterns = dirAgentMap;
+      console.log(chalk.green(`  ✓ Mapped ${Object.keys(dirAgentMap).length} directories to agents`));
+
+    } catch (e) {
+      console.log(chalk.yellow(`  ⚠ Directory analysis skipped: ${e.message}`));
+    }
+
+    // Save all learning data
+    intel.data.pretrained = {
+      date: new Date().toISOString(),
+      stats: stats
+    };
+    intel.save();
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(chalk.bold.green(`\n✅ Pretrain complete in ${elapsed}s!\n`));
+    console.log(chalk.cyan('Summary:'));
+    console.log(`  📁 ${stats.files} files analyzed`);
+    console.log(`  🧠 ${stats.patterns} agent routing patterns`);
+    console.log(`  🔗 ${stats.coedits} co-edit patterns`);
+    console.log(`  💾 ${stats.memories} memory entries`);
+    console.log(chalk.dim('\nThe intelligence layer will now provide better recommendations.'));
   });
 
 program.parse();
