@@ -1,5 +1,13 @@
 # @ruvector/rudag
 
+[![npm version](https://img.shields.io/npm/v/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag)
+[![npm downloads](https://img.shields.io/npm/dm/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag)
+[![license](https://img.shields.io/npm/l/@ruvector/rudag.svg)](https://github.com/ruvnet/ruvector/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-Rust-orange.svg)](https://webassembly.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-16+-green.svg)](https://nodejs.org/)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@ruvector/rudag)](https://bundlephobia.com/package/@ruvector/rudag)
+
 **Self-learning DAG query optimization with WASM acceleration**
 
 Build, analyze, and optimize Directed Acyclic Graphs (DAGs) in JavaScript/TypeScript with blazing-fast WebAssembly performance and automatic browser persistence.
