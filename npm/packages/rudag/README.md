@@ -177,28 +177,43 @@ const restored = await RuDag.fromJSON(json);
 
 ## CLI Tool
 
+After installing globally or in your project:
+
+```bash
+# If installed globally: npm install -g @ruvector/rudag
+rudag create my-query > my-query.dag
+
+# Or run directly with npx (no install needed)
+npx @ruvector/rudag create my-query > my-query.dag
+```
+
+### Commands
+
 ```bash
 # Create a sample DAG
-npx rudag create my-query > my-query.dag
+rudag create my-query > my-query.dag
 
 # Show DAG information
-npx rudag info my-query.dag
+rudag info my-query.dag
 
 # Print topological sort
-npx rudag topo my-query.dag
+rudag topo my-query.dag
 
 # Find critical path
-npx rudag critical my-query.dag
+rudag critical my-query.dag
 
 # Compute attention scores
-npx rudag attention my-query.dag critical
+rudag attention my-query.dag critical
 
 # Convert between formats
-npx rudag convert my-query.dag my-query.json
-npx rudag convert my-query.json my-query.dag
+rudag convert my-query.dag my-query.json
+rudag convert my-query.json my-query.dag
 
 # JSON output
-npx rudag info my-query.dag --json
+rudag info my-query.dag --json
+
+# Help
+rudag help
 ```
 
 ## Use Cases
