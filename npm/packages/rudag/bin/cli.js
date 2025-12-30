@@ -2,11 +2,15 @@
 
 /**
  * rudag CLI - Command-line interface for DAG operations
+ *
+ * @security File paths are validated to prevent reading arbitrary files
  */
 
-const { RuDag, DagOperator, AttentionMechanism, MemoryStorage } = require('../dist/index.js');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+
+// Lazy load to improve startup time
+let RuDag, DagOperator, AttentionMechanism;
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -17,8 +21,8 @@ rudag - Self-learning DAG query optimization CLI
 Usage: rudag <command> [options]
 
 Commands:
-  create <name>             Create a new DAG
-  load <file>               Load DAG from file
+  create <name>             Create a new DAG and output to stdout
+  load <file>               Load DAG from file (must be .dag or .json)
   info <file>               Show DAG information
   topo <file>               Print topological sort
   critical <file>           Find critical path
@@ -28,14 +32,97 @@ Commands:
 
 Examples:
   rudag create my-query > my-query.dag
-  rudag info my-query.dag
-  rudag critical my-query.dag
-  rudag attention my-query.dag critical
+  rudag info ./data/my-query.dag
+  rudag critical ./queries/query.dag
+  rudag attention query.dag critical
 
 Options:
   --json                    Output in JSON format
   --verbose                 Verbose output
+
+Security:
+  - Only .dag and .json files are allowed
+  - Paths are restricted to current directory and subdirectories
 `;
+
+/**
+ * Validate file path for security
+ * @security Prevents path traversal and restricts to allowed extensions
+ */
+function validateFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('File path is required');
+  }
+
+  // Check extension
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext !== '.dag' && ext !== '.json') {
+    throw new Error(`Invalid file extension: ${ext}. Only .dag and .json files are allowed.`);
+  }
+
+  // Resolve to absolute path
+  const resolved = path.resolve(filePath);
+  const cwd = process.cwd();
+
+  // Ensure path is within current directory (prevents traversal)
+  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+    // Allow absolute paths within cwd or relative paths
+    const normalized = path.normalize(filePath);
+    if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+      // Check if absolute path is within cwd
+      if (!resolved.startsWith(cwd)) {
+        throw new Error('Access denied: file path must be within current directory');
+      }
+    }
+  }
+
+  // Additional check: no null bytes
+  if (filePath.includes('\0')) {
+    throw new Error('Invalid file path: contains null bytes');
+  }
+
+  return resolved;
+}
+
+/**
+ * Validate output file path
+ */
+function validateOutputPath(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('Output file path is required');
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext !== '.dag' && ext !== '.json') {
+    throw new Error(`Invalid output extension: ${ext}. Only .dag and .json files are allowed.`);
+  }
+
+  const resolved = path.resolve(filePath);
+  const cwd = process.cwd();
+
+  // Must be within current directory
+  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+    throw new Error('Access denied: output path must be within current directory');
+  }
+
+  if (filePath.includes('\0')) {
+    throw new Error('Invalid file path: contains null bytes');
+  }
+
+  return resolved;
+}
+
+/**
+ * Lazy load dependencies
+ */
+async function loadDependencies() {
+  if (!RuDag) {
+    const mod = require('../dist/index.js');
+    RuDag = mod.RuDag;
+    DagOperator = mod.DagOperator;
+    AttentionMechanism = mod.AttentionMechanism;
+  }
+}
 
 async function main() {
   if (!command || command === 'help' || command === '--help') {
@@ -47,9 +134,17 @@ async function main() {
   const verbose = args.includes('--verbose');
 
   try {
+    await loadDependencies();
+
     switch (command) {
       case 'create': {
         const name = args[1] || 'untitled';
+
+        // Validate name (alphanumeric only)
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+          throw new Error('Invalid name: must be alphanumeric with dashes/underscores only');
+        }
+
         const dag = new RuDag({ name, storage: null, autoSave: false });
         await dag.init();
 
@@ -67,14 +162,16 @@ async function main() {
           const bytes = dag.toBytes();
           process.stdout.write(Buffer.from(bytes));
         }
+
+        dag.dispose();
         break;
       }
 
       case 'load': {
-        const file = args[1];
-        if (!file) {
-          console.error('Error: No file specified');
-          process.exit(1);
+        const file = validateFilePath(args[1]);
+
+        if (!fs.existsSync(file)) {
+          throw new Error(`File not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(file);
@@ -87,14 +184,15 @@ async function main() {
         }
 
         console.log(`Loaded DAG with ${dag.nodeCount} nodes and ${dag.edgeCount} edges`);
+        dag.dispose();
         break;
       }
 
       case 'info': {
-        const file = args[1];
-        if (!file) {
-          console.error('Error: No file specified');
-          process.exit(1);
+        const file = validateFilePath(args[1]);
+
+        if (!fs.existsSync(file)) {
+          throw new Error(`File not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(file);
@@ -106,11 +204,12 @@ async function main() {
           dag = await RuDag.fromBytes(new Uint8Array(data), { storage: null });
         }
 
+        const critPath = dag.criticalPath();
         const info = {
-          file,
+          file: args[1],
           nodes: dag.nodeCount,
           edges: dag.edgeCount,
-          criticalPath: dag.criticalPath(),
+          criticalPath: critPath,
         };
 
         if (isJson) {
@@ -122,14 +221,16 @@ async function main() {
           console.log(`Critical Path: ${info.criticalPath.path.join(' -> ')}`);
           console.log(`Total Cost: ${info.criticalPath.cost}`);
         }
+
+        dag.dispose();
         break;
       }
 
       case 'topo': {
-        const file = args[1];
-        if (!file) {
-          console.error('Error: No file specified');
-          process.exit(1);
+        const file = validateFilePath(args[1]);
+
+        if (!fs.existsSync(file)) {
+          throw new Error(`File not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(file);
@@ -148,14 +249,16 @@ async function main() {
         } else {
           console.log('Topological order:', topo.join(' -> '));
         }
+
+        dag.dispose();
         break;
       }
 
       case 'critical': {
-        const file = args[1];
-        if (!file) {
-          console.error('Error: No file specified');
-          process.exit(1);
+        const file = validateFilePath(args[1]);
+
+        if (!fs.existsSync(file)) {
+          throw new Error(`File not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(file);
@@ -175,16 +278,17 @@ async function main() {
           console.log('Critical Path:', result.path.join(' -> '));
           console.log('Total Cost:', result.cost);
         }
+
+        dag.dispose();
         break;
       }
 
       case 'attention': {
-        const file = args[1];
+        const file = validateFilePath(args[1]);
         const type = args[2] || 'critical';
 
-        if (!file) {
-          console.error('Error: No file specified');
-          process.exit(1);
+        if (!fs.existsSync(file)) {
+          throw new Error(`File not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(file);
@@ -210,8 +314,8 @@ async function main() {
             mechanism = AttentionMechanism.UNIFORM;
             break;
           default:
-            console.error(`Unknown attention type: ${type}`);
-            process.exit(1);
+            dag.dispose();
+            throw new Error(`Unknown attention type: ${type}. Use: topo, critical, or uniform`);
         }
 
         const scores = dag.attention(mechanism);
@@ -224,16 +328,17 @@ async function main() {
             console.log(`  Node ${i}: ${score.toFixed(4)}`);
           });
         }
+
+        dag.dispose();
         break;
       }
 
       case 'convert': {
-        const inFile = args[1];
-        const outFile = args[2];
+        const inFile = validateFilePath(args[1]);
+        const outFile = validateOutputPath(args[2]);
 
-        if (!inFile || !outFile) {
-          console.error('Error: Input and output files required');
-          process.exit(1);
+        if (!fs.existsSync(inFile)) {
+          throw new Error(`Input file not found: ${args[1]}`);
         }
 
         const data = fs.readFileSync(inFile);
@@ -251,7 +356,8 @@ async function main() {
           fs.writeFileSync(outFile, Buffer.from(dag.toBytes()));
         }
 
-        console.log(`Converted ${inFile} -> ${outFile}`);
+        console.log(`Converted ${args[1]} -> ${args[2]}`);
+        dag.dispose();
         break;
       }
 
