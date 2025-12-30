@@ -428,6 +428,36 @@ let (value, cut_edges) = mincut.compute();
 // Updates in subpolynomial time as edges change
 ```
 
+### Self-Learning Query DAG (ruvector-dag)
+
+| Crate | Description | crates.io |
+|-------|-------------|-----------|
+| [ruvector-dag](./crates/ruvector-dag) | Neural self-learning DAG for automatic query optimization | [![crates.io](https://img.shields.io/crates/v/ruvector-dag.svg)](https://crates.io/crates/ruvector-dag) |
+| [ruvector-dag-wasm](./crates/ruvector-dag-wasm) | WASM bindings for browser DAG optimization (58KB gzipped) | [![crates.io](https://img.shields.io/crates/v/ruvector-dag-wasm.svg)](https://crates.io/crates/ruvector-dag-wasm) |
+
+**Make your queries faster automatically.** RuVector DAG learns from every query execution and continuously optimizes performance—no manual tuning required.
+
+- **7 Attention Mechanisms**: Automatically selects the best strategy (Topological, Causal Cone, Critical Path, MinCut Gated, etc.)
+- **SONA Learning**: Self-Optimizing Neural Architecture adapts in <100μs per query
+- **MinCut Control**: Rising "tension" triggers automatic strategy switching and predictive healing
+- **50-80% Latency Reduction**: Queries improve over time without code changes
+
+```rust
+use ruvector_dag::{QueryDag, OperatorNode};
+use ruvector_dag::attention::{AttentionSelector, SelectionPolicy};
+
+let mut dag = QueryDag::new();
+let scan = dag.add_node(OperatorNode::hnsw_scan(0, "vectors_idx", 64));
+let filter = dag.add_node(OperatorNode::filter(1, "score > 0.5"));
+dag.add_edge(scan, filter).unwrap();
+
+// System learns which attention mechanism works best
+let selector = AttentionSelector::new();
+let scores = selector.select_and_apply(SelectionPolicy::Adaptive, &dag)?;
+```
+
+See [ruvector-dag README](./crates/ruvector-dag/README.md) for full documentation.
+
 ### Standalone Vector Database (rvLite)
 
 | Crate | Description | crates.io |
