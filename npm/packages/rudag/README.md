@@ -14,6 +14,14 @@
 
 rudag answers these questions instantly. It's a **Directed Acyclic Graph (DAG)** library that helps you manage dependencies, find bottlenecks, and optimize execution — all with self-learning intelligence that gets smarter over time.
 
+
+## Installation
+
+```bash
+npm install @ruvector/rudag
+```
+
+
 ```typescript
 // 3 lines to find your bottleneck
 const dag = new RuDag({ name: 'my-pipeline' });
@@ -73,6 +81,36 @@ You have tasks with dependencies. **Task C** needs **A** and **B** to finish fir
 | Hard to find bottlenecks | **Attention scores** highlight important nodes |
 | Complex setup | `npm install` and go |
 
+
+## Comparison with Alternatives
+
+| Feature | rudag | graphlib | dagre | d3-dag |
+|---------|-------|----------|-------|--------|
+| **Performance** | ⚡ WASM (10-100x faster) | JS | JS | JS |
+| **Critical Path** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+| **Attention/Scoring** | ✅ ML-inspired | ❌ | ❌ | ❌ |
+| **Cycle Detection** | ✅ Automatic | ✅ | ✅ | ✅ |
+| **Topological Sort** | ✅ | ✅ | ✅ | ✅ |
+| **Persistence** | ✅ IndexedDB + Files | ❌ | ❌ | ❌ |
+| **Browser + Node.js** | ✅ Both | ✅ Both | ✅ Both | ⚠️ Browser |
+| **TypeScript** | ✅ Native | ⚠️ @types | ⚠️ @types | ✅ Native |
+| **Bundle Size** | ~50KB (WASM) | ~15KB | ~30KB | ~20KB |
+| **Self-Learning** | ✅ | ❌ | ❌ | ❌ |
+| **Serialization** | ✅ JSON + Binary | ✅ JSON | ✅ JSON | ❌ |
+| **CLI Tool** | ✅ | ❌ | ❌ | ❌ |
+
+### When to Use What
+
+| Use Case | Recommendation |
+|----------|----------------|
+| **Query optimization / Task scheduling** | **rudag** - Critical path + attention scoring |
+| **Graph visualization / Layout** | **dagre** - Designed for layout algorithms |
+| **Simple dependency tracking** | **graphlib** - Lightweight, no WASM overhead |
+| **D3 integration** | **d3-dag** - Native D3 compatibility |
+| **Large graphs (10k+ nodes)** | **rudag** - WASM performance advantage |
+| **Offline-first apps** | **rudag** - Built-in persistence |
+
+
 ## Key Capabilities
 
 ### 🧠 Self-Learning Optimization
@@ -105,11 +143,6 @@ Your DAGs automatically save to **IndexedDB** in browsers or **files** in Node.j
 ### 🔌 Serialization & Interop
 Export to **JSON** (human-readable) or **binary** (compact, fast). Share DAGs between services, store in databases, or send over the network.
 
-## Installation
-
-```bash
-npm install @ruvector/rudag
-```
 
 ## Quick Start
 
@@ -660,34 +693,6 @@ async function executeWithRxJS(dag: RuDag) {
 - Edge 79+
 
 Requires WebAssembly support.
-
-## Comparison with Alternatives
-
-| Feature | rudag | graphlib | dagre | d3-dag |
-|---------|-------|----------|-------|--------|
-| **Performance** | ⚡ WASM (10-100x faster) | JS | JS | JS |
-| **Critical Path** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Attention/Scoring** | ✅ ML-inspired | ❌ | ❌ | ❌ |
-| **Cycle Detection** | ✅ Automatic | ✅ | ✅ | ✅ |
-| **Topological Sort** | ✅ | ✅ | ✅ | ✅ |
-| **Persistence** | ✅ IndexedDB + Files | ❌ | ❌ | ❌ |
-| **Browser + Node.js** | ✅ Both | ✅ Both | ✅ Both | ⚠️ Browser |
-| **TypeScript** | ✅ Native | ⚠️ @types | ⚠️ @types | ✅ Native |
-| **Bundle Size** | ~50KB (WASM) | ~15KB | ~30KB | ~20KB |
-| **Self-Learning** | ✅ | ❌ | ❌ | ❌ |
-| **Serialization** | ✅ JSON + Binary | ✅ JSON | ✅ JSON | ❌ |
-| **CLI Tool** | ✅ | ❌ | ❌ | ❌ |
-
-### When to Use What
-
-| Use Case | Recommendation |
-|----------|----------------|
-| **Query optimization / Task scheduling** | **rudag** - Critical path + attention scoring |
-| **Graph visualization / Layout** | **dagre** - Designed for layout algorithms |
-| **Simple dependency tracking** | **graphlib** - Lightweight, no WASM overhead |
-| **D3 integration** | **d3-dag** - Native D3 compatibility |
-| **Large graphs (10k+ nodes)** | **rudag** - WASM performance advantage |
-| **Offline-first apps** | **rudag** - Built-in persistence |
 
 ## API Reference
 
