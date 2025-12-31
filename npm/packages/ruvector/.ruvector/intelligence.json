@@ -1,0 +1,125 @@
+{
+  "learning": {
+    "qTables": {
+      "typescript": {
+        "coder": 0.1
+      }
+    },
+    "qTables2": {
+      "typescript": {}
+    },
+    "criticValues": {},
+    "trajectories": [],
+    "stats": {
+      "q-learning": {
+        "algorithm": "q-learning",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "sarsa": {
+        "algorithm": "sarsa",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "double-q": {
+        "algorithm": "double-q",
+        "updates": 1,
+        "avgReward": 1,
+        "convergenceScore": 0.5,
+        "lastUpdate": 1767193942801
+      },
+      "actor-critic": {
+        "algorithm": "actor-critic",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "ppo": {
+        "algorithm": "ppo",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "decision-transformer": {
+        "algorithm": "decision-transformer",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "monte-carlo": {
+        "algorithm": "monte-carlo",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "td-lambda": {
+        "algorithm": "td-lambda",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      },
+      "dqn": {
+        "algorithm": "dqn",
+        "updates": 0,
+        "avgReward": 0,
+        "convergenceScore": 0,
+        "lastUpdate": 1767193933062
+      }
+    },
+    "configs": {
+      "agent-routing": {
+        "algorithm": "double-q",
+        "learningRate": 0.1,
+        "discountFactor": 0.95,
+        "epsilon": 0.1
+      },
+      "error-avoidance": {
+        "algorithm": "sarsa",
+        "learningRate": 0.05,
+        "discountFactor": 0.99,
+        "epsilon": 0.05
+      },
+      "confidence-scoring": {
+        "algorithm": "actor-critic",
+        "learningRate": 0.01,
+        "discountFactor": 0.95,
+        "epsilon": 0.1,
+        "entropyCoef": 0.01
+      },
+      "trajectory-learning": {
+        "algorithm": "decision-transformer",
+        "learningRate": 0.001,
+        "discountFactor": 0.99,
+        "epsilon": 0,
+        "sequenceLength": 20
+      },
+      "context-ranking": {
+        "algorithm": "ppo",
+        "learningRate": 0.0003,
+        "discountFactor": 0.99,
+        "epsilon": 0.2,
+        "clipRange": 0.2,
+        "entropyCoef": 0.01
+      },
+      "memory-recall": {
+        "algorithm": "td-lambda",
+        "learningRate": 0.1,
+        "discountFactor": 0.9,
+        "epsilon": 0.1,
+        "lambda": 0.8
+      }
+    },
+    "rewardHistory": [
+      1
+    ]
+  }
+}

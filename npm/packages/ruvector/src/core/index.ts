@@ -20,6 +20,8 @@ export * from './ast-parser';
 export * from './diff-embeddings';
 export * from './coverage-router';
 export * from './graph-algorithms';
+export * from './tensor-compress';
+export * from './learning-engine';
 
 // Re-export default objects for convenience
 export { default as gnnWrapper } from './gnn-wrapper';
@@ -37,3 +39,7 @@ export { default as CodeParser } from './ast-parser';
 
 // Alias for backward compatibility
 export { CodeParser as ASTParser } from './ast-parser';
+
+// New v2.1 modules
+export { default as TensorCompress } from './tensor-compress';
+export { default as LearningEngine } from './learning-engine';

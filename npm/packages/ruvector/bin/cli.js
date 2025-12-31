@@ -3917,6 +3917,449 @@ hooksCmd.command('route-enhanced')
   });
 
 // ============================================
+// LEARNING & COMPRESSION COMMANDS (v2.1)
+// ============================================
+
+let TensorCompressClass = null;
+let LearningEngineClass = null;
+
+function loadLearningModules() {
+  if (LearningEngineClass) return true;
+  try {
+    const core = require('../dist/core/index.js');
+    TensorCompressClass = core.TensorCompress;
+    LearningEngineClass = core.LearningEngine;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Learning algorithm configuration
+hooksCmd.command('learning-config')
+  .description('Configure learning algorithms for different tasks')
+  .option('-t, --task <type>', 'Task type (agent-routing, error-avoidance, confidence-scoring, trajectory-learning, context-ranking, memory-recall)')
+  .option('-a, --algorithm <alg>', 'Algorithm (q-learning, sarsa, double-q, actor-critic, ppo, decision-transformer, monte-carlo, td-lambda, dqn)')
+  .option('-l, --learning-rate <rate>', 'Learning rate (0.0-1.0)', parseFloat)
+  .option('-g, --gamma <gamma>', 'Discount factor (0.0-1.0)', parseFloat)
+  .option('-e, --epsilon <epsilon>', 'Exploration rate (0.0-1.0)', parseFloat)
+  .option('--lambda <lambda>', 'Lambda for TD(λ)', parseFloat)
+  .option('--list', 'List all algorithms and their descriptions')
+  .option('--show', 'Show current configuration')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Learning modules not available. Run npm run build.' }));
+      return;
+    }
+
+    if (opts.list) {
+      const algorithms = LearningEngineClass.getAlgorithms();
+      console.log(JSON.stringify({
+        success: true,
+        algorithms: algorithms.map(a => ({
+          name: a.algorithm,
+          description: a.description,
+          bestFor: a.bestFor
+        }))
+      }));
+      return;
+    }
+
+    // Load existing intelligence data
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const engine = new LearningEngineClass();
+    if (data.learning) {
+      engine.import(data.learning);
+    }
+
+    if (opts.show) {
+      const tasks = ['agent-routing', 'error-avoidance', 'confidence-scoring', 'trajectory-learning', 'context-ranking', 'memory-recall'];
+      const configs = {};
+      for (const task of tasks) {
+        configs[task] = engine.getConfig(task);
+      }
+      console.log(JSON.stringify({ success: true, configs }));
+      return;
+    }
+
+    if (!opts.task) {
+      console.log(JSON.stringify({ success: false, error: 'Specify --task or use --list/--show' }));
+      return;
+    }
+
+    const config = {};
+    if (opts.algorithm) config.algorithm = opts.algorithm;
+    if (opts.learningRate !== undefined) config.learningRate = opts.learningRate;
+    if (opts.gamma !== undefined) config.discountFactor = opts.gamma;
+    if (opts.epsilon !== undefined) config.epsilon = opts.epsilon;
+    if (opts.lambda !== undefined) config.lambda = opts.lambda;
+
+    engine.configure(opts.task, config);
+
+    // Save
+    data.learning = engine.export();
+    fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    console.log(JSON.stringify({
+      success: true,
+      task: opts.task,
+      config: engine.getConfig(opts.task)
+    }));
+  });
+
+// Learning statistics
+hooksCmd.command('learning-stats')
+  .description('Show learning algorithm statistics and performance')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Learning modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const engine = new LearningEngineClass();
+    if (data.learning) {
+      engine.import(data.learning);
+    }
+
+    const summary = engine.getStatsSummary();
+
+    if (opts.json) {
+      console.log(JSON.stringify({ success: true, ...summary }));
+    } else {
+      console.log(chalk.bold.cyan('\n📊 Learning Statistics\n'));
+      console.log(`  Best Algorithm: ${chalk.green(summary.bestAlgorithm)}`);
+      console.log(`  Total Updates:  ${summary.totalUpdates}`);
+      console.log(`  Avg Reward:     ${summary.avgReward.toFixed(4)}`);
+
+      if (summary.algorithms.length > 0) {
+        console.log(chalk.bold('\n  Algorithm Performance:'));
+        for (const alg of summary.algorithms) {
+          console.log(`    ${alg.algorithm.padEnd(20)} updates: ${String(alg.updates).padStart(6)}  avgReward: ${alg.avgReward.toFixed(3).padStart(8)}  convergence: ${alg.convergenceScore.toFixed(3)}`);
+        }
+      }
+      console.log('');
+    }
+  });
+
+// Manual learning update
+hooksCmd.command('learning-update')
+  .description('Manually record a learning experience')
+  .requiredOption('-t, --task <type>', 'Task type')
+  .requiredOption('-s, --state <state>', 'Current state')
+  .requiredOption('-a, --action <action>', 'Action taken')
+  .requiredOption('-r, --reward <reward>', 'Reward received', parseFloat)
+  .option('-n, --next-state <state>', 'Next state')
+  .option('-d, --done', 'Episode is done')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Learning modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const engine = new LearningEngineClass();
+    if (data.learning) {
+      engine.import(data.learning);
+    }
+
+    const experience = {
+      state: opts.state,
+      action: opts.action,
+      reward: opts.reward,
+      nextState: opts.nextState || opts.state,
+      done: opts.done || false,
+      timestamp: Date.now()
+    };
+
+    const delta = engine.update(opts.task, experience);
+
+    // Save
+    data.learning = engine.export();
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    console.log(JSON.stringify({
+      success: true,
+      task: opts.task,
+      experience,
+      delta,
+      algorithm: engine.getConfig(opts.task).algorithm
+    }));
+  });
+
+// TensorCompress commands
+hooksCmd.command('compress')
+  .description('Compress pattern storage using TensorCompress')
+  .option('--force', 'Force recompression of all patterns')
+  .option('--stats', 'Show compression statistics only')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Compression modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const compress = new TensorCompressClass({
+      autoCompress: false,
+      hotThreshold: 0.8,
+      warmThreshold: 0.4,
+      coolThreshold: 0.1,
+      coldThreshold: 0.01
+    });
+
+    // Import existing compressed data
+    if (data.compressedPatterns) {
+      compress.import(data.compressedPatterns);
+    }
+
+    // Also compress any uncompressed patterns from the regular patterns
+    if (data.patterns && !data.compressedPatterns) {
+      for (const [key, value] of Object.entries(data.patterns)) {
+        if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'number') {
+          compress.store(key, value);
+        }
+      }
+    }
+
+    if (opts.stats) {
+      const stats = compress.getStats();
+      console.log(JSON.stringify({ success: true, ...stats }));
+      return;
+    }
+
+    // Recompress based on access patterns
+    const stats = compress.recompressAll();
+
+    // Save compressed data
+    data.compressedPatterns = compress.export();
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    console.log(JSON.stringify({
+      success: true,
+      message: 'Compression complete',
+      ...stats
+    }));
+  });
+
+hooksCmd.command('compress-stats')
+  .description('Show TensorCompress statistics')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Compression modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const compress = new TensorCompressClass({ autoCompress: false });
+    if (data.compressedPatterns) {
+      compress.import(data.compressedPatterns);
+    }
+
+    const stats = compress.getStats();
+
+    if (opts.json) {
+      console.log(JSON.stringify({ success: true, ...stats }));
+    } else {
+      console.log(chalk.bold.cyan('\n📦 TensorCompress Statistics\n'));
+      console.log(`  Total Tensors:    ${stats.totalTensors}`);
+      console.log(`  Original Size:    ${(stats.originalBytes / 1024).toFixed(2)} KB`);
+      console.log(`  Compressed Size:  ${(stats.compressedBytes / 1024).toFixed(2)} KB`);
+      console.log(`  Savings:          ${chalk.green(stats.savingsPercent.toFixed(1) + '%')}`);
+
+      console.log(chalk.bold('\n  By Compression Level:'));
+      console.log(`    none (hot):     ${stats.byLevel.none}`);
+      console.log(`    half (warm):    ${stats.byLevel.half}`);
+      console.log(`    pq8 (cool):     ${stats.byLevel.pq8}`);
+      console.log(`    pq4 (cold):     ${stats.byLevel.pq4}`);
+      console.log(`    binary (archive): ${stats.byLevel.binary}`);
+      console.log('');
+    }
+  });
+
+// Store embedding with compression
+hooksCmd.command('compress-store')
+  .description('Store an embedding with adaptive compression')
+  .requiredOption('-k, --key <key>', 'Storage key')
+  .requiredOption('-v, --vector <vector>', 'Vector as JSON array')
+  .option('-l, --level <level>', 'Compression level (none, half, pq8, pq4, binary)')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Compression modules not available' }));
+      return;
+    }
+
+    let vector;
+    try {
+      vector = JSON.parse(opts.vector);
+    } catch (e) {
+      console.log(JSON.stringify({ success: false, error: 'Invalid vector JSON' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const compress = new TensorCompressClass({ autoCompress: false });
+    if (data.compressedPatterns) {
+      compress.import(data.compressedPatterns);
+    }
+
+    compress.store(opts.key, vector, opts.level);
+
+    data.compressedPatterns = compress.export();
+    fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    const stats = compress.getStats();
+    console.log(JSON.stringify({
+      success: true,
+      key: opts.key,
+      level: opts.level || 'auto',
+      originalDim: vector.length,
+      totalTensors: stats.totalTensors
+    }));
+  });
+
+// Retrieve compressed embedding
+hooksCmd.command('compress-get')
+  .description('Retrieve a compressed embedding')
+  .requiredOption('-k, --key <key>', 'Storage key')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Compression modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const compress = new TensorCompressClass({ autoCompress: false });
+    if (data.compressedPatterns) {
+      compress.import(data.compressedPatterns);
+    }
+
+    const vector = compress.get(opts.key);
+    if (!vector) {
+      console.log(JSON.stringify({ success: false, error: 'Key not found' }));
+      return;
+    }
+
+    console.log(JSON.stringify({
+      success: true,
+      key: opts.key,
+      vector: Array.from(vector),
+      dimension: vector.length
+    }));
+  });
+
+// Combined learning action with best algorithm
+hooksCmd.command('learn')
+  .description('Record learning outcome and get best action recommendation')
+  .requiredOption('-s, --state <state>', 'Current state (e.g., file extension, task type)')
+  .option('-a, --action <action>', 'Action taken')
+  .option('-r, --reward <reward>', 'Reward (-1 to 1)', parseFloat)
+  .option('--actions <actions>', 'Available actions (comma-separated)')
+  .option('-t, --task <type>', 'Task type', 'agent-routing')
+  .action(async (opts) => {
+    if (!loadLearningModules()) {
+      console.log(JSON.stringify({ success: false, error: 'Learning modules not available' }));
+      return;
+    }
+
+    const dataPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
+    let data = {};
+    try {
+      if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      }
+    } catch (e) {}
+
+    const engine = new LearningEngineClass();
+    if (data.learning) {
+      engine.import(data.learning);
+    }
+
+    let result = { success: true };
+
+    // If action and reward provided, record the experience
+    if (opts.action && opts.reward !== undefined) {
+      const experience = {
+        state: opts.state,
+        action: opts.action,
+        reward: opts.reward,
+        nextState: opts.state,
+        done: true,
+        timestamp: Date.now()
+      };
+
+      const delta = engine.update(opts.task, experience);
+      result.recorded = { experience, delta, algorithm: engine.getConfig(opts.task).algorithm };
+    }
+
+    // Get best action recommendation
+    if (opts.actions) {
+      const actions = opts.actions.split(',').map(a => a.trim());
+      const best = engine.getBestAction(opts.task, opts.state, actions);
+      result.recommendation = best;
+    }
+
+    // Save
+    data.learning = engine.export();
+    fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    console.log(JSON.stringify(result));
+  });
+
+// ============================================
 // END NEW CAPABILITY COMMANDS
 // ============================================
 

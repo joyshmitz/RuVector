@@ -737,6 +737,124 @@ const TOOLS = [
       properties: {},
       required: []
     }
+  },
+  // Learning Engine Tools (v2.1)
+  {
+    name: 'hooks_learning_config',
+    description: 'Configure learning algorithms for different tasks. Supports 9 algorithms: q-learning, sarsa, double-q, actor-critic, ppo, decision-transformer, monte-carlo, td-lambda, dqn',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: {
+          type: 'string',
+          description: 'Task type: agent-routing, error-avoidance, confidence-scoring, trajectory-learning, context-ranking, memory-recall',
+          enum: ['agent-routing', 'error-avoidance', 'confidence-scoring', 'trajectory-learning', 'context-ranking', 'memory-recall']
+        },
+        algorithm: {
+          type: 'string',
+          description: 'Learning algorithm',
+          enum: ['q-learning', 'sarsa', 'double-q', 'actor-critic', 'ppo', 'decision-transformer', 'monte-carlo', 'td-lambda', 'dqn']
+        },
+        learningRate: { type: 'number', description: 'Learning rate (0.0-1.0)' },
+        discountFactor: { type: 'number', description: 'Discount factor gamma (0.0-1.0)' },
+        epsilon: { type: 'number', description: 'Exploration rate (0.0-1.0)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_learning_stats',
+    description: 'Get learning algorithm statistics and performance metrics',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'hooks_learning_update',
+    description: 'Record a learning experience for a specific task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Task type' },
+        state: { type: 'string', description: 'Current state' },
+        action: { type: 'string', description: 'Action taken' },
+        reward: { type: 'number', description: 'Reward received (-1 to 1)' },
+        nextState: { type: 'string', description: 'Next state (optional)' },
+        done: { type: 'boolean', description: 'Episode is done' }
+      },
+      required: ['task', 'state', 'action', 'reward']
+    }
+  },
+  {
+    name: 'hooks_learn',
+    description: 'Combined learning action: record experience and get best action recommendation',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        state: { type: 'string', description: 'Current state' },
+        action: { type: 'string', description: 'Action taken (optional)' },
+        reward: { type: 'number', description: 'Reward (-1 to 1, optional)' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Available actions for recommendation' },
+        task: { type: 'string', description: 'Task type', default: 'agent-routing' }
+      },
+      required: ['state']
+    }
+  },
+  {
+    name: 'hooks_algorithms_list',
+    description: 'List all available learning algorithms with descriptions',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  // TensorCompress Tools
+  {
+    name: 'hooks_compress',
+    description: 'Compress pattern storage using TensorCompress. Provides up to 10x memory savings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        force: { type: 'boolean', description: 'Force recompression of all patterns' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_compress_stats',
+    description: 'Get TensorCompress statistics: memory savings, compression levels, tensor counts',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'hooks_compress_store',
+    description: 'Store an embedding with adaptive compression',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Storage key' },
+        vector: { type: 'array', items: { type: 'number' }, description: 'Vector to store' },
+        level: { type: 'string', description: 'Compression level', enum: ['none', 'half', 'pq8', 'pq4', 'binary'] }
+      },
+      required: ['key', 'vector']
+    }
+  },
+  {
+    name: 'hooks_compress_get',
+    description: 'Retrieve a compressed embedding',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Storage key' }
+      },
+      required: ['key']
+    }
   }
 ];
 
@@ -1523,6 +1641,225 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           gnnInfo = { available: false, error: 'GNN package not installed' };
         }
         return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...gnnInfo }, null, 2) }] };
+      }
+
+      // Learning Engine Handlers (v2.1)
+      case 'hooks_learning_config': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        if (args.task && args.algorithm) {
+          const config = {};
+          if (args.algorithm) config.algorithm = args.algorithm;
+          if (args.learningRate !== undefined) config.learningRate = args.learningRate;
+          if (args.discountFactor !== undefined) config.discountFactor = args.discountFactor;
+          if (args.epsilon !== undefined) config.epsilon = args.epsilon;
+          engine.configure(args.task, config);
+          intel.learning = engine.export();
+          intel.save();
+        }
+
+        const tasks = ['agent-routing', 'error-avoidance', 'confidence-scoring', 'trajectory-learning', 'context-ranking', 'memory-recall'];
+        const configs = {};
+        for (const task of tasks) {
+          configs[task] = engine.getConfig(task);
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, configs }, null, 2) }] };
+      }
+
+      case 'hooks_learning_stats': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const summary = engine.getStatsSummary();
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...summary }, null, 2) }] };
+      }
+
+      case 'hooks_learning_update': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const experience = {
+          state: args.state,
+          action: args.action,
+          reward: args.reward,
+          nextState: args.nextState || args.state,
+          done: args.done || false,
+          timestamp: Date.now()
+        };
+
+        const delta = engine.update(args.task, experience);
+        intel.learning = engine.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          task: args.task,
+          experience,
+          delta,
+          algorithm: engine.getConfig(args.task).algorithm
+        }, null, 2) }] };
+      }
+
+      case 'hooks_learn': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const task = args.task || 'agent-routing';
+        let result = { success: true };
+
+        if (args.action && args.reward !== undefined) {
+          const experience = {
+            state: args.state,
+            action: args.action,
+            reward: args.reward,
+            nextState: args.state,
+            done: true,
+            timestamp: Date.now()
+          };
+          const delta = engine.update(task, experience);
+          result.recorded = { experience, delta, algorithm: engine.getConfig(task).algorithm };
+        }
+
+        if (args.actions && args.actions.length > 0) {
+          const best = engine.getBestAction(task, args.state, args.actions);
+          result.recommendation = best;
+        }
+
+        intel.learning = engine.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'hooks_algorithms_list': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const algorithms = LearningEngine.getAlgorithms();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          algorithms: algorithms.map(a => ({
+            name: a.algorithm,
+            description: a.description,
+            bestFor: a.bestFor
+          }))
+        }, null, 2) }] };
+      }
+
+      // TensorCompress Handlers
+      case 'hooks_compress': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const stats = compress.recompressAll();
+        intel.compressedPatterns = compress.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'Compression complete', ...stats }, null, 2) }] };
+      }
+
+      case 'hooks_compress_stats': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const stats = compress.getStats();
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...stats }, null, 2) }] };
+      }
+
+      case 'hooks_compress_store': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        compress.store(args.key, args.vector, args.level);
+        intel.compressedPatterns = compress.export();
+        intel.save();
+
+        const stats = compress.getStats();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          key: args.key,
+          level: args.level || 'auto',
+          originalDim: args.vector.length,
+          totalTensors: stats.totalTensors
+        }, null, 2) }] };
+      }
+
+      case 'hooks_compress_get': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const vector = compress.get(args.key);
+        if (!vector) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Key not found' }) }] };
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          key: args.key,
+          vector: Array.from(vector),
+          dimension: vector.length
+        }, null, 2) }] };
       }
 
       default:
