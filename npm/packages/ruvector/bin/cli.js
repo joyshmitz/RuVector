@@ -2093,7 +2093,20 @@ program
 
 // ============================================
 // Self-Learning Intelligence Hooks
+// Full RuVector Stack: VectorDB + SONA + Attention
 // ============================================
+
+// Try to load the full IntelligenceEngine, fallback to simple implementation
+let IntelligenceEngine = null;
+let engineAvailable = false;
+
+try {
+  const core = require('../dist/core/intelligence-engine.js');
+  IntelligenceEngine = core.IntelligenceEngine || core.default;
+  engineAvailable = true;
+} catch (e) {
+  // IntelligenceEngine not available, use fallback
+}
 
 class Intelligence {
   constructor() {
@@ -2101,6 +2114,77 @@ class Intelligence {
     this.data = this.load();
     this.alpha = 0.1;
     this.lastEditedFile = null;
+    this.sessionStartTime = null;
+
+    // Initialize full RuVector engine if available
+    this.engine = null;
+    if (engineAvailable && IntelligenceEngine) {
+      try {
+        this.engine = new IntelligenceEngine({
+          embeddingDim: 256,
+          maxMemories: 100000,
+          maxEpisodes: 50000,
+          enableSona: true,
+          enableAttention: true,
+          learningRate: this.alpha,
+        });
+        // Import existing data into engine
+        if (this.data) {
+          this.engine.import(this.convertLegacyData(this.data), true);
+        }
+      } catch (e) {
+        // Engine initialization failed, use fallback
+        this.engine = null;
+      }
+    }
+  }
+
+  // Convert legacy data format to new engine format
+  convertLegacyData(data) {
+    const converted = {
+      memories: [],
+      routingPatterns: {},
+      errorPatterns: data.errors || {},
+      coEditPatterns: {},
+      agentMappings: {},
+    };
+
+    // Convert memories
+    if (data.memories) {
+      converted.memories = data.memories.map(m => ({
+        id: m.id,
+        content: m.content,
+        type: m.memory_type || 'general',
+        embedding: m.embedding || this.embed(m.content),
+        created: m.timestamp ? new Date(m.timestamp * 1000).toISOString() : new Date().toISOString(),
+        accessed: 0,
+      }));
+    }
+
+    // Convert Q-learning patterns to routing patterns
+    if (data.patterns) {
+      for (const [key, value] of Object.entries(data.patterns)) {
+        const [state, action] = key.split('|');
+        if (state && action) {
+          if (!converted.routingPatterns[state]) {
+            converted.routingPatterns[state] = {};
+          }
+          converted.routingPatterns[state][action] = value.q_value || 0.5;
+        }
+      }
+    }
+
+    // Convert file sequences to co-edit patterns
+    if (data.file_sequences) {
+      for (const seq of data.file_sequences) {
+        if (!converted.coEditPatterns[seq.from_file]) {
+          converted.coEditPatterns[seq.from_file] = {};
+        }
+        converted.coEditPatterns[seq.from_file][seq.to_file] = seq.count;
+      }
+    }
+
+    return converted;
   }
 
   // Prefer project-local storage, fall back to home directory
@@ -2108,19 +2192,9 @@ class Intelligence {
     const projectPath = path.join(process.cwd(), '.ruvector', 'intelligence.json');
     const homePath = path.join(require('os').homedir(), '.ruvector', 'intelligence.json');
 
-    // If project .ruvector exists, use it
-    if (fs.existsSync(path.dirname(projectPath))) {
-      return projectPath;
-    }
-    // If project .claude exists (hooks initialized), prefer project-local
-    if (fs.existsSync(path.join(process.cwd(), '.claude'))) {
-      return projectPath;
-    }
-    // If home .ruvector exists with data, use it
-    if (fs.existsSync(homePath)) {
-      return homePath;
-    }
-    // Default to project-local for new setups
+    if (fs.existsSync(path.dirname(projectPath))) return projectPath;
+    if (fs.existsSync(path.join(process.cwd(), '.claude'))) return projectPath;
+    if (fs.existsSync(homePath)) return homePath;
     return projectPath;
   }
 
@@ -2145,12 +2219,41 @@ class Intelligence {
   save() {
     const dir = path.dirname(this.intelPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    // If engine is available, export its data
+    if (this.engine) {
+      try {
+        const engineData = this.engine.export();
+        // Merge engine data with legacy format for compatibility
+        this.data.patterns = {};
+        for (const [state, actions] of Object.entries(engineData.routingPatterns || {})) {
+          for (const [action, value] of Object.entries(actions)) {
+            this.data.patterns[`${state}|${action}`] = { state, action, q_value: value, visits: 1, last_update: this.now() };
+          }
+        }
+        this.data.stats.total_patterns = Object.keys(this.data.patterns).length;
+        this.data.stats.total_memories = engineData.stats?.totalMemories || this.data.memories.length;
+
+        // Add engine stats
+        this.data.engineStats = engineData.stats;
+      } catch (e) {
+        // Ignore engine export errors
+      }
+    }
+
     fs.writeFileSync(this.intelPath, JSON.stringify(this.data, null, 2));
   }
 
   now() { return Math.floor(Date.now() / 1000); }
 
+  // Use engine embedding if available (256-dim with attention), otherwise fallback (64-dim hash)
   embed(text) {
+    if (this.engine) {
+      try {
+        return this.engine.embed(text);
+      } catch {}
+    }
+    // Fallback: simple 64-dim hash embedding
     const embedding = new Array(64).fill(0);
     for (let i = 0; i < text.length; i++) {
       const idx = (text.charCodeAt(i) + i * 7) % 64;
@@ -2162,19 +2265,66 @@ class Intelligence {
   }
 
   similarity(a, b) {
-    if (a.length !== b.length) return 0;
+    if (!a || !b || a.length !== b.length) return 0;
     const dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
     const normA = Math.sqrt(a.reduce((sum, v) => sum + v * v, 0));
     const normB = Math.sqrt(b.reduce((sum, v) => sum + v * v, 0));
     return normA > 0 && normB > 0 ? dot / (normA * normB) : 0;
   }
 
+  // Memory operations - use engine's VectorDB for semantic search
+  async rememberAsync(memoryType, content, metadata = {}) {
+    if (this.engine) {
+      try {
+        const entry = await this.engine.remember(content, memoryType);
+        // Also store in legacy format for compatibility
+        this.data.memories.push({
+          id: entry.id,
+          memory_type: memoryType,
+          content,
+          embedding: entry.embedding,
+          metadata,
+          timestamp: this.now()
+        });
+        if (this.data.memories.length > 5000) this.data.memories.splice(0, 1000);
+        this.data.stats.total_memories = this.data.memories.length;
+        return entry.id;
+      } catch {}
+    }
+    return this.remember(memoryType, content, metadata);
+  }
+
   remember(memoryType, content, metadata = {}) {
     const id = `mem_${this.now()}`;
-    this.data.memories.push({ id, memory_type: memoryType, content, embedding: this.embed(content), metadata, timestamp: this.now() });
+    const embedding = this.embed(content);
+    this.data.memories.push({ id, memory_type: memoryType, content, embedding, metadata, timestamp: this.now() });
     if (this.data.memories.length > 5000) this.data.memories.splice(0, 1000);
     this.data.stats.total_memories = this.data.memories.length;
+
+    // Also store in engine if available
+    if (this.engine) {
+      this.engine.remember(content, memoryType).catch(() => {});
+    }
+
     return id;
+  }
+
+  async recallAsync(query, topK = 5) {
+    if (this.engine) {
+      try {
+        const results = await this.engine.recall(query, topK);
+        return results.map(r => ({
+          score: r.score || 0,
+          memory: {
+            id: r.id,
+            content: r.content,
+            memory_type: r.type,
+            timestamp: r.created
+          }
+        }));
+      } catch {}
+    }
+    return this.recall(query, topK);
   }
 
   recall(query, topK) {
@@ -2184,6 +2334,7 @@ class Intelligence {
       .sort((a, b) => b.score - a.score).slice(0, topK).map(r => r.memory);
   }
 
+  // Q-learning operations - enhanced with SONA trajectory tracking
   getQ(state, action) {
     const key = `${state}|${action}`;
     return this.data.patterns[key]?.q_value ?? 0;
@@ -2191,12 +2342,19 @@ class Intelligence {
 
   updateQ(state, action, reward) {
     const key = `${state}|${action}`;
-    if (!this.data.patterns[key]) this.data.patterns[key] = { state, action, q_value: 0, visits: 0, last_update: 0 };
+    if (!this.data.patterns[key]) {
+      this.data.patterns[key] = { state, action, q_value: 0, visits: 0, last_update: 0 };
+    }
     const p = this.data.patterns[key];
     p.q_value = p.q_value + this.alpha * (reward - p.q_value);
     p.visits++;
     p.last_update = this.now();
     this.data.stats.total_patterns = Object.keys(this.data.patterns).length;
+
+    // Record episode in engine if available
+    if (this.engine) {
+      this.engine.recordEpisode(state, action, reward, state, false).catch(() => {});
+    }
   }
 
   learn(state, action, outcome, reward) {
@@ -2205,6 +2363,12 @@ class Intelligence {
     this.data.trajectories.push({ id, state, action, outcome, reward, timestamp: this.now() });
     if (this.data.trajectories.length > 1000) this.data.trajectories.splice(0, 200);
     this.data.stats.total_trajectories = this.data.trajectories.length;
+
+    // End trajectory in engine if available
+    if (this.engine) {
+      this.engine.endTrajectory(reward > 0.5, reward);
+    }
+
     return id;
   }
 
@@ -2218,20 +2382,53 @@ class Intelligence {
     return { action: bestAction, confidence: bestQ > 0 ? Math.min(bestQ, 1) : 0 };
   }
 
+  // Agent routing - use engine's SONA-enhanced routing
+  async routeAsync(task, file, crateName, operation = 'edit') {
+    if (this.engine) {
+      try {
+        const result = await this.engine.route(task, file);
+        // Begin trajectory for learning
+        this.engine.beginTrajectory(task, file);
+        if (result.agent) {
+          this.engine.setTrajectoryRoute(result.agent);
+        }
+        return {
+          agent: result.agent,
+          confidence: result.confidence,
+          reason: result.reason + (result.patterns?.length ? ` (${result.patterns.length} SONA patterns)` : ''),
+          alternates: result.alternates,
+          patterns: result.patterns
+        };
+      } catch {}
+    }
+    return this.route(task, file, crateName, operation);
+  }
+
   route(task, file, crateName, operation = 'edit') {
     const fileType = file ? path.extname(file).slice(1) : 'unknown';
     const state = `${operation}_${fileType}_in_${crateName ?? 'project'}`;
     const agentMap = {
       rs: ['rust-developer', 'coder', 'reviewer', 'tester'],
       ts: ['typescript-developer', 'coder', 'frontend-dev'],
-      tsx: ['typescript-developer', 'coder', 'frontend-dev'],
-      js: ['coder', 'frontend-dev'],
+      tsx: ['react-developer', 'typescript-developer', 'coder'],
+      js: ['javascript-developer', 'coder', 'frontend-dev'],
+      jsx: ['react-developer', 'coder'],
       py: ['python-developer', 'coder', 'ml-developer'],
-      md: ['docs-writer', 'coder']
+      go: ['go-developer', 'coder'],
+      sql: ['database-specialist', 'coder'],
+      md: ['documentation-specialist', 'coder'],
+      yml: ['devops-engineer', 'coder'],
+      yaml: ['devops-engineer', 'coder']
     };
     const agents = agentMap[fileType] ?? ['coder', 'reviewer'];
     const { action, confidence } = this.suggest(state, agents);
     const reason = confidence > 0.5 ? 'learned from past success' : confidence > 0 ? 'based on patterns' : `default for ${fileType} files`;
+
+    // Begin trajectory in engine
+    if (this.engine) {
+      this.engine.beginTrajectory(task || operation, file);
+    }
+
     return { agent: action, confidence, reason };
   }
 
@@ -2244,27 +2441,77 @@ class Intelligence {
       }
       case 'ts': case 'tsx': case 'js': case 'jsx': return { suggest: true, command: 'npm test' };
       case 'py': return { suggest: true, command: 'pytest' };
+      case 'go': return { suggest: true, command: 'go test ./...' };
       default: return { suggest: false, command: '' };
     }
   }
 
+  // Co-edit pattern tracking - use engine's co-edit patterns
   recordFileSequence(fromFile, toFile) {
     const existing = this.data.file_sequences.find(s => s.from_file === fromFile && s.to_file === toFile);
     if (existing) existing.count++;
     else this.data.file_sequences.push({ from_file: fromFile, to_file: toFile, count: 1 });
     this.lastEditedFile = toFile;
+
+    // Record in engine
+    if (this.engine) {
+      this.engine.recordCoEdit(fromFile, toFile);
+    }
   }
 
   suggestNext(file, limit = 3) {
-    return this.data.file_sequences.filter(s => s.from_file === file).sort((a, b) => b.count - a.count).slice(0, limit).map(s => ({ file: s.to_file, score: s.count }));
+    // Try engine first
+    if (this.engine) {
+      try {
+        const results = this.engine.getLikelyNextFiles(file, limit);
+        if (results.length > 0) {
+          return results.map(r => ({ file: r.file, score: r.count }));
+        }
+      } catch {}
+    }
+    return this.data.file_sequences
+      .filter(s => s.from_file === file)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+      .map(s => ({ file: s.to_file, score: s.count }));
+  }
+
+  // Error pattern learning
+  recordErrorFix(errorPattern, fix) {
+    if (!this.data.errors[errorPattern]) {
+      this.data.errors[errorPattern] = [];
+    }
+    if (!this.data.errors[errorPattern].includes(fix)) {
+      this.data.errors[errorPattern].push(fix);
+    }
+    this.data.stats.total_errors = Object.keys(this.data.errors).length;
+
+    if (this.engine) {
+      this.engine.recordErrorFix(errorPattern, fix);
+    }
+  }
+
+  getSuggestedFixes(error) {
+    // Try engine first (uses embedding similarity)
+    if (this.engine) {
+      try {
+        const fixes = this.engine.getSuggestedFixes(error);
+        if (fixes.length > 0) return fixes;
+      } catch {}
+    }
+    return this.data.errors[error] || [];
   }
 
   classifyCommand(command) {
     const cmd = command.toLowerCase();
     if (cmd.includes('cargo') || cmd.includes('rustc')) return { category: 'rust', subcategory: cmd.includes('test') ? 'test' : 'build', risk: 'low' };
-    if (cmd.includes('npm') || cmd.includes('node')) return { category: 'javascript', subcategory: cmd.includes('test') ? 'test' : 'build', risk: 'low' };
-    if (cmd.includes('git')) return { category: 'git', subcategory: 'vcs', risk: cmd.includes('push') ? 'medium' : 'low' };
-    if (cmd.includes('rm') || cmd.includes('delete')) return { category: 'filesystem', subcategory: 'destructive', risk: 'high' };
+    if (cmd.includes('npm') || cmd.includes('node') || cmd.includes('yarn') || cmd.includes('pnpm')) return { category: 'javascript', subcategory: cmd.includes('test') ? 'test' : 'build', risk: 'low' };
+    if (cmd.includes('python') || cmd.includes('pip') || cmd.includes('pytest')) return { category: 'python', subcategory: cmd.includes('test') ? 'test' : 'run', risk: 'low' };
+    if (cmd.includes('go ')) return { category: 'go', subcategory: cmd.includes('test') ? 'test' : 'build', risk: 'low' };
+    if (cmd.includes('git')) return { category: 'git', subcategory: 'vcs', risk: cmd.includes('push') || cmd.includes('force') ? 'medium' : 'low' };
+    if (cmd.includes('rm ') || cmd.includes('delete') || cmd.includes('rmdir')) return { category: 'filesystem', subcategory: 'destructive', risk: 'high' };
+    if (cmd.includes('sudo') || cmd.includes('chmod') || cmd.includes('chown')) return { category: 'system', subcategory: 'privileged', risk: 'high' };
+    if (cmd.includes('docker') || cmd.includes('kubectl')) return { category: 'container', subcategory: 'orchestration', risk: 'medium' };
     return { category: 'shell', subcategory: 'general', risk: 'low' };
   }
 
@@ -2274,14 +2521,87 @@ class Intelligence {
     return { agents, edges };
   }
 
-  stats() { return this.data.stats; }
-  sessionStart() { this.data.stats.session_count++; this.data.stats.last_session = this.now(); }
+  // Enhanced stats with engine metrics
+  stats() {
+    const baseStats = this.data.stats;
+
+    if (this.engine) {
+      try {
+        const engineStats = this.engine.getStats();
+        return {
+          ...baseStats,
+          // Engine stats
+          engineEnabled: true,
+          sonaEnabled: engineStats.sonaEnabled,
+          attentionEnabled: engineStats.attentionEnabled,
+          embeddingDim: engineStats.memoryDimensions,
+          totalMemories: engineStats.totalMemories,
+          totalEpisodes: engineStats.totalEpisodes,
+          trajectoriesRecorded: engineStats.trajectoriesRecorded,
+          patternsLearned: engineStats.patternsLearned,
+          microLoraUpdates: engineStats.microLoraUpdates,
+          baseLoraUpdates: engineStats.baseLoraUpdates,
+          ewcConsolidations: engineStats.ewcConsolidations,
+        };
+      } catch {}
+    }
+
+    return { ...baseStats, engineEnabled: false };
+  }
+
+  sessionStart() {
+    this.data.stats.session_count++;
+    this.data.stats.last_session = this.now();
+    this.sessionStartTime = this.now();
+
+    // Tick engine for background learning
+    if (this.engine) {
+      this.engine.tick();
+    }
+  }
+
   sessionEnd() {
-    const duration = this.now() - this.data.stats.last_session;
+    const duration = this.now() - (this.sessionStartTime || this.data.stats.last_session);
     const actions = this.data.trajectories.filter(t => t.timestamp >= this.data.stats.last_session).length;
+
+    // Force learning cycle
+    if (this.engine) {
+      this.engine.forceLearn();
+    }
+
+    // Save all data
+    this.save();
+
     return { duration, actions };
   }
+
   getLastEditedFile() { return this.lastEditedFile; }
+
+  // New: Check if full engine is available
+  isEngineEnabled() {
+    return this.engine !== null;
+  }
+
+  // New: Get engine capabilities
+  getCapabilities() {
+    if (!this.engine) {
+      return {
+        engine: false,
+        vectorDb: false,
+        sona: false,
+        attention: false,
+        embeddingDim: 64,
+      };
+    }
+    const stats = this.engine.getStats();
+    return {
+      engine: true,
+      vectorDb: true,
+      sona: stats.sonaEnabled,
+      attention: stats.attentionEnabled,
+      embeddingDim: stats.memoryDimensions,
+    };
+  }
 }
 
 // Hooks command group
@@ -2759,6 +3079,158 @@ hooksCmd.command('lsp-diagnostic').description('LSP diagnostic hook').option('--
 hooksCmd.command('track-notification').description('Track notification').action(() => {
   console.log(JSON.stringify({ tracked: true }));
 });
+
+// Trajectory tracking commands
+hooksCmd.command('trajectory-begin')
+  .description('Begin tracking a new execution trajectory')
+  .requiredOption('-c, --context <context>', 'Task or operation context')
+  .option('-a, --agent <agent>', 'Agent performing the task', 'unknown')
+  .action((opts) => {
+    const intel = new Intelligence();
+    const trajId = `traj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    if (!intel.data.activeTrajectories) intel.data.activeTrajectories = {};
+    intel.data.activeTrajectories[trajId] = {
+      id: trajId,
+      context: opts.context,
+      agent: opts.agent,
+      steps: [],
+      startTime: Date.now()
+    };
+    intel.save();
+    console.log(JSON.stringify({ success: true, trajectory_id: trajId, context: opts.context, agent: opts.agent }));
+  });
+
+hooksCmd.command('trajectory-step')
+  .description('Add a step to the current trajectory')
+  .requiredOption('-a, --action <action>', 'Action taken')
+  .option('-r, --result <result>', 'Result of action')
+  .option('--reward <reward>', 'Reward signal (0-1)', '0.5')
+  .action((opts) => {
+    const intel = new Intelligence();
+    const trajectories = intel.data.activeTrajectories || {};
+    const trajIds = Object.keys(trajectories);
+    if (trajIds.length === 0) {
+      console.log(JSON.stringify({ success: false, error: 'No active trajectory' }));
+      return;
+    }
+    const latestTrajId = trajIds[trajIds.length - 1];
+    trajectories[latestTrajId].steps.push({
+      action: opts.action,
+      result: opts.result || '',
+      reward: parseFloat(opts.reward),
+      time: Date.now()
+    });
+    intel.save();
+    console.log(JSON.stringify({ success: true, trajectory_id: latestTrajId, step: trajectories[latestTrajId].steps.length }));
+  });
+
+hooksCmd.command('trajectory-end')
+  .description('End the current trajectory with a quality score')
+  .option('--success', 'Task succeeded')
+  .option('--quality <quality>', 'Quality score (0-1)', '0.5')
+  .action((opts) => {
+    const intel = new Intelligence();
+    const trajectories = intel.data.activeTrajectories || {};
+    const trajIds = Object.keys(trajectories);
+    if (trajIds.length === 0) {
+      console.log(JSON.stringify({ success: false, error: 'No active trajectory' }));
+      return;
+    }
+    const latestTrajId = trajIds[trajIds.length - 1];
+    const traj = trajectories[latestTrajId];
+    const quality = opts.success ? 0.8 : parseFloat(opts.quality);
+    traj.endTime = Date.now();
+    traj.quality = quality;
+    traj.success = opts.success || false;
+
+    if (!intel.data.trajectories) intel.data.trajectories = [];
+    intel.data.trajectories.push(traj);
+    delete trajectories[latestTrajId];
+    intel.save();
+
+    console.log(JSON.stringify({
+      success: true,
+      trajectory_id: latestTrajId,
+      steps: traj.steps.length,
+      duration_ms: traj.endTime - traj.startTime,
+      quality
+    }));
+  });
+
+// Co-edit pattern commands
+hooksCmd.command('coedit-record')
+  .description('Record co-edit pattern (files edited together)')
+  .requiredOption('-p, --primary <file>', 'Primary file being edited')
+  .requiredOption('-r, --related <files...>', 'Related files edited together')
+  .action((opts) => {
+    const intel = new Intelligence();
+    if (!intel.data.coEditPatterns) intel.data.coEditPatterns = {};
+    if (!intel.data.coEditPatterns[opts.primary]) intel.data.coEditPatterns[opts.primary] = {};
+
+    for (const related of opts.related) {
+      intel.data.coEditPatterns[opts.primary][related] = (intel.data.coEditPatterns[opts.primary][related] || 0) + 1;
+    }
+    intel.save();
+    console.log(JSON.stringify({ success: true, primary_file: opts.primary, related_count: opts.related.length }));
+  });
+
+hooksCmd.command('coedit-suggest')
+  .description('Get suggested related files based on co-edit patterns')
+  .requiredOption('-f, --file <file>', 'Current file')
+  .option('-k, --top-k <n>', 'Number of suggestions', '5')
+  .action((opts) => {
+    const intel = new Intelligence();
+    let suggestions = [];
+
+    if (intel.data.coEditPatterns && intel.data.coEditPatterns[opts.file]) {
+      suggestions = Object.entries(intel.data.coEditPatterns[opts.file])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, parseInt(opts.topK))
+        .map(([f, count]) => ({ file: f, count, confidence: Math.min(count / 10, 1) }));
+    }
+    console.log(JSON.stringify({ success: true, file: opts.file, suggestions }));
+  });
+
+// Error pattern commands
+hooksCmd.command('error-record')
+  .description('Record an error and its fix for learning')
+  .requiredOption('-e, --error <error>', 'Error message or code')
+  .requiredOption('-x, --fix <fix>', 'Fix that resolved the error')
+  .option('-f, --file <file>', 'File where error occurred')
+  .action((opts) => {
+    const intel = new Intelligence();
+    if (!intel.data.errors) intel.data.errors = {};
+    if (!intel.data.errors[opts.error]) intel.data.errors[opts.error] = [];
+    intel.data.errors[opts.error].push({ fix: opts.fix, file: opts.file || '', recorded: Date.now() });
+    intel.save();
+    console.log(JSON.stringify({ success: true, error: opts.error.substring(0, 50), fixes_recorded: intel.data.errors[opts.error].length }));
+  });
+
+hooksCmd.command('error-suggest')
+  .description('Get suggested fixes for an error based on learned patterns')
+  .requiredOption('-e, --error <error>', 'Error message or code')
+  .action((opts) => {
+    const intel = new Intelligence();
+    let suggestions = [];
+
+    if (intel.data.errors) {
+      for (const [errKey, fixes] of Object.entries(intel.data.errors)) {
+        if (opts.error.includes(errKey) || errKey.includes(opts.error)) {
+          suggestions.push(...fixes.map(f => f.fix));
+        }
+      }
+    }
+    console.log(JSON.stringify({ success: true, error: opts.error.substring(0, 50), suggestions: [...new Set(suggestions)].slice(0, 5) }));
+  });
+
+// Force learning command
+hooksCmd.command('force-learn')
+  .description('Force an immediate learning cycle')
+  .action(() => {
+    const intel = new Intelligence();
+    intel.tick();
+    console.log(JSON.stringify({ success: true, result: 'Learning cycle triggered', stats: intel.stats() }));
+  });
 
 // Verify hooks are working
 hooksCmd.command('verify')
