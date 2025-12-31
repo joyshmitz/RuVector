@@ -3045,11 +3045,13 @@ hooksCmd.command('suggest-context').description('Suggest relevant context').acti
   console.log(`RuVector Intelligence: ${stats.total_patterns} learned patterns, ${stats.total_errors} error fixes available. Use 'ruvector hooks route' for agent suggestions.`);
 });
 
-hooksCmd.command('remember').description('Store in memory').requiredOption('-t, --type <type>', 'Memory type').argument('<content...>', 'Content').action((content, opts) => {
+hooksCmd.command('remember').description('Store in memory').requiredOption('-t, --type <type>', 'Memory type').option('--silent', 'Suppress output').argument('<content...>', 'Content').action((content, opts) => {
   const intel = new Intelligence();
   const id = intel.remember(opts.type, content.join(' '));
   intel.save();
-  console.log(JSON.stringify({ success: true, id }));
+  if (!opts.silent) {
+    console.log(JSON.stringify({ success: true, id }));
+  }
 });
 
 hooksCmd.command('recall').description('Search memory').argument('<query...>', 'Query').option('-k, --top-k <n>', 'Results', '5').action((query, opts) => {
