@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>@ruvector/edge - Swarm Generator</title>
+  <title>@ruvector/edge-full - Swarm Generator</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -193,7 +193,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>@ruvector/edge Swarm Generator</h1>
+    <h1>@ruvector/edge-full Swarm Generator</h1>
     <p class="subtitle">Generate ready-to-use code for any deployment topology</p>
 
     <div class="grid">
@@ -284,6 +284,36 @@
         </div>
 
         <div class="section">
+          <div class="section-title">WASM Modules</div>
+          <div class="option-grid" id="module-options">
+            <div class="option selected" data-value="edge">
+              <div class="option-title">🔐 Edge Core</div>
+              <div class="option-desc">364KB - Crypto, vectors</div>
+            </div>
+            <div class="option" data-value="graph">
+              <div class="option-title">🕸️ Graph DB</div>
+              <div class="option-desc">288KB - Neo4j, Cypher</div>
+            </div>
+            <div class="option" data-value="rvlite">
+              <div class="option-title">🗃️ RVLite</div>
+              <div class="option-desc">260KB - SQL/SPARQL</div>
+            </div>
+            <div class="option" data-value="sona">
+              <div class="option-title">🧠 SONA</div>
+              <div class="option-desc">238KB - LoRA, EWC++</div>
+            </div>
+            <div class="option" data-value="dag">
+              <div class="option-title">📊 DAG</div>
+              <div class="option-desc">132KB - Workflows</div>
+            </div>
+            <div class="option" data-value="onnx">
+              <div class="option-title">🤖 ONNX</div>
+              <div class="option-desc">7.1MB - Embeddings</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
           <div class="section-title">Features</div>
           <div class="tag-list" id="feature-tags">
             <div class="tag selected" data-value="identity">Identity</div>
@@ -324,7 +354,7 @@
             <div class="stat-label">Monthly</div>
           </div>
           <div class="stat">
-            <div class="stat-value">364KB</div>
+            <div class="stat-value" id="bundle-size">364KB</div>
             <div class="stat-label">Bundle</div>
           </div>
         </div>
@@ -383,9 +413,26 @@
       topology: 'mesh',
       transport: 'gun',
       usecase: 'ai-assistants',
+      modules: ['edge'],
       features: ['identity', 'encryption'],
       exotic: []
     };
+
+    // Module sizes in KB
+    const moduleSizes = {
+      edge: 364,
+      graph: 288,
+      rvlite: 260,
+      sona: 238,
+      dag: 132,
+      onnx: 7270  // 7.1MB
+    };
+
+    function updateBundleSize() {
+      const totalKB = state.modules.reduce((sum, mod) => sum + moduleSizes[mod], 0);
+      const sizeStr = totalKB >= 1024 ? `${(totalKB / 1024).toFixed(1)}MB` : `${totalKB}KB`;
+      document.getElementById('bundle-size').textContent = sizeStr;
+    }
 
     // Code templates
     const templates = {
@@ -1448,17 +1495,63 @@ class EmergentSwarm {
 
     // Generate code
     function generateCode() {
-      let code = `// @ruvector/edge - Generated Swarm Configuration
-// Topology: ${state.topology} | Transport: ${state.transport} | Use Case: ${state.usecase}
-// Features: ${state.features.join(', ')}${state.exotic.length ? '\n// Exotic: ' + state.exotic.join(', ') : ''}
+      const hasMultipleModules = state.modules.length > 1 || !state.modules.includes('edge');
+      const packageName = hasMultipleModules ? '@ruvector/edge-full' : '@ruvector/edge';
 
+      let code = `// ${packageName} - Generated Swarm Configuration
+// Topology: ${state.topology} | Transport: ${state.transport} | Use Case: ${state.usecase}
+// Modules: ${state.modules.join(', ')} | Features: ${state.features.join(', ')}${state.exotic.length ? '\n// Exotic: ' + state.exotic.join(', ') : ''}
+`;
+
+      // Generate imports based on selected modules
+      if (state.modules.includes('edge')) {
+        code += `
 import init, {
   WasmIdentity,
   WasmCrypto,
-${state.features.includes('hnsw') ? '  WasmHnswIndex,\n' : ''}${state.features.includes('semantic') ? '  WasmSemanticMatcher,\n' : ''}${state.features.includes('raft') ? '  WasmRaftNode,\n' : ''}${state.features.includes('pq') ? '  WasmHybridKeyPair,\n' : ''}${state.features.includes('spiking') ? '  WasmSpikingNetwork,\n' : ''}${state.features.includes('compression') ? '  WasmQuantizer,\n  WasmAdaptiveCompressor,\n' : ''}} from '@ruvector/edge';
+${state.features.includes('hnsw') ? '  WasmHnswIndex,\n' : ''}${state.features.includes('semantic') ? '  WasmSemanticMatcher,\n' : ''}${state.features.includes('raft') ? '  WasmRaftNode,\n' : ''}${state.features.includes('pq') ? '  WasmHybridKeyPair,\n' : ''}${state.features.includes('spiking') ? '  WasmSpikingNetwork,\n' : ''}${state.features.includes('compression') ? '  WasmQuantizer,\n  WasmAdaptiveCompressor,\n' : ''}} from '${packageName}${hasMultipleModules ? '/edge' : ''}';
+`;
+      }
 
-await init();
+      if (state.modules.includes('graph')) {
+        code += `
+import graphInit, { WasmGraphStore } from '${packageName}/graph';
+`;
+      }
 
+      if (state.modules.includes('rvlite')) {
+        code += `
+import rvliteInit, { Database } from '${packageName}/rvlite';
+`;
+      }
+
+      if (state.modules.includes('sona')) {
+        code += `
+import sonaInit, { SonaEngine, ReasoningBank } from '${packageName}/sona';
+`;
+      }
+
+      if (state.modules.includes('dag')) {
+        code += `
+import dagInit, { Dag } from '${packageName}/dag';
+`;
+      }
+
+      if (state.modules.includes('onnx')) {
+        code += `
+import onnxInit, { WasmEmbedder } from '${packageName}/onnx';
+`;
+      }
+
+      // Init calls
+      code += `
+// Initialize WASM modules
+await Promise.all([
+${state.modules.includes('edge') ? '  init(),\n' : ''}${state.modules.includes('graph') ? '  graphInit(),\n' : ''}${state.modules.includes('rvlite') ? '  rvliteInit(),\n' : ''}${state.modules.includes('sona') ? '  sonaInit(),\n' : ''}${state.modules.includes('dag') ? '  dagInit(),\n' : ''}${state.modules.includes('onnx') ? '  onnxInit(),\n' : ''}]);
+`;
+
+      // Add topology section
+      code += `
 // ═══════════════════════════════════════════════════════════════
 // TOPOLOGY: ${state.topology.toUpperCase()}
 // ═══════════════════════════════════════════════════════════════
@@ -1476,6 +1569,223 @@ ${templates.transports[state.transport]}
 // ═══════════════════════════════════════════════════════════════
 
 ${templates.usecases[state.usecase]}`;
+
+      // Add module-specific sections
+      if (state.modules.includes('graph')) {
+        code += `
+
+// ═══════════════════════════════════════════════════════════════
+// GRAPH DATABASE (Neo4j-style)
+// ═══════════════════════════════════════════════════════════════
+
+class SwarmGraph {
+  constructor() {
+    this.store = new WasmGraphStore();
+  }
+
+  // Create agent nodes
+  addAgent(id, type, capabilities) {
+    this.store.run_cypher(\`CREATE (a:Agent {id: '\${id}', type: '\${type}'})\`);
+    capabilities.forEach(cap => {
+      this.store.run_cypher(\`MATCH (a:Agent {id: '\${id}'}) CREATE (a)-[:HAS_CAPABILITY]->(:Capability {name: '\${cap}'})\`);
+    });
+  }
+
+  // Query connected agents
+  findConnectedAgents(agentId) {
+    return this.store.run_cypher(\`MATCH (a:Agent {id: '\${agentId}'})-[:CONNECTED_TO]->(b:Agent) RETURN b\`);
+  }
+
+  // Build agent relationship graph
+  connect(fromId, toId, relationship = 'CONNECTED_TO') {
+    this.store.run_cypher(\`MATCH (a:Agent {id: '\${fromId}'}), (b:Agent {id: '\${toId}'}) CREATE (a)-[:\${relationship}]->(b)\`);
+  }
+}`;
+      }
+
+      if (state.modules.includes('rvlite')) {
+        code += `
+
+// ═══════════════════════════════════════════════════════════════
+// VECTOR DATABASE (SQL/SPARQL/Cypher)
+// ═══════════════════════════════════════════════════════════════
+
+class SwarmMemory {
+  constructor() {
+    this.db = new Database();
+    this.db.execute(\`
+      CREATE TABLE IF NOT EXISTS memories (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT,
+        content TEXT,
+        embedding BLOB,
+        timestamp INTEGER
+      )
+    \`);
+  }
+
+  // Store memory with embedding
+  async store(agentId, content, embedding) {
+    const id = crypto.randomUUID();
+    this.db.execute(\`INSERT INTO memories VALUES (?, ?, ?, ?, ?)\`,
+      [id, agentId, content, embedding, Date.now()]);
+    return id;
+  }
+
+  // Semantic search across all agent memories
+  async search(queryEmbedding, limit = 10) {
+    return this.db.execute(\`
+      SELECT * FROM memories
+      ORDER BY vector_distance(embedding, ?)
+      LIMIT ?
+    \`, [queryEmbedding, limit]);
+  }
+
+  // SPARQL query for complex relationships
+  sparql(query) {
+    return this.db.sparql(query);
+  }
+}`;
+      }
+
+      if (state.modules.includes('sona')) {
+        code += `
+
+// ═══════════════════════════════════════════════════════════════
+// SELF-OPTIMIZING NEURAL ARCHITECTURE (SONA)
+// ═══════════════════════════════════════════════════════════════
+
+class SwarmBrain {
+  constructor() {
+    this.engine = new SonaEngine();
+    this.reasoningBank = new ReasoningBank();
+  }
+
+  // Route task to best agent using neural routing
+  async route(task, availableAgents) {
+    const decision = await this.engine.route_request({
+      task,
+      agents: availableAgents.map(a => ({ id: a.id, capabilities: a.capabilities }))
+    });
+
+    // Learn from routing decisions
+    this.reasoningBank.record_trajectory({
+      state: task,
+      action: decision.selected_agent,
+      timestamp: Date.now()
+    });
+
+    return decision;
+  }
+
+  // Apply LoRA fine-tuning based on feedback
+  async adapt(feedback) {
+    await this.engine.apply_lora_update({
+      positive_examples: feedback.successes,
+      negative_examples: feedback.failures
+    });
+  }
+
+  // Get routing confidence
+  getConfidence(task) {
+    return this.engine.estimate_confidence(task);
+  }
+}`;
+      }
+
+      if (state.modules.includes('dag')) {
+        code += `
+
+// ═══════════════════════════════════════════════════════════════
+// WORKFLOW DAG (Task Orchestration)
+// ═══════════════════════════════════════════════════════════════
+
+class SwarmWorkflow {
+  constructor() {
+    this.dag = new Dag();
+    this.tasks = new Map();
+  }
+
+  // Define workflow steps
+  addStep(id, executor, dependencies = []) {
+    this.dag.add_node(id);
+    this.tasks.set(id, { executor, status: 'pending' });
+    dependencies.forEach(dep => this.dag.add_edge(dep, id));
+  }
+
+  // Get execution order
+  getExecutionOrder() {
+    return this.dag.topological_sort();
+  }
+
+  // Execute workflow
+  async execute() {
+    const order = this.getExecutionOrder();
+    const results = new Map();
+
+    for (const stepId of order) {
+      const task = this.tasks.get(stepId);
+      task.status = 'running';
+
+      // Get results from dependencies
+      const deps = this.dag.get_dependencies(stepId);
+      const depResults = deps.map(d => results.get(d));
+
+      // Execute step
+      results.set(stepId, await task.executor(depResults));
+      task.status = 'complete';
+    }
+
+    return results;
+  }
+}`;
+      }
+
+      if (state.modules.includes('onnx')) {
+        code += `
+
+// ═══════════════════════════════════════════════════════════════
+// ONNX EMBEDDINGS (HuggingFace Models)
+// ═══════════════════════════════════════════════════════════════
+
+class SwarmEmbedder {
+  constructor() {
+    this.embedder = null;
+  }
+
+  async init(modelName = 'all-MiniLM-L6-v2') {
+    this.embedder = new WasmEmbedder();
+    await this.embedder.load_model(modelName);
+    console.log(\`Loaded embedding model: \${modelName}\`);
+  }
+
+  // Generate embedding for text
+  async embed(text) {
+    return await this.embedder.embed(text);
+  }
+
+  // Batch embed multiple texts (3.8x faster with parallel workers)
+  async embedBatch(texts) {
+    return await this.embedder.embed_batch(texts);
+  }
+
+  // Compute similarity between texts
+  async similarity(text1, text2) {
+    const [emb1, emb2] = await this.embedBatch([text1, text2]);
+    return this.cosineSimilarity(emb1, emb2);
+  }
+
+  cosineSimilarity(a, b) {
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+}`;
+      }
 
       // Add exotic patterns
       for (const exotic of state.exotic) {
@@ -1558,6 +1868,28 @@ main().catch(console.error);`;
           document.querySelectorAll('#usecase-options .option').forEach(e => e.classList.remove('selected'));
           el.classList.add('selected');
           state.usecase = el.dataset.value;
+          updateCode();
+        });
+      });
+
+      // Module options (multi-select)
+      document.querySelectorAll('#module-options .option').forEach(el => {
+        el.addEventListener('click', () => {
+          el.classList.toggle('selected');
+          const value = el.dataset.value;
+          if (el.classList.contains('selected')) {
+            if (!state.modules.includes(value)) {
+              state.modules.push(value);
+            }
+          } else {
+            state.modules = state.modules.filter(m => m !== value);
+            // Always keep at least edge
+            if (state.modules.length === 0) {
+              state.modules = ['edge'];
+              document.querySelector('#module-options .option[data-value="edge"]').classList.add('selected');
+            }
+          }
+          updateBundleSize();
           updateCode();
         });
       });

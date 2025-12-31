@@ -8,7 +8,13 @@
 
 ## Free Edge-Based AI Swarms
 
-**Run unlimited AI agent swarms directly in browsers, edge devices, and serverless functions - with zero cloud costs. Forever.**
+**Build and deploy AI agent swarms that run entirely in web browsers, mobile devices, and edge servers - without paying for cloud infrastructure.**
+
+Imagine having dozens of AI agents working together - analyzing data, routing tasks, making decisions - all running directly in your users' browsers. No API costs. No server bills. No data leaving your network. That's what @ruvector/edge makes possible.
+
+This library gives you everything you need to build distributed AI systems: cryptographic identity for each agent, encrypted communication between them, lightning-fast vector search for finding the right agent for each task, and consensus protocols so your agents can coordinate without a central server. It's all compiled to a tiny 364KB WebAssembly binary that runs anywhere JavaScript runs.
+
+**The key insight:** Instead of paying cloud providers to run your AI infrastructure, you use the computing power that's already there - your users' devices. Each browser becomes a node in your swarm. The more users you have, the more powerful your system becomes, and it still costs you nothing.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -54,6 +60,18 @@
 | Bandwidth | $0.09/GB | **$0** (P2P direct) |
 | Consensus | $100-200/month | **$0** (built-in Raft) |
 | **Total** | **$450-1100/month** | **$0/month** |
+
+### Need More Power?
+
+Check out **[@ruvector/edge-full](https://www.npmjs.com/package/@ruvector/edge-full)** - the batteries-included version with additional modules:
+
+| Module | Size | Adds |
+|--------|------|------|
+| **Graph DB** | +288KB | Neo4j-style graph database with Cypher queries |
+| **RVLite** | +260KB | SQL/SPARQL/Cypher vector database |
+| **SONA** | +238KB | Self-learning neural router with LoRA |
+| **DAG** | +132KB | Workflow orchestration engine |
+| **ONNX** | +7.1MB | HuggingFace embedding models |
 
 ### Quick Start
 
@@ -1024,53 +1042,122 @@ comp.condition()  // "excellent"|"good"|"poor"|"critical"
 
 ---
 
-## Interactive Generator
+## Interactive Swarm Generator
 
-The package includes an interactive HTML generator for creating swarm configurations:
+Don't know where to start? We've included an interactive code generator that helps you build swarm configurations visually. Just select your options and get production-ready code instantly.
+
+### How to Use the Generator
 
 ```bash
-# After installing, open the generator
-npx serve node_modules/@ruvector/edge/generator.html
-# Or just open the file directly in your browser
+# Option 1: Use a local server (recommended)
+npm install @ruvector/edge
+npx serve node_modules/@ruvector/edge/
+# Then open http://localhost:3000/generator.html
+
+# Option 2: Open directly in browser
+# Navigate to: node_modules/@ruvector/edge/generator.html
 ```
 
-**Generator Features:**
+The generator runs live demos directly in your browser using the actual WASM library - you can test everything before copying the code.
 
-| Category | Options |
-|----------|---------|
-| **Topologies** | Mesh, Star, Hierarchical, Ring, Gossip, Sharded |
-| **Transports** | GUN.js, WebRTC, libp2p, Nostr |
-| **Use Cases** | AI Assistants, Data Pipeline, Gaming, IoT, Marketplace, Research |
-| **Features** | Identity, Encryption, HNSW, Semantic, Raft, Post-Quantum, Spiking, Compression |
-| **Exotic** | MCP Tools, Byzantine Fault, Quantum Resistant, Neural Consensus, Swarm Intelligence, Self-Healing, Emergent Behavior |
+### What You Can Configure
+
+**Network Topologies** - How agents connect to each other:
+
+| Topology | Best For | Description |
+|----------|----------|-------------|
+| **Mesh** | General purpose | Every agent can talk to every other agent directly |
+| **Star** | Centralized control | All agents connect through one coordinator |
+| **Hierarchical** | Large organizations | Tree structure with managers and workers |
+| **Ring** | Sequential processing | Messages pass around in a circle |
+| **Gossip** | Eventual consistency | Information spreads like rumors |
+| **Sharded** | Domain separation | Different groups handle different topics |
+
+**Transport Layers** - How messages travel between agents:
+
+| Transport | Latency | Offline? | Best For |
+|-----------|---------|----------|----------|
+| **GUN.js** | ~100ms | Yes | Getting started, offline-first apps |
+| **WebRTC** | ~50ms | No | Real-time gaming, video, low latency |
+| **libp2p** | ~200ms | Partial | IPFS integration, content addressing |
+| **Nostr** | ~150ms | No | Decentralized social, simple pub/sub |
+
+**Use Cases** - Pre-built patterns for common scenarios:
+
+| Use Case | What It Does |
+|----------|--------------|
+| **AI Assistants** | Multiple specialized agents handling different types of questions |
+| **Data Pipeline** | Distributed ETL with parallel processing stages |
+| **Multiplayer Gaming** | Real-time game state sync with authoritative host |
+| **IoT Swarm** | Coordinate sensors and actuators across locations |
+| **Marketplace** | Agents that negotiate, bid, and trade autonomously |
+| **Research Compute** | Distribute calculations across many devices |
+
+**Features** - Building blocks you can mix and match:
+
+| Feature | What It Adds |
+|---------|--------------|
+| **Identity** | Ed25519 cryptographic keypairs for each agent |
+| **Encryption** | AES-256-GCM for all messages |
+| **HNSW Index** | Fast similarity search (150x faster than brute force) |
+| **Semantic Matching** | Route tasks to the best agent automatically |
+| **Raft Consensus** | Elect leaders and agree on shared state |
+| **Post-Quantum** | Future-proof signatures against quantum computers |
+| **Spiking Neural** | Bio-inspired learning and pattern recognition |
+| **Compression** | Adaptive bandwidth optimization (4-32x) |
+
+**Exotic Patterns** - Advanced capabilities for specialized needs:
+
+| Pattern | What It Does |
+|---------|--------------|
+| **MCP Tools** | Browser-based Model Context Protocol for AI collaboration |
+| **Byzantine Fault** | Tolerate malicious or faulty nodes |
+| **Quantum Resistant** | Hybrid signatures safe from future quantum attacks |
+| **Neural Consensus** | Use spiking networks for group decisions |
+| **Swarm Intelligence** | Particle swarm optimization for problem solving |
+| **Self-Healing** | Automatic failure detection and recovery |
+| **Emergent Behavior** | Evolutionary algorithms for agent adaptation |
 
 ### Browser-Based MCP Tools
 
-The generator includes MCP (Model Context Protocol) tools for browser-based AI collaboration:
+The generator includes a complete MCP (Model Context Protocol) implementation that runs entirely in the browser. This lets you create AI tools that work with Claude and other MCP-compatible systems, but without needing a server.
 
 ```javascript
-import init from '@ruvector/edge';
-
-// Create browser MCP server
+// Create a browser-based MCP server
 const mcp = new BrowserMCPServer();
 await mcp.init();
 
-// Built-in tools
-// - discover_agents: Find agents by capability
-// - send_secure_message: Encrypted P2P messaging
-// - store_memory: Vector memory storage
-// - search_memory: Semantic search
-// - sign_message: Cryptographic signing
+// Built-in tools ready to use:
+// - discover_agents: Find the right agent for a task
+// - send_secure_message: Encrypted P2P communication
+// - store_memory: Save vectors for semantic search
+// - search_memory: Find similar items by meaning
+// - sign_message: Cryptographically prove authorship
 
-// Handle MCP requests
+// Example: Route a request to find coding help
 const response = await mcp.handleRequest({
   method: 'tools/call',
   params: {
     name: 'discover_agents',
-    arguments: { query: 'coding expert' }
+    arguments: { query: 'help me write a Python script' }
   }
 });
+
+// Connect multiple MCP servers for collaboration
+const network = new MCPCollaborativeNetwork();
+await network.addServer('coder', 'programming development');
+await network.addServer('analyst', 'data analysis statistics');
+await network.addServer('writer', 'documentation technical writing');
+
+// Requests automatically route to the best server
+const result = await network.routeRequest(request);
 ```
+
+**Why browser-based MCP?**
+- No server costs - runs on user devices
+- Works offline - all tools available without internet
+- Privacy-first - sensitive data never leaves the browser
+- Instant deployment - just include the library
 
 ---
 
