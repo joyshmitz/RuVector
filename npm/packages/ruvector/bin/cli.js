@@ -2609,22 +2609,37 @@ class Intelligence {
   }
 
   sessionEnd() {
-    // Ensure stats exists with defaults
+    // Ensure data structure exists with defaults
+    if (!this.data) {
+      this.data = { patterns: {}, memories: [], trajectories: [], errors: [], agents: {}, edges: [], stats: {} };
+    }
     if (!this.data.stats) {
       this.data.stats = { total_patterns: 0, total_memories: 0, total_trajectories: 0, total_errors: 0, session_count: 0, last_session: 0 };
     }
+    if (!this.data.trajectories) {
+      this.data.trajectories = [];
+    }
+
     const lastSession = this.data.stats.last_session || 0;
     const duration = this.now() - (this.sessionStartTime || lastSession);
-    const actions = (this.data.trajectories || []).filter(t => t.timestamp >= lastSession).length;
+    const actions = this.data.trajectories.filter(t => t && t.timestamp >= lastSession).length;
 
     // Force learning cycle (only if engine already initialized)
-    const eng = this.getEngineIfReady();
-    if (eng) {
-      eng.forceLearn();
+    try {
+      const eng = this.getEngineIfReady();
+      if (eng) {
+        eng.forceLearn();
+      }
+    } catch (e) {
+      // Ignore engine errors on session end
     }
 
     // Save all data
-    this.save();
+    try {
+      this.save();
+    } catch (e) {
+      // Ignore save errors on session end
+    }
 
     return { duration, actions };
   }

@@ -127,7 +127,8 @@
     "total_memories": 0,
     "total_trajectories": 0,
     "total_errors": 0,
-    "session_count": 0,
-    "last_session": 0
-  }
+    "session_count": 1,
+    "last_session": 1767194227
+  },
+  "trajectories": []
 }
