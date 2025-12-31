@@ -42,4 +42,10 @@ pub use advanced::{
     HybridKeyPair, HybridPublicKey, HybridSignature,
     // Spiking neural networks
     LIFNeuron, SpikingNetwork,
+    // Semantic embeddings
+    SemanticEmbedder, SemanticTaskMatcher,
+    // Raft consensus
+    RaftNode, RaftState, LogEntry,
+    RaftVoteRequest, RaftVoteResponse,
+    RaftAppendEntries, RaftAppendEntriesResponse,
 };
