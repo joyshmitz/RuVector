@@ -495,18 +495,329 @@ export function getAttentionVersion(): string | null {
   }
 }
 
+// ============================================================================
+// Graph-based Attention (for code structure)
+// ============================================================================
+
+/**
+ * Graph attention with Rotary Position Embeddings
+ * Excellent for code AST and dependency graphs
+ */
+export class GraphRoPeAttention {
+  private inner: any;
+  public readonly dim: number;
+  public readonly numHeads: number;
+  public readonly maxSeqLen: number;
+
+  constructor(dim: number, numHeads: number = 4, maxSeqLen: number = 4096) {
+    const attention = getAttentionModule();
+    this.inner = new attention.GraphRoPeAttention(dim, numHeads, maxSeqLen);
+    this.dim = dim;
+    this.numHeads = numHeads;
+    this.maxSeqLen = maxSeqLen;
+  }
+
+  compute(
+    query: number[] | Float32Array,
+    keys: (number[] | Float32Array)[],
+    values: (number[] | Float32Array)[],
+    positions?: number[]
+  ): AttentionOutput {
+    const raw = this.inner.compute(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values),
+      positions ? new Int32Array(positions) : undefined
+    );
+    return { values: fromFloat32Array(raw), raw };
+  }
+}
+
+/**
+ * Edge-featured attention for graphs with edge attributes
+ * Useful for weighted dependency graphs
+ */
+export class EdgeFeaturedAttention {
+  private inner: any;
+  public readonly dim: number;
+  public readonly edgeDim: number;
+
+  constructor(dim: number, edgeDim: number = 16) {
+    const attention = getAttentionModule();
+    this.inner = new attention.EdgeFeaturedAttention(dim, edgeDim);
+    this.dim = dim;
+    this.edgeDim = edgeDim;
+  }
+
+  compute(
+    query: number[] | Float32Array,
+    keys: (number[] | Float32Array)[],
+    values: (number[] | Float32Array)[],
+    edgeFeatures?: (number[] | Float32Array)[]
+  ): AttentionOutput {
+    const raw = this.inner.compute(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values),
+      edgeFeatures ? toFloat32Arrays(edgeFeatures) : undefined
+    );
+    return { values: fromFloat32Array(raw), raw };
+  }
+}
+
+/**
+ * Dual-space attention (Euclidean + Hyperbolic)
+ * Best of both worlds for hierarchical + semantic similarity
+ */
+export class DualSpaceAttention {
+  private inner: any;
+  public readonly dim: number;
+  public readonly curvature: number;
+  public readonly alpha: number;
+
+  constructor(dim: number, curvature: number = 1.0, alpha: number = 0.5) {
+    const attention = getAttentionModule();
+    this.inner = new attention.DualSpaceAttention(dim, curvature, alpha);
+    this.dim = dim;
+    this.curvature = curvature;
+    this.alpha = alpha;
+  }
+
+  compute(
+    query: number[] | Float32Array,
+    keys: (number[] | Float32Array)[],
+    values: (number[] | Float32Array)[]
+  ): AttentionOutput {
+    const raw = this.inner.compute(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values)
+    );
+    return { values: fromFloat32Array(raw), raw };
+  }
+}
+
+/**
+ * Basic dot-product attention
+ */
+export class DotProductAttention {
+  private inner: any;
+  public readonly dim: number;
+
+  constructor(dim: number) {
+    const attention = getAttentionModule();
+    this.inner = new attention.DotProductAttention(dim);
+    this.dim = dim;
+  }
+
+  compute(
+    query: number[] | Float32Array,
+    keys: (number[] | Float32Array)[],
+    values: (number[] | Float32Array)[]
+  ): AttentionOutput {
+    const raw = this.inner.compute(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values)
+    );
+    return { values: fromFloat32Array(raw), raw };
+  }
+}
+
+// ============================================================================
+// Parallel/Batch Attention Compute
+// ============================================================================
+
+/**
+ * Compute attention in parallel across multiple queries
+ */
+export async function parallelAttentionCompute(
+  queries: (number[] | Float32Array)[],
+  keys: (number[] | Float32Array)[],
+  values: (number[] | Float32Array)[],
+  attentionType: 'dot' | 'multi-head' | 'flash' | 'hyperbolic' | 'linear' = 'multi-head'
+): Promise<number[][]> {
+  const attention = getAttentionModule();
+  const results = await attention.parallelAttentionCompute(
+    toFloat32Arrays(queries),
+    toFloat32Arrays(keys),
+    toFloat32Arrays(values),
+    attentionType
+  );
+  return results.map((r: Float32Array) => fromFloat32Array(r));
+}
+
+/**
+ * Batch attention compute for multiple query-key-value sets
+ */
+export async function batchAttentionCompute(
+  batches: Array<{
+    query: number[] | Float32Array;
+    keys: (number[] | Float32Array)[];
+    values: (number[] | Float32Array)[];
+  }>,
+  attentionType: 'dot' | 'multi-head' | 'flash' | 'hyperbolic' | 'linear' = 'multi-head'
+): Promise<number[][]> {
+  const attention = getAttentionModule();
+  const nativeBatches = batches.map(b => ({
+    query: toFloat32Array(b.query),
+    keys: toFloat32Arrays(b.keys),
+    values: toFloat32Arrays(b.values),
+  }));
+  const results = await attention.batchAttentionCompute(nativeBatches, attentionType);
+  return results.map((r: Float32Array) => fromFloat32Array(r));
+}
+
+/**
+ * Async flash attention with callback
+ */
+export function computeFlashAttentionAsync(
+  query: number[] | Float32Array,
+  keys: (number[] | Float32Array)[],
+  values: (number[] | Float32Array)[]
+): Promise<number[]> {
+  const attention = getAttentionModule();
+  return new Promise((resolve, reject) => {
+    attention.computeFlashAttentionAsync(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values),
+      (err: Error | null, result: Float32Array) => {
+        if (err) reject(err);
+        else resolve(fromFloat32Array(result));
+      }
+    );
+  });
+}
+
+/**
+ * Async hyperbolic attention
+ */
+export function computeHyperbolicAttentionAsync(
+  query: number[] | Float32Array,
+  keys: (number[] | Float32Array)[],
+  values: (number[] | Float32Array)[],
+  curvature: number = 1.0
+): Promise<number[]> {
+  const attention = getAttentionModule();
+  return new Promise((resolve, reject) => {
+    attention.computeHyperbolicAttentionAsync(
+      toFloat32Array(query),
+      toFloat32Arrays(keys),
+      toFloat32Arrays(values),
+      curvature,
+      (err: Error | null, result: Float32Array) => {
+        if (err) reject(err);
+        else resolve(fromFloat32Array(result));
+      }
+    );
+  });
+}
+
+// ============================================================================
+// Training Utilities (for SONA integration)
+// ============================================================================
+
+/**
+ * Adam optimizer for attention training
+ */
+export class AdamOptimizer {
+  private inner: any;
+
+  constructor(learningRate: number = 0.001, beta1: number = 0.9, beta2: number = 0.999) {
+    const attention = getAttentionModule();
+    this.inner = new attention.AdamOptimizer(learningRate, beta1, beta2);
+  }
+
+  step(gradients: number[] | Float32Array, params: number[] | Float32Array): number[] {
+    const result = this.inner.step(toFloat32Array(gradients), toFloat32Array(params));
+    return fromFloat32Array(result);
+  }
+}
+
+/**
+ * InfoNCE contrastive loss
+ */
+export function infoNceLoss(
+  anchor: number[] | Float32Array,
+  positive: number[] | Float32Array,
+  negatives: (number[] | Float32Array)[],
+  temperature: number = 0.07
+): number {
+  const attention = getAttentionModule();
+  return attention.InfoNceLoss.compute(
+    toFloat32Array(anchor),
+    toFloat32Array(positive),
+    toFloat32Arrays(negatives),
+    temperature
+  );
+}
+
+/**
+ * Hard negative mining for contrastive learning
+ */
+export function mineHardNegatives(
+  anchor: number[] | Float32Array,
+  candidates: (number[] | Float32Array)[],
+  topK: number = 5
+): number[][] {
+  const attention = getAttentionModule();
+  const miner = new attention.HardNegativeMiner(topK);
+  const results = miner.mine(toFloat32Array(anchor), toFloat32Arrays(candidates));
+  return results.map((r: Float32Array) => fromFloat32Array(r));
+}
+
+// ============================================================================
+// Benchmarking
+// ============================================================================
+
+/**
+ * Benchmark attention implementations
+ */
+export async function benchmarkAttention(
+  dim: number,
+  seqLen: number,
+  iterations: number = 100
+): Promise<Record<string, { avgMs: number; minMs: number; maxMs: number }>> {
+  const attention = getAttentionModule();
+  return attention.benchmarkAttention(dim, seqLen, iterations);
+}
+
 export default {
+  // Core attention types
+  DotProductAttention,
   MultiHeadAttention,
   FlashAttention,
   HyperbolicAttention,
   LinearAttention,
   LocalGlobalAttention,
   MoEAttention,
+
+  // Graph attention types
+  GraphRoPeAttention,
+  EdgeFeaturedAttention,
+  DualSpaceAttention,
+
+  // Parallel/batch compute
+  parallelAttentionCompute,
+  batchAttentionCompute,
+  computeFlashAttentionAsync,
+  computeHyperbolicAttentionAsync,
+
+  // Training utilities
+  AdamOptimizer,
+  infoNceLoss,
+  mineHardNegatives,
+
+  // Hyperbolic math
   projectToPoincareBall,
   poincareDistance,
   mobiusAddition,
   expMap,
   logMap,
+
+  // Utilities
   isAttentionAvailable,
   getAttentionVersion,
+  benchmarkAttention,
 };

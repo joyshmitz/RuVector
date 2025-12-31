@@ -1,6 +1,6 @@
 {
   "name": "ruvector",
-  "version": "0.1.53",
+  "version": "0.1.74",
   "description": "High-performance vector database for Node.js with automatic native/WASM fallback",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,7 +8,7 @@
     "ruvector": "./bin/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/core/onnx/pkg/package.json dist/core/onnx/pkg/",
     "prepublishOnly": "npm run build",
     "test": "node test/integration.js"
   },
@@ -38,7 +38,10 @@
     "lora",
     "ewc",
     "adaptive-learning",
-    "continual-learning"
+    "continual-learning",
+    "onnx",
+    "semantic-embeddings",
+    "minilm"
   ],
   "author": "ruv.io Team <info@ruv.io> (https://ruv.io)",
   "homepage": "https://ruv.io",

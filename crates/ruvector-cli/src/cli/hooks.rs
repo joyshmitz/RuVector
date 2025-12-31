@@ -1212,33 +1212,58 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
 
     fs::create_dir_all(&claude_dir)?;
 
+    // Create platform-specific statusline script
+    let (statusline_path, statusline_config) = if cfg!(windows) {
+        // Windows: Use PowerShell script
+        let path = claude_dir.join("statusline-command.ps1");
+        let script = include_str!("../../scripts/statusline-command.ps1");
+        fs::write(&path, script)?;
+        (Some(path), Some(".claude/statusline-command.ps1"))
+    } else {
+        // Unix (macOS, Linux): Use bash script
+        let path = claude_dir.join("statusline-command.sh");
+        let script = include_str!("../../scripts/statusline-command.sh");
+        fs::write(&path, script)?;
+
+        // Make executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&path, perms)?;
+        }
+        (Some(path), Some(".claude/statusline-command.sh"))
+    };
+
     let hooks_config = serde_json::json!({
+        "statusline": statusline_config,
         "hooks": {
             // Pre-tool hooks: provide guidance before actions
             "PreToolUse": [{
                 "matcher": "Edit|Write|MultiEdit",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-edit \"$TOOL_INPUT_FILE_PATH\"",
+                    "command": "npx ruvector hooks pre-edit \"$TOOL_INPUT_FILE_PATH\"",
                     "timeout": 3000
                 }]
             }, {
                 "matcher": "Bash",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-command \"$TOOL_INPUT_COMMAND\"",
+                    "command": "npx ruvector hooks pre-command \"$TOOL_INPUT_COMMAND\"",
                     "timeout": 3000
                 }]
             }, {
                 "matcher": "Task",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks swarm-recommend \"$TOOL_INPUT_SUBAGENT_TYPE\"",
+                    "command": "npx ruvector hooks swarm-recommend \"$TOOL_INPUT_SUBAGENT_TYPE\"",
                     "timeout": 2000
                 }, {
                     // Claude Code v2.0.55+: Register async sub-agent
                     "type": "command",
-                    "command": "ruvector hooks async-agent --action spawn --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\" --task \"$TOOL_INPUT_PROMPT\"",
+                    "command": "npx ruvector hooks async-agent --action spawn --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\" --task \"$TOOL_INPUT_PROMPT\"",
                     "timeout": 1000
                 }]
             }],
@@ -1247,14 +1272,14 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": "Edit|Write|MultiEdit",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks post-edit \"$TOOL_INPUT_FILE_PATH\" --success=$TOOL_STATUS",
+                    "command": "npx ruvector hooks post-edit \"$TOOL_INPUT_FILE_PATH\" --success=$TOOL_STATUS",
                     "timeout": 3000
                 }]
             }, {
                 "matcher": "Bash",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks post-command \"$TOOL_INPUT_COMMAND\" --success=$TOOL_STATUS",
+                    "command": "npx ruvector hooks post-command \"$TOOL_INPUT_COMMAND\" --success=$TOOL_STATUS",
                     "timeout": 3000
                 }]
             }, {
@@ -1262,7 +1287,7 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": "LSP",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks lsp-diagnostic --file \"$TOOL_INPUT_FILE\" --severity \"$TOOL_INPUT_SEVERITY\" --message \"$TOOL_INPUT_MESSAGE\"",
+                    "command": "npx ruvector hooks lsp-diagnostic --file \"$TOOL_INPUT_FILE\" --severity \"$TOOL_INPUT_SEVERITY\" --message \"$TOOL_INPUT_MESSAGE\"",
                     "timeout": 2000
                 }]
             }, {
@@ -1270,7 +1295,7 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": "Task",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks async-agent --action complete --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\"",
+                    "command": "npx ruvector hooks async-agent --action complete --agent-id \"$TOOL_INPUT_SUBAGENT_TYPE\"",
                     "timeout": 2000
                 }]
             }],
@@ -1279,21 +1304,21 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": "startup",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks session-start",
+                    "command": "npx ruvector hooks session-start",
                     "timeout": 5000
                 }]
             }, {
                 "matcher": "resume",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks session-start --resume",
+                    "command": "npx ruvector hooks session-start --resume",
                     "timeout": 3000
                 }]
             }],
             "Stop": [{
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks session-end --export-metrics",
+                    "command": "npx ruvector hooks session-end --export-metrics",
                     "timeout": 5000
                 }]
             }],
@@ -1302,14 +1327,14 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": "auto",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-compact --auto",
+                    "command": "npx ruvector hooks pre-compact --auto",
                     "timeout": 3000
                 }]
             }, {
                 "matcher": "manual",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks pre-compact",
+                    "command": "npx ruvector hooks pre-compact",
                     "timeout": 3000
                 }]
             }],
@@ -1317,7 +1342,7 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
             "UserPromptSubmit": [{
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks suggest-context",
+                    "command": "npx ruvector hooks suggest-context",
                     "timeout": 2000
                 }]
             }],
@@ -1326,7 +1351,7 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
                 "matcher": ".*",
                 "hooks": [{
                     "type": "command",
-                    "command": "ruvector hooks track-notification",
+                    "command": "npx ruvector hooks track-notification",
                     "timeout": 1000
                 }]
             }]
@@ -1337,9 +1362,12 @@ pub fn init_hooks(force: bool, postgres: bool, _config: &Config) -> Result<()> {
 
     println!("{}", "✅ Hooks initialized!".green().bold());
     println!("   Created: {}", settings_path.display());
+    if let Some(ref path) = statusline_path {
+        println!("   Created: {}", path.display());
+    }
     println!("\n{}", "Next steps:".bold());
     println!("   1. Restart Claude Code to activate hooks");
-    println!("   2. Run 'ruvector hooks stats' to verify");
+    println!("   2. Run 'npx ruvector hooks stats' to verify");
 
     Ok(())
 }

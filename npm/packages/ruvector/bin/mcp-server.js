@@ -11,6 +11,9 @@
  *   claude mcp add ruvector npx ruvector mcp start
  */
 
+// Signal that this is an MCP server (enables parallel workers for embeddings)
+process.env.MCP_SERVER = '1';
+
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const {
@@ -291,7 +294,7 @@ class Intelligence {
 const server = new Server(
   {
     name: 'ruvector',
-    version: '0.1.53',
+    version: '0.1.58',
   },
   {
     capabilities: {
@@ -557,6 +560,357 @@ const TOOLS = [
   {
     name: 'hooks_force_learn',
     description: 'Force an immediate learning cycle',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  // ============================================
+  // NEW CAPABILITY TOOLS (AST, Diff, Coverage, Graph, Security, RAG)
+  // ============================================
+  {
+    name: 'hooks_ast_analyze',
+    description: 'Parse file AST and extract symbols, imports, complexity metrics',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'File path to analyze' }
+      },
+      required: ['file']
+    }
+  },
+  {
+    name: 'hooks_ast_complexity',
+    description: 'Get cyclomatic and cognitive complexity metrics for files',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Files to analyze' },
+        threshold: { type: 'number', description: 'Warn if complexity exceeds threshold', default: 10 }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'hooks_diff_analyze',
+    description: 'Analyze git diff with semantic embeddings and risk scoring',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        commit: { type: 'string', description: 'Commit hash (defaults to staged changes)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_diff_classify',
+    description: 'Classify change type (feature, bugfix, refactor, docs, test, config)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        commit: { type: 'string', description: 'Commit hash (defaults to HEAD)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_diff_similar',
+    description: 'Find similar past commits based on diff embeddings',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        top_k: { type: 'number', description: 'Number of results', default: 5 },
+        commits: { type: 'number', description: 'Recent commits to search', default: 50 }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_coverage_route',
+    description: 'Get coverage-aware agent routing for a file',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'File to analyze' }
+      },
+      required: ['file']
+    }
+  },
+  {
+    name: 'hooks_coverage_suggest',
+    description: 'Suggest tests for files based on coverage data',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Files to analyze' }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'hooks_graph_mincut',
+    description: 'Find optimal code boundaries using MinCut algorithm (Stoer-Wagner)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Files to analyze' }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'hooks_graph_cluster',
+    description: 'Detect code communities using spectral or Louvain clustering',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Files to analyze' },
+        method: { type: 'string', enum: ['spectral', 'louvain'], default: 'louvain' },
+        clusters: { type: 'number', description: 'Number of clusters (spectral only)', default: 3 }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'hooks_security_scan',
+    description: 'Parallel security vulnerability scan for common issues',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Files to scan' }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'hooks_rag_context',
+    description: 'Get RAG-enhanced context for a query with optional reranking',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Query for context' },
+        top_k: { type: 'number', description: 'Number of results', default: 5 },
+        rerank: { type: 'boolean', description: 'Rerank results by relevance', default: false }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'hooks_git_churn',
+    description: 'Analyze git churn to find hot spots',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Number of days to analyze', default: 30 },
+        top: { type: 'number', description: 'Top N files', default: 10 }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_route_enhanced',
+    description: 'Enhanced routing using AST complexity, coverage, and diff analysis signals',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Task description' },
+        file: { type: 'string', description: 'File context' }
+      },
+      required: ['task']
+    }
+  },
+  {
+    name: 'hooks_attention_info',
+    description: 'Get available attention mechanisms and their configurations',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'hooks_gnn_info',
+    description: 'Get GNN layer capabilities and configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  // Learning Engine Tools (v2.1)
+  {
+    name: 'hooks_learning_config',
+    description: 'Configure learning algorithms for different tasks. Supports 9 algorithms: q-learning, sarsa, double-q, actor-critic, ppo, decision-transformer, monte-carlo, td-lambda, dqn',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: {
+          type: 'string',
+          description: 'Task type: agent-routing, error-avoidance, confidence-scoring, trajectory-learning, context-ranking, memory-recall',
+          enum: ['agent-routing', 'error-avoidance', 'confidence-scoring', 'trajectory-learning', 'context-ranking', 'memory-recall']
+        },
+        algorithm: {
+          type: 'string',
+          description: 'Learning algorithm',
+          enum: ['q-learning', 'sarsa', 'double-q', 'actor-critic', 'ppo', 'decision-transformer', 'monte-carlo', 'td-lambda', 'dqn']
+        },
+        learningRate: { type: 'number', description: 'Learning rate (0.0-1.0)' },
+        discountFactor: { type: 'number', description: 'Discount factor gamma (0.0-1.0)' },
+        epsilon: { type: 'number', description: 'Exploration rate (0.0-1.0)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_learning_stats',
+    description: 'Get learning algorithm statistics and performance metrics',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'hooks_learning_update',
+    description: 'Record a learning experience for a specific task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Task type' },
+        state: { type: 'string', description: 'Current state' },
+        action: { type: 'string', description: 'Action taken' },
+        reward: { type: 'number', description: 'Reward received (-1 to 1)' },
+        nextState: { type: 'string', description: 'Next state (optional)' },
+        done: { type: 'boolean', description: 'Episode is done' }
+      },
+      required: ['task', 'state', 'action', 'reward']
+    }
+  },
+  {
+    name: 'hooks_learn',
+    description: 'Combined learning action: record experience and get best action recommendation',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        state: { type: 'string', description: 'Current state' },
+        action: { type: 'string', description: 'Action taken (optional)' },
+        reward: { type: 'number', description: 'Reward (-1 to 1, optional)' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Available actions for recommendation' },
+        task: { type: 'string', description: 'Task type', default: 'agent-routing' }
+      },
+      required: ['state']
+    }
+  },
+  {
+    name: 'hooks_algorithms_list',
+    description: 'List all available learning algorithms with descriptions',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  // TensorCompress Tools
+  {
+    name: 'hooks_compress',
+    description: 'Compress pattern storage using TensorCompress. Provides up to 10x memory savings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        force: { type: 'boolean', description: 'Force recompression of all patterns' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_compress_stats',
+    description: 'Get TensorCompress statistics: memory savings, compression levels, tensor counts',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'hooks_compress_store',
+    description: 'Store an embedding with adaptive compression',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Storage key' },
+        vector: { type: 'array', items: { type: 'number' }, description: 'Vector to store' },
+        level: { type: 'string', description: 'Compression level', enum: ['none', 'half', 'pq8', 'pq4', 'binary'] }
+      },
+      required: ['key', 'vector']
+    }
+  },
+  {
+    name: 'hooks_compress_get',
+    description: 'Retrieve a compressed embedding',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Storage key' }
+      },
+      required: ['key']
+    }
+  },
+  {
+    name: 'hooks_batch_learn',
+    description: 'Record multiple learning experiences in batch for efficiency. Processes an array of experiences at once.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        experiences: {
+          type: 'array',
+          description: 'Array of experiences to learn from',
+          items: {
+            type: 'object',
+            properties: {
+              state: { type: 'string', description: 'State identifier' },
+              action: { type: 'string', description: 'Action taken' },
+              reward: { type: 'number', description: 'Reward (-1 to 1)' },
+              nextState: { type: 'string', description: 'Next state (optional)' },
+              done: { type: 'boolean', description: 'Episode ended' }
+            },
+            required: ['state', 'action', 'reward']
+          }
+        },
+        task: { type: 'string', description: 'Task type for all experiences', default: 'agent-routing' }
+      },
+      required: ['experiences']
+    }
+  },
+  {
+    name: 'hooks_subscribe_snapshot',
+    description: 'Get current state snapshot for subscription-style updates. Returns counts and deltas since last call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        events: {
+          type: 'array',
+          description: 'Event types to check',
+          items: { type: 'string', enum: ['learn', 'compress', 'route', 'memory'] },
+          default: ['learn', 'route']
+        },
+        lastState: {
+          type: 'object',
+          description: 'Previous state for delta calculation',
+          properties: {
+            patterns: { type: 'number' },
+            memories: { type: 'number' },
+            trajectories: { type: 'number' },
+            updates: { type: 'number' }
+          }
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'hooks_watch_status',
+    description: 'Get file watching status and recent changes detected',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1163,6 +1517,553 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             text: JSON.stringify({ success: true, result, stats: intel.stats() }, null, 2)
           }]
         };
+      }
+
+      // ============================================
+      // NEW CAPABILITY TOOL HANDLERS
+      // ============================================
+
+      case 'hooks_ast_analyze': {
+        try {
+          const output = execSync(`npx ruvector hooks ast-analyze "${args.file}" --json`, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_ast_complexity': {
+        try {
+          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const output = execSync(`npx ruvector hooks ast-complexity ${filesArg} --threshold ${args.threshold || 10}`, { encoding: 'utf-8', timeout: 60000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_diff_analyze': {
+        try {
+          const cmd = args.commit ? `npx ruvector hooks diff-analyze "${args.commit}" --json` : 'npx ruvector hooks diff-analyze --json';
+          const output = execSync(cmd, { encoding: 'utf-8', timeout: 60000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_diff_classify': {
+        try {
+          const cmd = args.commit ? `npx ruvector hooks diff-classify "${args.commit}"` : 'npx ruvector hooks diff-classify';
+          const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_diff_similar': {
+        try {
+          const output = execSync(`npx ruvector hooks diff-similar -k ${args.top_k || 5} --commits ${args.commits || 50}`, { encoding: 'utf-8', timeout: 120000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_coverage_route': {
+        try {
+          const output = execSync(`npx ruvector hooks coverage-route "${args.file}"`, { encoding: 'utf-8', timeout: 15000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_coverage_suggest': {
+        try {
+          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const output = execSync(`npx ruvector hooks coverage-suggest ${filesArg}`, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_graph_mincut': {
+        try {
+          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const output = execSync(`npx ruvector hooks graph-mincut ${filesArg}`, { encoding: 'utf-8', timeout: 60000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_graph_cluster': {
+        try {
+          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const method = args.method || 'louvain';
+          const clusters = args.clusters || 3;
+          const output = execSync(`npx ruvector hooks graph-cluster ${filesArg} --method ${method} --clusters ${clusters}`, { encoding: 'utf-8', timeout: 60000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_security_scan': {
+        try {
+          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const output = execSync(`npx ruvector hooks security-scan ${filesArg}`, { encoding: 'utf-8', timeout: 120000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_rag_context': {
+        try {
+          let cmd = `npx ruvector hooks rag-context "${args.query}" -k ${args.top_k || 5}`;
+          if (args.rerank) cmd += ' --rerank';
+          const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_git_churn': {
+        try {
+          const output = execSync(`npx ruvector hooks git-churn --days ${args.days || 30} --top ${args.top || 10}`, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_route_enhanced': {
+        try {
+          let cmd = `npx ruvector hooks route-enhanced "${args.task}"`;
+          if (args.file) cmd += ` --file "${args.file}"`;
+          const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+          return { content: [{ type: 'text', text: output }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
+        }
+      }
+
+      case 'hooks_attention_info': {
+        // Return info about available attention mechanisms
+        let attentionInfo = { available: false, mechanisms: [] };
+        try {
+          const attention = require('@ruvector/attention');
+          attentionInfo = {
+            available: true,
+            version: attention.version || '1.0.0',
+            mechanisms: [
+              { name: 'DotProductAttention', description: 'Basic scaled dot-product attention' },
+              { name: 'MultiHeadAttention', description: 'Multi-head self-attention with parallel heads' },
+              { name: 'FlashAttention', description: 'Memory-efficient attention with tiling' },
+              { name: 'HyperbolicAttention', description: 'Attention in Poincaré ball hyperbolic space' },
+              { name: 'LinearAttention', description: 'O(n) linear complexity attention' },
+              { name: 'MoEAttention', description: 'Mixture-of-Experts sparse attention' },
+              { name: 'GraphRoPeAttention', description: 'Rotary position embeddings for graphs' },
+              { name: 'DualSpaceAttention', description: 'Euclidean + Hyperbolic hybrid' },
+              { name: 'LocalGlobalAttention', description: 'Sliding window + global tokens' }
+            ],
+            hyperbolic: { expMap: true, logMap: true, mobiusAddition: true, poincareDistance: true }
+          };
+        } catch (e) {
+          attentionInfo = { available: false, error: 'Attention package not installed' };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...attentionInfo }, null, 2) }] };
+      }
+
+      case 'hooks_gnn_info': {
+        // Return info about GNN capabilities
+        let gnnInfo = { available: false, layers: [] };
+        try {
+          const gnn = require('@ruvector/gnn');
+          gnnInfo = {
+            available: true,
+            version: gnn.version || '1.0.0',
+            layers: [
+              { name: 'RuvectorLayer', description: 'Differentiable vector search layer' },
+              { name: 'TensorCompress', description: 'Tensor compression for embeddings' }
+            ],
+            features: [
+              'differentiableSearch - Gradient-based vector search',
+              'hierarchicalForward - Multi-scale graph processing',
+              'getCompressionLevel - Adaptive compression'
+            ]
+          };
+        } catch (e) {
+          gnnInfo = { available: false, error: 'GNN package not installed' };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...gnnInfo }, null, 2) }] };
+      }
+
+      // Learning Engine Handlers (v2.1)
+      case 'hooks_learning_config': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        if (args.task && args.algorithm) {
+          const config = {};
+          if (args.algorithm) config.algorithm = args.algorithm;
+          if (args.learningRate !== undefined) config.learningRate = args.learningRate;
+          if (args.discountFactor !== undefined) config.discountFactor = args.discountFactor;
+          if (args.epsilon !== undefined) config.epsilon = args.epsilon;
+          engine.configure(args.task, config);
+          intel.learning = engine.export();
+          intel.save();
+        }
+
+        const tasks = ['agent-routing', 'error-avoidance', 'confidence-scoring', 'trajectory-learning', 'context-ranking', 'memory-recall'];
+        const configs = {};
+        for (const task of tasks) {
+          configs[task] = engine.getConfig(task);
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, configs }, null, 2) }] };
+      }
+
+      case 'hooks_learning_stats': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const summary = engine.getStatsSummary();
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...summary }, null, 2) }] };
+      }
+
+      case 'hooks_learning_update': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const experience = {
+          state: args.state,
+          action: args.action,
+          reward: args.reward,
+          nextState: args.nextState || args.state,
+          done: args.done || false,
+          timestamp: Date.now()
+        };
+
+        const delta = engine.update(args.task, experience);
+        intel.learning = engine.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          task: args.task,
+          experience,
+          delta,
+          algorithm: engine.getConfig(args.task).algorithm
+        }, null, 2) }] };
+      }
+
+      case 'hooks_learn': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const engine = new LearningEngine();
+        if (intel.learning) engine.import(intel.learning);
+
+        const task = args.task || 'agent-routing';
+        let result = { success: true };
+
+        if (args.action && args.reward !== undefined) {
+          const experience = {
+            state: args.state,
+            action: args.action,
+            reward: args.reward,
+            nextState: args.state,
+            done: true,
+            timestamp: Date.now()
+          };
+          const delta = engine.update(task, experience);
+          result.recorded = { experience, delta, algorithm: engine.getConfig(task).algorithm };
+        }
+
+        if (args.actions && args.actions.length > 0) {
+          const best = engine.getBestAction(task, args.state, args.actions);
+          result.recommendation = best;
+        }
+
+        intel.learning = engine.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'hooks_algorithms_list': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const algorithms = LearningEngine.getAlgorithms();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          algorithms: algorithms.map(a => ({
+            name: a.algorithm,
+            description: a.description,
+            bestFor: a.bestFor
+          }))
+        }, null, 2) }] };
+      }
+
+      // TensorCompress Handlers
+      case 'hooks_compress': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const stats = compress.recompressAll();
+        intel.compressedPatterns = compress.export();
+        intel.save();
+
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'Compression complete', ...stats }, null, 2) }] };
+      }
+
+      case 'hooks_compress_stats': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const stats = compress.getStats();
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...stats }, null, 2) }] };
+      }
+
+      case 'hooks_compress_store': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        compress.store(args.key, args.vector, args.level);
+        intel.compressedPatterns = compress.export();
+        intel.save();
+
+        const stats = compress.getStats();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          key: args.key,
+          level: args.level || 'auto',
+          originalDim: args.vector.length,
+          totalTensors: stats.totalTensors
+        }, null, 2) }] };
+      }
+
+      case 'hooks_compress_get': {
+        let TensorCompress;
+        try {
+          TensorCompress = require('../dist/core/tensor-compress').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'TensorCompress not available' }) }] };
+        }
+
+        const compress = new TensorCompress({ autoCompress: false });
+        if (intel.compressedPatterns) compress.import(intel.compressedPatterns);
+
+        const vector = compress.get(args.key);
+        if (!vector) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Key not found' }) }] };
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          key: args.key,
+          vector: Array.from(vector),
+          dimension: vector.length
+        }, null, 2) }] };
+      }
+
+      case 'hooks_batch_learn': {
+        let LearningEngine;
+        try {
+          LearningEngine = require('../dist/core/learning-engine').default;
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'LearningEngine not available' }) }] };
+        }
+
+        const experiences = args.experiences || [];
+        if (!Array.isArray(experiences) || experiences.length === 0) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'experiences must be a non-empty array' }) }] };
+        }
+
+        const task = args.task || 'agent-routing';
+        const engine = new LearningEngine();
+
+        // Import existing learning data
+        if (intel.data.learning) {
+          engine.import(intel.data.learning);
+        }
+
+        const results = [];
+        let totalReward = 0;
+
+        for (const exp of experiences) {
+          const experience = {
+            state: exp.state,
+            action: exp.action,
+            reward: exp.reward ?? 0.5,
+            nextState: exp.nextState ?? exp.state,
+            done: exp.done ?? false,
+            timestamp: Date.now()
+          };
+
+          const delta = engine.update(task, experience);
+          totalReward += experience.reward;
+          results.push({ state: exp.state, action: exp.action, reward: experience.reward, delta });
+        }
+
+        // Save
+        intel.data.learning = engine.export();
+        intel.save();
+
+        const stats = engine.getStatsSummary();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          processed: experiences.length,
+          avgReward: totalReward / experiences.length,
+          results,
+          stats: {
+            bestAlgorithm: stats.bestAlgorithm,
+            totalUpdates: stats.totalUpdates,
+            avgReward: stats.avgReward
+          }
+        }, null, 2) }] };
+      }
+
+      case 'hooks_subscribe_snapshot': {
+        const events = args.events || ['learn', 'route'];
+        const lastState = args.lastState || { patterns: 0, memories: 0, trajectories: 0, updates: 0 };
+
+        const stats = intel.data.stats || {};
+        const learning = intel.data.learning?.stats || {};
+
+        // Calculate current state
+        let totalUpdates = 0;
+        let bestAlgorithm = null;
+        let bestAvgReward = -Infinity;
+
+        Object.entries(learning).forEach(([algo, data]) => {
+          if (data.updates) {
+            totalUpdates += data.updates;
+            if (data.avgReward > bestAvgReward) {
+              bestAvgReward = data.avgReward;
+              bestAlgorithm = algo;
+            }
+          }
+        });
+
+        const currentState = {
+          patterns: stats.total_patterns || 0,
+          memories: stats.total_memories || 0,
+          trajectories: stats.total_trajectories || 0,
+          updates: totalUpdates
+        };
+
+        // Calculate deltas
+        const deltas = {
+          patterns: currentState.patterns - (lastState.patterns || 0),
+          memories: currentState.memories - (lastState.memories || 0),
+          trajectories: currentState.trajectories - (lastState.trajectories || 0),
+          updates: currentState.updates - (lastState.updates || 0)
+        };
+
+        const hasChanges = Object.values(deltas).some(d => d > 0);
+
+        // Build events array
+        const eventsList = [];
+        if (events.includes('learn') && deltas.patterns > 0) {
+          eventsList.push({ type: 'learn', subtype: 'pattern', delta: deltas.patterns, total: currentState.patterns });
+        }
+        if (events.includes('learn') && deltas.updates > 0) {
+          eventsList.push({ type: 'learn', subtype: 'algorithm', delta: deltas.updates, total: currentState.updates, bestAlgorithm });
+        }
+        if (events.includes('memory') && deltas.memories > 0) {
+          eventsList.push({ type: 'memory', delta: deltas.memories, total: currentState.memories });
+        }
+        if (events.includes('route') && deltas.trajectories > 0) {
+          eventsList.push({ type: 'route', delta: deltas.trajectories, total: currentState.trajectories });
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          hasChanges,
+          currentState,
+          deltas,
+          events: eventsList,
+          bestAlgorithm,
+          timestamp: Date.now()
+        }, null, 2) }] };
+      }
+
+      case 'hooks_watch_status': {
+        // Return current intelligence state as a "watch" status
+        const stats = intel.data.stats || {};
+        const patterns = Object.keys(intel.data.patterns || {});
+        const recentPatterns = patterns.slice(-5);
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          watching: true,
+          stats: {
+            totalPatterns: stats.total_patterns || 0,
+            totalMemories: stats.total_memories || 0,
+            totalTrajectories: stats.total_trajectories || 0,
+            sessionCount: stats.session_count || 0
+          },
+          recentPatterns,
+          lastUpdate: stats.last_session || Date.now(),
+          tip: 'Use hooks_subscribe_snapshot with lastState for delta tracking'
+        }, null, 2) }] };
       }
 
       default:

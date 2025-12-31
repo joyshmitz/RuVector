@@ -20,23 +20,58 @@ Built by [rUv](https://ruv.io) with production-grade Rust performance and intell
 
 ---
 
-## 🧠 Claude Code Hooks (NEW)
+## 🧠 Claude Code Intelligence v2.0
 
-**Self-learning intelligence for Claude Code** — RuVector provides optimized hooks that learn from your development patterns.
+**Self-learning intelligence for Claude Code** — RuVector provides optimized hooks with ONNX embeddings, AST analysis, and coverage-aware routing.
 
 ```bash
 # One-command setup with pretrain and agent generation
 npx ruvector hooks init --pretrain --build-agents quality
 ```
 
-**Features:**
-- 🎯 **Smart Agent Routing** — Automatically suggests the best agent for each file type
-- 📚 **Repository Pretrain** — Analyzes your codebase to bootstrap intelligence
-- 🤖 **Agent Builder** — Generates optimized `.claude/agents/` configs for your stack
-- 🔗 **Co-edit Patterns** — Learns which files are edited together from git history
-- 💾 **Vector Memory** — Semantic recall of project context
+### Core Features
+- 🎯 **Smart Agent Routing** — Q-learning optimized suggestions with 80%+ accuracy
+- 📚 **9-Phase Pretrain** — AST, diff, coverage, neural, and graph analysis
+- 🤖 **Agent Builder** — Generates optimized `.claude/agents/` configs
+- 🔗 **Co-edit Patterns** — Learns file relationships from git history
+- 💾 **Vector Memory** — HNSW-indexed semantic recall (150x faster)
+
+### New in v2.0
+- ⚡ **ONNX WASM Embeddings** — all-MiniLM-L6-v2 (384d) runs locally, no API needed
+- 🌳 **AST Analysis** — Symbol extraction, complexity metrics, import graphs
+- 📊 **Diff Embeddings** — Semantic change classification with risk scoring
+- 🧪 **Coverage Routing** — Test coverage-aware agent selection
+- 🔍 **Graph Algorithms** — MinCut boundaries, Louvain communities, Spectral clustering
+- 🛡️ **Security Scanning** — Parallel vulnerability pattern detection
+- 🎯 **RAG Context** — Semantic retrieval with HNSW indexing
+
+### Performance
+| Backend | Read Time | Speedup |
+|---------|-----------|---------|
+| ONNX inference | ~400ms | baseline |
+| HNSW search | ~0.045ms | 8,800x |
+| Memory cache | ~0.01ms | **40,000x** |
 
 📖 **[Full Hooks Documentation →](https://github.com/ruvnet/ruvector/blob/main/npm/packages/ruvector/HOOKS.md)**
+
+### MCP Server Integration
+
+RuVector includes an MCP server for Claude Code with 30+ tools:
+
+```bash
+# Add to Claude Code
+claude mcp add ruvector-mcp -- npx ruvector mcp-server
+```
+
+**Available MCP Tools:**
+- `hooks_route`, `hooks_route_enhanced` — Agent routing with signals
+- `hooks_ast_analyze`, `hooks_ast_complexity` — Code structure analysis
+- `hooks_diff_analyze`, `hooks_diff_classify` — Change classification
+- `hooks_coverage_route`, `hooks_coverage_suggest` — Test-aware routing
+- `hooks_graph_mincut`, `hooks_graph_cluster` — Code boundaries
+- `hooks_security_scan` — Vulnerability detection
+- `hooks_rag_context` — Semantic context retrieval
+- `hooks_attention_info`, `hooks_gnn_info` — Neural capabilities
 
 ---
 
@@ -112,6 +147,15 @@ npm install ruvector
 - Downloads the correct native binary for maximum performance
 - Falls back to WebAssembly if native binaries aren't available
 - No additional setup, Docker, or external services required
+
+**Windows Installation (without build tools):**
+```bash
+# Skip native compilation, use WASM fallback
+npm install ruvector --ignore-scripts
+
+# The ONNX WASM runtime (7.4MB) works without build tools
+# Memory cache provides 40,000x speedup over inference
+```
 
 **Verify installation:**
 ```bash
@@ -617,9 +661,38 @@ npx ruvector attention hyperbolic -a exp-map -v "[0.1,0.2,0.3]"
 | **Large-Scale Graphs** | LocalGlobalAttention | Efficient local + global context |
 | **Model Routing/MoE** | MoEAttention | Expert selection and routing |
 
-### 🧠 Self-Learning Hooks
+### ⚡ ONNX WASM Embeddings (v2.0)
 
-Ruvector includes **self-learning intelligence hooks** for Claude Code integration. These hooks enable automatic agent routing, pattern learning, and context suggestions.
+RuVector includes a pure JavaScript ONNX runtime for local embeddings - no Python, no API calls, no build tools required.
+
+```bash
+# Embeddings work out of the box
+npx ruvector hooks remember "important context" -t project
+npx ruvector hooks recall "context query"
+npx ruvector hooks rag-context "how does auth work"
+```
+
+**Model**: all-MiniLM-L6-v2 (384 dimensions, 23MB)
+- Downloads automatically on first use
+- Cached in `.ruvector/models/`
+- SIMD-accelerated when available
+
+**Performance:**
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Model load | ~2s | First use only |
+| Embedding | ~50ms | Per text chunk |
+| HNSW search | 0.045ms | 150x faster than brute force |
+| Cache hit | 0.01ms | 40,000x faster than inference |
+
+**Fallback Chain:**
+1. Native SQLite → best persistence
+2. WASM SQLite → cross-platform
+3. Memory Cache → fastest (no persistence)
+
+### 🧠 Self-Learning Hooks v2.0
+
+Ruvector includes **self-learning intelligence hooks** for Claude Code integration with ONNX embeddings, AST analysis, and coverage-aware routing.
 
 #### Initialize Hooks
 
@@ -628,11 +701,13 @@ Ruvector includes **self-learning intelligence hooks** for Claude Code integrati
 npx ruvector hooks init
 
 # Options:
-#   --force     Overwrite existing configuration
-#   --minimal   Minimal configuration (no optional hooks)
+#   --force      Overwrite existing configuration
+#   --minimal    Minimal configuration (no optional hooks)
+#   --pretrain   Initialize + pretrain from git history
+#   --build-agents quality  Generate optimized agent configs
 ```
 
-This creates `.claude/settings.json` with pre-configured hooks for intelligent development assistance.
+This creates `.claude/settings.json` with pre-configured hooks and `CLAUDE.md` with comprehensive documentation.
 
 #### Session Management
 
@@ -720,31 +795,102 @@ npx ruvector hooks swarm-recommend "code-review"
 # Output: Recommended agents for code review task
 ```
 
+#### AST Analysis (v2.0)
+
+```bash
+# Analyze file structure, symbols, imports, complexity
+npx ruvector hooks ast-analyze src/index.ts --json
+
+# Get complexity metrics for multiple files
+npx ruvector hooks ast-complexity src/*.ts --threshold 15
+# Flags files exceeding cyclomatic complexity threshold
+```
+
+#### Diff & Risk Analysis (v2.0)
+
+```bash
+# Analyze commit with semantic embeddings and risk scoring
+npx ruvector hooks diff-analyze HEAD
+# Output: risk score, category, affected files
+
+# Classify change type (feature, bugfix, refactor, docs, test)
+npx ruvector hooks diff-classify
+
+# Find similar past commits via embeddings
+npx ruvector hooks diff-similar -k 5
+
+# Git churn analysis (hot spots)
+npx ruvector hooks git-churn --days 30
+```
+
+#### Coverage-Aware Routing (v2.0)
+
+```bash
+# Get coverage-aware routing for a file
+npx ruvector hooks coverage-route src/api.ts
+# Output: agent weights based on test coverage
+
+# Suggest tests for files based on coverage gaps
+npx ruvector hooks coverage-suggest src/*.ts
+```
+
+#### Graph Analysis (v2.0)
+
+```bash
+# Find optimal code boundaries (MinCut algorithm)
+npx ruvector hooks graph-mincut src/*.ts
+
+# Detect code communities (Louvain/Spectral clustering)
+npx ruvector hooks graph-cluster src/*.ts --method louvain
+```
+
+#### Security & RAG (v2.0)
+
+```bash
+# Parallel security vulnerability scan
+npx ruvector hooks security-scan src/*.ts
+
+# RAG-enhanced context retrieval
+npx ruvector hooks rag-context "how does auth work"
+
+# Enhanced routing with all signals
+npx ruvector hooks route-enhanced "fix bug" --file src/api.ts
+```
+
 #### Hooks Configuration
 
 The hooks integrate with Claude Code via `.claude/settings.json`:
 
 ```json
 {
+  "env": {
+    "RUVECTOR_INTELLIGENCE_ENABLED": "true",
+    "RUVECTOR_LEARNING_RATE": "0.1",
+    "RUVECTOR_AST_ENABLED": "true",
+    "RUVECTOR_DIFF_EMBEDDINGS": "true",
+    "RUVECTOR_COVERAGE_ROUTING": "true",
+    "RUVECTOR_GRAPH_ALGORITHMS": "true",
+    "RUVECTOR_SECURITY_SCAN": "true"
+  },
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "hooks": ["ruvector hooks pre-edit \"$TOOL_INPUT_file_path\""]
+        "hooks": [{ "type": "command", "command": "npx ruvector hooks pre-edit \"$TOOL_INPUT_file_path\"" }]
       },
       {
         "matcher": "Bash",
-        "hooks": ["ruvector hooks pre-command \"$TOOL_INPUT_command\""]
+        "hooks": [{ "type": "command", "command": "npx ruvector hooks pre-command \"$TOOL_INPUT_command\"" }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "hooks": ["ruvector hooks post-edit \"$TOOL_INPUT_file_path\""]
+        "hooks": [{ "type": "command", "command": "npx ruvector hooks post-edit \"$TOOL_INPUT_file_path\"" }]
       }
     ],
-    "SessionStart": ["ruvector hooks session-start"],
-    "Stop": ["ruvector hooks session-end"]
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "npx ruvector hooks session-start" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "npx ruvector hooks session-end" }] }]
   }
 }
 ```
@@ -753,8 +899,11 @@ The hooks integrate with Claude Code via `.claude/settings.json`:
 
 1. **Pattern Recording**: Every edit and command is recorded with context
 2. **Q-Learning**: Success/failure updates agent routing weights
-3. **Vector Memory**: Decisions and references stored for semantic recall
-4. **Continuous Improvement**: The more you use it, the smarter it gets
+3. **AST Analysis**: Code complexity informs agent selection
+4. **Diff Embeddings**: Change patterns improve risk assessment
+5. **Coverage Routing**: Test coverage guides testing priorities
+6. **Vector Memory**: Decisions and references stored for semantic recall (HNSW indexed)
+7. **Continuous Improvement**: The more you use it, the smarter it gets
 
 ## 📊 Performance Benchmarks
 

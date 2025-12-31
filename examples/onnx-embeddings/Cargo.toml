@@ -7,7 +7,7 @@ description = "ONNX-based embedding generation for RuVector - Reimagined embeddi
 license = "MIT"
 repository = "https://github.com/ruvnet/ruvector"
 keywords = ["onnx", "embeddings", "vector-database", "rust", "ml"]
-categories = ["science", "machine-learning"]
+categories = ["science", "algorithms"]
 
 # Make this a standalone package, not part of the workspace
 [workspace]
