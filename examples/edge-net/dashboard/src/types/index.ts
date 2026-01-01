@@ -12,7 +12,7 @@ export interface NetworkStats {
 
 export interface NodeInfo {
   id: string;
-  status: 'online' | 'offline' | 'busy' | 'idle';
+  status: 'online' | 'offline' | 'busy' | 'idle' | 'active';
   computePower: number;
   creditsEarned: number;
   tasksCompleted: number;
@@ -68,6 +68,7 @@ export interface WASMModule {
   features: string[];
   status: 'loading' | 'ready' | 'error' | 'unloaded';
   error?: string;
+  loadTime?: number; // ms to load
 }
 
 export interface WASMBenchmark {
@@ -109,6 +110,34 @@ export interface TemporalMetrics {
   driftCorrection: number;
   consensusLatency: number;
   epochNumber: number;
+}
+
+// Specialized Networks
+export interface SpecializedNetwork {
+  id: string;
+  name: string;
+  description: string;
+  category: 'science' | 'finance' | 'healthcare' | 'ai' | 'gaming' | 'social';
+  icon: string;
+  color: string;
+  stats: {
+    nodes: number;
+    compute: number; // TFLOPS
+    tasks: number;
+    uptime: number; // percentage
+  };
+  requirements: {
+    minCompute: number;
+    minBandwidth: number;
+    capabilities: string[];
+  };
+  rewards: {
+    baseRate: number; // credits per hour
+    bonusMultiplier: number;
+  };
+  status: 'active' | 'maintenance' | 'launching' | 'closed';
+  joined: boolean;
+  joinedAt?: Date;
 }
 
 // Credit Economy

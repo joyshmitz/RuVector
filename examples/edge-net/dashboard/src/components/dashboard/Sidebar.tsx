@@ -11,6 +11,8 @@ import {
   X,
   Coins,
   Activity,
+  KeyRound,
+  BookOpen,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -30,21 +32,60 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={20} /> },
-  { id: 'network', label: 'Network', icon: <Network size={20} />, badge: 892 },
-  { id: 'wasm', label: 'WASM Modules', icon: <Cpu size={20} /> },
-  { id: 'cdn', label: 'CDN Scripts', icon: <Package size={20} /> },
-  { id: 'mcp', label: 'MCP Tools', icon: <Wrench size={20} /> },
-  { id: 'credits', label: 'Credits', icon: <Coins size={20} /> },
-  { id: 'console', label: 'Console', icon: <Terminal size={20} /> },
+  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={18} /> },
+  { id: 'identity', label: 'Identity', icon: <KeyRound size={18} /> },
+  { id: 'network', label: 'Network', icon: <Network size={18} /> },
+  { id: 'wasm', label: 'WASM Modules', icon: <Cpu size={18} /> },
+  { id: 'cdn', label: 'CDN Scripts', icon: <Package size={18} /> },
+  { id: 'mcp', label: 'MCP Tools', icon: <Wrench size={18} /> },
+  { id: 'credits', label: 'Credits', icon: <Coins size={18} /> },
+  { id: 'console', label: 'Console', icon: <Terminal size={18} /> },
+  { id: 'docs', label: 'Documentation', icon: <BookOpen size={18} /> },
 ];
 
 const bottomItems: NavItem[] = [
-  { id: 'activity', label: 'Activity', icon: <Activity size={20} /> },
-  { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },
+  { id: 'activity', label: 'Activity', icon: <Activity size={18} /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
 export function Sidebar({ activeTab, onTabChange, isOpen, onClose, isMobile }: SidebarProps) {
+  const NavButton = ({ item, activeColor = 'sky' }: { item: NavItem; activeColor?: string }) => {
+    const isActive = activeTab === item.id;
+    const colorClasses = activeColor === 'sky'
+      ? 'bg-sky-500/20 text-sky-400 border-sky-500/30'
+      : 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+
+    return (
+      <button
+        onClick={() => {
+          onTabChange(item.id);
+          if (isMobile) onClose();
+        }}
+        className={`
+          w-full h-10 px-3 rounded-lg
+          flex items-center gap-3
+          transition-all duration-200
+          ${isActive
+            ? `${colorClasses} border`
+            : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }
+        `}
+      >
+        <span className="flex-shrink-0 flex items-center justify-center w-5">
+          {item.icon}
+        </span>
+        <span className="flex-1 text-left text-sm font-medium truncate">
+          {item.label}
+        </span>
+        {item.badge !== undefined && (
+          <span className="text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full">
+            {item.badge.toLocaleString()}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   const content = (
     <div className="flex flex-col h-full py-4">
       {/* Close button (mobile) */}
@@ -58,32 +99,11 @@ export function Sidebar({ activeTab, onTabChange, isOpen, onClose, isMobile }: S
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3">
-        <ul className="space-y-1">
+        <div className="space-y-1">
           {navItems.map((item) => (
-            <li key={item.id}>
-              <Button
-                className={`w-full justify-start gap-3 px-3 ${
-                  activeTab === item.id
-                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                }`}
-                variant="light"
-                onPress={() => {
-                  onTabChange(item.id);
-                  if (isMobile) onClose();
-                }}
-              >
-                {item.icon}
-                <span className="flex-1 text-left">{item.label}</span>
-                {item.badge && (
-                  <span className="text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full">
-                    {item.badge.toLocaleString()}
-                  </span>
-                )}
-              </Button>
-            </li>
+            <NavButton key={item.id} item={item} activeColor="sky" />
           ))}
-        </ul>
+        </div>
       </nav>
 
       {/* Divider */}
@@ -91,27 +111,11 @@ export function Sidebar({ activeTab, onTabChange, isOpen, onClose, isMobile }: S
 
       {/* Bottom Navigation */}
       <nav className="px-3">
-        <ul className="space-y-1">
+        <div className="space-y-1">
           {bottomItems.map((item) => (
-            <li key={item.id}>
-              <Button
-                className={`w-full justify-start gap-3 px-3 ${
-                  activeTab === item.id
-                    ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                }`}
-                variant="light"
-                onPress={() => {
-                  onTabChange(item.id);
-                  if (isMobile) onClose();
-                }}
-              >
-                {item.icon}
-                <span className="flex-1 text-left">{item.label}</span>
-              </Button>
-            </li>
+            <NavButton key={item.id} item={item} activeColor="violet" />
           ))}
-        </ul>
+        </div>
       </nav>
 
       {/* Version info */}

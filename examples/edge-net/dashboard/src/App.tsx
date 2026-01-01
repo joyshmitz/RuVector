@@ -4,12 +4,16 @@ import { Header } from './components/dashboard/Header';
 import { Sidebar } from './components/dashboard/Sidebar';
 import { NetworkStats } from './components/network/NetworkStats';
 import { NetworkVisualization } from './components/network/NetworkVisualization';
+import { SpecializedNetworks } from './components/network/SpecializedNetworks';
 import { CDNPanel } from './components/cdn/CDNPanel';
 import { WASMModules } from './components/wasm/WASMModules';
 import { MCPTools } from './components/mcp/MCPTools';
 import { CreditsPanel } from './components/dashboard/CreditsPanel';
 import { ConsolePanel } from './components/dashboard/ConsolePanel';
+import { IdentityPanel } from './components/identity/IdentityPanel';
+import { DocumentationPanel } from './components/docs/DocumentationPanel';
 import { CrystalLoader } from './components/common/CrystalLoader';
+import { ConsentWidget } from './components/common/ConsentWidget';
 import { useNetworkStore } from './stores/networkStore';
 
 function App() {
@@ -17,7 +21,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { simulateActivity } = useNetworkStore();
+  const { initializeEdgeNet, updateRealStats, isWASMReady } = useNetworkStore();
 
   // Check for mobile viewport
   useEffect(() => {
@@ -27,17 +31,26 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Simulate network activity
+  // Initialize real EdgeNet WASM module
   useEffect(() => {
-    const interval = setInterval(simulateActivity, 2000);
-    return () => clearInterval(interval);
-  }, [simulateActivity]);
+    const init = async () => {
+      try {
+        await initializeEdgeNet();
+        console.log('[App] EdgeNet initialized, WASM ready:', isWASMReady);
+      } catch (error) {
+        console.error('[App] EdgeNet initialization failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, [initializeEdgeNet, isWASMReady]);
 
-  // Initial loading
+  // Update real stats from EdgeNet node
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    const interval = setInterval(updateRealStats, 1000);
+    return () => clearInterval(interval);
+  }, [updateRealStats]);
 
   // Render active tab content
   const renderContent = () => {
@@ -90,11 +103,11 @@ function App() {
                   <p className="text-xs text-zinc-400 mt-1">Load libraries</p>
                 </button>
                 <button
-                  className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors text-left"
-                  onClick={() => setActiveTab('console')}
+                  className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors text-left"
+                  onClick={() => setActiveTab('identity')}
                 >
-                  <p className="font-medium text-white">Debug</p>
-                  <p className="text-xs text-zinc-400 mt-1">View console</p>
+                  <p className="font-medium text-white">Identity</p>
+                  <p className="text-xs text-zinc-400 mt-1">Crypto ID & Networks</p>
                 </button>
               </div>
             </motion.div>
@@ -103,9 +116,18 @@ function App() {
       ),
       network: (
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Network Nodes</h1>
+          <h1 className="text-2xl font-bold">
+            <span className="bg-gradient-to-r from-sky-400 to-cyan-400 bg-clip-text text-transparent">
+              Network & Communities
+            </span>
+          </h1>
+          <p className="text-zinc-400">Join specialized networks to earn credits by contributing compute</p>
           <NetworkStats />
-          <NetworkVisualization />
+          <SpecializedNetworks />
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-zinc-300 mb-4">Network Topology</h2>
+            <NetworkVisualization />
+          </div>
         </div>
       ),
       wasm: (
@@ -127,6 +149,17 @@ function App() {
           <CreditsPanel />
         </div>
       ),
+      identity: (
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold">
+            <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+              Identity & Networks
+            </span>
+          </h1>
+          <p className="text-zinc-400">Manage your cryptographic identity and network participation</p>
+          <IdentityPanel />
+        </div>
+      ),
       console: <ConsolePanel />,
       activity: (
         <div className="crystal-card p-8 text-center">
@@ -136,6 +169,17 @@ function App() {
       settings: (
         <div className="crystal-card p-8 text-center">
           <p className="text-zinc-400">Settings panel coming soon...</p>
+        </div>
+      ),
+      docs: (
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold">
+            <span className="bg-gradient-to-r from-sky-400 to-cyan-400 bg-clip-text text-transparent">
+              Documentation
+            </span>
+          </h1>
+          <p className="text-zinc-400">Learn how to use Edge-Net and integrate it into your projects</p>
+          <DocumentationPanel />
         </div>
       ),
     };
@@ -183,6 +227,9 @@ function App() {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Floating consent widget for CPU/GPU contribution */}
+      <ConsentWidget />
     </div>
   );
 }
