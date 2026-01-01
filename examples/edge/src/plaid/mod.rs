@@ -4,6 +4,26 @@
 //! in the browser. No financial data, learning patterns, or AI models ever leave the
 //! client device.
 //!
+//! ## Modules
+//!
+//! - `zkproofs` - Zero-knowledge proofs for financial statements
+//! - `wasm` - WASM bindings for browser integration
+//! - `zk_wasm` - WASM bindings for ZK proofs
+
+pub mod zkproofs;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;
+
+#[cfg(feature = "wasm")]
+pub mod zk_wasm;
+
+// Re-export ZK types
+pub use zkproofs::{
+    ZkProof, ProofType, VerificationResult, Commitment,
+    FinancialProofBuilder, RentalApplicationProof,
+};
+//!
 //! ## Architecture
 //!
 //! ```text
