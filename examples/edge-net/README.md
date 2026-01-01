@@ -611,6 +611,154 @@ npm run simulate
 
 ---
 
+## Exotic AI Capabilities
+
+Edge-net can be enhanced with exotic AI WASM capabilities for advanced P2P coordination, self-learning, and distributed reasoning. Enable these features by building with the appropriate feature flags.
+
+### Available Feature Flags
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `exotic` | Time Crystal, NAO, Morphogenetic Networks | ruvector-exotic-wasm |
+| `learning-enhanced` | MicroLoRA, BTSP, HDC, WTA, Global Workspace | ruvector-learning-wasm, ruvector-nervous-system-wasm |
+| `economy-enhanced` | Enhanced CRDT credits | ruvector-economy-wasm |
+| `exotic-full` | All exotic capabilities | All above |
+
+### Time Crystal (P2P Synchronization)
+
+Robust distributed coordination using discrete time crystal dynamics:
+
+```javascript
+// Enable time crystal with 10 oscillators
+node.enableTimeCrystal(10);
+
+// Check synchronization level (0.0 - 1.0)
+const sync = node.getTimeCrystalSync();
+console.log(`P2P sync: ${(sync * 100).toFixed(1)}%`);
+
+// Check if crystal is stable
+if (node.isTimeCrystalStable()) {
+  console.log('Network is synchronized!');
+}
+```
+
+### NAO (Neural Autonomous Organization)
+
+Decentralized governance with stake-weighted quadratic voting:
+
+```javascript
+// Enable NAO with 70% quorum requirement
+node.enableNAO(0.7);
+
+// Add peer nodes as members
+node.addNAOMember('peer-123', 100);
+node.addNAOMember('peer-456', 50);
+
+// Propose and vote on network actions
+const propId = node.proposeNAOAction('Increase task capacity');
+node.voteNAOProposal(propId, 0.9);  // Vote with 90% weight
+
+// Execute if quorum reached
+if (node.executeNAOProposal(propId)) {
+  console.log('Proposal executed!');
+}
+```
+
+### MicroLoRA (Per-Node Self-Learning)
+
+Ultra-fast LoRA adaptation with <100us latency:
+
+```javascript
+// Enable MicroLoRA with rank-2 adaptation
+node.enableMicroLoRA(2);
+
+// Adapt weights based on task feedback
+const gradient = new Float32Array(128);
+node.adaptMicroLoRA('vector_search', gradient);
+
+// Apply adaptation to inputs
+const input = new Float32Array(128);
+const adapted = node.applyMicroLoRA('vector_search', input);
+```
+
+### HDC (Hyperdimensional Computing)
+
+10,000-bit binary hypervectors for distributed reasoning:
+
+```javascript
+// Enable HDC memory
+node.enableHDC();
+
+// Store patterns for semantic operations
+node.storeHDCPattern('concept_a');
+node.storeHDCPattern('concept_b');
+```
+
+### WTA (Winner-Take-All)
+
+Instant decisions with <1us latency:
+
+```javascript
+// Enable WTA with 1000 neurons
+node.enableWTA(1000);
+```
+
+### BTSP (One-Shot Learning)
+
+Immediate pattern association without iterative training:
+
+```javascript
+// Enable BTSP with 128-dim inputs
+node.enableBTSP(128);
+
+// One-shot associate a pattern
+const pattern = new Float32Array(128);
+node.oneShotAssociate(pattern, 1.0);
+```
+
+### Morphogenetic Network
+
+Self-organizing network topology through cellular differentiation:
+
+```javascript
+// Enable 100x100 morphogenetic grid
+node.enableMorphogenetic(100);
+
+// Network grows automatically
+console.log(`Cells: ${node.getMorphogeneticCellCount()}`);
+```
+
+### Stepping All Capabilities
+
+In your main loop, step all capabilities forward:
+
+```javascript
+function gameLoop(dt) {
+  // Step exotic capabilities
+  node.stepCapabilities(dt);
+
+  // Process tasks
+  node.processNextTask();
+}
+
+setInterval(() => gameLoop(0.016), 16);  // 60 FPS
+```
+
+### Building with Exotic Features
+
+```bash
+# Build with exotic capabilities
+wasm-pack build --target web --release --out-dir pkg -- --features exotic
+
+# Build with learning-enhanced capabilities
+wasm-pack build --target web --release --out-dir pkg -- --features learning-enhanced
+
+# Build with all exotic capabilities
+wasm-pack build --target web --release --out-dir pkg -- --features exotic-full
+```
+
+---
+
 ## Research Foundation
 
 Edge-net is built on research in:
@@ -619,6 +767,9 @@ Edge-net is built on research in:
 - **Collective Intelligence** - Emergent optimization
 - **Game Theory** - Incentive-compatible mechanisms
 - **Adaptive Security** - Q-learning threat response
+- **Time Crystals** - Floquet engineering for coordination
+- **Neuromorphic Computing** - BTSP, HDC, WTA mechanisms
+- **Decentralized Governance** - Neural Autonomous Organizations
 
 ---
 

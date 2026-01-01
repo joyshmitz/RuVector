@@ -7,10 +7,10 @@
 //!
 //! - **DAG Data Structures**: Efficient directed acyclic graph representation for query plans
 //! - **7 Attention Mechanisms**: Topological, Causal Cone, Critical Path, MinCut Gated, and more
-//! - **SONA Learning**: Self-Optimizing Neural Architecture with MicroLoRA adaptation
+//! - **SONA Learning**: Self-Optimizing Neural Architecture with MicroLoRA adaptation (non-WASM only)
 //! - **MinCut Optimization**: Subpolynomial O(n^0.12) bottleneck detection
-//! - **Self-Healing**: Autonomous anomaly detection and repair
-//! - **QuDAG Integration**: Quantum-resistant distributed pattern learning
+//! - **Self-Healing**: Autonomous anomaly detection and repair (non-WASM only)
+//! - **QuDAG Integration**: Quantum-resistant distributed pattern learning (non-WASM only)
 //!
 //! ## Quick Start
 //!
@@ -33,16 +33,22 @@
 //!
 //! - [`dag`] - Core DAG data structures and algorithms
 //! - [`attention`] - Neural attention mechanisms for node importance
-//! - [`sona`] - Self-Optimizing Neural Architecture with adaptive learning
+//! - [`sona`] - Self-Optimizing Neural Architecture with adaptive learning (requires `full` feature)
 //! - [`mincut`] - Subpolynomial bottleneck detection and optimization
-//! - [`healing`] - Self-healing system with anomaly detection
-//! - [`qudag`] - QuDAG network integration for distributed learning
+//! - [`healing`] - Self-healing system with anomaly detection (requires `full` feature)
+//! - [`qudag`] - QuDAG network integration for distributed learning (requires `full` feature)
 
+// Core modules (always available)
 pub mod attention;
 pub mod dag;
-pub mod healing;
 pub mod mincut;
+
+// Modules requiring async runtime (non-WASM only)
+#[cfg(feature = "full")]
+pub mod healing;
+#[cfg(feature = "full")]
 pub mod qudag;
+#[cfg(feature = "full")]
 pub mod sona;
 
 pub use dag::{
@@ -62,11 +68,14 @@ pub use attention::{
     TopologicalConfig,
 };
 
+#[cfg(feature = "full")]
 pub use qudag::QuDagClient;
 
-// Re-export crypto security functions for easy access
+// Re-export crypto security functions for easy access (requires full feature)
+#[cfg(feature = "full")]
 pub use qudag::crypto::{check_crypto_security, is_production_ready, security_status, SecurityStatus};
 
+#[cfg(feature = "full")]
 pub use healing::{
     Anomaly, AnomalyConfig, AnomalyDetector, AnomalyType, DriftMetric, DriftTrend,
     HealingCycleResult, HealingOrchestrator, HealthStatus, IndexCheckResult, IndexHealth,
@@ -74,6 +83,7 @@ pub use healing::{
     RepairStrategy,
 };
 
+#[cfg(feature = "full")]
 pub use sona::{
     DagPattern, DagReasoningBank, DagSonaEngine, DagTrajectory, DagTrajectoryBuffer, EwcConfig,
     EwcPlusPlus, MicroLoRA, MicroLoRAConfig, ReasoningBankConfig,

@@ -47,6 +47,11 @@ members = [
     "crates/ruvector-nervous-system",
     "crates/ruvector-dag",
     "crates/ruvector-dag-wasm",
+    "crates/ruvector-nervous-system-wasm",
+    "crates/ruvector-economy-wasm",
+    "crates/ruvector-learning-wasm",
+    "crates/ruvector-exotic-wasm",
+    "crates/ruvector-attention-unified-wasm",
 ]
 resolver = "2"
 

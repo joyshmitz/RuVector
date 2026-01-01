@@ -1,7 +1,14 @@
 //! P2P networking layer using GUN.js and WebRTC
+//!
+//! This module provides:
+//! - **NetworkManager**: Basic P2P peer management
+//! - **SemanticRouter**: RuVector-based intelligent routing with HNSW indexing
 
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+
+pub mod semantic;
+pub use semantic::{SemanticRouter, PeerInfo, HnswIndex, PeerId, TopicHash};
 
 /// Network message types
 #[derive(Clone, Serialize, Deserialize, Debug)]

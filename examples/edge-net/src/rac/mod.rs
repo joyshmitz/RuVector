@@ -259,6 +259,150 @@ pub struct DeprecateEvent {
     pub superseded_by: Option<EventId>,
 }
 
+// ============================================================================
+// AI Model Consensus Types (Axiom 2: Everything is an event)
+// ============================================================================
+
+/// Task types for LoRA adapter classification
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum TaskType {
+    /// Text generation/completion tasks
+    TextGeneration,
+    /// Code generation and analysis
+    CodeGeneration,
+    /// Image classification/analysis
+    VisionClassification,
+    /// Embedding generation
+    Embedding,
+    /// Retrieval augmented generation
+    RAG,
+    /// Reinforcement learning from feedback
+    RLHF,
+    /// Multi-modal tasks
+    MultiModal,
+    /// Custom task type
+    Custom(String),
+}
+
+impl Default for TaskType {
+    fn default() -> Self {
+        TaskType::TextGeneration
+    }
+}
+
+/// Model weight claim for AI consensus
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModelWeightClaim {
+    /// Unique model identifier
+    pub model_id: String,
+    /// Layer identifier (e.g., "transformer.h.0.attn")
+    pub layer: String,
+    /// SHA-256 hash of the weight tensor bytes
+    pub weights_hash: [u8; 32],
+    /// Version number (monotonically increasing)
+    pub version: u64,
+    /// Optional quantization info (e.g., "int8", "fp16")
+    pub quantization: Option<String>,
+    /// Number of parameters in this layer
+    pub param_count: usize,
+}
+
+/// LoRA adapter claim for per-task fine-tuning
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LoraAdapterClaim {
+    /// Unique adapter identifier
+    pub adapter_id: String,
+    /// Task type this adapter specializes in
+    pub task_type: TaskType,
+    /// LoRA rank (typically 2-64)
+    pub rank: u8,
+    /// SHA-256 hash of adapter weights
+    pub weights_hash: [u8; 32],
+    /// Base model this adapter applies to
+    pub base_model_id: String,
+    /// Training metrics (loss, accuracy, etc.)
+    pub metrics: Option<AdapterMetrics>,
+}
+
+/// Metrics for LoRA adapter performance
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AdapterMetrics {
+    /// Final training loss
+    pub final_loss: f32,
+    /// Validation accuracy (0.0 - 1.0)
+    pub val_accuracy: f32,
+    /// Number of training samples
+    pub train_samples: usize,
+    /// Training epochs completed
+    pub epochs: u32,
+}
+
+/// Learning pattern claim for collective memory
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LearningPatternClaim {
+    /// Unique pattern identifier
+    pub pattern_id: String,
+    /// Vector embedding representing the pattern
+    pub embedding: Vec<f32>,
+    /// Quality score from validation (0.0 - 1.0)
+    pub quality_score: f32,
+    /// Number of samples used to learn this pattern
+    pub sample_count: usize,
+    /// Context/domain this pattern applies to
+    pub domain: String,
+    /// Confidence interval (low, high)
+    pub confidence_interval: (f32, f32),
+}
+
+/// Gradient contribution claim for federated learning
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GradientContributionClaim {
+    /// Federated learning round number
+    pub round: u64,
+    /// Contributor's public key
+    pub contributor: PublicKeyBytes,
+    /// SHA-256 hash of the gradient tensor
+    pub gradient_hash: [u8; 32],
+    /// Contributor's reputation at contribution time
+    pub reputation_at_time: f32,
+    /// Number of local samples used
+    pub local_samples: usize,
+    /// Gradient norm (for anomaly detection)
+    pub gradient_norm: f32,
+    /// Model ID this gradient applies to
+    pub model_id: String,
+    /// Signature proving ownership
+    pub signature: SignatureBytes,
+}
+
+/// Claim type enumeration for AI/model consensus
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ClaimType {
+    /// Standard text/data assertion
+    Standard(AssertEvent),
+    /// Model weight claim
+    ModelWeight(ModelWeightClaim),
+    /// LoRA adapter claim
+    LoraAdapter(LoraAdapterClaim),
+    /// Learned pattern claim
+    LearningPattern(LearningPatternClaim),
+    /// Gradient contribution claim
+    GradientContribution(GradientContributionClaim),
+}
+
+impl ClaimType {
+    /// Get claim type as string for logging
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            ClaimType::Standard(_) => "standard",
+            ClaimType::ModelWeight(_) => "model_weight",
+            ClaimType::LoraAdapter(_) => "lora_adapter",
+            ClaimType::LearningPattern(_) => "learning_pattern",
+            ClaimType::GradientContribution(_) => "gradient_contribution",
+        }
+    }
+}
+
 /// Event kind enumeration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum EventKind {
@@ -267,6 +411,8 @@ pub enum EventKind {
     Support(SupportEvent),
     Resolution(ResolutionEvent),
     Deprecate(DeprecateEvent),
+    /// AI model claim (extends assertions for ML consensus)
+    ModelClaim(ClaimType),
 }
 
 /// A signed, logged event
@@ -1346,6 +1492,9 @@ impl CoherenceEngine {
                 self.quarantine.set_level(&hex::encode(&deprecate.claim_id), 3);
                 stats.claims_deprecated += 1;
             }
+            EventKind::ModelClaim(_) => {
+                // Model claims are handled separately by validate_weight_consensus
+            }
         }
 
         stats.quarantined_claims = self.quarantine.quarantined_count();
@@ -1661,6 +1810,603 @@ impl SemanticRouter {
         let now = current_timestamp_ms();
         let mut peers = self.peers.write().unwrap();
         peers.retain(|p| now - p.last_seen < max_age_ms);
+    }
+}
+
+// ============================================================================
+// AI Model Consensus (Axiom 2, 7, 8, 9: Events, Authority, Witnesses, Quarantine)
+// ============================================================================
+
+/// Result of model weight consensus
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeightConsensus {
+    /// Model ID that reached consensus
+    pub model_id: String,
+    /// Agreed-upon weight version
+    pub agreed_version: u64,
+    /// Agreed-upon weights hash
+    pub agreed_hash: [u8; 32],
+    /// Number of witnesses supporting this version
+    pub witness_count: usize,
+    /// Confidence in consensus (0.0 - 1.0)
+    pub confidence: f32,
+    /// Timestamp when consensus was reached
+    pub consensus_time: u64,
+    /// Event IDs that contributed to consensus
+    pub contributing_events: Vec<EventId>,
+    /// Any conflicting claims that were quarantined
+    pub quarantined_claims: Vec<EventId>,
+}
+
+/// Dispute record for model updates
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModelDispute {
+    /// Model being disputed
+    pub model_id: String,
+    /// Conflicting version claims
+    pub version_conflicts: Vec<(EventId, u64)>,
+    /// Conflicting hash claims
+    pub hash_conflicts: Vec<(EventId, [u8; 32])>,
+    /// Dispute severity (0.0 - 1.0)
+    pub severity: f32,
+    /// When dispute was detected
+    pub detected_at: u64,
+    /// Resolution status
+    pub resolved: bool,
+}
+
+/// Gradient validation result
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GradientValidation {
+    /// Whether gradient is valid
+    pub valid: bool,
+    /// Validation score (0.0 - 1.0)
+    pub score: f32,
+    /// Reason if invalid
+    pub rejection_reason: Option<String>,
+    /// Detected anomalies
+    pub anomalies: Vec<String>,
+    /// Contributor reputation factor
+    pub reputation_factor: f32,
+}
+
+/// Model consensus manager for federated learning integration
+#[wasm_bindgen]
+pub struct ModelConsensusManager {
+    /// Model weight claims by model_id -> layer -> versions
+    model_claims: RwLock<FxHashMap<String, FxHashMap<String, Vec<(EventId, ModelWeightClaim)>>>>,
+    /// Gradient contributions by round -> contributor
+    gradient_claims: RwLock<FxHashMap<u64, FxHashMap<PublicKeyBytes, Vec<(EventId, GradientContributionClaim)>>>>,
+    /// LoRA adapter claims by adapter_id
+    lora_claims: RwLock<FxHashMap<String, Vec<(EventId, LoraAdapterClaim)>>>,
+    /// Learning pattern claims by pattern_id
+    pattern_claims: RwLock<FxHashMap<String, Vec<(EventId, LearningPatternClaim)>>>,
+    /// Active disputes
+    disputes: RwLock<Vec<ModelDispute>>,
+    /// Quarantined model updates
+    quarantined_updates: RwLock<FxHashMap<String, Vec<EventId>>>,
+    /// Minimum witnesses for consensus
+    min_witnesses: usize,
+    /// Equivocation detection window (ms)
+    equivocation_window_ms: u64,
+    /// Maximum gradient norm (for anomaly detection)
+    max_gradient_norm: f32,
+}
+
+#[wasm_bindgen]
+impl ModelConsensusManager {
+    /// Create a new model consensus manager
+    #[wasm_bindgen(constructor)]
+    pub fn new(min_witnesses: usize) -> Self {
+        Self {
+            model_claims: RwLock::new(FxHashMap::default()),
+            gradient_claims: RwLock::new(FxHashMap::default()),
+            lora_claims: RwLock::new(FxHashMap::default()),
+            pattern_claims: RwLock::new(FxHashMap::default()),
+            disputes: RwLock::new(Vec::new()),
+            quarantined_updates: RwLock::new(FxHashMap::default()),
+            min_witnesses: min_witnesses.max(1),
+            equivocation_window_ms: 60_000, // 1 minute
+            max_gradient_norm: 100.0,
+        }
+    }
+
+    /// Get number of tracked models
+    #[wasm_bindgen(js_name = modelCount)]
+    pub fn model_count(&self) -> usize {
+        self.model_claims.read().unwrap().len()
+    }
+
+    /// Get number of active disputes
+    #[wasm_bindgen(js_name = disputeCount)]
+    pub fn dispute_count(&self) -> usize {
+        self.disputes.read().unwrap().iter().filter(|d| !d.resolved).count()
+    }
+
+    /// Get number of quarantined updates
+    #[wasm_bindgen(js_name = quarantinedUpdateCount)]
+    pub fn quarantined_update_count(&self) -> usize {
+        self.quarantined_updates.read().unwrap()
+            .values()
+            .map(|v| v.len())
+            .sum()
+    }
+
+    /// Get statistics as JSON
+    #[wasm_bindgen(js_name = getStats)]
+    pub fn get_stats(&self) -> String {
+        let model_count = self.model_count();
+        let dispute_count = self.dispute_count();
+        let quarantined = self.quarantined_update_count();
+        let gradient_rounds = self.gradient_claims.read().unwrap().len();
+        let lora_count = self.lora_claims.read().unwrap().len();
+        let pattern_count = self.pattern_claims.read().unwrap().len();
+
+        format!(
+            r#"{{"models":{},"disputes":{},"quarantined":{},"gradient_rounds":{},"lora_adapters":{},"patterns":{}}}"#,
+            model_count, dispute_count, quarantined, gradient_rounds, lora_count, pattern_count
+        )
+    }
+}
+
+impl Default for ModelConsensusManager {
+    fn default() -> Self {
+        Self::new(3)
+    }
+}
+
+impl ModelConsensusManager {
+    /// Register a model weight claim
+    pub fn register_model_claim(&self, event_id: EventId, claim: ModelWeightClaim) {
+        let mut claims = self.model_claims.write().unwrap();
+        claims
+            .entry(claim.model_id.clone())
+            .or_default()
+            .entry(claim.layer.clone())
+            .or_default()
+            .push((event_id, claim));
+    }
+
+    /// Register a gradient contribution claim
+    pub fn register_gradient_claim(&self, event_id: EventId, claim: GradientContributionClaim) {
+        let mut claims = self.gradient_claims.write().unwrap();
+        claims
+            .entry(claim.round)
+            .or_default()
+            .entry(claim.contributor)
+            .or_default()
+            .push((event_id, claim));
+    }
+
+    /// Register a LoRA adapter claim
+    pub fn register_lora_claim(&self, event_id: EventId, claim: LoraAdapterClaim) {
+        let mut claims = self.lora_claims.write().unwrap();
+        claims
+            .entry(claim.adapter_id.clone())
+            .or_default()
+            .push((event_id, claim));
+    }
+
+    /// Register a learning pattern claim
+    pub fn register_pattern_claim(&self, event_id: EventId, claim: LearningPatternClaim) {
+        let mut claims = self.pattern_claims.write().unwrap();
+        claims
+            .entry(claim.pattern_id.clone())
+            .or_default()
+            .push((event_id, claim));
+    }
+
+    /// Attempt to reach consensus on model weights
+    pub fn model_consensus(&self, model_id: &str, layer: &str) -> Option<WeightConsensus> {
+        let claims = self.model_claims.read().unwrap();
+        let quarantined = self.quarantined_updates.read().unwrap();
+
+        let model_claims = claims.get(model_id)?;
+        let layer_claims = model_claims.get(layer)?;
+
+        if layer_claims.is_empty() {
+            return None;
+        }
+
+        // Get quarantined events for this model
+        let quarantined_events: std::collections::HashSet<EventId> = quarantined
+            .get(model_id)
+            .map(|v| v.iter().cloned().collect())
+            .unwrap_or_default();
+
+        // Filter out quarantined claims
+        let valid_claims: Vec<_> = layer_claims
+            .iter()
+            .filter(|(id, _)| !quarantined_events.contains(id))
+            .collect();
+
+        if valid_claims.len() < self.min_witnesses {
+            return None;
+        }
+
+        // Group by (version, hash) and count witnesses
+        let mut version_counts: FxHashMap<(u64, [u8; 32]), Vec<EventId>> = FxHashMap::default();
+        for (event_id, claim) in &valid_claims {
+            let key = (claim.version, claim.weights_hash);
+            version_counts.entry(key).or_default().push(*event_id);
+        }
+
+        // Find version with most witnesses
+        let best = version_counts
+            .iter()
+            .max_by_key(|(_, events)| events.len())?;
+
+        let ((agreed_version, agreed_hash), contributing_events) = best;
+        let witness_count = contributing_events.len();
+
+        if witness_count < self.min_witnesses {
+            return None;
+        }
+
+        // Calculate confidence based on witness agreement
+        let total_claims = valid_claims.len();
+        let confidence = (witness_count as f32) / (total_claims as f32);
+
+        // Identify quarantined claims (those that disagree with consensus)
+        let quarantined_claims: Vec<EventId> = valid_claims
+            .iter()
+            .filter(|(_, claim)| {
+                claim.version != *agreed_version || claim.weights_hash != *agreed_hash
+            })
+            .map(|(id, _)| *id)
+            .collect();
+
+        Some(WeightConsensus {
+            model_id: model_id.to_string(),
+            agreed_version: *agreed_version,
+            agreed_hash: *agreed_hash,
+            witness_count,
+            confidence,
+            consensus_time: current_timestamp_ms(),
+            contributing_events: contributing_events.clone(),
+            quarantined_claims,
+        })
+    }
+
+    /// Validate a gradient contribution (Axiom 8, 11: Witnesses, Equivocation)
+    pub fn validate_gradient(&self, event: &GradientContributionClaim, reputation_manager: Option<&ReputationManager>) -> GradientValidation {
+        let mut anomalies = Vec::new();
+        let mut score = 1.0f32;
+
+        // Check 1: Gradient norm within bounds
+        if event.gradient_norm > self.max_gradient_norm {
+            anomalies.push(format!(
+                "Gradient norm {} exceeds maximum {}",
+                event.gradient_norm, self.max_gradient_norm
+            ));
+            score *= 0.5;
+        }
+
+        // Check 2: Signature present
+        if event.signature.is_empty() {
+            return GradientValidation {
+                valid: false,
+                score: 0.0,
+                rejection_reason: Some("Missing signature".to_string()),
+                anomalies: vec!["No signature provided".to_string()],
+                reputation_factor: 0.0,
+            };
+        }
+
+        // Check 3: Verify signature matches contributor
+        let sig_valid = if event.signature.len() == 64 {
+            // Compute expected message
+            let mut message = Vec::with_capacity(64);
+            message.extend_from_slice(&event.round.to_le_bytes());
+            message.extend_from_slice(&event.gradient_hash);
+            message.extend_from_slice(event.model_id.as_bytes());
+
+            // Verify Ed25519 signature
+            ScopedAuthority::verify_ed25519_signature(
+                &event.contributor,
+                &message,
+                &event.signature,
+            )
+        } else {
+            false
+        };
+
+        if !sig_valid {
+            anomalies.push("Signature verification failed".to_string());
+            score *= 0.3;
+        }
+
+        // Check 4: Reputation at time matches current (within tolerance)
+        let reputation_factor = if let Some(rep_mgr) = reputation_manager {
+            let current_rep = rep_mgr.get_reputation(&event.contributor);
+            let rep_diff = (current_rep as f32 - event.reputation_at_time).abs();
+
+            if rep_diff > 0.2 {
+                anomalies.push(format!(
+                    "Reputation mismatch: claimed {} vs current {:.2}",
+                    event.reputation_at_time, current_rep
+                ));
+                score *= 0.8;
+            }
+
+            current_rep as f32
+        } else {
+            event.reputation_at_time
+        };
+
+        // Check 5: Detect equivocation (same contributor, same round, different gradients)
+        let equivocation = self.detect_gradient_equivocation(event);
+        if equivocation {
+            return GradientValidation {
+                valid: false,
+                score: 0.0,
+                rejection_reason: Some("Equivocation detected: multiple gradients for same round".to_string()),
+                anomalies: vec!["Contributor submitted conflicting gradients".to_string()],
+                reputation_factor,
+            };
+        }
+
+        // Check 6: Local samples reasonable
+        if event.local_samples == 0 {
+            anomalies.push("Zero local samples".to_string());
+            score *= 0.7;
+        }
+
+        let valid = score >= 0.5 && anomalies.len() < 3;
+
+        GradientValidation {
+            valid,
+            score,
+            rejection_reason: if valid { None } else { Some("Multiple validation failures".to_string()) },
+            anomalies,
+            reputation_factor,
+        }
+    }
+
+    /// Detect gradient equivocation (Axiom 11)
+    fn detect_gradient_equivocation(&self, event: &GradientContributionClaim) -> bool {
+        let claims = self.gradient_claims.read().unwrap();
+
+        if let Some(round_claims) = claims.get(&event.round) {
+            if let Some(contributor_claims) = round_claims.get(&event.contributor) {
+                // Check if any existing claim has a different hash
+                for (_, existing) in contributor_claims {
+                    if existing.gradient_hash != event.gradient_hash {
+                        return true; // Equivocation detected
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Quarantine a disputed model update (Axiom 9)
+    pub fn quarantine_model_update(&self, model_id: &str, event_id: EventId, dispute: Option<&ModelDispute>) {
+        let mut quarantined = self.quarantined_updates.write().unwrap();
+        quarantined
+            .entry(model_id.to_string())
+            .or_default()
+            .push(event_id);
+
+        // If dispute provided, register it
+        if let Some(d) = dispute {
+            self.disputes.write().unwrap().push(d.clone());
+        }
+    }
+
+    /// Check if a model update is quarantined
+    pub fn is_update_quarantined(&self, model_id: &str, event_id: &EventId) -> bool {
+        self.quarantined_updates
+            .read()
+            .unwrap()
+            .get(model_id)
+            .map(|v| v.contains(event_id))
+            .unwrap_or(false)
+    }
+
+    /// Lift quarantine on a model update (after dispute resolution)
+    pub fn lift_quarantine(&self, model_id: &str, event_id: &EventId) -> bool {
+        let mut quarantined = self.quarantined_updates.write().unwrap();
+        if let Some(events) = quarantined.get_mut(model_id) {
+            if let Some(pos) = events.iter().position(|e| e == event_id) {
+                events.remove(pos);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Detect conflicts in model weight claims (Axiom 6)
+    pub fn detect_model_conflicts(&self, model_id: &str) -> Vec<ModelDispute> {
+        let claims = self.model_claims.read().unwrap();
+        let mut disputes = Vec::new();
+
+        if let Some(model_claims) = claims.get(model_id) {
+            for (layer, layer_claims) in model_claims {
+                if layer_claims.len() < 2 {
+                    continue;
+                }
+
+                // Group by version
+                let mut version_groups: FxHashMap<u64, Vec<(EventId, [u8; 32])>> = FxHashMap::default();
+                for (event_id, claim) in layer_claims {
+                    version_groups
+                        .entry(claim.version)
+                        .or_default()
+                        .push((*event_id, claim.weights_hash));
+                }
+
+                // Check for hash conflicts within same version
+                for (version, entries) in &version_groups {
+                    if entries.len() < 2 {
+                        continue;
+                    }
+
+                    let first_hash = entries[0].1;
+                    let has_conflict = entries.iter().any(|(_, h)| *h != first_hash);
+
+                    if has_conflict {
+                        let version_conflicts: Vec<_> = entries.iter().map(|(id, _)| (*id, *version)).collect();
+                        let hash_conflicts: Vec<_> = entries.iter().map(|(id, h)| (*id, *h)).collect();
+
+                        disputes.push(ModelDispute {
+                            model_id: format!("{}:{}", model_id, layer),
+                            version_conflicts,
+                            hash_conflicts,
+                            severity: 0.8,
+                            detected_at: current_timestamp_ms(),
+                            resolved: false,
+                        });
+                    }
+                }
+            }
+        }
+
+        disputes
+    }
+
+    /// Get LoRA adapter consensus for a task type
+    pub fn lora_consensus(&self, adapter_id: &str) -> Option<(EventId, LoraAdapterClaim)> {
+        let claims = self.lora_claims.read().unwrap();
+        let adapter_claims = claims.get(adapter_id)?;
+
+        if adapter_claims.is_empty() {
+            return None;
+        }
+
+        // For LoRA, prefer latest version with best metrics
+        adapter_claims
+            .iter()
+            .filter(|(_, claim)| claim.metrics.is_some())
+            .max_by(|(_, a), (_, b)| {
+                let a_score = a.metrics.as_ref().map(|m| m.val_accuracy).unwrap_or(0.0);
+                let b_score = b.metrics.as_ref().map(|m| m.val_accuracy).unwrap_or(0.0);
+                a_score.partial_cmp(&b_score).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .cloned()
+    }
+
+    /// Get learning pattern consensus
+    pub fn pattern_consensus(&self, pattern_id: &str) -> Option<(EventId, LearningPatternClaim)> {
+        let claims = self.pattern_claims.read().unwrap();
+        let pattern_claims = claims.get(pattern_id)?;
+
+        if pattern_claims.is_empty() {
+            return None;
+        }
+
+        // Prefer pattern with highest quality score weighted by sample count
+        pattern_claims
+            .iter()
+            .max_by(|(_, a), (_, b)| {
+                let a_score = a.quality_score * (a.sample_count as f32).ln().max(1.0);
+                let b_score = b.quality_score * (b.sample_count as f32).ln().max(1.0);
+                a_score.partial_cmp(&b_score).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .cloned()
+    }
+
+    /// Aggregate gradients for a federated learning round
+    pub fn aggregate_round_gradients(&self, round: u64, min_contributors: usize) -> Option<Vec<(PublicKeyBytes, f32)>> {
+        let claims = self.gradient_claims.read().unwrap();
+        let round_claims = claims.get(&round)?;
+
+        if round_claims.len() < min_contributors {
+            return None;
+        }
+
+        // Return contributors with their reputation weights
+        let contributors: Vec<(PublicKeyBytes, f32)> = round_claims
+            .iter()
+            .filter_map(|(contributor, claims)| {
+                // Take most recent claim per contributor
+                claims.last().map(|(_, claim)| (*contributor, claim.reputation_at_time))
+            })
+            .collect();
+
+        if contributors.len() >= min_contributors {
+            Some(contributors)
+        } else {
+            None
+        }
+    }
+}
+
+// Extension methods for CoherenceEngine to support AI model consensus
+impl CoherenceEngine {
+    /// Create a model consensus manager for this engine
+    pub fn create_model_consensus_manager(&self, min_witnesses: usize) -> ModelConsensusManager {
+        ModelConsensusManager::new(min_witnesses)
+    }
+
+    /// Ingest a model claim event
+    pub fn ingest_model_claim(&mut self, event: Event, manager: &ModelConsensusManager) -> IngestResult {
+        // First ingest as normal event
+        let result = self.ingest(event.clone());
+
+        // Then register with consensus manager if it's a model claim
+        if let IngestResult::Success(event_id) = &result {
+            if let EventKind::ModelClaim(claim_type) = &event.kind {
+                match claim_type {
+                    ClaimType::ModelWeight(claim) => {
+                        manager.register_model_claim(*event_id, claim.clone());
+
+                        // Check for conflicts
+                        let disputes = manager.detect_model_conflicts(&claim.model_id);
+                        for dispute in disputes {
+                            // Quarantine all conflicting claims
+                            for (conflict_id, _) in &dispute.hash_conflicts {
+                                manager.quarantine_model_update(&claim.model_id, *conflict_id, Some(&dispute));
+                                self.quarantine.set_level(&hex::encode(conflict_id), 2);
+                            }
+                        }
+                    }
+                    ClaimType::GradientContribution(claim) => {
+                        manager.register_gradient_claim(*event_id, claim.clone());
+                    }
+                    ClaimType::LoraAdapter(claim) => {
+                        manager.register_lora_claim(*event_id, claim.clone());
+                    }
+                    ClaimType::LearningPattern(claim) => {
+                        manager.register_pattern_claim(*event_id, claim.clone());
+                    }
+                    ClaimType::Standard(_) => {
+                        // Standard claims don't need special handling
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Get model weight consensus through the manager
+    pub fn model_consensus(&self, manager: &ModelConsensusManager, model_id: &str, layer: &str) -> Option<WeightConsensus> {
+        manager.model_consensus(model_id, layer)
+    }
+
+    /// Validate a gradient contribution
+    pub fn validate_gradient(&self, manager: &ModelConsensusManager, event: &GradientContributionClaim) -> GradientValidation {
+        manager.validate_gradient(event, None)
+    }
+
+    /// Quarantine a disputed model update
+    pub fn quarantine_model_update(&mut self, manager: &ModelConsensusManager, model_id: &str, event_id: EventId) {
+        let dispute = ModelDispute {
+            model_id: model_id.to_string(),
+            version_conflicts: vec![],
+            hash_conflicts: vec![(event_id, [0u8; 32])],
+            severity: 0.5,
+            detected_at: current_timestamp_ms(),
+            resolved: false,
+        };
+
+        manager.quarantine_model_update(model_id, event_id, Some(&dispute));
+        self.quarantine.set_level(&hex::encode(&event_id), 2);
+
+        let mut stats = self.stats.write().unwrap();
+        stats.quarantined_claims += 1;
     }
 }
 

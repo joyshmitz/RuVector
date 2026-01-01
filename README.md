@@ -553,6 +553,442 @@ See [ruvector-postgres README](./crates/ruvector-postgres/README.md) for full SQ
 | [profiling](./crates/profiling) | Performance profiling and analysis tools | [![crates.io](https://img.shields.io/crates/v/ruvector-profiling.svg)](https://crates.io/crates/ruvector-profiling) |
 | [micro-hnsw-wasm](./crates/micro-hnsw-wasm) | Lightweight HNSW implementation for WASM | [![crates.io](https://img.shields.io/crates/v/micro-hnsw-wasm.svg)](https://crates.io/crates/micro-hnsw-wasm) |
 
+## WASM Packages
+
+Specialized WebAssembly modules for browser and edge deployment. These packages bring advanced AI and distributed computing primitives to JavaScript/TypeScript with near-native performance.
+
+### Installation
+
+```bash
+# Install individual packages
+npm install @ruvector/learning-wasm
+npm install @ruvector/economy-wasm
+npm install @ruvector/exotic-wasm
+npm install @ruvector/nervous-system-wasm
+npm install @ruvector/attention-unified-wasm
+
+# Or build from source
+cd crates/ruvector-learning-wasm
+wasm-pack build --target web
+```
+
+### ruvector-learning-wasm
+
+**MicroLoRA, BTSP, and HDC for self-learning AI systems.**
+
+Ultra-fast Low-Rank Adaptation (LoRA) optimized for WASM execution with <100us adaptation latency. Designed for real-time per-operator learning in query optimization and AI agent systems.
+
+| Feature | Performance | Description |
+|---------|-------------|-------------|
+| **MicroLoRA** | <100us latency | Rank-2 LoRA matrices for instant weight adaptation |
+| **Per-Operator Scoping** | Zero-allocation hot paths | Separate adapters for different operator types |
+| **Trajectory Tracking** | Lock-free buffers | Record learning trajectories for replay |
+
+**Architecture:**
+
+```
+Input Embedding (256-dim)
+       |
+       v
+  +---------+
+  | A: d x 2 |  Down projection
+  +---------+
+       |
+       v
+  +---------+
+  | B: 2 x d |  Up projection
+  +---------+
+       |
+       v
+Delta W = alpha * (A @ B)
+       |
+       v
+Output = Input + Delta W
+```
+
+**JavaScript/TypeScript Example:**
+
+```typescript
+import init, { WasmMicroLoRA } from '@ruvector/learning-wasm';
+
+await init();
+
+// Create MicroLoRA engine (256-dim, alpha=0.1, lr=0.01)
+const lora = new WasmMicroLoRA(256, 0.1, 0.01);
+
+// Forward pass with adaptation
+const input = new Float32Array(256).fill(0.5);
+const output = lora.forward_array(input);
+
+// Adapt based on gradient signal
+const gradient = new Float32Array(256).fill(0.1);
+lora.adapt_array(gradient);
+
+// Adapt with reward signal for RL
+lora.adapt_with_reward(0.8);  // 80% improvement
+
+console.log(`Adaptations: ${lora.adapt_count()}`);
+console.log(`Delta norm: ${lora.delta_norm()}`);
+```
+
+### ruvector-economy-wasm
+
+**CRDT-based autonomous credit economy for distributed compute networks.**
+
+P2P-safe concurrent transactions using Conflict-free Replicated Data Types (CRDTs). Features a 10x-to-1x early adopter contribution curve and stake/slash mechanisms for participation incentives.
+
+| Feature | Description |
+|---------|-------------|
+| **CRDT Ledger** | G-Counter (earned) + PN-Counter (spent) for P2P consistency |
+| **Contribution Curve** | 10x early adopter multiplier decaying to 1x baseline |
+| **Stake/Slash** | Participation requirements with slashing for bad actors |
+| **Reputation Scoring** | Multi-factor: accuracy * uptime * stake_weight |
+| **Merkle Verification** | SHA-256 state root for quick ledger verification |
+
+**Architecture:**
+
+```
++------------------------+
+|     CreditLedger       |  <-- CRDT-based P2P-safe ledger
+|  +------------------+  |
+|  | G-Counter: Earned|  |  <-- Monotonically increasing
+|  | PN-Counter: Spent|  |  <-- Can handle disputes/refunds
+|  | Stake: Locked    |  |  <-- Participation requirement
+|  | State Root       |  |  <-- Merkle root for verification
+|  +------------------+  |
++------------------------+
+          |
+          v
++------------------------+
+|  ContributionCurve     |  <-- Exponential decay: 10x -> 1x
++------------------------+
+          |
+          v
++------------------------+
+|   ReputationScore      |  <-- accuracy * uptime * stake_weight
++------------------------+
+```
+
+**JavaScript/TypeScript Example:**
+
+```typescript
+import init, {
+  CreditLedger,
+  ReputationScore,
+  contribution_multiplier
+} from '@ruvector/economy-wasm';
+
+await init();
+
+// Create a new ledger for a node
+const ledger = new CreditLedger("node-123");
+
+// Earn credits (with early adopter multiplier)
+ledger.creditWithMultiplier(100, "task:abc");
+console.log(`Balance: ${ledger.balance()}`);
+console.log(`Multiplier: ${ledger.currentMultiplier()}x`);
+
+// Stake for participation
+ledger.stake(50);
+console.log(`Staked: ${ledger.stakedAmount()}`);
+
+// Check multiplier for network compute hours
+const mult = contribution_multiplier(50000.0);  // 50K hours
+console.log(`Network multiplier: ${mult}x`);  // ~8.5x
+
+// Track reputation
+const rep = new ReputationScore(0.95, 0.98, 1000);
+console.log(`Composite score: ${rep.composite_score()}`);
+
+// P2P merge with another ledger (CRDT operation)
+const otherEarned = new Uint8Array([/* serialized earned counter */]);
+const otherSpent = new Uint8Array([/* serialized spent counter */]);
+const mergedCount = ledger.merge(otherEarned, otherSpent);
+```
+
+### ruvector-exotic-wasm
+
+**Exotic AI mechanisms for emergent behavior in distributed systems.**
+
+Novel coordination primitives inspired by decentralized governance, developmental biology, and quantum physics.
+
+| Mechanism | Inspiration | Use Case |
+|-----------|-------------|----------|
+| **Neural Autonomous Organization (NAO)** | DAOs + oscillatory sync | Decentralized AI agent governance |
+| **Morphogenetic Network** | Developmental biology | Emergent network topology |
+| **Time Crystal Coordinator** | Quantum time crystals | Robust distributed coordination |
+
+**NAO Features:**
+- Stake-weighted quadratic voting
+- Oscillatory synchronization for coherence
+- Quorum-based consensus (configurable threshold)
+
+**Morphogenetic Network Features:**
+- Cellular differentiation through morphogen gradients
+- Emergent network topology via growth/pruning
+- Synaptic pruning for optimization
+
+**Time Crystal Features:**
+- Period-doubled oscillations for stable coordination
+- Floquet engineering for noise resilience
+- Phase-locked agent synchronization
+
+**JavaScript/TypeScript Example:**
+
+```typescript
+import init, {
+  WasmNAO,
+  WasmMorphogeneticNetwork,
+  WasmTimeCrystal,
+  ExoticEcosystem
+} from '@ruvector/exotic-wasm';
+
+await init();
+
+// Neural Autonomous Organization
+const nao = new WasmNAO(0.7);  // 70% quorum
+nao.addMember("agent_1", 100);  // 100 stake
+nao.addMember("agent_2", 50);
+
+const propId = nao.propose("Upgrade memory backend");
+nao.vote(propId, "agent_1", 0.9);  // 90% approval weight
+nao.vote(propId, "agent_2", 0.6);
+
+if (nao.execute(propId)) {
+  console.log("Proposal executed!");
+}
+
+// Morphogenetic Network
+const net = new WasmMorphogeneticNetwork(100, 100);  // 100x100 grid
+net.seedSignaling(50, 50);  // Seed signaling cell at center
+
+for (let i = 0; i < 1000; i++) {
+  net.grow(0.1);  // 10% growth rate
+}
+net.differentiate();
+net.prune(0.1);  // 10% pruning threshold
+
+// Time Crystal Coordinator
+const crystal = new WasmTimeCrystal(10, 100);  // 10 oscillators, 100ms period
+crystal.crystallize();
+
+for (let i = 0; i < 200; i++) {
+  const pattern = crystal.tick();
+  // Use pattern for coordination decisions
+}
+
+console.log(`Synchronization: ${crystal.orderParameter()}`);
+
+// Combined Ecosystem (all three working together)
+const eco = new ExoticEcosystem(5, 50, 8);  // 5 agents, 50x50 grid, 8 oscillators
+eco.crystallize();
+
+for (let i = 0; i < 100; i++) {
+  eco.step();
+}
+
+console.log(eco.summaryJson());
+```
+
+### ruvector-nervous-system-wasm
+
+**Bio-inspired neural system components for browser execution.**
+
+| Component | Performance | Description |
+|-----------|-------------|-------------|
+| **BTSP** | Immediate | Behavioral Timescale Synaptic Plasticity for one-shot learning |
+| **HDC** | <50ns bind, <100ns similarity | Hyperdimensional Computing with 10,000-bit vectors |
+| **WTA** | <1us | Winner-Take-All for instant decisions |
+| **K-WTA** | <10us | K-Winner-Take-All for sparse distributed coding |
+| **Global Workspace** | <10us | 4-7 item attention bottleneck (Miller's Law) |
+
+**Hyperdimensional Computing:**
+- 10,000-bit binary hypervectors
+- 10^40 representational capacity
+- XOR binding (associative, commutative, self-inverse)
+- Hamming distance similarity with SIMD optimization
+
+**Biological References:**
+- BTSP: Bittner et al. 2017 - Hippocampal place fields
+- HDC: Kanerva 1988, Plate 2003 - Hyperdimensional computing
+- WTA: Cortical microcircuits - Lateral inhibition
+- Global Workspace: Baars 1988, Dehaene 2014 - Consciousness
+
+**JavaScript/TypeScript Example:**
+
+```typescript
+import init, {
+  BTSPLayer,
+  Hypervector,
+  HdcMemory,
+  WTALayer,
+  KWTALayer,
+  GlobalWorkspace,
+  WorkspaceItem,
+} from '@ruvector/nervous-system-wasm';
+
+await init();
+
+// One-shot learning with BTSP
+const btsp = new BTSPLayer(100, 2000.0);  // 100 dim, 2000ms tau
+const pattern = new Float32Array(100).fill(0.1);
+btsp.one_shot_associate(pattern, 1.0);  // Immediate association
+const output = btsp.forward(pattern);
+
+// Hyperdimensional Computing
+const apple = Hypervector.random();
+const orange = Hypervector.random();
+const fruit = apple.bind(orange);  // XOR binding
+
+const similarity = apple.similarity(orange);  // ~0.0 (orthogonal)
+console.log(`Similarity: ${similarity}`);  // Random vectors are orthogonal
+
+// HDC Memory
+const memory = new HdcMemory();
+memory.store("apple", apple);
+memory.store("orange", orange);
+
+const results = memory.retrieve(apple, 0.9);  // threshold 0.9
+const topK = memory.top_k(fruit, 3);  // top-3 similar
+
+// Instant decisions with WTA
+const wta = new WTALayer(1000, 0.5, 0.8);  // 1000 neurons, threshold, inhibition
+const activations = new Float32Array(1000);
+// ... fill activations ...
+const winner = wta.compete(activations);
+
+// Sparse coding with K-WTA
+const kwta = new KWTALayer(1000, 50);  // 1000 neurons, k=50 winners
+const winners = kwta.select(activations);
+
+// Attention bottleneck with Global Workspace
+const workspace = new GlobalWorkspace(7);  // Miller's Law: 7 +/- 2
+const item = new WorkspaceItem(
+  new Float32Array([1, 2, 3]),  // content
+  0.9,  // salience
+  1,    // source
+  Date.now()  // timestamp
+);
+workspace.broadcast(item);
+```
+
+### ruvector-attention-unified-wasm
+
+**Unified API for 18+ attention mechanisms across Neural, DAG, Graph, and SSM domains.**
+
+A single WASM interface that routes to the appropriate attention implementation based on your data structure and requirements.
+
+| Category | Mechanisms | Best For |
+|----------|------------|----------|
+| **Neural** | Scaled Dot-Product, Multi-Head, Hyperbolic, Linear, Flash, Local-Global, MoE | Transformers, sequences |
+| **DAG** | Topological, Causal Cone, Critical Path, MinCut-Gated, Hierarchical Lorentz, Parallel Branch, Temporal BTSP | Query DAGs, workflows |
+| **Graph** | GAT, GCN, GraphSAGE | GNNs, knowledge graphs |
+| **SSM** | Mamba | Long sequences, streaming |
+
+**Mechanism Selection:**
+
+```
++------------------+     +-------------------+
+|   Your Data      | --> | UnifiedAttention  | --> Optimal Mechanism
++------------------+     +-------------------+
+                               |
+        +----------------------+----------------------+
+        |                      |                      |
+   +----v----+           +-----v-----+          +-----v----+
+   | Neural  |           |    DAG    |          |  Graph   |
+   +---------+           +-----------+          +----------+
+   | dot_prod|           | topological|         | gat      |
+   | multi_hd|           | causal_cone|         | gcn      |
+   | flash   |           | mincut_gtd |         | graphsage|
+   +---------+           +-----------+          +----------+
+```
+
+**JavaScript/TypeScript Example:**
+
+```typescript
+import init, {
+  UnifiedAttention,
+  availableMechanisms,
+  getStats,
+  softmax,
+  temperatureSoftmax,
+  cosineSimilarity,
+  // Neural attention
+  ScaledDotProductAttention,
+  MultiHeadAttention,
+  // DAG attention
+  TopologicalAttention,
+  MinCutGatedAttention,
+  // Graph attention
+  GraphAttention,
+  // SSM
+  MambaSSM,
+} from '@ruvector/attention-unified-wasm';
+
+await init();
+
+// List all available mechanisms
+console.log(availableMechanisms());
+// { neural: [...], dag: [...], graph: [...], ssm: [...] }
+
+console.log(getStats());
+// { total_mechanisms: 18, neural_count: 7, dag_count: 7, ... }
+
+// Unified selector - routes to appropriate implementation
+const attention = new UnifiedAttention("multi_head");
+console.log(`Category: ${attention.category}`);  // "neural"
+console.log(`Supports sequences: ${attention.supportsSequences()}`);  // true
+console.log(`Supports graphs: ${attention.supportsGraphs()}`);  // false
+
+// For DAG structures
+const dagAttention = new UnifiedAttention("topological");
+console.log(`Category: ${dagAttention.category}`);  // "dag"
+console.log(`Supports graphs: ${dagAttention.supportsGraphs()}`);  // true
+
+// Hyperbolic attention for hierarchical data
+const hypAttention = new UnifiedAttention("hierarchical_lorentz");
+console.log(`Supports hyperbolic: ${hypAttention.supportsHyperbolic()}`);  // true
+
+// Utility functions
+const logits = [1.0, 2.0, 3.0, 4.0];
+const probs = softmax(logits);
+console.log(`Probabilities sum to: ${probs.reduce((a, b) => a + b)}`);  // 1.0
+
+// Temperature-scaled softmax (lower = more peaked)
+const sharperProbs = temperatureSoftmax(logits, 0.5);
+
+// Cosine similarity
+const vecA = [1.0, 0.0, 0.0];
+const vecB = [1.0, 0.0, 0.0];
+console.log(`Similarity: ${cosineSimilarity(vecA, vecB)}`);  // 1.0
+```
+
+### WASM Package Summary
+
+| Package | Size Target | Key Features |
+|---------|-------------|--------------|
+| `@ruvector/learning-wasm` | <50KB | MicroLoRA (<100us), trajectory tracking |
+| `@ruvector/economy-wasm` | <100KB | CRDT ledger, 10x->1x curve, stake/slash |
+| `@ruvector/exotic-wasm` | <150KB | NAO, Morphogenetic, Time Crystal |
+| `@ruvector/nervous-system-wasm` | <100KB | BTSP, HDC (10K-bit), WTA, Global Workspace |
+| `@ruvector/attention-unified-wasm` | <200KB | 18+ attention mechanisms, unified API |
+
+**Common Patterns:**
+
+```typescript
+// All packages follow the same initialization pattern
+import init, { /* exports */ } from '@ruvector/<package>-wasm';
+await init();
+
+// Version check
+import { version } from '@ruvector/<package>-wasm';
+console.log(`Version: ${version()}`);
+
+// Feature discovery
+import { available_mechanisms } from '@ruvector/<package>-wasm';
+console.log(available_mechanisms());
+```
+
 ### Self-Learning Intelligence Hooks
 
 **Make your AI assistant smarter over time.**
