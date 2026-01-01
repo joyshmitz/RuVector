@@ -55,6 +55,8 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use rustc_hash::FxHashMap;
 use std::sync::RwLock;
+use ed25519_dalek::{VerifyingKey, Signature, Verifier as Ed25519Verifier};
+use sha2::{Sha256, Digest};
 
 // Economic layer with staking, reputation, and rewards
 pub mod economics;
@@ -951,14 +953,87 @@ impl ScopedAuthority {
         }
     }
 
-    /// Check if resolution has sufficient authorized signatures
+    /// Compute the canonical message to sign for a resolution
+    fn resolution_sign_message(resolution: &ResolutionEvent, context: &ContextId) -> Vec<u8> {
+        let mut message = Vec::with_capacity(128);
+        message.extend_from_slice(b"RAC_RESOLUTION_V1:");
+        message.extend_from_slice(context);
+        message.extend_from_slice(&resolution.conflict_id);
+        for claim_id in &resolution.accepted {
+            message.extend_from_slice(claim_id);
+        }
+        for claim_id in &resolution.deprecated {
+            message.extend_from_slice(claim_id);
+        }
+        message
+    }
+
+    /// Verify a single Ed25519 signature against a public key
+    fn verify_ed25519_signature(public_key: &PublicKeyBytes, message: &[u8], signature: &[u8]) -> bool {
+        if signature.len() != 64 {
+            return false;
+        }
+
+        let verifying_key = match VerifyingKey::from_bytes(public_key) {
+            Ok(k) => k,
+            Err(_) => return false,
+        };
+
+        let sig_bytes: [u8; 64] = match signature.try_into() {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+
+        let sig = Signature::from_bytes(&sig_bytes);
+        Ed25519Verifier::verify(&verifying_key, message, &sig).is_ok()
+    }
+
+    /// Check if resolution has sufficient authorized signatures (Ed25519 verified)
     pub fn verify_resolution(&self, resolution: &ResolutionEvent) -> bool {
         if resolution.authority_sigs.len() < self.threshold {
             return false;
         }
-        // In a real implementation, we would verify each signature
-        // against the authorized keys and count valid ones
-        true
+
+        // Compute the canonical message that should have been signed
+        let message = Self::resolution_sign_message(resolution, &self.context);
+
+        // Count valid signatures from authorized keys
+        let mut valid_sigs = 0;
+        let mut used_keys: Vec<PublicKeyBytes> = Vec::new();
+
+        for sig in &resolution.authority_sigs {
+            // Try each authorized key to find a match
+            for auth_key in &self.authorized_keys {
+                // Prevent same key being used twice
+                if used_keys.contains(auth_key) {
+                    continue;
+                }
+
+                if Self::verify_ed25519_signature(auth_key, &message, sig) {
+                    valid_sigs += 1;
+                    used_keys.push(*auth_key);
+                    break;
+                }
+            }
+
+            // Early exit if we have enough valid signatures
+            if valid_sigs >= self.threshold {
+                return true;
+            }
+        }
+
+        valid_sigs >= self.threshold
+    }
+
+    /// Sign a resolution with the given signing key (utility for testing/creating valid resolutions)
+    pub fn sign_resolution(resolution: &ResolutionEvent, context: &ContextId, signing_key_bytes: &[u8; 32]) -> Vec<u8> {
+        use ed25519_dalek::SigningKey;
+
+        let signing_key = SigningKey::from_bytes(signing_key_bytes);
+        let message = Self::resolution_sign_message(resolution, context);
+
+        use ed25519_dalek::Signer;
+        signing_key.sign(&message).to_bytes().to_vec()
     }
 }
 
@@ -1714,11 +1789,25 @@ mod tests {
 
     #[test]
     fn test_authority_verification() {
+        use ed25519_dalek::SigningKey;
+
         let mut engine = CoherenceEngine::new();
         let context = [42u8; 32];
-        let author = [1u8; 32];
 
-        // Register authority requiring signatures
+        // Generate a real Ed25519 keypair for signing
+        let signing_key_bytes: [u8; 32] = [
+            0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60,
+            0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
+            0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19,
+            0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60,
+        ];
+        let signing_key = SigningKey::from_bytes(&signing_key_bytes);
+        let public_key_bytes: [u8; 32] = signing_key.verifying_key().to_bytes();
+
+        // Use the real public key as author/authorized key
+        let author = public_key_bytes;
+
+        // Register authority requiring signatures from this public key
         let authority = ScopedAuthority::new(context, vec![author], 1);
         engine.register_authority(authority);
 
@@ -1740,7 +1829,19 @@ mod tests {
         let result = engine.ingest(resolution_no_sig);
         assert!(matches!(result, IngestResult::UnauthorizedResolution));
 
-        // Create resolution with signature - should succeed
+        // Create resolution with REAL Ed25519 signature
+        let resolution_event = ResolutionEvent {
+            conflict_id: [0u8; 32],
+            accepted: vec![],
+            deprecated: vec![[99u8; 32]],
+            rationale: vec![],
+            authority_sigs: vec![], // Will be replaced with real signature
+        };
+
+        // Sign the resolution with the real private key
+        let signature = ScopedAuthority::sign_resolution(&resolution_event, &context, &signing_key_bytes);
+
+        // Create the resolution with the real signature
         let resolution_with_sig = Event::new(
             author,
             context,
@@ -1750,7 +1851,7 @@ mod tests {
                 accepted: vec![],
                 deprecated: vec![[99u8; 32]],
                 rationale: vec![],
-                authority_sigs: vec![vec![0u8; 64]], // Has signature
+                authority_sigs: vec![signature], // Real Ed25519 signature
             }),
             None,
         );

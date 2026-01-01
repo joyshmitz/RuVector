@@ -11,6 +11,7 @@
 //! - Authority bypass attempts
 
 use ruvector_edge_net::rac::*;
+use ed25519_dalek::SigningKey;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -753,7 +754,16 @@ fn authority_bypass_forged_resolution() {
     // Scenario: Attacker tries to forge resolution without proper authority
     let mut engine = CoherenceEngine::new();
     let context = [0xAB; 32];
-    let authorized_key = [0xA0; 32];
+
+    // Generate a real Ed25519 keypair for the authority
+    let signing_key_bytes: [u8; 32] = [
+        0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60,
+        0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
+        0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19,
+        0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60,
+    ];
+    let signing_key = SigningKey::from_bytes(&signing_key_bytes);
+    let authorized_key: [u8; 32] = signing_key.verifying_key().to_bytes();
 
     // Register authority for context
     let authority = ScopedAuthority::new(context, vec![authorized_key], 1);
@@ -802,7 +812,19 @@ fn authority_bypass_forged_resolution() {
         "Forged resolution should be rejected"
     );
 
-    // Valid resolution with authority signature
+    // Create valid resolution event (without signature first, for signing)
+    let resolution_event = ResolutionEvent {
+        conflict_id,
+        accepted: vec![claim.id],
+        deprecated: vec![],
+        rationale: vec![EvidenceRef::hash(b"authority_decision")],
+        authority_sigs: vec![], // Will be replaced
+    };
+
+    // Sign with real Ed25519 key
+    let signature = ScopedAuthority::sign_resolution(&resolution_event, &context, &signing_key_bytes);
+
+    // Valid resolution with real authority signature
     let valid_resolution = create_test_event(
         context,
         authorized_key,
@@ -811,7 +833,7 @@ fn authority_bypass_forged_resolution() {
             accepted: vec![claim.id],
             deprecated: vec![],
             rationale: vec![EvidenceRef::hash(b"authority_decision")],
-            authority_sigs: vec![vec![0u8; 64]], // Has signature (simplified)
+            authority_sigs: vec![signature], // Real Ed25519 signature
         }),
         Some(generate_unique_id(4)),
     );

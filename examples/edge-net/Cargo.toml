@@ -50,6 +50,8 @@ aes-gcm = { version = "0.10", default-features = false, features = ["aes", "allo
 sha2 = { version = "0.10", default-features = false }
 rand = { version = "0.8", default-features = false, features = ["getrandom"] }
 getrandom = { version = "0.2", features = ["js"] }
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }  # Memory-hard KDF
+zeroize = { version = "1.7", features = ["derive"] }  # Secure memory cleanup
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

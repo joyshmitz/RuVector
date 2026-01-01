@@ -341,6 +341,53 @@ const decrypted = session.decrypt(encrypted);
 
 ---
 
+## Security Architecture
+
+Edge-net implements production-grade cryptographic security:
+
+### Cryptographic Primitives
+
+| Component | Algorithm | Purpose |
+|-----------|-----------|---------|
+| **Key Derivation** | Argon2id (64MB, 3 iterations) | Memory-hard password hashing |
+| **Signing** | Ed25519 | Digital signatures (128-bit security) |
+| **Encryption** | AES-256-GCM | Authenticated encryption |
+| **Hashing** | SHA-256 | Content hashing and verification |
+
+### Identity Protection
+
+```rust
+// Password-protected key export with Argon2id + AES-256-GCM
+let encrypted = identity.export_secret_key("strong_password")?;
+
+// Secure memory cleanup (zeroize)
+// All sensitive key material is automatically zeroed after use
+```
+
+### Authority Verification
+
+All resolution events require cryptographic proof:
+
+```rust
+// Ed25519 signature verification for authority decisions
+let signature = ScopedAuthority::sign_resolution(&resolution, &context, &signing_key);
+// Signature verified against registered authority public keys
+```
+
+### Attack Resistance
+
+The RAC (RuVector Adversarial Coherence) protocol defends against:
+
+| Attack | Defense |
+|--------|---------|
+| **Sybil** | Stake-weighted voting, witness path diversity |
+| **Eclipse** | Context isolation, Merkle divergence detection |
+| **Byzantine** | 1/3 threshold, escalation tracking |
+| **Replay** | Timestamp validation, duplicate detection |
+| **Double-spend** | Conflict detection, quarantine system |
+
+---
+
 ## Self-Optimization
 
 The network continuously improves itself:

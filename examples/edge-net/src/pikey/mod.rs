@@ -21,6 +21,8 @@ use aes_gcm::{
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
 use rand::{RngCore, rngs::OsRng};
 use serde::{Serialize, Deserialize};
+use argon2::{Argon2, Algorithm, Version, Params, password_hash::SaltString};
+use zeroize::Zeroize;
 
 /// Mathematical constant key sizes (in bits)
 pub mod sizes {
@@ -252,14 +254,36 @@ impl PiKey {
         verifying_key.as_bytes().to_vec()
     }
 
-    /// Create encrypted backup of private key
+    /// Derive encryption key using Argon2id (memory-hard KDF)
+    /// Parameters tuned for browser WASM: 64MB memory, 3 iterations
+    fn derive_key_argon2id(password: &str, salt: &[u8]) -> Result<[u8; 32], JsValue> {
+        // Argon2id parameters: 64MB memory, 3 iterations, 1 parallelism
+        // These are tuned for browser WASM while still being secure
+        let params = Params::new(
+            65536,  // 64 MB memory cost
+            3,      // 3 iterations (time cost)
+            1,      // 1 lane (parallelism - WASM is single-threaded)
+            Some(32) // 32 byte output
+        ).map_err(|e| JsValue::from_str(&format!("Argon2 params error: {}", e)))?;
+
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        let mut key_material = [0u8; 32];
+        argon2.hash_password_into(password.as_bytes(), salt, &mut key_material)
+            .map_err(|e| JsValue::from_str(&format!("Argon2 error: {}", e)))?;
+
+        Ok(key_material)
+    }
+
+    /// Create encrypted backup of private key using Argon2id KDF
     #[wasm_bindgen(js_name = createEncryptedBackup)]
     pub fn create_encrypted_backup(&mut self, password: &str) -> Result<Vec<u8>, JsValue> {
-        // Derive encryption key from password
-        let mut hasher = Sha256::new();
-        hasher.update(password.as_bytes());
-        hasher.update(&sizes::PI_MAGIC);
-        let key_material = hasher.finalize();
+        // Generate random salt for Argon2id
+        let mut salt = [0u8; 16];
+        OsRng.fill_bytes(&mut salt);
+
+        // Derive encryption key using Argon2id (memory-hard, resistant to brute-force)
+        let mut key_material = Self::derive_key_argon2id(password, &salt)?;
 
         let cipher = Aes256Gcm::new_from_slice(&key_material)
             .map_err(|e| JsValue::from_str(&format!("Cipher error: {}", e)))?;
@@ -274,10 +298,15 @@ impl PiKey {
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref())
             .map_err(|e| JsValue::from_str(&format!("Encryption error: {}", e)))?;
 
-        // Combine: version (1) + purpose (1) + nonce (12) + ciphertext
-        let mut backup = Vec::with_capacity(2 + 12 + ciphertext.len());
-        backup.push(0x01); // Version
+        // Zeroize key material after use
+        key_material.zeroize();
+
+        // Combine: version (1) + purpose (1) + salt (16) + nonce (12) + ciphertext
+        // Version 0x02 indicates Argon2id KDF
+        let mut backup = Vec::with_capacity(2 + 16 + 12 + ciphertext.len());
+        backup.push(0x02); // Version 2 = Argon2id
         backup.push(0x01); // Purpose marker: 1 = Identity (Pi-key)
+        backup.extend_from_slice(&salt);
         backup.extend_from_slice(&nonce_bytes);
         backup.extend_from_slice(&ciphertext);
 
@@ -285,7 +314,7 @@ impl PiKey {
         Ok(backup)
     }
 
-    /// Restore from encrypted backup
+    /// Restore from encrypted backup (supports both v1 legacy and v2 Argon2id)
     #[wasm_bindgen(js_name = restoreFromBackup)]
     pub fn restore_from_backup(backup: &[u8], password: &str) -> Result<PiKey, JsValue> {
         if backup.len() < 14 {
@@ -293,35 +322,55 @@ impl PiKey {
         }
 
         let version = backup[0];
-        if version != 0x01 {
-            return Err(JsValue::from_str(&format!("Unknown backup version: {}", version)));
-        }
 
-        // Derive decryption key
-        let mut hasher = Sha256::new();
-        hasher.update(password.as_bytes());
-        hasher.update(&sizes::PI_MAGIC);
-        let key_material = hasher.finalize();
+        let (key_material, nonce_start, nonce_end) = match version {
+            0x01 => {
+                // Legacy v1: SHA-256 based (deprecated but supported for migration)
+                let mut hasher = Sha256::new();
+                hasher.update(password.as_bytes());
+                hasher.update(&sizes::PI_MAGIC);
+                let hash = hasher.finalize();
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&hash);
+                (key, 2usize, 14usize)
+            },
+            0x02 => {
+                // v2: Argon2id (secure)
+                if backup.len() < 30 {
+                    return Err(JsValue::from_str("Backup too short for v2 format"));
+                }
+                let salt = &backup[2..18];
+                let key = Self::derive_key_argon2id(password, salt)?;
+                (key, 18usize, 30usize)
+            },
+            _ => {
+                return Err(JsValue::from_str(&format!("Unknown backup version: {}", version)));
+            }
+        };
 
         let cipher = Aes256Gcm::new_from_slice(&key_material)
             .map_err(|e| JsValue::from_str(&format!("Cipher error: {}", e)))?;
 
         // Extract nonce and ciphertext
-        let nonce = Nonce::from_slice(&backup[2..14]);
-        let ciphertext = &backup[14..];
+        let nonce = Nonce::from_slice(&backup[nonce_start..nonce_end]);
+        let ciphertext = &backup[nonce_end..];
 
         // Decrypt
-        let plaintext = cipher.decrypt(nonce, ciphertext)
+        let mut plaintext = cipher.decrypt(nonce, ciphertext)
             .map_err(|_| JsValue::from_str("Decryption failed - wrong password?"))?;
 
         if plaintext.len() != 32 {
+            plaintext.zeroize();
             return Err(JsValue::from_str("Invalid key length after decryption"));
         }
 
-        let key_bytes: [u8; 32] = plaintext.try_into()
+        let mut key_bytes: [u8; 32] = plaintext.clone().try_into()
             .map_err(|_| JsValue::from_str("Key conversion error"))?;
+        plaintext.zeroize();
 
         let signing_key = SigningKey::from_bytes(&key_bytes);
+        key_bytes.zeroize();
+
         let verifying_key = VerifyingKey::from(&signing_key);
         let identity = Self::derive_pi_identity(&verifying_key);
         let genesis_fingerprint = Self::derive_genesis_fingerprint(&identity);
