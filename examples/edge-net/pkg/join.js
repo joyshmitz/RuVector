@@ -20,6 +20,7 @@ import { webcrypto } from 'crypto';
 import { performance } from 'perf_hooks';
 import { homedir } from 'os';
 import { NetworkManager } from './network.js';
+import { MultiNetworkManager, NetworkRegistry } from './networks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -106,7 +107,7 @@ function printHelp() {
   console.log(`${c('bold', 'USAGE:')}
   ${c('green', 'npx @ruvector/edge-net join')} [options]
 
-${c('bold', 'OPTIONS:')}
+${c('bold', 'IDENTITY OPTIONS:')}
   ${c('yellow', '--generate')}         Generate new Pi-Key identity without joining
   ${c('yellow', '--key <pubkey>')}     Join using existing public key (hex)
   ${c('yellow', '--site <id>')}        Set site identifier (default: "edge-contributor")
@@ -117,23 +118,38 @@ ${c('bold', 'OPTIONS:')}
   ${c('yellow', '--history')}          Show contribution history
   ${c('yellow', '--list')}             List all stored identities
   ${c('yellow', '--peers')}            List connected peers
-  ${c('yellow', '--help')}             Show this help message
+
+${c('bold', 'MULTI-NETWORK OPTIONS:')}
+  ${c('yellow', '--networks')}         List all known networks
+  ${c('yellow', '--discover')}         Discover available networks
+  ${c('yellow', '--network <id>')}     Join/use specific network by ID
+  ${c('yellow', '--create-network')}   Create a new network with name
+  ${c('yellow', '--network-type')}     Network type: public, private, consortium
+  ${c('yellow', '--network-desc')}     Description for new network
+  ${c('yellow', '--switch <id>')}      Switch active network
+  ${c('yellow', '--invite <code>')}    Invite code for private networks
 
 ${c('bold', 'EXAMPLES:')}
-  ${c('dim', '# Generate new identity and join network')}
+  ${c('dim', '# Generate new identity and join default network')}
   $ npx @ruvector/edge-net join
 
-  ${c('dim', '# Generate a new Pi-Key identity only')}
-  $ npx @ruvector/edge-net join --generate
+  ${c('dim', '# Discover available networks')}
+  $ npx @ruvector/edge-net join --discover
 
-  ${c('dim', '# Export identity for backup')}
-  $ npx @ruvector/edge-net join --export my-identity.key --password mypass
+  ${c('dim', '# Create a public research network')}
+  $ npx @ruvector/edge-net join --create-network "ML Research" --network-desc "For ML workloads"
 
-  ${c('dim', '# Import and join with existing identity')}
-  $ npx @ruvector/edge-net join --import my-identity.key --password mypass
+  ${c('dim', '# Create a private team network')}
+  $ npx @ruvector/edge-net join --create-network "Team Alpha" --network-type private
 
-  ${c('dim', '# Join with specific site ID')}
-  $ npx @ruvector/edge-net join --site "my-compute-node"
+  ${c('dim', '# Join a specific network')}
+  $ npx @ruvector/edge-net join --network net-abc123
+
+  ${c('dim', '# Join a private network with invite code')}
+  $ npx @ruvector/edge-net join --network net-xyz789 --invite <invite-code>
+
+  ${c('dim', '# Switch active network')}
+  $ npx @ruvector/edge-net join --switch net-abc123
 
 ${c('bold', 'MULTI-CONTRIBUTOR SETUP:')}
   Each contributor runs their own node with a unique identity.
@@ -145,6 +161,11 @@ ${c('bold', 'MULTI-CONTRIBUTOR SETUP:')}
   $ npx @ruvector/edge-net join --site contributor-2
 
   ${c('dim', 'All nodes automatically discover and connect via P2P gossip.')}
+
+${c('bold', 'NETWORK TYPES:')}
+  ${c('cyan', '🌐 Public')}      Anyone can join and discover
+  ${c('cyan', '🔒 Private')}     Requires invite code to join
+  ${c('cyan', '🏢 Consortium')}  Requires approval from existing members
 
 ${c('bold', 'IDENTITY INFO:')}
   ${c('cyan', 'Pi-Key:')}    40-byte Ed25519-based identity (π-sized)
@@ -413,6 +434,15 @@ function parseArgs(args) {
     list: false,
     peers: false,
     help: false,
+    // Multi-network options
+    network: null,           // Network ID to join/use
+    createNetwork: null,     // Create new network with name
+    networkType: 'public',   // public, private, consortium
+    networkDesc: null,       // Network description
+    discoverNetworks: false, // Discover available networks
+    listNetworks: false,     // List known networks
+    switchNetwork: null,     // Switch active network
+    invite: null,            // Invite code for private networks
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -447,6 +477,32 @@ function parseArgs(args) {
         break;
       case '--peers':
         opts.peers = true;
+        break;
+      // Multi-network options
+      case '--network':
+      case '-n':
+        opts.network = args[++i];
+        break;
+      case '--create-network':
+        opts.createNetwork = args[++i];
+        break;
+      case '--network-type':
+        opts.networkType = args[++i];
+        break;
+      case '--network-desc':
+        opts.networkDesc = args[++i];
+        break;
+      case '--discover':
+        opts.discoverNetworks = true;
+        break;
+      case '--networks':
+        opts.listNetworks = true;
+        break;
+      case '--switch':
+        opts.switchNetwork = args[++i];
+        break;
+      case '--invite':
+        opts.invite = args[++i];
         break;
       case '--help':
       case '-h':
@@ -764,6 +820,103 @@ async function showPeers() {
   }
 }
 
+// Handle --networks command (list known networks)
+async function handleListNetworks() {
+  console.log(`${c('bold', 'KNOWN NETWORKS:')}\n`);
+
+  try {
+    const registry = new NetworkRegistry();
+    await registry.load();
+
+    const networks = registry.listNetworks();
+    const active = registry.activeNetwork;
+
+    if (networks.length === 0) {
+      console.log(`  ${c('dim', 'No networks registered.')}`);
+      console.log(`  ${c('dim', 'Use --discover to find available networks.')}\n`);
+      return;
+    }
+
+    for (const network of networks) {
+      const isActive = network.id === active;
+      const status = network.joined ?
+        (isActive ? c('green', '● Active') : c('cyan', '○ Joined')) :
+        c('dim', '  Available');
+      const typeIcon = network.type === 'public' ? '🌐' :
+                       network.type === 'private' ? '🔒' : '🏢';
+
+      console.log(`  ${status} ${typeIcon} ${c('bold', network.name)}`);
+      console.log(`    ${c('dim', 'ID:')}   ${network.id}`);
+      console.log(`    ${c('dim', 'Type:')} ${network.type}`);
+      if (network.description) {
+        console.log(`    ${c('dim', network.description)}`);
+      }
+      console.log('');
+    }
+
+    console.log(`${c('dim', 'Use --switch <network-id> to change active network')}\n`);
+
+  } catch (err) {
+    console.log(`  ${c('red', '✗')} Error: ${err.message}\n`);
+  }
+}
+
+// Handle --discover command
+async function handleDiscoverNetworks() {
+  console.log(`${c('cyan', 'Discovering networks...')}\n`);
+
+  try {
+    const manager = new MultiNetworkManager(null);
+    await manager.initialize();
+    const networks = await manager.discoverNetworks();
+
+    if (networks.length > 0) {
+      console.log(`\n${c('dim', 'To join a network:')} --network <id> [--invite <code>]`);
+      console.log(`${c('dim', 'To create your own:')} --create-network "Name" [--network-type private]\n`);
+    }
+  } catch (err) {
+    console.log(`  ${c('red', '✗')} Error: ${err.message}\n`);
+  }
+}
+
+// Handle --create-network command
+async function handleCreateNetwork(opts) {
+  console.log(`${c('cyan', 'Creating new network...')}\n`);
+
+  try {
+    const manager = new MultiNetworkManager(null);
+    await manager.initialize();
+
+    const result = await manager.createNetwork({
+      name: opts.createNetwork,
+      type: opts.networkType,
+      description: opts.networkDesc,
+    });
+
+    console.log(`\n${c('dim', 'To invite others (if private):')} Share the invite codes above`);
+    console.log(`${c('dim', 'To contribute:')} --network ${result.networkId}\n`);
+
+  } catch (err) {
+    console.log(`  ${c('red', '✗')} Error: ${err.message}\n`);
+  }
+}
+
+// Handle --switch command
+async function handleSwitchNetwork(networkId) {
+  console.log(`${c('cyan', `Switching to network ${networkId}...`)}\n`);
+
+  try {
+    const manager = new MultiNetworkManager(null);
+    await manager.initialize();
+    await manager.switchNetwork(networkId);
+
+    console.log(`\n${c('dim', 'Your contributions will now go to this network.')}\n`);
+
+  } catch (err) {
+    console.log(`  ${c('red', '✗')} Error: ${err.message}\n`);
+  }
+}
+
 // Show network/QDAG statistics
 async function showNetworkStats() {
   console.log(`${c('bold', 'NETWORK STATISTICS:')}\n`);
@@ -914,6 +1067,31 @@ async function main() {
   if (opts.list) {
     printBanner();
     await listIdentities();
+    return;
+  }
+
+  // Handle multi-network commands (no WASM needed)
+  if (opts.listNetworks) {
+    printBanner();
+    await handleListNetworks();
+    return;
+  }
+
+  if (opts.discoverNetworks) {
+    printBanner();
+    await handleDiscoverNetworks();
+    return;
+  }
+
+  if (opts.createNetwork) {
+    printBanner();
+    await handleCreateNetwork(opts);
+    return;
+  }
+
+  if (opts.switchNetwork) {
+    printBanner();
+    await handleSwitchNetwork(opts.switchNetwork);
     return;
   }
 
