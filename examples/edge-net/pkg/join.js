@@ -13,7 +13,7 @@
  *   npx @ruvector/edge-net join --import <file>   # Import identity from backup
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { webcrypto } from 'crypto';
@@ -113,6 +113,8 @@ ${c('bold', 'OPTIONS:')}
   ${c('yellow', '--import <file>')}    Import identity from encrypted backup
   ${c('yellow', '--password <pw>')}    Password for import/export operations
   ${c('yellow', '--status')}           Show current contributor status
+  ${c('yellow', '--history')}          Show contribution history
+  ${c('yellow', '--list')}             List all stored identities
   ${c('yellow', '--peers')}            List connected peers
   ${c('yellow', '--help')}             Show this help message
 
@@ -152,13 +154,236 @@ ${c('dim', 'Documentation: https://github.com/ruvnet/ruvector/tree/main/examples
 `);
 }
 
-// Config directory for storing identities
+// Config directory for storing identities - persistent across months/years
 function getConfigDir() {
   const configDir = join(homedir(), '.ruvector');
   if (!existsSync(configDir)) {
     mkdirSync(configDir, { recursive: true });
   }
   return configDir;
+}
+
+function getIdentitiesDir() {
+  const identitiesDir = join(getConfigDir(), 'identities');
+  if (!existsSync(identitiesDir)) {
+    mkdirSync(identitiesDir, { recursive: true });
+  }
+  return identitiesDir;
+}
+
+function getContributionsDir() {
+  const contribDir = join(getConfigDir(), 'contributions');
+  if (!existsSync(contribDir)) {
+    mkdirSync(contribDir, { recursive: true });
+  }
+  return contribDir;
+}
+
+// Long-term persistent identity management
+class PersistentIdentity {
+  constructor(siteId, wasm) {
+    this.siteId = siteId;
+    this.wasm = wasm;
+    this.identityPath = join(getIdentitiesDir(), `${siteId}.identity`);
+    this.metaPath = join(getIdentitiesDir(), `${siteId}.meta.json`);
+    this.contributionPath = join(getContributionsDir(), `${siteId}.history.json`);
+    this.piKey = null;
+    this.meta = null;
+  }
+
+  exists() {
+    return existsSync(this.identityPath);
+  }
+
+  // Generate new or restore existing identity
+  async initialize(password) {
+    if (this.exists()) {
+      return this.restore(password);
+    } else {
+      return this.generate(password);
+    }
+  }
+
+  // Generate new identity with full metadata
+  generate(password) {
+    this.piKey = new this.wasm.PiKey();
+
+    // Save encrypted identity
+    const backup = this.piKey.createEncryptedBackup(password);
+    writeFileSync(this.identityPath, Buffer.from(backup));
+
+    // Save metadata (not secret)
+    this.meta = {
+      version: 1,
+      siteId: this.siteId,
+      shortId: this.piKey.getShortId(),
+      publicKey: toHex(this.piKey.getPublicKey()),
+      genesisFingerprint: toHex(this.piKey.getGenesisFingerprint()),
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+      totalSessions: 1,
+      totalContributions: 0
+    };
+    writeFileSync(this.metaPath, JSON.stringify(this.meta, null, 2));
+
+    // Initialize contribution history
+    const history = {
+      siteId: this.siteId,
+      shortId: this.meta.shortId,
+      sessions: [{
+        started: new Date().toISOString(),
+        type: 'genesis'
+      }],
+      contributions: [],
+      milestones: [{
+        type: 'identity_created',
+        timestamp: new Date().toISOString()
+      }]
+    };
+    writeFileSync(this.contributionPath, JSON.stringify(history, null, 2));
+
+    return { isNew: true, meta: this.meta };
+  }
+
+  // Restore existing identity
+  restore(password) {
+    const backup = new Uint8Array(readFileSync(this.identityPath));
+    this.piKey = this.wasm.PiKey.restoreFromBackup(backup, password);
+
+    // Load and update metadata
+    if (existsSync(this.metaPath)) {
+      this.meta = JSON.parse(readFileSync(this.metaPath, 'utf-8'));
+    } else {
+      // Rebuild metadata from key
+      this.meta = {
+        version: 1,
+        siteId: this.siteId,
+        shortId: this.piKey.getShortId(),
+        publicKey: toHex(this.piKey.getPublicKey()),
+        genesisFingerprint: toHex(this.piKey.getGenesisFingerprint()),
+        createdAt: 'unknown',
+        lastUsed: new Date().toISOString(),
+        totalSessions: 1,
+        totalContributions: 0
+      };
+    }
+
+    // Update usage stats
+    this.meta.lastUsed = new Date().toISOString();
+    this.meta.totalSessions = (this.meta.totalSessions || 0) + 1;
+    writeFileSync(this.metaPath, JSON.stringify(this.meta, null, 2));
+
+    // Update contribution history
+    let history;
+    if (existsSync(this.contributionPath)) {
+      history = JSON.parse(readFileSync(this.contributionPath, 'utf-8'));
+    } else {
+      history = {
+        siteId: this.siteId,
+        shortId: this.meta.shortId,
+        sessions: [],
+        contributions: [],
+        milestones: []
+      };
+    }
+
+    // Calculate time since last session
+    const lastSession = history.sessions[history.sessions.length - 1];
+    let timeSinceLastSession = null;
+    if (lastSession && lastSession.started) {
+      const last = new Date(lastSession.started);
+      const now = new Date();
+      const diffMs = now - last;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      timeSinceLastSession = diffDays;
+
+      if (diffDays > 30) {
+        history.milestones.push({
+          type: 'returned_after_absence',
+          timestamp: new Date().toISOString(),
+          daysSinceLastSession: diffDays
+        });
+      }
+    }
+
+    history.sessions.push({
+      started: new Date().toISOString(),
+      type: 'restored',
+      timeSinceLastDays: timeSinceLastSession
+    });
+
+    writeFileSync(this.contributionPath, JSON.stringify(history, null, 2));
+
+    return {
+      isNew: false,
+      meta: this.meta,
+      sessions: this.meta.totalSessions,
+      daysSinceLastSession: timeSinceLastSession
+    };
+  }
+
+  // Record a contribution
+  recordContribution(type, details = {}) {
+    this.meta.totalContributions = (this.meta.totalContributions || 0) + 1;
+    this.meta.lastUsed = new Date().toISOString();
+    writeFileSync(this.metaPath, JSON.stringify(this.meta, null, 2));
+
+    let history = { sessions: [], contributions: [], milestones: [] };
+    if (existsSync(this.contributionPath)) {
+      history = JSON.parse(readFileSync(this.contributionPath, 'utf-8'));
+    }
+
+    history.contributions.push({
+      type,
+      timestamp: new Date().toISOString(),
+      ...details
+    });
+
+    writeFileSync(this.contributionPath, JSON.stringify(history, null, 2));
+    return this.meta.totalContributions;
+  }
+
+  // Get full history
+  getHistory() {
+    if (!existsSync(this.contributionPath)) {
+      return null;
+    }
+    return JSON.parse(readFileSync(this.contributionPath, 'utf-8'));
+  }
+
+  // Get public info for sharing
+  getPublicInfo() {
+    return {
+      siteId: this.siteId,
+      shortId: this.meta.shortId,
+      publicKey: this.meta.publicKey,
+      genesisFingerprint: this.meta.genesisFingerprint,
+      memberSince: this.meta.createdAt,
+      totalContributions: this.meta.totalContributions
+    };
+  }
+
+  free() {
+    if (this.piKey) this.piKey.free();
+  }
+}
+
+// List all stored identities
+function listStoredIdentities() {
+  const identitiesDir = getIdentitiesDir();
+  if (!existsSync(identitiesDir)) return [];
+
+  const files = readdirSync(identitiesDir);
+  const identities = [];
+
+  for (const file of files) {
+    if (file.endsWith('.meta.json')) {
+      const meta = JSON.parse(readFileSync(join(identitiesDir, file), 'utf-8'));
+      identities.push(meta);
+    }
+  }
+
+  return identities;
 }
 
 function toHex(bytes) {
@@ -183,6 +408,8 @@ function parseArgs(args) {
     import: null,
     password: null,
     status: false,
+    history: false,
+    list: false,
     peers: false,
     help: false,
   };
@@ -211,6 +438,12 @@ function parseArgs(args) {
       case '--status':
         opts.status = true;
         break;
+      case '--history':
+        opts.history = true;
+        break;
+      case '--list':
+        opts.list = true;
+        break;
       case '--peers':
         opts.peers = true;
         break;
@@ -222,6 +455,85 @@ function parseArgs(args) {
   }
 
   return opts;
+}
+
+// Show contribution history
+async function showHistory(wasm, siteId, password) {
+  console.log(`${c('bold', 'CONTRIBUTION HISTORY:')}\n`);
+
+  const identity = new PersistentIdentity(siteId, wasm);
+
+  if (!identity.exists()) {
+    console.log(`${c('yellow', '⚠')} No identity found for site "${siteId}"`);
+    console.log(`${c('dim', 'Run without --history to create one.')}\n`);
+    return;
+  }
+
+  await identity.initialize(password);
+  const history = identity.getHistory();
+
+  if (!history) {
+    console.log(`${c('dim', 'No history available.')}\n`);
+    identity.free();
+    return;
+  }
+
+  console.log(`  ${c('cyan', 'Site ID:')}      ${history.siteId}`);
+  console.log(`  ${c('cyan', 'Short ID:')}     ${history.shortId}`);
+  console.log(`  ${c('cyan', 'Sessions:')}     ${history.sessions.length}`);
+  console.log(`  ${c('cyan', 'Contributions:')} ${history.contributions.length}`);
+  console.log(`  ${c('cyan', 'Milestones:')}   ${history.milestones.length}\n`);
+
+  if (history.milestones.length > 0) {
+    console.log(`  ${c('bold', 'Milestones:')}`);
+    history.milestones.slice(-5).forEach(m => {
+      const date = new Date(m.timestamp).toLocaleDateString();
+      console.log(`    ${c('dim', date)} - ${c('green', m.type)}`);
+    });
+  }
+
+  if (history.sessions.length > 0) {
+    console.log(`\n  ${c('bold', 'Recent Sessions:')}`);
+    history.sessions.slice(-5).forEach(s => {
+      const date = new Date(s.started).toLocaleDateString();
+      const time = new Date(s.started).toLocaleTimeString();
+      const elapsed = s.timeSinceLastDays ? ` (${s.timeSinceLastDays}d since last)` : '';
+      console.log(`    ${c('dim', date + ' ' + time)} - ${s.type}${elapsed}`);
+    });
+  }
+
+  console.log('');
+  identity.free();
+}
+
+// List all stored identities
+async function listIdentities() {
+  console.log(`${c('bold', 'STORED IDENTITIES:')}\n`);
+
+  const identities = listStoredIdentities();
+
+  if (identities.length === 0) {
+    console.log(`  ${c('dim', 'No identities found.')}`);
+    console.log(`  ${c('dim', 'Run "npx @ruvector/edge-net join" to create one.')}\n`);
+    return;
+  }
+
+  console.log(`  ${c('cyan', 'Found')} ${identities.length} ${c('cyan', 'identities:')}\n`);
+
+  for (const meta of identities) {
+    const memberSince = meta.createdAt ? new Date(meta.createdAt).toLocaleDateString() : 'unknown';
+    const lastUsed = meta.lastUsed ? new Date(meta.lastUsed).toLocaleDateString() : 'unknown';
+
+    console.log(`  ${c('bold', meta.siteId)}`);
+    console.log(`    ${c('dim', 'ID:')}           ${meta.shortId}`);
+    console.log(`    ${c('dim', 'Public Key:')}   ${meta.publicKey.substring(0, 16)}...`);
+    console.log(`    ${c('dim', 'Member Since:')} ${memberSince}`);
+    console.log(`    ${c('dim', 'Last Used:')}    ${lastUsed}`);
+    console.log(`    ${c('dim', 'Sessions:')}     ${meta.totalSessions || 0}`);
+    console.log(`    ${c('dim', 'Contributions:')} ${meta.totalContributions || 0}\n`);
+  }
+
+  console.log(`${c('dim', 'Storage: ' + getIdentitiesDir())}\n`);
 }
 
 async function generateIdentity(wasm, siteId) {
@@ -483,6 +795,13 @@ async function main() {
     return;
   }
 
+  // Handle --list early (no WASM needed)
+  if (opts.list) {
+    printBanner();
+    await listIdentities();
+    return;
+  }
+
   printBanner();
   await setupPolyfills();
 
@@ -494,7 +813,15 @@ async function main() {
   const wasm = require('./node/ruvector_edge_net.cjs');
   console.log(`${c('green', '✓')} WASM module loaded\n`);
 
+  // Handle --history
+  if (opts.history) {
+    const password = opts.password || `${opts.site}-edge-net-key`;
+    await showHistory(wasm, opts.site, password);
+    return;
+  }
+
   let piKey = null;
+  let persistentIdentity = null;
 
   try {
     // Handle different modes
@@ -511,36 +838,146 @@ async function main() {
       console.log(`${c('dim', 'Note: Full key management requires import/export.')}\n`);
       piKey = new wasm.PiKey();
     } else {
-      // Generate new identity
-      const result = await generateIdentity(wasm, opts.site);
-      piKey = result.piKey;
+      // Use persistent identity (auto-creates or restores)
+      const password = opts.password || `${opts.site}-edge-net-key`;
+      persistentIdentity = new PersistentIdentity(opts.site, wasm);
+      const result = await persistentIdentity.initialize(password);
+
+      if (result.isNew) {
+        console.log(`${c('green', '✓')} New identity created: ${result.meta.shortId}`);
+        console.log(`  ${c('dim', 'Your identity is now stored locally and will persist.')}`);
+        console.log(`  ${c('dim', 'Storage:')} ${getIdentitiesDir()}\n`);
+      } else {
+        console.log(`${c('green', '✓')} Identity restored: ${result.meta.shortId}`);
+        console.log(`  ${c('dim', 'Member since:')} ${result.meta.createdAt}`);
+        console.log(`  ${c('dim', 'Total sessions:')} ${result.sessions}`);
+        if (result.daysSinceLastSession !== null) {
+          if (result.daysSinceLastSession > 30) {
+            console.log(`  ${c('yellow', 'Welcome back!')} ${result.daysSinceLastSession} days since last session`);
+          } else if (result.daysSinceLastSession > 0) {
+            console.log(`  ${c('dim', 'Last session:')} ${result.daysSinceLastSession} days ago`);
+          }
+        }
+        console.log('');
+      }
+
+      piKey = persistentIdentity.piKey;
     }
 
     if (opts.generate) {
       // Just generate, don't join
-      console.log(`${c('green', '✓ Identity generated successfully!')}\n`);
-      console.log(`${c('dim', 'Use --export to save, or run without --generate to join.')}\n`);
+      console.log(`${c('green', '✓ Identity generated and persisted!')}\n`);
+      console.log(`${c('dim', 'Your identity is stored at:')} ${getIdentitiesDir()}`);
+      console.log(`${c('dim', 'Run again to continue with the same identity.')}\n`);
 
       // Also demonstrate multi-contributor
-      piKey.free();
+      if (persistentIdentity) persistentIdentity.free();
+      else if (piKey) piKey.free();
       await demonstrateMultiContributor(wasm);
       return;
     }
 
     if (opts.status) {
       await showStatus(wasm, piKey);
-      piKey.free();
+      if (persistentIdentity) persistentIdentity.free();
+      else if (piKey) piKey.free();
       return;
     }
 
-    // Join the network
-    await joinNetwork(wasm, opts, piKey);
+    // Join the network with persistence
+    if (persistentIdentity) {
+      await joinNetworkPersistent(wasm, opts, persistentIdentity);
+    } else {
+      await joinNetwork(wasm, opts, piKey);
+    }
 
   } catch (err) {
     console.error(`${c('red', '✗ Error:')} ${err.message}`);
-    if (piKey) piKey.free();
+    if (persistentIdentity) persistentIdentity.free();
+    else if (piKey) piKey.free();
     process.exit(1);
   }
+}
+
+// Join network with persistent identity (tracks contributions)
+async function joinNetworkPersistent(wasm, opts, identity) {
+  console.log(`${c('bold', 'JOINING EDGE-NET (Persistent Mode)...')}\n`);
+
+  const publicKeyHex = identity.meta.publicKey;
+
+  // Create components for network participation
+  const detector = new wasm.ByzantineDetector(0.5);
+  const dp = new wasm.DifferentialPrivacy(1.0, 0.001);
+  const model = new wasm.FederatedModel(100, 0.01, 0.9);
+  const coherence = new wasm.CoherenceEngine();
+  const evolution = new wasm.EvolutionEngine();
+  const events = new wasm.NetworkEvents();
+
+  console.log(`${c('bold', 'CONTRIBUTOR NODE:')}`);
+  console.log(`  ${c('cyan', 'Site ID:')}       ${opts.site}`);
+  console.log(`  ${c('cyan', 'Short ID:')}      ${identity.meta.shortId}`);
+  console.log(`  ${c('cyan', 'Public Key:')}    ${publicKeyHex.substring(0, 16)}...${publicKeyHex.slice(-8)}`);
+  console.log(`  ${c('cyan', 'Member Since:')}  ${new Date(identity.meta.createdAt).toLocaleDateString()}`);
+  console.log(`  ${c('cyan', 'Sessions:')}      ${identity.meta.totalSessions}`);
+  console.log(`  ${c('cyan', 'Status:')}        ${c('green', 'Connected')}`);
+  console.log(`  ${c('cyan', 'Mode:')}          Persistent\n`);
+
+  console.log(`${c('bold', 'ACTIVE COMPONENTS:')}`);
+  console.log(`  ${c('green', '✓')} Byzantine Detector (threshold=0.5)`);
+  console.log(`  ${c('green', '✓')} Differential Privacy (ε=1.0)`);
+  console.log(`  ${c('green', '✓')} Federated Model (dim=100)`);
+  console.log(`  ${c('green', '✓')} Coherence Engine`);
+  console.log(`  ${c('green', '✓')} Evolution Engine`);
+
+  // Get themed status
+  const themedStatus = events.getThemedStatus(1, BigInt(identity.meta.totalContributions || 0));
+  console.log(`\n${c('bold', 'NETWORK STATUS:')}`);
+  console.log(`  ${themedStatus}\n`);
+
+  // Show persistence info
+  console.log(`${c('bold', 'PERSISTENCE:')}`);
+  console.log(`  ${c('dim', 'Identity stored at:')} ${identity.identityPath}`);
+  console.log(`  ${c('dim', 'History stored at:')}  ${identity.contributionPath}`);
+  console.log(`  ${c('dim', 'Your contributions are preserved across sessions (months/years).')}\n`);
+
+  console.log(`${c('green', '✓ Successfully joined Edge-Net!')}\n`);
+  console.log(`${c('dim', 'Press Ctrl+C to disconnect.')}\n`);
+
+  // Keep running with periodic status updates and contribution tracking
+  let ticks = 0;
+  let contributions = 0;
+  const statusInterval = setInterval(() => {
+    ticks++;
+
+    // Simulate contribution every 5 seconds
+    if (ticks % 5 === 0) {
+      contributions++;
+      identity.recordContribution('compute', { duration: 5, tick: ticks });
+    }
+
+    const motivation = events.getMotivation(BigInt(ticks * 10));
+    if (ticks % 10 === 0) {
+      console.log(`  ${c('dim', `[${ticks}s]`)} ${c('cyan', 'Contributing...')} ${contributions} total | ${motivation}`);
+    }
+  }, 1000);
+
+  process.on('SIGINT', () => {
+    clearInterval(statusInterval);
+    console.log(`\n${c('yellow', 'Disconnected from Edge-Net.')}`);
+    console.log(`${c('green', '✓')} Session recorded: ${contributions} contributions`);
+    console.log(`${c('dim', 'Your identity and history are preserved. Rejoin anytime.')}\n`);
+
+    // Clean up WASM resources
+    detector.free();
+    dp.free();
+    model.free();
+    coherence.free();
+    evolution.free();
+    events.free();
+    identity.free();
+
+    process.exit(0);
+  });
 }
 
 main().catch(err => {
