@@ -3,12 +3,34 @@
 use super::Backend;
 use crate::config::ActivationType;
 use ndarray::Array2;
+use std::sync::OnceLock;
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
+
+/// Cached SIMD feature detection for x86_64
+#[cfg(target_arch = "x86_64")]
+static SIMD_FEATURES: OnceLock<SimdFeatures> = OnceLock::new();
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug, Clone, Copy)]
+struct SimdFeatures {
+    has_avx2: bool,
+    has_sse41: bool,
+    has_fma: bool,
+}
+
+#[cfg(target_arch = "x86_64")]
+fn get_simd_features() -> SimdFeatures {
+    *SIMD_FEATURES.get_or_init(|| SimdFeatures {
+        has_avx2: is_x86_feature_detected!("avx2"),
+        has_sse41: is_x86_feature_detected!("sse4.1"),
+        has_fma: is_x86_feature_detected!("fma"),
+    })
+}
 
 /// CPU backend using portable SIMD
 pub struct CpuBackend;
@@ -18,16 +40,21 @@ impl Backend for CpuBackend {
         debug_assert_eq!(a.len(), b.len());
 
         #[cfg(target_arch = "x86_64")]
-        if is_x86_feature_detected!("avx2") {
-            return unsafe { dot_product_avx2(a, b) };
-        } else if is_x86_feature_detected!("sse4.1") {
-            return unsafe { dot_product_sse(a, b) };
+        {
+            let features = get_simd_features();
+            if features.has_avx2 {
+                return unsafe { dot_product_avx2(a, b) };
+            } else if features.has_sse41 {
+                return unsafe { dot_product_sse(a, b) };
+            }
+            return dot_product_scalar(a, b);
         }
 
         #[cfg(target_arch = "aarch64")]
         return unsafe { dot_product_neon(a, b) };
 
         // Fallback scalar
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
         dot_product_scalar(a, b)
     }
 
@@ -61,18 +88,29 @@ impl Backend for CpuBackend {
     }
 
     fn activation(&self, data: &mut [f32], activation_type: ActivationType) {
+        #[cfg(target_arch = "x86_64")]
+        let features = get_simd_features();
+
         match activation_type {
             ActivationType::Relu => {
                 #[cfg(target_arch = "x86_64")]
-                if is_x86_feature_detected!("avx2") {
+                if features.has_avx2 {
                     return unsafe { relu_avx2(data) };
                 }
                 relu_scalar(data);
             }
             ActivationType::Gelu => {
+                #[cfg(target_arch = "x86_64")]
+                if features.has_avx2 {
+                    return unsafe { gelu_avx2(data) };
+                }
                 gelu_scalar(data);
             }
             ActivationType::Silu | ActivationType::Swish => {
+                #[cfg(target_arch = "x86_64")]
+                if features.has_avx2 {
+                    return unsafe { silu_avx2(data) };
+                }
                 silu_scalar(data);
             }
             ActivationType::Identity => { /* no-op */ }
@@ -83,7 +121,7 @@ impl Backend for CpuBackend {
         debug_assert_eq!(a.len(), b.len());
 
         #[cfg(target_arch = "x86_64")]
-        if is_x86_feature_detected!("avx2") {
+        if get_simd_features().has_avx2 {
             return unsafe { add_avx2(a, b) };
         }
 
@@ -96,7 +134,7 @@ impl Backend for CpuBackend {
         debug_assert_eq!(a.len(), b.len());
 
         #[cfg(target_arch = "x86_64")]
-        if is_x86_feature_detected!("avx2") {
+        if get_simd_features().has_avx2 {
             return unsafe { axpy_avx2(a, b, scalar) };
         }
 
@@ -108,27 +146,33 @@ impl Backend for CpuBackend {
     fn name(&self) -> &'static str {
         #[cfg(target_arch = "x86_64")]
         {
-            if is_x86_feature_detected!("avx2") {
+            let features = get_simd_features();
+            if features.has_avx2 {
                 return "CPU-AVX2";
-            } else if is_x86_feature_detected!("sse4.1") {
+            } else if features.has_sse41 {
                 return "CPU-SSE4.1";
             }
+            return "CPU-Scalar";
         }
         #[cfg(target_arch = "aarch64")]
         return "CPU-NEON";
 
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
         "CPU-Scalar"
     }
 
     fn simd_width(&self) -> usize {
         #[cfg(target_arch = "x86_64")]
         {
-            if is_x86_feature_detected!("avx2") { return 8; }
-            if is_x86_feature_detected!("sse4.1") { return 4; }
+            let features = get_simd_features();
+            if features.has_avx2 { return 8; }
+            if features.has_sse41 { return 4; }
+            return 1;
         }
         #[cfg(target_arch = "aarch64")]
         return 4;
 
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
         1
     }
 }
@@ -182,6 +226,96 @@ unsafe fn relu_avx2(data: &mut [f32]) {
     // Handle remainder
     for i in (chunks * 8)..data.len() {
         data[i] = data[i].max(0.0);
+    }
+}
+
+/// SIMD GELU using polynomial approximation
+/// GELU(x) ≈ 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x³)))
+/// Using fast tanh approximation for SIMD
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn gelu_avx2(data: &mut [f32]) {
+    let chunks = data.len() / 8;
+
+    // Constants for GELU approximation
+    let half = _mm256_set1_ps(0.5);
+    let one = _mm256_set1_ps(1.0);
+    let sqrt_2_over_pi = _mm256_set1_ps(0.7978845608); // sqrt(2/π)
+    let coef = _mm256_set1_ps(0.044715);
+
+    // Constants for fast tanh approximation: tanh(x) ≈ x * (27 + x²) / (27 + 9x²)
+    let c27 = _mm256_set1_ps(27.0);
+    let c9 = _mm256_set1_ps(9.0);
+
+    for i in 0..chunks {
+        let ptr = data.as_mut_ptr().add(i * 8);
+        let x = _mm256_loadu_ps(ptr);
+
+        // x³
+        let x2 = _mm256_mul_ps(x, x);
+        let x3 = _mm256_mul_ps(x2, x);
+
+        // inner = sqrt(2/π) * (x + 0.044715 * x³)
+        let inner = _mm256_mul_ps(sqrt_2_over_pi, _mm256_fmadd_ps(coef, x3, x));
+
+        // Fast tanh approximation
+        let inner2 = _mm256_mul_ps(inner, inner);
+        let num = _mm256_fmadd_ps(inner2, one, c27); // 27 + inner²
+        let den = _mm256_fmadd_ps(inner2, c9, c27); // 27 + 9*inner²
+        let tanh_approx = _mm256_mul_ps(inner, _mm256_div_ps(num, den));
+
+        // 0.5 * x * (1 + tanh)
+        let result = _mm256_mul_ps(half, _mm256_mul_ps(x, _mm256_add_ps(one, tanh_approx)));
+        _mm256_storeu_ps(ptr, result);
+    }
+
+    // Handle remainder with scalar
+    for i in (chunks * 8)..data.len() {
+        let x = data[i];
+        let x3 = x * x * x;
+        let inner = 0.7978845608 * (x + 0.044715 * x3);
+        data[i] = 0.5 * x * (1.0 + inner.tanh());
+    }
+}
+
+/// SIMD SiLU (Swish) using fast sigmoid approximation
+/// SiLU(x) = x * sigmoid(x) = x / (1 + exp(-x))
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn silu_avx2(data: &mut [f32]) {
+    let chunks = data.len() / 8;
+
+    // For sigmoid, use: 1/(1+e^-x) ≈ 0.5 + 0.5*tanh(x/2)
+    let half = _mm256_set1_ps(0.5);
+    let c27 = _mm256_set1_ps(27.0);
+    let c9 = _mm256_set1_ps(9.0);
+    let one = _mm256_set1_ps(1.0);
+
+    for i in 0..chunks {
+        let ptr = data.as_mut_ptr().add(i * 8);
+        let x = _mm256_loadu_ps(ptr);
+
+        // Use sigmoid(x) = 0.5 + 0.5 * tanh(x/2)
+        let x_half = _mm256_mul_ps(x, half);
+
+        // Fast tanh(x/2)
+        let xh2 = _mm256_mul_ps(x_half, x_half);
+        let num = _mm256_fmadd_ps(xh2, one, c27);
+        let den = _mm256_fmadd_ps(xh2, c9, c27);
+        let tanh_approx = _mm256_mul_ps(x_half, _mm256_div_ps(num, den));
+
+        // sigmoid = 0.5 + 0.5 * tanh
+        let sigmoid = _mm256_fmadd_ps(half, tanh_approx, half);
+
+        // silu = x * sigmoid
+        let result = _mm256_mul_ps(x, sigmoid);
+        _mm256_storeu_ps(ptr, result);
+    }
+
+    // Handle remainder with scalar
+    for i in (chunks * 8)..data.len() {
+        let x = data[i];
+        data[i] = x / (1.0 + (-x).exp());
     }
 }
 
