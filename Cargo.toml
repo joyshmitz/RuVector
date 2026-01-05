@@ -54,6 +54,8 @@ members = [
     "crates/ruvector-attention-unified-wasm",
     "crates/ruvector-fpga-transformer",
     "crates/ruvector-fpga-transformer-wasm",
+    "crates/ruvector-sparse-inference",
+    "crates/ruvector-sparse-inference-wasm",
 ]
 resolver = "2"
 

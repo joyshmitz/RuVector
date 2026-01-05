@@ -7374,6 +7374,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-sparse-inference"
+version = "0.1.30"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "criterion",
+ "half 2.7.1",
+ "memmap2",
+ "mockall",
+ "ndarray 0.16.1",
+ "parking_lot 0.12.5",
+ "proptest",
+ "rand 0.8.5",
+ "rand_distr 0.4.3",
+ "rayon",
+ "rkyv",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "ruvector-sparse-inference-wasm"
+version = "0.1.30"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom 0.3.4",
+ "js-sys",
+ "ruvector-sparse-inference",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "web-sys",
+]
+
+[[package]]
 name = "ruvector-tiny-dancer-core"
 version = "0.1.30"
 dependencies = [
