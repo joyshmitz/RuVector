@@ -825,6 +825,51 @@ let scores = selector.select_and_apply(SelectionPolicy::Adaptive, &dag)?;
 
 See [ruvector-dag README](./crates/ruvector-dag/README.md) for full documentation.
 
+### Distributed Systems (Raft & Replication)
+
+| Crate | Description | crates.io |
+|-------|-------------|-----------|
+| [ruvector-raft](./crates/ruvector-raft) | Raft consensus with leader election & log replication | [![crates.io](https://img.shields.io/crates/v/ruvector-raft.svg)](https://crates.io/crates/ruvector-raft) |
+| [ruvector-replication](./crates/ruvector-replication) | Multi-master replication with vector clocks | [![crates.io](https://img.shields.io/crates/v/ruvector-replication.svg)](https://crates.io/crates/ruvector-replication) |
+| [ruvector-cluster](./crates/ruvector-cluster) | Cluster coordination and sharding | [![crates.io](https://img.shields.io/crates/v/ruvector-cluster.svg)](https://crates.io/crates/ruvector-cluster) |
+
+**Build distributed vector databases** with strong consistency guarantees:
+
+- **Raft Consensus** — Leader election, log replication, automatic failover
+- **Vector Clocks** — Causal ordering for conflict detection
+- **Conflict Resolution** — Last-Write-Wins, custom merge functions, CRDT support
+- **Change Data Capture** — Stream changes to replicas in real-time
+- **Automatic Failover** — Promote replicas on primary failure
+
+```typescript
+import { RaftNode, ReplicaSet, VectorClock } from '@ruvector/raft';
+import { ReplicationManager, ConflictStrategy } from '@ruvector/replication';
+
+// Raft consensus cluster
+const node = new RaftNode({
+  nodeId: 'node-1',
+  peers: ['node-2', 'node-3'],
+  electionTimeout: [150, 300],
+});
+
+await node.start();
+const entry = await node.propose({ op: 'insert', vector: embedding });
+
+// Multi-master replication
+const replicaSet = new ReplicaSet();
+replicaSet.addReplica('primary', 'localhost:5001', 'primary');
+replicaSet.addReplica('replica-1', 'localhost:5002', 'replica');
+
+const manager = new ReplicationManager(replicaSet, {
+  conflictStrategy: ConflictStrategy.LastWriteWins,
+  syncMode: 'async',
+});
+
+await manager.write('vectors', { id: 'v1', data: embedding });
+```
+
+See [npm/packages/raft/README.md](./npm/packages/raft/README.md) and [npm/packages/replication/README.md](./npm/packages/replication/README.md) for full documentation.
+
 ### Standalone Vector Database (rvLite)
 
 | Crate | Description | crates.io |
@@ -1714,17 +1759,52 @@ The PostgreSQL backend provides:
 <details>
 <summary>🔬 Scientific OCR (SciPix)</summary>
 
-| Crate | Description | crates.io |
-|-------|-------------|-----------|
-| [ruvector-scipix](./examples/scipix) | OCR engine for scientific documents, math equations → LaTeX/MathML | [![crates.io](https://img.shields.io/crates/v/ruvector-scipix.svg)](https://crates.io/crates/ruvector-scipix) |
+| Package | Description | Install |
+|---------|-------------|---------|
+| [ruvector-scipix](./examples/scipix) | Rust OCR engine for scientific documents | `cargo add ruvector-scipix` |
+| [@ruvector/scipix](https://www.npmjs.com/package/@ruvector/scipix) | TypeScript client for SciPix API | `npm install @ruvector/scipix` |
 
-**SciPix** extracts text and mathematical equations from images, converting them to LaTeX, MathML, or plain text. Features GPU-accelerated ONNX inference, SIMD-optimized preprocessing, REST API server, CLI tool, and MCP integration for AI assistants.
+**SciPix** extracts text and mathematical equations from images, converting them to LaTeX, MathML, or plain text.
+
+**Features:**
+- **Multi-format output** — LaTeX, MathML, AsciiMath, plain text, structured JSON
+- **Batch processing** — Process multiple images with parallel execution
+- **Content detection** — Equations, tables, diagrams, mixed content
+- **Confidence scoring** — Per-region confidence levels (high/medium/low)
+- **PDF support** — Extract from multi-page PDFs with page selection
+
+```typescript
+import { SciPixClient, OutputFormat } from '@ruvector/scipix';
+
+const client = new SciPixClient({
+  baseUrl: 'http://localhost:8080',
+  apiKey: 'your-api-key',
+});
+
+// OCR an image file
+const result = await client.ocrFile('./equation.png', {
+  formats: [OutputFormat.LaTeX, OutputFormat.MathML],
+  detectEquations: true,
+});
+
+console.log('LaTeX:', result.latex);
+console.log('Confidence:', result.confidence);
+
+// Quick LaTeX extraction
+const latex = await client.extractLatex('./math.png');
+
+// Batch processing
+const batchResult = await client.batchOcr({
+  images: [
+    { source: 'base64...', id: 'eq1' },
+    { source: 'base64...', id: 'eq2' },
+  ],
+  defaultOptions: { formats: [OutputFormat.LaTeX] },
+});
+```
 
 ```bash
-# Install
-cargo add ruvector-scipix
-
-# CLI usage
+# Rust CLI usage
 scipix-cli ocr --input equation.png --format latex
 scipix-cli serve --port 3000
 
@@ -1732,6 +1812,8 @@ scipix-cli serve --port 3000
 scipix-cli mcp
 claude mcp add scipix -- scipix-cli mcp
 ```
+
+See [npm/packages/scipix/README.md](./npm/packages/scipix/README.md) for full documentation.
 
 </details>
 
@@ -2013,7 +2095,7 @@ await db.sync('https://api.example.com/vectors');
 </details>
 
 <details>
-<summary>📦 npm Packages (40+ Packages)</summary>
+<summary>📦 npm Packages (45+ Packages)</summary>
 
 #### ✅ Published
 
@@ -2035,6 +2117,9 @@ await db.sync('https://api.example.com/vectors');
 | [@ruvector/rudag](https://www.npmjs.com/package/@ruvector/rudag) | Self-learning DAG | [![npm](https://img.shields.io/npm/v/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag) | [![downloads](https://img.shields.io/npm/dt/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag) |
 | [@ruvector/burst-scaling](https://www.npmjs.com/package/@ruvector/burst-scaling) | 10-50x burst scaling | [![npm](https://img.shields.io/npm/v/@ruvector/burst-scaling.svg)](https://www.npmjs.com/package/@ruvector/burst-scaling) | [![downloads](https://img.shields.io/npm/dt/@ruvector/burst-scaling.svg)](https://www.npmjs.com/package/@ruvector/burst-scaling) |
 | [@ruvector/spiking-neural](https://www.npmjs.com/package/@ruvector/spiking-neural) | Spiking neural networks | [![npm](https://img.shields.io/npm/v/@ruvector/spiking-neural.svg)](https://www.npmjs.com/package/@ruvector/spiking-neural) | [![downloads](https://img.shields.io/npm/dt/@ruvector/spiking-neural.svg)](https://www.npmjs.com/package/@ruvector/spiking-neural) |
+| [@ruvector/raft](https://www.npmjs.com/package/@ruvector/raft) | Raft consensus for distributed systems | [![npm](https://img.shields.io/npm/v/@ruvector/raft.svg)](https://www.npmjs.com/package/@ruvector/raft) | [![downloads](https://img.shields.io/npm/dt/@ruvector/raft.svg)](https://www.npmjs.com/package/@ruvector/raft) |
+| [@ruvector/replication](https://www.npmjs.com/package/@ruvector/replication) | Multi-master replication with vector clocks | [![npm](https://img.shields.io/npm/v/@ruvector/replication.svg)](https://www.npmjs.com/package/@ruvector/replication) | [![downloads](https://img.shields.io/npm/dt/@ruvector/replication.svg)](https://www.npmjs.com/package/@ruvector/replication) |
+| [@ruvector/scipix](https://www.npmjs.com/package/@ruvector/scipix) | Scientific OCR (LaTeX/MathML extraction) | [![npm](https://img.shields.io/npm/v/@ruvector/scipix.svg)](https://www.npmjs.com/package/@ruvector/scipix) | [![downloads](https://img.shields.io/npm/dt/@ruvector/scipix.svg)](https://www.npmjs.com/package/@ruvector/scipix) |
 
 <details>
 <summary>WASM & Utility Packages</summary>
@@ -2061,14 +2146,6 @@ await db.sync('https://api.example.com/vectors');
 - `@ruvector/router-linux-x64-gnu`, `@ruvector/router-linux-arm64-gnu`, `@ruvector/router-darwin-x64`, `@ruvector/router-darwin-arm64`, `@ruvector/router-win32-x64-msvc`
 - `@ruvector/attention-linux-x64-gnu`, `@ruvector/attention-linux-arm64-gnu`, `@ruvector/attention-darwin-x64`, `@ruvector/attention-darwin-arm64`, `@ruvector/attention-win32-x64-msvc`
 - `@ruvector/ruvllm-linux-x64-gnu`, `@ruvector/ruvllm-linux-arm64-gnu`, `@ruvector/ruvllm-darwin-x64`, `@ruvector/ruvllm-darwin-arm64`, `@ruvector/ruvllm-win32-x64-msvc`
-
-#### 🚧 Planned
-
-| Package | Description | Status |
-|---------|-------------|--------|
-| @ruvector/raft | Raft consensus for distributed ops | Crate ready |
-| @ruvector/replication | Multi-master replication | Crate ready |
-| @ruvector/scipix | Scientific OCR (LaTeX/MathML) | Crate ready |
 
 See [GitHub Issue #20](https://github.com/ruvnet/ruvector/issues/20) for multi-platform npm package roadmap.
 
