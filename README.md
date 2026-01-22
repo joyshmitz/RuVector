@@ -1137,6 +1137,315 @@ npm install @ruvector/rudag-wasm
 </details>
 
 <details>
+<summary><strong>📦 rvLite - Standalone Edge Database</strong></summary>
+
+[![crates.io](https://img.shields.io/crates/v/rvlite.svg)](https://crates.io/crates/rvlite)
+[![npm](https://img.shields.io/npm/v/@ruvector/rvlite.svg)](https://www.npmjs.com/package/@ruvector/rvlite)
+
+**A complete vector database that runs anywhere JavaScript runs** — browsers, Node.js, Deno, Bun, Cloudflare Workers, Vercel Edge Functions.
+
+### What is rvLite?
+
+rvLite is a **lightweight, standalone vector database** that runs entirely in WebAssembly. It provides SQL, SPARQL, and Cypher query interfaces, along with graph neural networks and self-learning capabilities—all in under 3MB.
+
+### Key Features
+
+| Feature | What It Does | Why It Matters |
+|---------|--------------|----------------|
+| **SQL Interface** | Familiar `SELECT`, `INSERT`, `WHERE` | No learning curve |
+| **SPARQL Support** | W3C-compliant RDF queries | Knowledge graphs in browser |
+| **Cypher Queries** | Neo4j-style graph queries | Graph traversals anywhere |
+| **GNN Embeddings** | Graph neural network layers | Self-learning search |
+| **ReasoningBank** | Trajectory learning | Gets smarter over time |
+| **SIMD Optimized** | Vector operations accelerated | Native-like performance |
+
+### Runs Everywhere
+
+| Platform | Status | Use Case |
+|----------|--------|----------|
+| **Browsers** | ✅ | Offline-first apps |
+| **Node.js** | ✅ | Server-side |
+| **Deno** | ✅ | Edge functions |
+| **Bun** | ✅ | Fast runtime |
+| **Cloudflare Workers** | ✅ | Edge computing |
+| **Vercel Edge** | ✅ | Serverless |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────┐
+│  RvLite (Orchestration)                 │
+│  ├─ SQL executor                        │
+│  ├─ SPARQL executor                     │
+│  ├─ Cypher executor                     │
+│  └─ Unified WASM API                    │
+└──────────────┬──────────────────────────┘
+               │ depends on (100% reuse)
+               ▼
+┌──────────────────────────────────────────┐
+│  Existing WASM Crates                    │
+├──────────────────────────────────────────┤
+│  • ruvector-core (vectors, SIMD)         │
+│  • ruvector-graph-wasm (Cypher)          │
+│  • ruvector-gnn-wasm (GNN layers)        │
+│  • sona (ReasoningBank learning)         │
+│  • micro-hnsw-wasm (ultra-fast HNSW)     │
+└──────────────────────────────────────────┘
+```
+
+### Quick Start
+
+```typescript
+import { RvLite } from '@ruvector/rvlite';
+
+// Create database
+const db = await RvLite.create();
+
+// SQL with vector search
+await db.sql(`
+  CREATE TABLE docs (
+    id SERIAL PRIMARY KEY,
+    content TEXT,
+    embedding VECTOR(384)
+  )
+`);
+
+await db.sql(`
+  SELECT id, content, embedding <=> $1 AS distance
+  FROM docs
+  ORDER BY distance
+  LIMIT 10
+`, [queryVector]);
+
+// Cypher graph queries
+await db.cypher(`
+  CREATE (a:Person {name: 'Alice'})-[:KNOWS]->(b:Person {name: 'Bob'})
+`);
+
+// SPARQL RDF queries
+await db.sparql(`
+  SELECT ?name WHERE {
+    ?person foaf:name ?name .
+  }
+`);
+
+// GNN embeddings
+const embeddings = await db.gnn.computeEmbeddings('social_network', [
+  db.gnn.createLayer('gcn', { inputDim: 128, outputDim: 64 })
+]);
+
+// Self-learning with ReasoningBank
+await db.learning.recordTrajectory({ state: [0.1], action: 2, reward: 1.0 });
+await db.learning.train({ algorithm: 'q-learning', iterations: 1000 });
+```
+
+### Size Budget
+
+| Component | Size | Purpose |
+|-----------|------|---------|
+| ruvector-core | ~500KB | Vectors, SIMD |
+| SQL parser | ~200KB | Query parsing |
+| SPARQL executor | ~300KB | RDF queries |
+| Cypher (graph-wasm) | ~600KB | Graph queries |
+| GNN layers | ~300KB | Neural networks |
+| ReasoningBank (sona) | ~300KB | Self-learning |
+| **Total** | **~2.3MB** | Gzipped |
+
+### Installation
+
+```bash
+# npm
+npm install @ruvector/rvlite
+
+# Rust
+cargo add rvlite
+
+# Build WASM
+wasm-pack build --target web --release
+```
+
+> **Full Documentation**: [rvlite README](./crates/rvlite/README.md)
+
+</details>
+
+<details>
+<summary><strong>🌐 Edge-Net - Collective AI Computing Network</strong></summary>
+
+[![npm](https://img.shields.io/npm/v/@ruvector/edge-net.svg)](https://www.npmjs.com/package/@ruvector/edge-net)
+
+**Share, Contribute, Compute Together** — A distributed computing platform that enables collective resource sharing for AI workloads.
+
+### What is Edge-Net?
+
+Edge-Net creates a **collective computing network** where participants share idle browser resources to power distributed AI workloads:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              EDGE-NET: COLLECTIVE AI COMPUTING NETWORK                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌─────────────┐       ┌─────────────┐       ┌─────────────┐              │
+│   │  Your       │       │  Collective │       │  AI Tasks   │              │
+│   │  Browser    │◄─────►│  Network    │◄─────►│  Completed  │              │
+│   │  (Idle CPU) │  P2P  │  (1000s)    │       │  for You    │              │
+│   └─────────────┘       └─────────────┘       └─────────────┘              │
+│         │                     │                     │                       │
+│   Contribute ──────► Earn rUv Units ──────► Use for AI Workloads           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### How It Works
+
+| Step | What Happens | Result |
+|------|--------------|--------|
+| 1. **Contribute** | Share unused CPU cycles when browsing | Help the network |
+| 2. **Earn** | Accumulate rUv (Resource Utility Vouchers) | Build credits |
+| 3. **Use** | Spend rUv to run AI tasks | Access collective power |
+| 4. **Network Grows** | More participants = more power | Everyone benefits |
+
+### Why Collective AI Computing?
+
+| Traditional AI | Collective Edge-Net |
+|----------------|---------------------|
+| Expensive GPU servers | Free idle browser CPUs |
+| Centralized data centers | Distributed global network |
+| Pay-per-use pricing | Contribution-based access |
+| Single point of failure | Resilient P2P mesh |
+| Limited by your hardware | Scale with the collective |
+
+### AI Intelligence Stack
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        AI INTELLIGENCE STACK                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    MicroLoRA Adapter Pool (from ruvLLM)              │   │
+│  │  • LRU-managed pool (16 slots) • <50µs rank-1 forward               │   │
+│  │  • 4-bit/8-bit quantization    • 2,236+ ops/sec                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    SONA - Self-Optimizing Neural Architecture         │   │
+│  │  • Instant Loop: Per-request MicroLoRA adaptation                    │   │
+│  │  • Background Loop: Hourly K-means consolidation                     │   │
+│  │  • Deep Loop: Weekly EWC++ (prevents catastrophic forgetting)        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌─────────────────┐  │
+│  │   HNSW Vector Index  │  │  Federated Learning  │  │ ReasoningBank   │  │
+│  │   • 150x faster      │  │  • Byzantine tolerant│  │ • Pattern learn │  │
+│  │   • O(log N) search  │  │  • Diff privacy      │  │ • 87x energy    │  │
+│  └──────────────────────┘  └──────────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core AI Tasks
+
+| Task Type | Use Case | Performance |
+|-----------|----------|-------------|
+| **Vector Search** | Find similar items | 150x speedup via HNSW |
+| **Embeddings** | Text understanding | Semantic vectors |
+| **Semantic Match** | Intent detection | Classify meaning |
+| **LoRA Inference** | Task adaptation | <100µs forward |
+| **Pattern Learning** | Self-optimization | ReasoningBank trajectories |
+
+### Pi-Key Identity System
+
+Ultra-compact cryptographic identity using mathematical constants:
+
+| Key Type | Size | Purpose |
+|----------|------|---------|
+| **π (Pi-Key)** | 40 bytes | Permanent identity |
+| **e (Session)** | 34 bytes | Encrypted sessions |
+| **φ (Genesis)** | 21 bytes | Network origin markers |
+
+### Self-Optimizing Features
+
+| Feature | Mechanism | Benefit |
+|---------|-----------|---------|
+| **Task Routing** | Multi-head attention | Work goes to best nodes |
+| **Topology Optimization** | Self-organizing mesh | Network adapts to load |
+| **Q-Learning Security** | Reinforcement learning | Learns to defend threats |
+| **Economic Balance** | rUv token system | Self-sustaining economy |
+
+### Quick Start
+
+**Add to Your Website:**
+```html
+<script type="module">
+  import init, { EdgeNetNode, EdgeNetConfig } from '@ruvector/edge-net';
+
+  async function joinCollective() {
+    await init();
+
+    // Join the collective
+    const node = new EdgeNetConfig('my-website')
+      .cpuLimit(0.3)          // Contribute 30% CPU when idle
+      .memoryLimit(256 * 1024 * 1024)  // 256MB max
+      .respectBattery(true)   // Reduce on battery
+      .build();
+
+    node.start();
+
+    // Monitor participation
+    setInterval(() => {
+      console.log(`Contributed: ${node.ruvBalance()} rUv`);
+    }, 10000);
+  }
+
+  joinCollective();
+</script>
+```
+
+**Use the Collective's AI Power:**
+```javascript
+// Submit an AI task to the collective
+const result = await node.submitTask('vector_search', {
+  query: embeddings,
+  k: 10,
+  index: 'shared-knowledge-base'
+}, 5);  // Spend up to 5 rUv
+
+console.log('Similar items:', result);
+```
+
+**Monitor Your Contribution:**
+```javascript
+const stats = node.getStats();
+console.log(`
+  rUv Earned: ${stats.ruv_earned}
+  rUv Spent: ${stats.ruv_spent}
+  Tasks Completed: ${stats.tasks_completed}
+  Reputation: ${(stats.reputation * 100).toFixed(1)}%
+`);
+```
+
+### Key Features
+
+| Feature | Benefit |
+|---------|---------|
+| **Idle CPU Utilization** | Use resources that would otherwise be wasted |
+| **Browser-Based** | No installation, runs in any modern browser |
+| **Adjustable Contribution** | Control how much you share (10-50% CPU) |
+| **Battery Aware** | Automatically reduces on battery power |
+| **Fair Distribution** | Work routed based on capability matching |
+| **Privacy-First** | Pi-Key cryptographic identity |
+| **Federated Learning** | Learn collectively without sharing data |
+| **Byzantine Tolerance** | Resilient to malicious nodes |
+
+### Installation
+
+```bash
+# npm
+npm install @ruvector/edge-net
+
+# Or include directly
+<script src="https://unpkg.com/@ruvector/edge-net"></script>
+```
+
+> **Full Documentation**: [edge-net README](./examples/edge-net/README.md)
+
+</details>
+
+<details>
 <summary><strong>🐘 PostgreSQL Extension</strong></summary>
 
 [![crates.io](https://img.shields.io/crates/v/ruvector-postgres.svg)](https://crates.io/crates/ruvector-postgres)
