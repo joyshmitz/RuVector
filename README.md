@@ -2387,6 +2387,48 @@ coordinator.accept_export(export)?;
 coordinator.consolidate();  // Share patterns with new agents
 ```
 
+### Dynamic Embedding Fine-Tuning
+
+RuvLLM's adaptive learning system enables real-time model improvement without retraining.
+
+| Feature | Description | Latency |
+|---------|-------------|---------|
+| **MicroLoRA** | Per-request adaptation (rank 1-2), <50KB adapters | <1ms |
+| **Contrastive Training** | Triplet loss with hard negatives for embedding optimization | Batch |
+| **Task-Specific Adapters** | Pre-tuned for Coder, Researcher, Security, Architect, Reviewer | Hot-swap |
+| **EWC++ Consolidation** | Prevents catastrophic forgetting during continuous learning | Background |
+| **Adapter Merging** | Average, Weighted, SLERP, TIES, DARE strategies | On-demand |
+
+```javascript
+// Contrastive fine-tuning for agent routing
+import { ContrastiveTrainer } from '@ruvector/ruvllm';
+
+const trainer = new ContrastiveTrainer({
+  margin: 0.5,
+  hardNegativeRatio: 0.7
+});
+
+// Learn: task → correct agent, not wrong agent
+trainer.addTriplet(taskEmb, correctAgentEmb, wrongAgentEmb, true);
+const model = trainer.train();
+```
+
+```rust
+// Task-specific adapter hot-swapping
+use ruvllm::lora::RuvLtraAdapters;
+
+let adapters = RuvLtraAdapters::new();
+let coder = adapters.create_lora("coder", 768)?;      // Rank 16, code patterns
+let security = adapters.create_lora("security", 768)?; // Rank 16, vulnerability detection
+
+// Hot-swap at runtime without model reload
+orchestrator.set_adapter(coder);
+let code_response = orchestrator.query("Implement binary search").await?;
+
+orchestrator.set_adapter(security);
+let audit_response = orchestrator.query("Audit this code for vulnerabilities").await?;
+```
+
 ### Advanced Features
 
 - **SIMD Inference**: AVX2/AVX512/SSE4.1 optimization
@@ -2394,8 +2436,9 @@ coordinator.consolidate();  // Share patterns with new agents
 - **HuggingFace Export**: Export LoRA weights and preference pairs
 - **Multi-Model Routing**: SmolLM, Qwen2, TinyLlama selection
 - **WASM Support**: Run SONA in browsers and edge devices
+- **Browser Fine-Tuning**: MicroLoRA WASM with localStorage persistence
 
-> **Full Documentation**: [ruvLLM README](./examples/ruvLLM/README.md)
+> **Full Documentation**: [ruvLLM README](./examples/ruvLLM/README.md) | [Fine-Tuning Guide](./docs/ruvllm/FINE_TUNING.md) | [Task Adapters](./docs/training/task_specific_lora_adapters.md)
 
 </details>
 
