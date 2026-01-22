@@ -21,23 +21,47 @@ ruvector/
 │   ├── ruvector-wasm/      # WebAssembly bindings
 │   ├── ruvector-cli/       # Command-line interface
 │   ├── ruvector-bench/     # Benchmarking suite
+│   ├── ruvllm/             # LLM inference engine
+│   ├── sona/               # Self-Optimizing Neural Architecture
 │   ├── router-core/        # Neural routing
-│   ├── router-cli/         # Router CLI
-│   ├── router-ffi/         # FFI bindings
-│   └── router-wasm/        # Router WASM
+│   └── ...                 # Additional crates
+│
+├── npm/                    # NPM packages
+│   └── packages/
+│       ├── ruvector/       # Core bindings
+│       ├── ruvllm/         # LLM package
+│       ├── raft/           # Consensus implementation
+│       ├── replication/    # Data replication
+│       └── scipix/         # OCR client
 │
 ├── docs/                   # 📚 Documentation (organized)
 │   ├── README.md           # Documentation index
-│   ├── getting-started/    # Quick starts and tutorials
-│   ├── api/               # API documentation
-│   ├── architecture/      # System architecture
-│   ├── cloud-architecture/ # Global cloud deployment
-│   ├── guide/             # User guides
-│   ├── benchmarks/        # Benchmarking guides
-│   ├── optimization/      # Performance optimization
-│   ├── development/       # Contributing and development
-│   ├── testing/          # Testing documentation
-│   └── project-phases/   # Historical project phases
+│   ├── INDEX.md            # Complete file index
+│   ├── REPO_STRUCTURE.md   # This file
+│   ├── adr/                # Architecture Decision Records
+│   ├── analysis/           # Research & analysis
+│   ├── api/                # API documentation
+│   ├── architecture/       # System architecture
+│   ├── benchmarks/         # Performance benchmarks
+│   ├── cloud-architecture/ # Cloud deployment
+│   ├── code-reviews/       # Code reviews
+│   ├── development/        # Contributing guides
+│   ├── gnn/                # GNN documentation
+│   ├── guides/             # User guides
+│   ├── hnsw/               # HNSW documentation
+│   ├── hooks/              # Hooks system
+│   ├── implementation/     # Implementation details
+│   ├── integration/        # Integration guides
+│   ├── nervous-system/     # Nervous system arch
+│   ├── optimization/       # Performance tuning
+│   ├── postgres/           # PostgreSQL extension
+│   ├── project-phases/     # Historical phases
+│   ├── publishing/         # NPM publishing
+│   ├── research/           # Research documentation
+│   ├── ruvllm/             # RuVLLM docs
+│   ├── security/           # Security audits
+│   ├── testing/            # Testing docs
+│   └── training/           # Training & LoRA
 │
 ├── src/                    # 🚀 Cloud deployment source
 │   ├── cloud-run/         # Cloud Run services
@@ -45,98 +69,102 @@ ruvector/
 │   └── burst-scaling/     # Auto-scaling system
 │
 ├── benchmarks/            # Load testing and benchmarks
-│   ├── load-generator.ts
-│   ├── benchmark-scenarios.ts
-│   └── ...
-│
 ├── tests/                 # Rust integration tests
 ├── examples/             # Example code
 │   ├── rust/            # Rust examples
 │   ├── nodejs/          # Node.js examples
 │   └── wasm-*/         # WASM examples
 │
-└── .claude-flow/        # Claude Flow coordination
+└── .claude/             # Claude Code helpers
 ```
 
 ## Documentation Organization
 
-All documentation is now organized in `/docs` with clear categories:
+All documentation is organized in `/docs` with clear categories:
 
-### 📖 Getting Started (7 files)
-- AGENTICDB_QUICKSTART.md - Quick start guide
-- OPTIMIZATION_QUICK_START.md - Performance quick start
-- AGENTICDB_API.md - API reference
-- wasm-api.md - WebAssembly API
-- wasm-build-guide.md - WASM build guide
-- advanced-features.md - Advanced features
-- quick-fix-guide.md - Common fixes
+### 📖 Guides & Tutorials
+- **guides/** - Getting started, tutorials, installation
+- **api/** - Rust, Node.js, Cypher API references
 
-### 🏗️ Architecture (11 files)
-- TECHNICAL_PLAN.md - Complete technical plan
-- architecture/ - System architecture
-- cloud-architecture/ - Global deployment
-  - architecture-overview.md - 15-region design
-  - scaling-strategy.md - Auto-scaling
-  - infrastructure-design.md - GCP infrastructure
-  - DEPLOYMENT_GUIDE.md - Deployment steps
-  - PERFORMANCE_OPTIMIZATION_GUIDE.md - Tuning guide
+### 🏗️ Architecture & Design
+- **adr/** - Architecture Decision Records
+- **architecture/** - System design documents
+- **cloud-architecture/** - Global cloud deployment
+- **nervous-system/** - Nervous system architecture
 
-### 📚 API Reference (2 files)
-- api/RUST_API.md - Rust API
-- api/NODEJS_API.md - Node.js API
+### ⚡ Performance
+- **benchmarks/** - Performance benchmarks & results
+- **optimization/** - Performance tuning guides
+- **analysis/** - Research & analysis documents
 
-### 📖 User Guides (4 files)
-- guide/GETTING_STARTED.md
-- guide/BASIC_TUTORIAL.md
-- guide/ADVANCED_FEATURES.md
-- guide/INSTALLATION.md
+### 🔐 Security
+- **security/** - Security audits & reports
 
-### ⚡ Performance (5 files)
-- optimization/ - Performance guides
-- benchmarks/ - Benchmarking documentation
+### 💻 Implementation
+- **implementation/** - Implementation details & summaries
+- **integration/** - Integration guides
+- **code-reviews/** - Code review documentation
 
-### 👨‍💻 Development (3 files)
-- development/CONTRIBUTING.md - Contribution guidelines
-- development/MIGRATION.md - Migration guide
-- development/FIXING_COMPILATION_ERRORS.md - Troubleshooting
+### 🔬 Specialized Topics
+- **gnn/** - Graph Neural Networks
+- **hnsw/** - HNSW index documentation
+- **postgres/** - PostgreSQL extension
+- **ruvllm/** - RuVLLM documentation
+- **training/** - Training & LoRA guides
 
-### 🧪 Testing (2 files)
-- testing/TDD_TEST_SUITE_SUMMARY.md
-- testing/integration-testing-report.md
+### 👨‍💻 Development
+- **development/** - Contributing, migration, troubleshooting
+- **testing/** - Testing documentation
+- **publishing/** - NPM publishing guides
+- **hooks/** - Hooks system documentation
 
-### 📜 Historical (9 files)
-- project-phases/ - Project phase documentation
+### 🔬 Research
+- **research/** - Research documentation
+  - cognitive-frontier/ - Advanced AI research
+  - gnn-v2/ - GNN v2 plans
+  - latent-space/ - HNSW & attention research
+  - mincut/ - MinCut algorithm research
+
+### 📜 Historical
+- **project-phases/** - Project phase documentation
 
 ## Source Code Organization
 
+### `/crates` - Rust Crates
+Core Rust implementation organized as workspace:
+- `ruvector-core` - Core vector database
+- `ruvllm` - LLM inference engine
+- `sona` - Self-Optimizing Neural Architecture
+- Platform bindings (Node.js, WASM, FFI)
+- CLI and benchmarking tools
+
+### `/npm/packages` - NPM Packages
+TypeScript packages for Node.js:
+- `@ruvector/ruvector` - Core bindings
+- `@ruvector/ruvllm` - LLM inference
+- `@ruvector/raft` - Consensus implementation
+- `@ruvector/replication` - Data replication
+- `@ruvector/scipix` - OCR client
+
 ### `/src` - Cloud Deployment Code
-All global streaming implementation code:
-- `cloud-run/` - Cloud Run streaming services
+Global streaming implementation:
+- `cloud-run/` - Cloud Run services
 - `agentic-integration/` - Distributed agent coordination
 - `burst-scaling/` - Auto-scaling and capacity management
 
-### `/crates` - Rust Crates
-Core Rust implementation organized as workspace:
-- Core functionality in `ruvector-core`
-- Platform-specific bindings (Node.js, WASM, FFI)
-- CLI and benchmarking tools
-
 ### `/benchmarks` - Load Testing
-Comprehensive benchmarking suite:
-- Load generators for 25B+ concurrent connections
-- 15+ test scenarios
-- Results analysis and visualization
+Comprehensive benchmarking suite for performance testing
 
 ## File Counts
 
-- **Total Files**: 48 production files
-- **Documentation**: 42 markdown files (organized)
-- **Source Code**: 28,000+ lines
+- **Documentation**: 170+ markdown files (organized in 25+ directories)
+- **Rust Crates**: 15+ crates
+- **NPM Packages**: 5 packages
 - **Root Files**: 8 essential files only
 
 ## Clean Root Directory
 
-Only essential files remain in root:
+Only essential files in root:
 - ✅ README.md - Project overview
 - ✅ CHANGELOG.md - Version history
 - ✅ CLAUDE.md - Development configuration
@@ -150,14 +178,15 @@ Only essential files remain in root:
 
 ## Navigation Tips
 
-1. **New users**: Start at [docs/README.md](./docs/README.md)
-2. **Quick start**: See [docs/getting-started/](./docs/getting-started/)
-3. **Cloud deployment**: Check [docs/cloud-architecture/](./docs/cloud-architecture/)
-4. **Contributing**: Read [docs/development/CONTRIBUTING.md](./docs/development/CONTRIBUTING.md)
-5. **API docs**: Browse [docs/api/](./docs/api/)
+1. **New users**: Start at [docs/README.md](./README.md)
+2. **Quick start**: See [docs/guides/](./guides/)
+3. **Cloud deployment**: Check [docs/cloud-architecture/](./cloud-architecture/)
+4. **Contributing**: Read [docs/development/CONTRIBUTING.md](./development/CONTRIBUTING.md)
+5. **API docs**: Browse [docs/api/](./api/)
+6. **Architecture decisions**: Review [docs/adr/](./adr/)
 
 ---
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2026-01-21
 **Status**: ✅ Clean and Organized
-**Total Documentation**: 42 files properly categorized
+**Total Documentation**: 170+ files properly categorized

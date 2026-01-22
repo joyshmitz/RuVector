@@ -14,18 +14,24 @@ Complete index of all Ruvector documentation.
 
 ```
 docs/
+├── adr/                    # Architecture Decision Records
+├── analysis/               # Research & analysis docs
 ├── api/                    # API references (Rust, Node.js, Cypher)
 ├── architecture/           # System design docs
-├── benchmarks/             # Performance benchmarks
+├── benchmarks/             # Performance benchmarks & results
 ├── cloud-architecture/     # Cloud deployment guides
+├── code-reviews/           # Code review documentation
+├── dag/                    # DAG implementation
 ├── development/            # Developer guides
 ├── examples/               # SQL examples
 ├── gnn/                    # GNN/Graph implementation
 ├── guides/                 # User guides & tutorials
 ├── hnsw/                   # HNSW index documentation
-├── implementation/         # Implementation details
+├── hooks/                  # Hooks system documentation
+├── implementation/         # Implementation details & summaries
 ├── integration/            # Integration guides
-├── optimization/           # Performance optimization
+├── nervous-system/         # Nervous system architecture
+├── optimization/           # Performance optimization guides
 ├── plans/                  # Implementation plans
 ├── postgres/               # PostgreSQL extension docs
 │   └── zero-copy/          # Zero-copy memory docs
@@ -36,8 +42,12 @@ docs/
 │   ├── gnn-v2/             # GNN v2 research plans
 │   ├── latent-space/       # HNSW & attention research
 │   └── mincut/             # MinCut algorithm research
+├── ruvllm/                 # RuVLLM documentation
+├── security/               # Security audits & reports
+├── sparse-inference/       # Sparse inference docs
 ├── sql/                    # SQL examples
-└── testing/                # Testing documentation
+├── testing/                # Testing documentation
+└── training/               # Training & LoRA docs
 ```
 
 ## User Guides
