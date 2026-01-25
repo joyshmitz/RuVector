@@ -400,6 +400,7 @@ pub struct PriorityEntry {
 }
 
 impl PriorityEntry {
+    /// Create a new priority entry with given distance and vertex.
     pub fn new(distance: f64, vertex: VertexId) -> Self {
         Self { distance, vertex }
     }
