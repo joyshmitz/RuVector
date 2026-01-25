@@ -42,7 +42,7 @@ mockall = { workspace = true }
 
 [features]
 default = ["exact", "approximate"]
-full = ["exact", "approximate", "integration", "monitoring", "simd", "agentic"]
+full = ["exact", "approximate", "integration", "monitoring", "simd", "agentic", "jtree", "tiered"]
 exact = []  # Exact minimum cut algorithm
 approximate = []  # (1+ε)-approximate algorithm
 integration = ["ruvector-graph"]  # GraphDB integration
@@ -50,6 +50,9 @@ monitoring = []  # Real-time monitoring with callbacks
 simd = ["ruvector-core/simd"]
 wasm = []  # WASM compatibility mode
 agentic = []  # 256-core parallel agentic chip backend
+jtree = []  # j-Tree hierarchical decomposition (ADR-002)
+tiered = ["jtree", "exact"]  # Two-tier coordinator (j-tree + exact)
+all-cut-queries = ["jtree"]  # Sparsest cut, multiway, multicut queries
 
 [lib]
 crate-type = ["rlib"]
@@ -73,6 +76,14 @@ harness = false
 
 [[bench]]
 name = "snn_bench"
+harness = false
+
+[[bench]]
+name = "jtree_bench"
+harness = false
+
+[[bench]]
+name = "optimization_bench"
 harness = false
 
 [[example]]

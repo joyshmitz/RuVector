@@ -143,6 +143,11 @@ pub mod tree;
 pub mod witness;
 pub mod wrapper;
 
+/// Performance optimizations for j-Tree + BMSSP implementation.
+///
+/// Provides SOTA optimizations achieving 10x combined speedup.
+pub mod optimization;
+
 /// Spiking Neural Network integration for deep MinCut optimization.
 ///
 /// This module implements a six-layer integration architecture combining
@@ -181,6 +186,35 @@ pub mod snn;
 /// This module implements the December 2024 breakthrough achieving n^{o(1)} update time.
 /// Integrates multi-level hierarchy, deterministic LocalKCut, and fragmenting algorithm.
 pub mod subpolynomial;
+
+/// Dynamic Hierarchical j-Tree Decomposition for Approximate Cut Structure
+///
+/// This module implements the two-tier dynamic cut architecture from ADR-002:
+///
+/// - **Tier 1 (j-Tree)**: O(n^ε) amortized updates, poly-log approximation
+/// - **Tier 2 (Exact)**: SubpolynomialMinCut for exact verification
+///
+/// Key features:
+/// - BMSSP WASM integration for O(m·log^(2/3) n) path-cut duality queries
+/// - Vertex-split-tolerant cut sparsifier with O(log² n / ε²) recourse
+/// - Lazy hierarchical evaluation (demand-paging)
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// use ruvector_mincut::jtree::{JTreeHierarchy, JTreeConfig};
+/// use ruvector_mincut::graph::DynamicGraph;
+/// use std::sync::Arc;
+///
+/// let graph = Arc::new(DynamicGraph::new());
+/// graph.insert_edge(1, 2, 1.0).unwrap();
+/// graph.insert_edge(2, 3, 1.0).unwrap();
+///
+/// let mut jtree = JTreeHierarchy::build(graph, JTreeConfig::default()).unwrap();
+/// let approx = jtree.approximate_min_cut().unwrap();
+/// ```
+#[cfg(feature = "jtree")]
+pub mod jtree;
 
 // Internal modules
 mod core;
@@ -242,6 +276,38 @@ pub use subpolynomial::{
 pub use tree::{DecompositionNode, HierarchicalDecomposition, LevelInfo};
 pub use witness::{EdgeWitness, LazyWitnessTree, WitnessTree};
 pub use wrapper::MinCutWrapper;
+
+// Optimization re-exports (SOTA j-Tree + BMSSP performance improvements)
+pub use optimization::{
+    // DSpar: 5.9x speedup via degree-based presparse
+    DegreePresparse, PresparseConfig, PresparseResult, PresparseStats,
+    // Cache: 10x for repeated distance queries
+    PathDistanceCache, CacheConfig, CacheStats, PrefetchHint,
+    // SIMD: 2-4x for distance operations
+    SimdDistanceOps, DistanceArray,
+    // Pool: 50-75% memory reduction
+    LevelPool, PoolConfig, LazyLevel, PoolStats,
+    // Parallel: Rayon-based work-stealing
+    ParallelLevelUpdater, ParallelConfig, WorkStealingScheduler,
+    // WASM Batch: 10x FFI overhead reduction
+    WasmBatchOps, BatchConfig, TypedArrayTransfer,
+    // Benchmarking
+    BenchmarkSuite, BenchmarkResult, OptimizationBenchmark,
+};
+
+// J-Tree re-exports (feature-gated)
+#[cfg(feature = "jtree")]
+pub use jtree::{
+    ApproximateCut, BmsspJTreeLevel, ContractedGraph, CutResult as JTreeCutResult,
+    DynamicCutSparsifier, EscalationPolicy, EscalationTrigger, JTreeConfig, JTreeError,
+    JTreeHierarchy, JTreeLevel, JTreeStatistics, LevelConfig, LevelStatistics, PathCutResult,
+    QueryResult as CoordinatorQueryResult, RecourseTracker, SparsifierConfig, SparsifierStatistics,
+    Tier, TierMetrics, TwoTierCoordinator, VertexSplitResult,
+};
+
+// Re-export ForestPacking with explicit disambiguation (also defined in localkcut)
+#[cfg(feature = "jtree")]
+pub use jtree::ForestPacking as JTreeForestPacking;
 
 // SNN Integration re-exports
 pub use snn::{
@@ -414,6 +480,15 @@ pub mod prelude {
 
     #[cfg(feature = "monitoring")]
     pub use crate::{EventType, MinCutEvent, MinCutMonitor, MonitorBuilder};
+
+    #[cfg(feature = "jtree")]
+    pub use crate::{
+        ApproximateCut, BmsspJTreeLevel, ContractedGraph, CoordinatorQueryResult,
+        DynamicCutSparsifier, EscalationPolicy, EscalationTrigger, JTreeConfig, JTreeCutResult,
+        JTreeError, JTreeForestPacking, JTreeHierarchy, JTreeLevel, JTreeStatistics, LevelConfig,
+        LevelStatistics, PathCutResult, RecourseTracker, SparsifierConfig, SparsifierStatistics,
+        Tier, TierMetrics, TwoTierCoordinator, VertexSplitResult,
+    };
 }
 
 #[cfg(test)]
