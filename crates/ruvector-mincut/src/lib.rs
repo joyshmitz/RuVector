@@ -277,6 +277,24 @@ pub use tree::{DecompositionNode, HierarchicalDecomposition, LevelInfo};
 pub use witness::{EdgeWitness, LazyWitnessTree, WitnessTree};
 pub use wrapper::MinCutWrapper;
 
+// Optimization re-exports (SOTA j-Tree + BMSSP performance improvements)
+pub use optimization::{
+    // DSpar: 5.9x speedup via degree-based presparse
+    DegreePresparse, PresparseConfig, PresparseResult, PresparseStats,
+    // Cache: 10x for repeated distance queries
+    PathDistanceCache, CacheConfig, CacheStats, PrefetchHint,
+    // SIMD: 2-4x for distance operations
+    SimdDistanceOps, DistanceArray,
+    // Pool: 50-75% memory reduction
+    LevelPool, PoolConfig, LazyLevel, PoolStats,
+    // Parallel: Rayon-based work-stealing
+    ParallelLevelUpdater, ParallelConfig, WorkStealingScheduler,
+    // WASM Batch: 10x FFI overhead reduction
+    WasmBatchOps, BatchConfig, TypedArrayTransfer,
+    // Benchmarking
+    BenchmarkSuite, BenchmarkResult, OptimizationBenchmark,
+};
+
 // J-Tree re-exports (feature-gated)
 #[cfg(feature = "jtree")]
 pub use jtree::{
