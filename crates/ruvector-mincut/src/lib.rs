@@ -182,6 +182,35 @@ pub mod snn;
 /// Integrates multi-level hierarchy, deterministic LocalKCut, and fragmenting algorithm.
 pub mod subpolynomial;
 
+/// Dynamic Hierarchical j-Tree Decomposition for Approximate Cut Structure
+///
+/// This module implements the two-tier dynamic cut architecture from ADR-002:
+///
+/// - **Tier 1 (j-Tree)**: O(n^ε) amortized updates, poly-log approximation
+/// - **Tier 2 (Exact)**: SubpolynomialMinCut for exact verification
+///
+/// Key features:
+/// - BMSSP WASM integration for O(m·log^(2/3) n) path-cut duality queries
+/// - Vertex-split-tolerant cut sparsifier with O(log² n / ε²) recourse
+/// - Lazy hierarchical evaluation (demand-paging)
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// use ruvector_mincut::jtree::{JTreeHierarchy, JTreeConfig};
+/// use ruvector_mincut::graph::DynamicGraph;
+/// use std::sync::Arc;
+///
+/// let graph = Arc::new(DynamicGraph::new());
+/// graph.insert_edge(1, 2, 1.0).unwrap();
+/// graph.insert_edge(2, 3, 1.0).unwrap();
+///
+/// let mut jtree = JTreeHierarchy::build(graph, JTreeConfig::default()).unwrap();
+/// let approx = jtree.approximate_min_cut().unwrap();
+/// ```
+#[cfg(feature = "jtree")]
+pub mod jtree;
+
 // Internal modules
 mod core;
 
@@ -242,6 +271,15 @@ pub use subpolynomial::{
 pub use tree::{DecompositionNode, HierarchicalDecomposition, LevelInfo};
 pub use witness::{EdgeWitness, LazyWitnessTree, WitnessTree};
 pub use wrapper::MinCutWrapper;
+
+// J-Tree re-exports (feature-gated)
+#[cfg(feature = "jtree")]
+pub use jtree::{
+    ApproximateCut, BmsspJTreeLevel, ContractedGraph, CutResult, DynamicCutSparsifier,
+    ForestPacking, JTreeConfig, JTreeError, JTreeHierarchy, JTreeLevel, JTreeStatistics,
+    LevelConfig, LevelStatistics, PathCutResult, RecourseTracker, SparsifierConfig,
+    SparsifierStatistics, Tier, VertexSplitResult,
+};
 
 // SNN Integration re-exports
 pub use snn::{
@@ -414,6 +452,14 @@ pub mod prelude {
 
     #[cfg(feature = "monitoring")]
     pub use crate::{EventType, MinCutEvent, MinCutMonitor, MonitorBuilder};
+
+    #[cfg(feature = "jtree")]
+    pub use crate::{
+        ApproximateCut, BmsspJTreeLevel, ContractedGraph, CutResult as JTreeCutResult,
+        DynamicCutSparsifier, ForestPacking, JTreeConfig, JTreeError, JTreeHierarchy,
+        JTreeLevel, JTreeStatistics, LevelConfig, LevelStatistics, PathCutResult,
+        RecourseTracker, SparsifierConfig, SparsifierStatistics, Tier, VertexSplitResult,
+    };
 }
 
 #[cfg(test)]
