@@ -5,11 +5,29 @@
 //! - **Tier 2 (Exact)**: Precise O(n^o(1)) queries via full algorithm
 //!
 //! Includes escalation trigger policies for automatic tier switching.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use ruvector_mincut::jtree::{TwoTierCoordinator, EscalationPolicy};
+//! use ruvector_mincut::graph::DynamicGraph;
+//! use std::sync::Arc;
+//!
+//! let graph = Arc::new(DynamicGraph::new());
+//! graph.insert_edge(1, 2, 1.0).unwrap();
+//! graph.insert_edge(2, 3, 1.0).unwrap();
+//!
+//! let mut coord = TwoTierCoordinator::with_defaults(graph);
+//! coord.build().unwrap();
+//!
+//! // Query with automatic tier selection
+//! let result = coord.min_cut();
+//! println!("Min cut: {} (tier {})", result.value, result.tier);
+//! ```
 
-use crate::error::{MinCutError, Result};
+use crate::error::Result;
 use crate::graph::{DynamicGraph, VertexId, Weight};
-use crate::jtree::hierarchy::{JTreeConfig, LazyJTreeHierarchy};
-use crate::jtree::level::MultiTerminalCut;
+use crate::jtree::hierarchy::{JTreeConfig, JTreeHierarchy};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -186,12 +204,13 @@ impl TierMetrics {
 }
 
 /// Two-tier coordinator for routing between approximate and exact algorithms
-#[derive(Debug)]
 pub struct TwoTierCoordinator {
     /// The underlying graph
     graph: Arc<DynamicGraph>,
-    /// Tier 1: J-Tree hierarchy for approximate queries
-    tier1: LazyJTreeHierarchy,
+    /// Configuration for j-tree hierarchy
+    config: JTreeConfig,
+    /// Tier 1: J-Tree hierarchy for approximate queries (built lazily)
+    tier1: Option<JTreeHierarchy>,
     /// Escalation policy
     policy: EscalationPolicy,
     /// Tier usage metrics
@@ -206,17 +225,17 @@ pub struct TwoTierCoordinator {
     queries_since_exact: usize,
     /// Time of last exact computation
     last_exact_time: Instant,
+    /// Cached approximate min-cut value
+    cached_approx_value: Option<f64>,
 }
 
 impl TwoTierCoordinator {
     /// Create a new two-tier coordinator
     pub fn new(graph: Arc<DynamicGraph>, policy: EscalationPolicy) -> Self {
-        let config = JTreeConfig::dynamic();
-        let tier1 = LazyJTreeHierarchy::new(Arc::clone(&graph), config);
-
         Self {
             graph,
-            tier1,
+            config: JTreeConfig::default(),
+            tier1: None,
             policy,
             metrics: TierMetrics::default(),
             error_window: VecDeque::new(),
@@ -224,6 +243,7 @@ impl TwoTierCoordinator {
             last_exact_value: None,
             queries_since_exact: 0,
             last_exact_time: Instant::now(),
+            cached_approx_value: None,
         }
     }
 
@@ -238,11 +258,10 @@ impl TwoTierCoordinator {
         jtree_config: JTreeConfig,
         policy: EscalationPolicy,
     ) -> Self {
-        let tier1 = LazyJTreeHierarchy::new(Arc::clone(&graph), jtree_config);
-
         Self {
             graph,
-            tier1,
+            config: jtree_config,
+            tier1: None,
             policy,
             metrics: TierMetrics::default(),
             error_window: VecDeque::new(),
@@ -250,13 +269,31 @@ impl TwoTierCoordinator {
             last_exact_value: None,
             queries_since_exact: 0,
             last_exact_time: Instant::now(),
+            cached_approx_value: None,
         }
     }
 
     /// Build/initialize the coordinator
     pub fn build(&mut self) -> Result<()> {
-        self.tier1.build()?;
+        let hierarchy = JTreeHierarchy::build(Arc::clone(&self.graph), self.config.clone())?;
+        self.tier1 = Some(hierarchy);
         Ok(())
+    }
+
+    /// Ensure hierarchy is built, build if not
+    fn ensure_built(&mut self) -> Result<()> {
+        if self.tier1.is_none() {
+            self.build()?;
+        }
+        Ok(())
+    }
+
+    /// Get the j-tree hierarchy, building if necessary
+    fn tier1_mut(&mut self) -> Result<&mut JTreeHierarchy> {
+        self.ensure_built()?;
+        self.tier1
+            .as_mut()
+            .ok_or_else(|| crate::error::MinCutError::InternalError("Hierarchy not built".to_string()))
     }
 
     /// Query global minimum cut with automatic tier selection
