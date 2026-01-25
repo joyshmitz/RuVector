@@ -249,6 +249,15 @@ impl LazyJTreeHierarchy {
 
     /// Query approximate min-cut with lazy materialization
     pub fn approximate_min_cut(&mut self) -> ApproximateCut {
+        // Handle empty hierarchy
+        if self.levels.is_empty() {
+            return ApproximateCut {
+                value: f64::INFINITY,
+                approximation_factor: f64::INFINITY,
+                level_used: 0,
+            };
+        }
+
         let mut current_level = self.levels.len() - 1;
 
         // Start from coarsest level, refine as needed
@@ -1260,8 +1269,17 @@ mod stress_tests {
             level.add_edge(i, i + 1, (i + 1) as f64);
         }
 
-        // Many queries
-        for i in 0..50 {
+        // First pass: populate cache
+        for i in 0u64..50 {
+            for j in (i + 1)..50 {
+                let _ = level.min_cut(i, j);
+            }
+        }
+
+        let (_, first_misses) = level.cache_stats();
+
+        // Second pass: should hit cache for same queries
+        for i in 0u64..50 {
             for j in (i + 1)..50 {
                 let _ = level.min_cut(i, j);
             }
@@ -1269,10 +1287,10 @@ mod stress_tests {
 
         // Verify cache statistics are reasonable
         let (hits, misses) = level.cache_stats();
-        assert!(hits > 0, "Should have cache hits");
-        assert!(misses > 0, "Should have cache misses");
-        // Hit ratio should be > 0 after warmup
-        assert!(hits as f64 / (hits + misses) as f64 > 0.0);
+        assert!(misses > 0, "Should have cache misses from first pass");
+        assert!(hits > 0, "Should have cache hits from second pass");
+        // Second pass should have produced hits
+        assert!(hits >= first_misses, "Second pass should hit cache: hits={}, first_misses={}", hits, first_misses);
     }
 
     #[test]
