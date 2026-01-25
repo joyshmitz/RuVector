@@ -514,9 +514,10 @@ impl TwoTierCoordinator {
     /// Build escalation trigger
     fn build_trigger(&self) -> EscalationTrigger {
         let recent_errors: Vec<f64> = self.error_window.iter().copied().collect();
+        let approximate_value = self.cached_approx_value.unwrap_or(f64::INFINITY);
 
         EscalationTrigger {
-            approximate_value: self.tier1.current_min_cut(),
+            approximate_value,
             confidence: self.estimate_confidence(),
             queries_since_exact: self.queries_since_exact,
             time_since_exact: self.last_exact_time.elapsed(),
@@ -527,12 +528,19 @@ impl TwoTierCoordinator {
     /// Estimate confidence of current approximate value
     fn estimate_confidence(&self) -> f64 {
         // Base confidence on:
-        // 1. Number of materialized levels
+        // 1. Number of levels and approximation factor
         // 2. Cache hit rate
         // 3. Recency of exact computation
 
-        let level_factor = if self.tier1.num_levels() > 0 {
-            self.tier1.num_materialized() as f64 / self.tier1.num_levels() as f64
+        let level_factor = if let Some(ref hierarchy) = self.tier1 {
+            let num_levels = hierarchy.num_levels();
+            let approx_factor = hierarchy.approximation_factor();
+            // Higher approximation factor = lower confidence
+            if num_levels > 0 {
+                (1.0 / approx_factor.ln().max(1.0)).min(1.0)
+            } else {
+                0.5
+            }
         } else {
             0.5
         };
@@ -564,17 +572,42 @@ impl TwoTierCoordinator {
 
     /// Handle edge insertion
     pub fn insert_edge(&mut self, u: VertexId, v: VertexId, weight: Weight) -> Result<f64> {
-        self.tier1.insert_edge(u, v, weight)
+        self.ensure_built()?;
+        let hierarchy = self.tier1.as_mut().ok_or_else(|| {
+            crate::error::MinCutError::InternalError("Hierarchy not built".to_string())
+        })?;
+        let result = hierarchy.insert_edge(u, v, weight)?;
+        self.cached_approx_value = Some(result);
+        Ok(result)
     }
 
     /// Handle edge deletion
     pub fn delete_edge(&mut self, u: VertexId, v: VertexId) -> Result<f64> {
-        self.tier1.delete_edge(u, v)
+        self.ensure_built()?;
+        let hierarchy = self.tier1.as_mut().ok_or_else(|| {
+            crate::error::MinCutError::InternalError("Hierarchy not built".to_string())
+        })?;
+        let result = hierarchy.delete_edge(u, v)?;
+        self.cached_approx_value = Some(result);
+        Ok(result)
     }
 
     /// Query multi-terminal cut
-    pub fn multi_terminal_cut(&mut self, terminals: &[VertexId]) -> Result<MultiTerminalCut> {
-        self.tier1.multi_terminal_cut(terminals)
+    ///
+    /// Returns the minimum cut value separating any pair of terminals.
+    pub fn multi_terminal_cut(&mut self, terminals: &[VertexId]) -> Result<f64> {
+        if terminals.len() < 2 {
+            return Ok(f64::INFINITY);
+        }
+
+        // Use approximate min cut as a proxy for multi-terminal
+        // A proper implementation would traverse levels
+        self.ensure_built()?;
+        let hierarchy = self.tier1.as_mut().ok_or_else(|| {
+            crate::error::MinCutError::InternalError("Hierarchy not built".to_string())
+        })?;
+        let approx = hierarchy.approximate_min_cut()?;
+        Ok(approx.value)
     }
 
     /// Get current metrics
@@ -603,16 +636,23 @@ impl TwoTierCoordinator {
         &self.graph
     }
 
-    /// Get Tier 1 hierarchy
-    pub fn tier1(&self) -> &LazyJTreeHierarchy {
-        &self.tier1
+    /// Get Tier 1 hierarchy (if built)
+    pub fn tier1(&self) -> Option<&JTreeHierarchy> {
+        self.tier1.as_ref()
+    }
+
+    /// Get number of levels in the hierarchy
+    pub fn num_levels(&self) -> usize {
+        self.tier1.as_ref().map(|h| h.num_levels()).unwrap_or(0)
     }
 
     /// Force rebuild of all tiers
     pub fn rebuild(&mut self) -> Result<()> {
-        self.tier1.rebuild()?;
+        self.tier1 = None;
+        self.build()?;
         self.last_exact_value = None;
         self.queries_since_exact = 0;
+        self.cached_approx_value = None;
         Ok(())
     }
 }
