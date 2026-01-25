@@ -91,7 +91,12 @@ pub enum JTreeError {
     /// Invalid configuration parameter
     InvalidConfig(String),
     /// Level index out of bounds
-    LevelOutOfBounds { level: usize, max_level: usize },
+    LevelOutOfBounds {
+        /// The requested level
+        level: usize,
+        /// The maximum valid level
+        max_level: usize,
+    },
     /// WASM module initialization failed
     WasmInitError(String),
     /// Vertex not found in hierarchy
@@ -99,7 +104,12 @@ pub enum JTreeError {
     /// FFI boundary error
     FfiBoundaryError(String),
     /// Sparsifier recourse exceeded
-    RecourseExceeded { actual: usize, limit: usize },
+    RecourseExceeded {
+        /// The actual recourse observed
+        actual: usize,
+        /// The configured limit
+        limit: usize,
+    },
     /// Cut computation failed
     CutComputationFailed(String),
 }
