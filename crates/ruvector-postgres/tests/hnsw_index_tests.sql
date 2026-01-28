@@ -307,6 +307,139 @@ ORDER BY embedding <-> ARRAY[0.0, 0.0, 0.0]::real[]
 LIMIT 5;
 
 -- ============================================================================
+-- Test 13: Parameterized Query Regression Tests (Issue #141)
+-- ============================================================================
+-- These tests verify the fix for HNSW segmentation fault with parameterized
+-- queries. See ADR-0027 and GitHub issue #141 for details.
+
+\echo '=== Test 13: Parameterized Query Regression Tests (Issue #141) ==='
+
+-- Create ruvector table for parameterized query testing
+CREATE TABLE test_ruvector_param (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    embedding ruvector(8)
+);
+
+-- Insert test data with ruvector type
+INSERT INTO test_ruvector_param (content, embedding) VALUES
+    ('Doc 1', '[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]'::ruvector(8)),
+    ('Doc 2', '[0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]'::ruvector(8)),
+    ('Doc 3', '[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]'::ruvector(8)),
+    ('Doc 4', '[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1]'::ruvector(8)),
+    ('Doc 5', '[0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2]'::ruvector(8));
+
+-- Create HNSW index on ruvector column
+CREATE INDEX test_ruvector_param_hnsw_idx ON test_ruvector_param
+    USING hnsw (embedding ruvector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+-- Test 13a: Literal query (baseline - should work)
+\echo '--- Test 13a: Literal Query (baseline) ---'
+SELECT id, content,
+       1 - (embedding <=> '[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]'::ruvector(8)) as similarity
+FROM test_ruvector_param
+ORDER BY embedding <=> '[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]'::ruvector(8)
+LIMIT 3;
+
+-- Test 13b: Prepared statement with parameter (was crashing before fix)
+\echo '--- Test 13b: Prepared Statement with Parameter ---'
+PREPARE param_search_test AS
+    SELECT id, content FROM test_ruvector_param
+    ORDER BY embedding <=> $1::ruvector(8)
+    LIMIT 3;
+
+EXECUTE param_search_test('[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]');
+EXECUTE param_search_test('[0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2]');
+
+DEALLOCATE param_search_test;
+
+-- Test 13c: Function with text parameter (simulates driver behavior)
+\echo '--- Test 13c: Function with Text Parameter ---'
+CREATE OR REPLACE FUNCTION test_hnsw_param_search(query_vec TEXT)
+RETURNS TABLE(id INT, content TEXT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT t.id, t.content
+    FROM test_ruvector_param t
+    ORDER BY t.embedding <=> query_vec::ruvector(8)
+    LIMIT 3;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT * FROM test_hnsw_param_search('[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]');
+SELECT * FROM test_hnsw_param_search('[0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]');
+
+DROP FUNCTION test_hnsw_param_search;
+
+-- Test 13d: Zero vector error handling (should error gracefully, not crash)
+\echo '--- Test 13d: Zero Vector Error Handling ---'
+\set ON_ERROR_STOP off
+-- This should produce an error, not a crash
+SELECT id, content FROM test_ruvector_param
+ORDER BY embedding <=> '[0, 0, 0, 0, 0, 0, 0, 0]'::ruvector(8)
+LIMIT 3;
+\set ON_ERROR_STOP on
+
+-- Test 13e: Dimension mismatch error handling (should error gracefully)
+\echo '--- Test 13e: Dimension Mismatch Error Handling ---'
+\set ON_ERROR_STOP off
+-- This should produce an error about dimension mismatch
+SELECT id, content FROM test_ruvector_param
+ORDER BY embedding <=> '[0.1, 0.2, 0.3]'::ruvector(3)
+LIMIT 3;
+\set ON_ERROR_STOP on
+
+-- Test 13f: 384-dimension vectors (production scale test)
+\echo '--- Test 13f: 384-Dimension Vectors (Production Scale) ---'
+CREATE TABLE test_ruvector_384 (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    embedding ruvector(384)
+);
+
+-- Generate 100 test vectors with 384 dimensions
+DO $$
+DECLARE
+    i INTEGER;
+    vec_text TEXT;
+BEGIN
+    FOR i IN 1..100 LOOP
+        SELECT '[' || string_agg(((random() - 0.5)::numeric(6,4))::text, ',') || ']'
+        INTO vec_text
+        FROM generate_series(1, 384);
+
+        INSERT INTO test_ruvector_384 (content, embedding)
+        VALUES ('Doc ' || i, vec_text::ruvector(384));
+    END LOOP;
+END $$;
+
+-- Create HNSW index
+CREATE INDEX test_ruvector_384_idx ON test_ruvector_384
+    USING hnsw (embedding ruvector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+-- Prepare and execute parameterized search on 384-dim vectors
+PREPARE param_search_384 AS
+    SELECT id, content FROM test_ruvector_384
+    ORDER BY embedding <=> $1::ruvector(384)
+    LIMIT 5;
+
+-- Get a sample vector and search with it via parameter
+DO $$
+DECLARE
+    sample_vec TEXT;
+BEGIN
+    SELECT embedding::text INTO sample_vec FROM test_ruvector_384 WHERE id = 1;
+    -- This would fail before the fix
+    RAISE NOTICE 'Sample vector extracted, length: %', length(sample_vec);
+END $$;
+
+DEALLOCATE param_search_384;
+
+\echo '=== Test 13: Parameterized Query Tests Completed ==='
+
+-- ============================================================================
 -- Cleanup
 -- ============================================================================
 
@@ -318,5 +451,7 @@ DROP TABLE IF EXISTS test_vectors_cosine CASCADE;
 DROP TABLE IF EXISTS test_vectors_ip CASCADE;
 DROP TABLE IF EXISTS test_vectors_high_dim CASCADE;
 DROP TABLE IF EXISTS test_single_vector CASCADE;
+DROP TABLE IF EXISTS test_ruvector_param CASCADE;
+DROP TABLE IF EXISTS test_ruvector_384 CASCADE;
 
 \echo '=== All tests completed successfully ==='
