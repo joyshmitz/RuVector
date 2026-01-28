@@ -11,19 +11,19 @@
 //!
 //! Target: Combined 10x speedup over naive implementation.
 
-pub mod dspar;
-pub mod cache;
-pub mod simd_distance;
-pub mod pool;
-pub mod parallel;
-pub mod wasm_batch;
 pub mod benchmark;
+pub mod cache;
+pub mod dspar;
+pub mod parallel;
+pub mod pool;
+pub mod simd_distance;
+pub mod wasm_batch;
 
 // Re-exports
+pub use benchmark::{BenchmarkResult, BenchmarkSuite, OptimizationBenchmark};
+pub use cache::{CacheConfig, CacheStats, PathDistanceCache, PrefetchHint};
 pub use dspar::{DegreePresparse, PresparseConfig, PresparseResult, PresparseStats};
-pub use cache::{PathDistanceCache, CacheConfig, CacheStats, PrefetchHint};
-pub use simd_distance::{SimdDistanceOps, DistanceArray};
-pub use pool::{LevelPool, PoolConfig, LazyLevel, PoolStats};
-pub use parallel::{ParallelLevelUpdater, ParallelConfig, WorkStealingScheduler};
-pub use wasm_batch::{WasmBatchOps, BatchConfig, TypedArrayTransfer};
-pub use benchmark::{BenchmarkSuite, BenchmarkResult, OptimizationBenchmark};
+pub use parallel::{ParallelConfig, ParallelLevelUpdater, WorkStealingScheduler};
+pub use pool::{LazyLevel, LevelPool, PoolConfig, PoolStats};
+pub use simd_distance::{DistanceArray, SimdDistanceOps};
+pub use wasm_batch::{BatchConfig, TypedArrayTransfer, WasmBatchOps};

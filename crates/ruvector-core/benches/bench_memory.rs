@@ -194,17 +194,13 @@ fn bench_soa_storage_get(c: &mut Criterion) {
 
         let mut output = vec![0.0_f32; dim];
 
-        group.bench_with_input(
-            BenchmarkId::new("sequential", dim),
-            &dim,
-            |bench, _| {
-                bench.iter(|| {
-                    for i in 0..10000 {
-                        storage.get(black_box(i), &mut output);
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("sequential", dim), &dim, |bench, _| {
+            bench.iter(|| {
+                for i in 0..10000 {
+                    storage.get(black_box(i), &mut output);
+                }
+            });
+        });
 
         group.bench_with_input(BenchmarkId::new("random", dim), &dim, |bench, _| {
             let indices: Vec<usize> = (0..10000).map(|i| (i * 37 + 13) % 10000).collect();
@@ -263,11 +259,19 @@ fn bench_soa_dimension_slice(c: &mut Criterion) {
 fn bench_soa_batch_distances(c: &mut Criterion) {
     let mut group = c.benchmark_group("soa_batch_distances");
 
-    for (dim, count) in [(128, 1000), (384, 1000), (768, 1000), (128, 10000), (384, 5000)] {
+    for (dim, count) in [
+        (128, 1000),
+        (384, 1000),
+        (768, 1000),
+        (128, 10000),
+        (384, 5000),
+    ] {
         let mut storage = SoAVectorStorage::new(dim, 128);
 
         for i in 0..count {
-            let vector: Vec<f32> = (0..dim).map(|j| ((i * dim + j) % 1000) as f32 * 0.001).collect();
+            let vector: Vec<f32> = (0..dim)
+                .map(|j| ((i * dim + j) % 1000) as f32 * 0.001)
+                .collect();
             storage.push(&vector);
         }
 
@@ -303,7 +307,9 @@ fn bench_memory_layout_comparison(c: &mut Criterion) {
     // SoA layout
     let mut soa_storage = SoAVectorStorage::new(dim, 128);
     for i in 0..count {
-        let vector: Vec<f32> = (0..dim).map(|j| ((i * dim + j) % 1000) as f32 * 0.001).collect();
+        let vector: Vec<f32> = (0..dim)
+            .map(|j| ((i * dim + j) % 1000) as f32 * 0.001)
+            .collect();
         soa_storage.push(&vector);
     }
 
@@ -355,7 +361,9 @@ fn bench_cache_efficiency(c: &mut Criterion) {
         let mut storage = SoAVectorStorage::new(dim, 128);
 
         for i in 0..count {
-            let vector: Vec<f32> = (0..dim).map(|j| ((i * dim + j) % 1000) as f32 * 0.001).collect();
+            let vector: Vec<f32> = (0..dim)
+                .map(|j| ((i * dim + j) % 1000) as f32 * 0.001)
+                .collect();
             storage.push(&vector);
         }
 

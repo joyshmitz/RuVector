@@ -6,11 +6,11 @@
 //! - Tamper detection
 //! - Security tests (chain manipulation, replay attacks)
 
+use cognitum_gate_tilezero::permit::PermitToken;
 use cognitum_gate_tilezero::receipt::{
     EvidentialWitness, PredictiveWitness, ReceiptLog, StructuralWitness, TimestampProof,
     WitnessReceipt, WitnessSummary,
 };
-use cognitum_gate_tilezero::permit::PermitToken;
 use cognitum_gate_tilezero::GateDecision;
 
 fn create_test_token(sequence: u64, action_id: &str) -> PermitToken {

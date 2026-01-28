@@ -7,8 +7,8 @@
 //!
 //! The composite score determines task priority and trust level.
 
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 /// Reputation score for a network participant
 ///
@@ -322,11 +322,11 @@ mod tests {
 
         rep.record_success();
         assert_eq!(rep.tasks_completed(), 6);
-        assert!((rep.accuracy() - 6.0/11.0).abs() < 0.001);
+        assert!((rep.accuracy() - 6.0 / 11.0).abs() < 0.001);
 
         rep.record_failure();
         assert_eq!(rep.tasks_failed(), 6);
-        assert!((rep.accuracy() - 6.0/12.0).abs() < 0.001);
+        assert!((rep.accuracy() - 6.0 / 12.0).abs() < 0.001);
     }
 
     #[test]
@@ -335,7 +335,7 @@ mod tests {
 
         assert!(rep.meets_minimum(0.9, 0.95, 500));
         assert!(!rep.meets_minimum(0.99, 0.95, 500)); // Accuracy too low
-        assert!(!rep.meets_minimum(0.9, 0.99, 500));  // Uptime too low
+        assert!(!rep.meets_minimum(0.9, 0.99, 500)); // Uptime too low
         assert!(!rep.meets_minimum(0.9, 0.95, 2000)); // Stake too low
     }
 

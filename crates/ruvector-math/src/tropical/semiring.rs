@@ -13,7 +13,9 @@ pub struct Tropical {
 
 impl Tropical {
     /// Tropical zero (-∞ in max-plus)
-    pub const ZERO: Tropical = Tropical { value: f64::NEG_INFINITY };
+    pub const ZERO: Tropical = Tropical {
+        value: f64::NEG_INFINITY,
+    };
 
     /// Tropical one (0 in max-plus)
     pub const ONE: Tropical = Tropical { value: 0.0 };
@@ -39,7 +41,9 @@ impl Tropical {
     /// Tropical addition: max(a, b)
     #[inline]
     pub fn add(&self, other: &Self) -> Self {
-        Self { value: self.value.max(other.value) }
+        Self {
+            value: self.value.max(other.value),
+        }
     }
 
     /// Tropical multiplication: a + b
@@ -48,7 +52,9 @@ impl Tropical {
         if self.is_zero() || other.is_zero() {
             Self::ZERO
         } else {
-            Self { value: self.value + other.value }
+            Self {
+                value: self.value + other.value,
+            }
         }
     }
 
@@ -58,7 +64,9 @@ impl Tropical {
         if self.is_zero() {
             Self::ZERO
         } else {
-            Self { value: self.value * n as f64 }
+            Self {
+                value: self.value * n as f64,
+            }
         }
     }
 }
@@ -136,7 +144,9 @@ pub struct TropicalMin {
 
 impl TropicalMin {
     /// Tropical zero (+∞ in min-plus)
-    pub const ZERO: TropicalMin = TropicalMin { value: f64::INFINITY };
+    pub const ZERO: TropicalMin = TropicalMin {
+        value: f64::INFINITY,
+    };
 
     /// Tropical one (0 in min-plus)
     pub const ONE: TropicalMin = TropicalMin { value: 0.0 };
@@ -156,7 +166,9 @@ impl TropicalMin {
     /// Tropical addition: min(a, b)
     #[inline]
     pub fn add(&self, other: &Self) -> Self {
-        Self { value: self.value.min(other.value) }
+        Self {
+            value: self.value.min(other.value),
+        }
     }
 
     /// Tropical multiplication: a + b
@@ -165,7 +177,9 @@ impl TropicalMin {
         if self.value == f64::INFINITY || other.value == f64::INFINITY {
             Self::ZERO
         } else {
-            Self { value: self.value + other.value }
+            Self {
+                value: self.value + other.value,
+            }
         }
     }
 }

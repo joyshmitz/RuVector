@@ -60,9 +60,7 @@ mod memory;
 mod postgres;
 
 // Re-exports
-pub use file::{
-    FileStorage, StorageFormat, StorageMetadata, StorageStats, WalEntry, WalOperation,
-};
+pub use file::{FileStorage, StorageFormat, StorageMetadata, StorageStats, WalEntry, WalOperation};
 pub use memory::{InMemoryStorage, IndexedInMemoryStorage, StorageEvent, StorageEventType};
 
 #[cfg(feature = "postgres")]
@@ -465,7 +463,9 @@ impl StorageFactory {
     /// # Errors
     ///
     /// Returns error if storage cannot be created.
-    pub fn create_graph_storage(config: &StorageConfig) -> Result<Box<dyn GraphStorage>, StorageError> {
+    pub fn create_graph_storage(
+        config: &StorageConfig,
+    ) -> Result<Box<dyn GraphStorage>, StorageError> {
         if config.graph_path.is_empty() {
             Ok(Box::new(InMemoryStorage::new()))
         } else {
@@ -478,7 +478,9 @@ impl StorageFactory {
     /// # Errors
     ///
     /// Returns error if storage cannot be created.
-    pub fn create_governance_storage(config: &StorageConfig) -> Result<Box<dyn GovernanceStorage>, StorageError> {
+    pub fn create_governance_storage(
+        config: &StorageConfig,
+    ) -> Result<Box<dyn GovernanceStorage>, StorageError> {
         if config.graph_path.is_empty() {
             Ok(Box::new(InMemoryStorage::new()))
         } else {

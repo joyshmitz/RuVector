@@ -1,10 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use thermodynamic_learning::*;
-use thermodynamic_learning::landauer_learning::*;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use thermodynamic_learning::equilibrium_propagation::*;
 use thermodynamic_learning::free_energy_agent::*;
-use thermodynamic_learning::reversible_neural::*;
+use thermodynamic_learning::landauer_learning::*;
 use thermodynamic_learning::novel_algorithms::*;
+use thermodynamic_learning::reversible_neural::*;
+use thermodynamic_learning::*;
 
 #[cfg(feature = "simd")]
 use thermodynamic_learning::simd_ops::*;
@@ -43,7 +43,7 @@ fn bench_equilibrium_propagation(c: &mut Criterion) {
                     black_box(&input),
                     black_box(&target),
                     0.5,
-                    0.01
+                    0.01,
                 );
             });
         });
@@ -59,7 +59,7 @@ fn bench_free_energy_perception(c: &mut Criterion) {
     for dim in [2, 4, 8].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(dim), dim, |b, &dim| {
             let mut agent = FreeEnergyAgent::new(dim, dim + 1, 300.0);
-            let observation: Vec<f64> = (0..dim+1).map(|i| (i as f64 * 0.1).sin()).collect();
+            let observation: Vec<f64> = (0..dim + 1).map(|i| (i as f64 * 0.1).sin()).collect();
 
             b.iter(|| {
                 agent.perceive(black_box(&observation));
@@ -177,46 +177,34 @@ fn bench_simd_ops(c: &mut Criterion) {
 
     for size in [100, 1000, 10000].iter() {
         // Dot product
-        group.bench_with_input(
-            BenchmarkId::new("dot_product", size),
-            size,
-            |b, &size| {
-                let a: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
-                let b: Vec<f64> = (0..size).map(|i| (size - i) as f64 * 0.1).collect();
+        group.bench_with_input(BenchmarkId::new("dot_product", size), size, |b, &size| {
+            let a: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
+            let b: Vec<f64> = (0..size).map(|i| (size - i) as f64 * 0.1).collect();
 
-                b.iter(|| {
-                    simd_dot_product(black_box(&a), black_box(&b));
-                });
-            }
-        );
+            b.iter(|| {
+                simd_dot_product(black_box(&a), black_box(&b));
+            });
+        });
 
         // Norm squared
-        group.bench_with_input(
-            BenchmarkId::new("norm_squared", size),
-            size,
-            |b, &size| {
-                let x: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
+        group.bench_with_input(BenchmarkId::new("norm_squared", size), size, |b, &size| {
+            let x: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
 
-                b.iter(|| {
-                    simd_norm_squared(black_box(&x));
-                });
-            }
-        );
+            b.iter(|| {
+                simd_norm_squared(black_box(&x));
+            });
+        });
 
         // Entropy calculation
-        group.bench_with_input(
-            BenchmarkId::new("entropy", size),
-            size,
-            |b, &size| {
-                let probs: Vec<f64> = (0..size)
-                    .map(|i| ((i as f64 + 1.0) / (size as f64 + 1.0)))
-                    .collect();
+        group.bench_with_input(BenchmarkId::new("entropy", size), size, |b, &size| {
+            let probs: Vec<f64> = (0..size)
+                .map(|i| ((i as f64 + 1.0) / (size as f64 + 1.0)))
+                .collect();
 
-                b.iter(|| {
-                    energy::entropy(black_box(&probs));
-                });
-            }
-        );
+            b.iter(|| {
+                energy::entropy(black_box(&probs));
+            });
+        });
     }
 
     group.finish();
@@ -236,19 +224,20 @@ fn bench_energy_calculations(c: &mut Criterion) {
                 b.iter(|| {
                     black_box(state.landauer_limit());
                 });
-            }
+            },
         );
 
         group.bench_with_input(
             BenchmarkId::new("energy_network", size),
             size,
             |b, &size| {
-                let network = EnergyBasedNetwork::new(vec![size / 10, size / 5, size / 10], 1.0, 300.0);
+                let network =
+                    EnergyBasedNetwork::new(vec![size / 10, size / 5, size / 10], 1.0, 300.0);
 
                 b.iter(|| {
                     black_box(network.energy());
                 });
-            }
+            },
         );
     }
 

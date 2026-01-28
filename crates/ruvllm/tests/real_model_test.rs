@@ -45,24 +45,11 @@ const MODEL_SEARCH_PATHS: &[&str] = &[
 ];
 
 /// Supported model file patterns for each architecture
-const TINYLLAMA_PATTERNS: &[&str] = &[
-    "tinyllama*.gguf",
-    "TinyLlama*.gguf",
-    "*tinyllama*.gguf",
-];
+const TINYLLAMA_PATTERNS: &[&str] = &["tinyllama*.gguf", "TinyLlama*.gguf", "*tinyllama*.gguf"];
 
-const PHI3_PATTERNS: &[&str] = &[
-    "phi-3*.gguf",
-    "Phi-3*.gguf",
-    "*phi3*.gguf",
-    "*phi-3*.gguf",
-];
+const PHI3_PATTERNS: &[&str] = &["phi-3*.gguf", "Phi-3*.gguf", "*phi3*.gguf", "*phi-3*.gguf"];
 
-const QWEN_PATTERNS: &[&str] = &[
-    "qwen*.gguf",
-    "Qwen*.gguf",
-    "*qwen*.gguf",
-];
+const QWEN_PATTERNS: &[&str] = &["qwen*.gguf", "Qwen*.gguf", "*qwen*.gguf"];
 
 /// Result type for test helpers (reserved for future use)
 #[allow(dead_code)]
@@ -209,7 +196,10 @@ pub fn skip_if_no_model(patterns: &[&str], model_name: &str) -> Option<PathBuf> 
             println!("SKIPPED: No {} model found.", model_name);
             println!("To run this test:");
             println!("  1. Download the model:");
-            println!("     cargo run -p ruvllm --example download_test_model -- --model {}", model_name.to_lowercase().replace(' ', ""));
+            println!(
+                "     cargo run -p ruvllm --example download_test_model -- --model {}",
+                model_name.to_lowercase().replace(' ', "")
+            );
             println!("  2. Or set TEST_MODEL_PATH environment variable");
             println!("  3. Or place model in ./test_models/ directory");
             None
@@ -301,11 +291,17 @@ fn test_gguf_file_validation() {
 
     // Read version (4 bytes, little-endian u32)
     let mut version_bytes = [0u8; 4];
-    reader.read_exact(&mut version_bytes).expect("Failed to read version");
+    reader
+        .read_exact(&mut version_bytes)
+        .expect("Failed to read version");
     let version = u32::from_le_bytes(version_bytes);
 
     // GGUF versions 2 and 3 are common
-    assert!(version >= 2 && version <= 3, "Unexpected GGUF version: {}", version);
+    assert!(
+        version >= 2 && version <= 3,
+        "Unexpected GGUF version: {}",
+        version
+    );
 
     println!("GGUF file validated:");
     println!("  Path: {}", model_path.display());
@@ -353,7 +349,10 @@ fn test_tinyllama_generation() {
         None => return,
     };
 
-    println!("Testing generation with TinyLlama: {}", model_path.display());
+    println!(
+        "Testing generation with TinyLlama: {}",
+        model_path.display()
+    );
 
     // Placeholder for actual generation test
     // In real implementation:
@@ -460,7 +459,10 @@ fn test_phi3_code_completion() {
         None => return,
     };
 
-    println!("Testing code completion with Phi-3: {}", model_path.display());
+    println!(
+        "Testing code completion with Phi-3: {}",
+        model_path.display()
+    );
 
     // Code completion prompts test the model's ability to understand code context
     let _prompts = [
@@ -526,10 +528,10 @@ fn test_qwen_multilingual() {
 
     // Qwen is known for good multilingual support
     let _prompts = [
-        "Hello, how are you today?",       // English
-        "Bonjour, comment allez-vous?",     // French
-        "Hallo, wie geht es Ihnen?",        // German
-        "Translate 'hello' to Chinese: ",   // Translation task
+        "Hello, how are you today?",      // English
+        "Bonjour, comment allez-vous?",   // French
+        "Hallo, wie geht es Ihnen?",      // German
+        "Translate 'hello' to Chinese: ", // Translation task
     ];
 
     println!("Qwen multilingual test placeholder - implement with actual backend");
@@ -550,7 +552,10 @@ fn test_benchmark_generation_speed() {
         None => return,
     };
 
-    println!("Benchmarking generation speed with: {}", model_path.display());
+    println!(
+        "Benchmarking generation speed with: {}",
+        model_path.display()
+    );
 
     // Benchmark parameters
     let warmup_iterations = 3;
@@ -614,7 +619,10 @@ fn test_memory_usage() {
             .ok();
 
         if let Some(output) = output {
-            if let Ok(rss) = String::from_utf8_lossy(&output.stdout).trim().parse::<u64>() {
+            if let Ok(rss) = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<u64>()
+            {
                 println!("Initial RSS: {} KB", rss);
             }
         }
@@ -646,10 +654,7 @@ fn test_model_comparison() {
         ("Qwen", find_test_model(QWEN_PATTERNS)),
     ];
 
-    let available: Vec<_> = models
-        .iter()
-        .filter(|(_, path)| path.is_some())
-        .collect();
+    let available: Vec<_> = models.iter().filter(|(_, path)| path.is_some()).collect();
 
     if available.is_empty() {
         println!("SKIPPED: No models available for comparison");
@@ -683,7 +688,10 @@ mod helper_tests {
     fn test_glob_pattern_matching() {
         assert!(matches_glob_pattern("tinyllama.gguf", "*.gguf"));
         assert!(matches_glob_pattern("tinyllama.gguf", "tinyllama*"));
-        assert!(matches_glob_pattern("tinyllama-1.1b.gguf", "*tinyllama*.gguf"));
+        assert!(matches_glob_pattern(
+            "tinyllama-1.1b.gguf",
+            "*tinyllama*.gguf"
+        ));
         assert!(matches_glob_pattern("model.gguf", "model.gguf"));
         assert!(!matches_glob_pattern("tinyllama.bin", "*.gguf"));
         assert!(!matches_glob_pattern("other.gguf", "tinyllama*"));

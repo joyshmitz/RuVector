@@ -921,7 +921,10 @@ mod tests {
         let q2 = BinaryQuantized::quantize(&v2);
 
         let sim = q1.similarity(&q2);
-        assert!((sim - 1.0).abs() < 0.001, "Same vectors should have similarity 1.0");
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Same vectors should have similarity 1.0"
+        );
     }
 
     #[test]

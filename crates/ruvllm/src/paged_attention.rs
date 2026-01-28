@@ -147,9 +147,7 @@ impl PageBlock {
         let end_offset = start_offset + keys.len();
 
         if end_offset > self.keys.len() {
-            return Err(RuvLLMError::PagedAttention(
-                "Block overflow".to_string(),
-            ));
+            return Err(RuvLLMError::PagedAttention("Block overflow".to_string()));
         }
 
         self.keys[start_offset..end_offset].copy_from_slice(keys);
@@ -217,17 +215,12 @@ impl PageTable {
         let mut free_blocks = self.free_blocks.write();
 
         let block_id = match self.config.allocation_strategy {
-            AllocationStrategy::FirstFit => {
-                free_blocks.pop_front()
-            }
-            AllocationStrategy::BestFit | AllocationStrategy::RoundRobin => {
-                free_blocks.pop_front()
-            }
+            AllocationStrategy::FirstFit => free_blocks.pop_front(),
+            AllocationStrategy::BestFit | AllocationStrategy::RoundRobin => free_blocks.pop_front(),
         };
 
-        let block_id = block_id.ok_or_else(|| {
-            RuvLLMError::OutOfMemory("No free blocks available".to_string())
-        })?;
+        let block_id = block_id
+            .ok_or_else(|| RuvLLMError::OutOfMemory("No free blocks available".to_string()))?;
 
         // Update page table entry
         self.entries
@@ -249,9 +242,10 @@ impl PageTable {
         let mut free_blocks = self.free_blocks.write();
 
         if block_id >= blocks.len() {
-            return Err(RuvLLMError::PagedAttention(
-                format!("Invalid block ID: {}", block_id),
-            ));
+            return Err(RuvLLMError::PagedAttention(format!(
+                "Invalid block ID: {}",
+                block_id
+            )));
         }
 
         // Reset the block
@@ -278,12 +272,7 @@ impl PageTable {
     }
 
     /// Append KV pairs to a sequence
-    pub fn append_kv(
-        &self,
-        sequence_id: &str,
-        keys: &[f32],
-        values: &[f32],
-    ) -> Result<()> {
+    pub fn append_kv(&self, sequence_id: &str, keys: &[f32], values: &[f32]) -> Result<()> {
         let stride = self.config.num_kv_heads * self.config.head_dim;
         let num_tokens = keys.len() / stride;
 
@@ -405,24 +394,14 @@ impl PagedAttention {
     }
 
     /// Append KV pairs for a sequence
-    pub fn append_kv(
-        &self,
-        sequence_id: &str,
-        keys: &[f32],
-        values: &[f32],
-    ) -> Result<()> {
+    pub fn append_kv(&self, sequence_id: &str, keys: &[f32], values: &[f32]) -> Result<()> {
         self.page_table.append_kv(sequence_id, keys, values)
     }
 
     /// Compute paged attention
     ///
     /// This is a simplified version - production would use optimized kernels
-    pub fn forward(
-        &self,
-        query: &[f32],
-        sequence_id: &str,
-        scale: f32,
-    ) -> Result<Vec<f32>> {
+    pub fn forward(&self, query: &[f32], sequence_id: &str, scale: f32) -> Result<Vec<f32>> {
         let blocks = self.page_table.get_blocks(sequence_id).ok_or_else(|| {
             RuvLLMError::PagedAttention(format!("Sequence not found: {}", sequence_id))
         })?;
@@ -459,7 +438,8 @@ impl PagedAttention {
                     let v_slice = &block.values[kv_offset..kv_offset + head_dim];
 
                     // Dot product for attention score
-                    let score: f32 = q_slice.iter()
+                    let score: f32 = q_slice
+                        .iter()
                         .zip(k_slice.iter())
                         .map(|(q, k)| q * k * scale)
                         .sum();

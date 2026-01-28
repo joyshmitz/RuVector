@@ -61,9 +61,26 @@ fn main() -> anyhow::Result<()> {
 
     // Run inference with different coherence levels
     let coherence_levels = [
-        ("High coherence", GateHint::new(500, false, ruvector_fpga_transformer::ComputeClass::Deliberative)),
-        ("Medium coherence", GateHint::new(100, false, ruvector_fpga_transformer::ComputeClass::Associative)),
-        ("Low coherence", GateHint::new(-100, true, ruvector_fpga_transformer::ComputeClass::Reflex)),
+        (
+            "High coherence",
+            GateHint::new(
+                500,
+                false,
+                ruvector_fpga_transformer::ComputeClass::Deliberative,
+            ),
+        ),
+        (
+            "Medium coherence",
+            GateHint::new(
+                100,
+                false,
+                ruvector_fpga_transformer::ComputeClass::Associative,
+            ),
+        ),
+        (
+            "Low coherence",
+            GateHint::new(-100, true, ruvector_fpga_transformer::ComputeClass::Reflex),
+        ),
     ];
 
     for (name, hint) in coherence_levels {
@@ -73,7 +90,10 @@ fn main() -> anyhow::Result<()> {
             Ok(result) => {
                 println!("\n{}", name);
                 println!("  Gate decision: {:?}", result.witness.gate_decision);
-                println!("  Latency: {:.2}ms", result.witness.latency_ns as f64 / 1_000_000.0);
+                println!(
+                    "  Latency: {:.2}ms",
+                    result.witness.latency_ns as f64 / 1_000_000.0
+                );
 
                 if let Some(topk) = &result.topk {
                     println!("  Top-3 predictions:");

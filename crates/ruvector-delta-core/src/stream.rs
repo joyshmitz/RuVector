@@ -239,11 +239,7 @@ where
         }
 
         // Find the latest checkpoint sequence
-        let checkpoint_sequence = self
-            .checkpoints
-            .last()
-            .map(|c| c.sequence)
-            .unwrap_or(0);
+        let checkpoint_sequence = self.checkpoints.last().map(|c| c.sequence).unwrap_or(0);
 
         // Only compact deltas after the latest checkpoint
         let mut compacted = 0;
@@ -378,7 +374,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

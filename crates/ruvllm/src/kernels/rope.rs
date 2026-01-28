@@ -147,7 +147,11 @@ impl RopeTables {
 ///
 /// # Returns
 /// Tuple of (cos_table, sin_table), each of shape (max_seq_len, head_dim/2)
-pub fn precompute_rope_tables(max_seq_len: usize, head_dim: usize, base: f32) -> (Vec<f32>, Vec<f32>) {
+pub fn precompute_rope_tables(
+    max_seq_len: usize,
+    head_dim: usize,
+    base: f32,
+) -> (Vec<f32>, Vec<f32>) {
     let half_dim = head_dim / 2;
     let mut cos_table = vec![0.0; max_seq_len * half_dim];
     let mut sin_table = vec![0.0; max_seq_len * half_dim];
@@ -441,7 +445,12 @@ fn apply_rope_scalar(
 
 /// Scalar fallback with precomputed tables
 #[allow(dead_code)]
-fn apply_rope_tables_scalar(x: &mut [f32], positions: &[usize], tables: &RopeTables, half_dim: usize) {
+fn apply_rope_tables_scalar(
+    x: &mut [f32],
+    positions: &[usize],
+    tables: &RopeTables,
+    half_dim: usize,
+) {
     let head_dim = half_dim * 2;
 
     for (tok_idx, &pos) in positions.iter().enumerate() {
@@ -642,6 +651,9 @@ mod tests {
 
         // Tokens 1 and 2 should be rotated
         // Just verify they're different from original
-        assert!(x.iter().skip(4).any(|&v| (v - 1.0).abs() > 1e-5 || v.abs() > 1e-5));
+        assert!(x
+            .iter()
+            .skip(4)
+            .any(|&v| (v - 1.0).abs() > 1e-5 || v.abs() > 1e-5));
     }
 }

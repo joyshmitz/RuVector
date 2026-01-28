@@ -39,19 +39,19 @@
 use crate::error::{Result, RuvLLMError};
 use crate::types::{ErrorInfo, ModelSize, QualityMetrics};
 use chrono::{DateTime, Utc};
-use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
+use parking_lot::Mutex;
 use ruvector_core::types::DbOptions;
+use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use parking_lot::Mutex;
 use uuid::Uuid;
 
 #[cfg(feature = "async-runtime")]
 use tokio::sync::{oneshot, Notify};
 #[cfg(feature = "async-runtime")]
-use tokio::time::{Duration, interval};
+use tokio::time::{interval, Duration};
 
 /// Latency breakdown for profiling
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -78,8 +78,11 @@ impl LatencyBreakdown {
 
     /// Compute total from components
     pub fn compute_total(&mut self) {
-        self.total_ms = self.embedding_ms + self.retrieval_ms + self.routing_ms
-            + self.attention_ms + self.generation_ms;
+        self.total_ms = self.embedding_ms
+            + self.retrieval_ms
+            + self.routing_ms
+            + self.attention_ms
+            + self.generation_ms;
     }
 
     /// Check if any component exceeds threshold
@@ -340,13 +343,16 @@ impl WitnessLog {
     }
 
     /// Create a new witness log with custom async write configuration
-    pub fn with_config(storage_path: &str, embedding_dim: usize, async_config: AsyncWriteConfig) -> Result<Self> {
+    pub fn with_config(
+        storage_path: &str,
+        embedding_dim: usize,
+        async_config: AsyncWriteConfig,
+    ) -> Result<Self> {
         let mut options = DbOptions::default();
         options.storage_path = storage_path.to_string();
         options.dimensions = embedding_dim;
 
-        let db = AgenticDB::new(options)
-            .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
+        let db = AgenticDB::new(options).map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         Ok(Self {
             db,
@@ -434,10 +440,7 @@ impl WitnessLog {
         #[cfg(feature = "async-runtime")]
         {
             use std::fs::OpenOptions;
-            if let Ok(file) = OpenOptions::new()
-                .read(true)
-                .open(&self.storage_path)
-            {
+            if let Ok(file) = OpenOptions::new().read(true).open(&self.storage_path) {
                 let _ = file.sync_all();
             }
         }
@@ -448,22 +451,52 @@ impl WitnessLog {
     fn flush_entries(&self, entries: Vec<WitnessEntry>) -> Result<()> {
         for entry in entries {
             let mut metadata = HashMap::new();
-            metadata.insert("request_id".to_string(), serde_json::json!(entry.request_id.to_string()));
-            metadata.insert("session_id".to_string(), serde_json::json!(entry.session_id));
-            metadata.insert("model_used".to_string(), serde_json::to_value(&entry.model_used).unwrap_or_default());
-            metadata.insert("quality_score".to_string(), serde_json::json!(entry.quality_score));
-            metadata.insert("routing_decision".to_string(), serde_json::to_value(&entry.routing_decision).unwrap_or_default());
-            metadata.insert("latency".to_string(), serde_json::to_value(&entry.latency).unwrap_or_default());
-            metadata.insert("timestamp".to_string(), serde_json::json!(entry.timestamp.to_rfc3339()));
-            metadata.insert("is_success".to_string(), serde_json::json!(entry.is_success()));
+            metadata.insert(
+                "request_id".to_string(),
+                serde_json::json!(entry.request_id.to_string()),
+            );
+            metadata.insert(
+                "session_id".to_string(),
+                serde_json::json!(entry.session_id),
+            );
+            metadata.insert(
+                "model_used".to_string(),
+                serde_json::to_value(&entry.model_used).unwrap_or_default(),
+            );
+            metadata.insert(
+                "quality_score".to_string(),
+                serde_json::json!(entry.quality_score),
+            );
+            metadata.insert(
+                "routing_decision".to_string(),
+                serde_json::to_value(&entry.routing_decision).unwrap_or_default(),
+            );
+            metadata.insert(
+                "latency".to_string(),
+                serde_json::to_value(&entry.latency).unwrap_or_default(),
+            );
+            metadata.insert(
+                "timestamp".to_string(),
+                serde_json::json!(entry.timestamp.to_rfc3339()),
+            );
+            metadata.insert(
+                "is_success".to_string(),
+                serde_json::json!(entry.is_success()),
+            );
             metadata.insert("tags".to_string(), serde_json::json!(entry.tags));
 
             if let Some(error) = &entry.error {
-                metadata.insert("error".to_string(), serde_json::to_value(error).unwrap_or_default());
+                metadata.insert(
+                    "error".to_string(),
+                    serde_json::to_value(error).unwrap_or_default(),
+                );
             }
 
             if let Some(qm) = &entry.quality_metrics {
-                metadata.insert("quality_metrics".to_string(), serde_json::to_value(qm).unwrap_or_default());
+                metadata.insert(
+                    "quality_metrics".to_string(),
+                    serde_json::to_value(qm).unwrap_or_default(),
+                );
             }
 
             let vector_entry = VectorEntry {
@@ -472,7 +505,8 @@ impl WitnessLog {
                 metadata: Some(metadata),
             };
 
-            self.db.insert(vector_entry)
+            self.db
+                .insert(vector_entry)
                 .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
         }
 
@@ -499,13 +533,16 @@ impl WitnessLog {
             ef_search: None,
         };
 
-        let results = self.db.search(query)
+        let results = self
+            .db
+            .search(query)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         let mut entries = Vec::with_capacity(results.len());
         for result in results {
             if let Some(metadata) = &result.metadata {
-                if let Some(entry) = self.entry_from_metadata(&result.id, query_embedding, metadata) {
+                if let Some(entry) = self.entry_from_metadata(&result.id, query_embedding, metadata)
+                {
                     entries.push(entry);
                 }
             }
@@ -525,7 +562,11 @@ impl WitnessLog {
             total_entries: total,
             success_count: success,
             error_count: errors,
-            success_rate: if total > 0 { success as f32 / total as f32 } else { 0.0 },
+            success_rate: if total > 0 {
+                success as f32 / total as f32
+            } else {
+                0.0
+            },
             pending_writes: queue.len(),
             dropped_entries: queue.dropped_count(),
             background_running: self.background_running.load(Ordering::SeqCst),
@@ -549,45 +590,59 @@ impl WitnessLog {
         embedding: &[f32],
         metadata: &HashMap<String, serde_json::Value>,
     ) -> Option<WitnessEntry> {
-        let request_id = metadata.get("request_id")
+        let request_id = metadata
+            .get("request_id")
             .and_then(|v| v.as_str())
             .and_then(|s| Uuid::parse_str(s).ok())?;
 
-        let session_id = metadata.get("session_id")
+        let session_id = metadata
+            .get("session_id")
             .and_then(|v| v.as_str())?
             .to_string();
 
-        let model_used: ModelSize = metadata.get("model_used")
+        let model_used: ModelSize = metadata
+            .get("model_used")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
 
-        let quality_score = metadata.get("quality_score")
+        let quality_score = metadata
+            .get("quality_score")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0) as f32;
 
-        let routing_decision: RoutingDecision = metadata.get("routing_decision")
+        let routing_decision: RoutingDecision = metadata
+            .get("routing_decision")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
 
-        let latency: LatencyBreakdown = metadata.get("latency")
+        let latency: LatencyBreakdown = metadata
+            .get("latency")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
 
-        let timestamp = metadata.get("timestamp")
+        let timestamp = metadata
+            .get("timestamp")
             .and_then(|v| v.as_str())
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or_else(Utc::now);
 
-        let error: Option<ErrorInfo> = metadata.get("error")
+        let error: Option<ErrorInfo> = metadata
+            .get("error")
             .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-        let quality_metrics: Option<QualityMetrics> = metadata.get("quality_metrics")
+        let quality_metrics: Option<QualityMetrics> = metadata
+            .get("quality_metrics")
             .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-        let tags: Vec<String> = metadata.get("tags")
+        let tags: Vec<String> = metadata
+            .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         Some(WitnessEntry {
@@ -779,7 +834,11 @@ impl WitnessLog {
             total_entries: total,
             success_count: success,
             error_count: errors,
-            success_rate: if total > 0 { success as f32 / total as f32 } else { 0.0 },
+            success_rate: if total > 0 {
+                success as f32 / total as f32
+            } else {
+                0.0
+            },
             pending_writes: queue.len(),
             dropped_entries: queue.dropped_count(),
             background_running: self.background_running.load(Ordering::SeqCst),
@@ -914,7 +973,10 @@ mod tests {
             vec![0.1; 768],
             RoutingDecision::default(),
         );
-        assert!(!queue.push(entry), "Entry should be dropped due to backpressure");
+        assert!(
+            !queue.push(entry),
+            "Entry should be dropped due to backpressure"
+        );
         assert_eq!(queue.dropped_count(), 1);
 
         // Another dropped entry
@@ -939,11 +1001,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let storage_path = temp_dir.path().join("witness_test");
 
-        let log = WitnessLog::with_config(
-            storage_path.to_str().unwrap(),
-            64,
-            config,
-        ).unwrap();
+        let log = WitnessLog::with_config(storage_path.to_str().unwrap(), 64, config).unwrap();
 
         // Record some entries
         for i in 0..3 {
@@ -979,11 +1037,9 @@ mod tests {
             let temp_dir = tempfile::tempdir().unwrap();
             let storage_path = temp_dir.path().join("async_witness_test");
 
-            let log = Arc::new(WitnessLog::with_config(
-                storage_path.to_str().unwrap(),
-                64,
-                config,
-            ).unwrap());
+            let log = Arc::new(
+                WitnessLog::with_config(storage_path.to_str().unwrap(), 64, config).unwrap(),
+            );
 
             // Start background flush task
             log.start_background_flush();
@@ -1021,20 +1077,19 @@ mod tests {
             let temp_dir = tempfile::tempdir().unwrap();
             let storage_path = temp_dir.path().join("batch_witness_test");
 
-            let log = Arc::new(WitnessLog::new(
-                storage_path.to_str().unwrap(),
-                64,
-            ).unwrap());
+            let log = Arc::new(WitnessLog::new(storage_path.to_str().unwrap(), 64).unwrap());
 
             log.start_background_flush();
 
             // Create batch of entries
             let entries: Vec<_> = (0..50)
-                .map(|i| WitnessEntry::new(
-                    format!("batch-session-{}", i),
-                    vec![0.1; 64],
-                    RoutingDecision::default(),
-                ))
+                .map(|i| {
+                    WitnessEntry::new(
+                        format!("batch-session-{}", i),
+                        vec![0.1; 64],
+                        RoutingDecision::default(),
+                    )
+                })
                 .collect();
 
             // Record batch
@@ -1052,10 +1107,7 @@ mod tests {
             let temp_dir = tempfile::tempdir().unwrap();
             let storage_path = temp_dir.path().join("flush_async_test");
 
-            let log = WitnessLog::new(
-                storage_path.to_str().unwrap(),
-                64,
-            ).unwrap();
+            let log = WitnessLog::new(storage_path.to_str().unwrap(), 64).unwrap();
 
             // Record entries
             for i in 0..5 {

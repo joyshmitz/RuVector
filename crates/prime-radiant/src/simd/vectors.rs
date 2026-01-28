@@ -540,7 +540,12 @@ mod tests {
 
         let result = dot_product_simd(&a, &b);
         let expected = dot_product_scalar(&a, &b);
-        assert!(approx_eq(result, expected), "got {} expected {}", result, expected);
+        assert!(
+            approx_eq(result, expected),
+            "got {} expected {}",
+            result,
+            expected
+        );
     }
 
     #[test]
@@ -557,7 +562,12 @@ mod tests {
 
         let result = norm_squared_simd(&v);
         let expected = norm_squared_scalar(&v);
-        assert!(approx_eq(result, expected), "got {} expected {}", result, expected);
+        assert!(
+            approx_eq(result, expected),
+            "got {} expected {}",
+            result,
+            expected
+        );
     }
 
     #[test]
@@ -581,7 +591,13 @@ mod tests {
 
         for i in 0..n {
             let expected = a[i] - b[i];
-            assert!(approx_eq(out[i], expected), "at {} got {} expected {}", i, out[i], expected);
+            assert!(
+                approx_eq(out[i], expected),
+                "at {} got {} expected {}",
+                i,
+                out[i],
+                expected
+            );
         }
     }
 
@@ -605,7 +621,13 @@ mod tests {
 
         for i in 0..n {
             let expected = v[i] * scalar;
-            assert!(approx_eq(out[i], expected), "at {} got {} expected {}", i, out[i], expected);
+            assert!(
+                approx_eq(out[i], expected),
+                "at {} got {} expected {}",
+                i,
+                out[i],
+                expected
+            );
         }
     }
 
@@ -626,7 +648,12 @@ mod tests {
 
         let result = squared_distance_simd(&a, &b);
         let expected = squared_distance_scalar(&a, &b);
-        assert!(approx_eq(result, expected), "got {} expected {}", result, expected);
+        assert!(
+            approx_eq(result, expected),
+            "got {} expected {}",
+            result,
+            expected
+        );
     }
 
     #[test]

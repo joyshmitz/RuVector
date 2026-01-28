@@ -63,12 +63,8 @@ impl DiscreteTimeCrystal {
         let n = config.n_oscillators;
 
         // Initialize positions and velocities randomly
-        let positions = Array1::from_vec(
-            (0..n).map(|_| rng.gen_range(-1.0..1.0)).collect()
-        );
-        let velocities = Array1::from_vec(
-            (0..n).map(|_| rng.gen_range(-0.1..0.1)).collect()
-        );
+        let positions = Array1::from_vec((0..n).map(|_| rng.gen_range(-1.0..1.0)).collect());
+        let velocities = Array1::from_vec((0..n).map(|_| rng.gen_range(-0.1..0.1)).collect());
 
         // Create asymmetric coupling matrix
         let coupling_matrix = Self::generate_asymmetric_coupling(n, &mut rng);
@@ -136,9 +132,7 @@ impl DiscreteTimeCrystal {
 
             // Velocity force: -x - γv + J*coupling + A*drive + noise
             let noise = self.rng.gen_range(-1.0..1.0) * self.config.noise_amplitude;
-            forces_vel[i] =
-                -self.positions[i]
-                - self.config.dissipation * self.velocities[i]
+            forces_vel[i] = -self.positions[i] - self.config.dissipation * self.velocities[i]
                 + self.config.coupling_strength * coupling_force
                 + drive
                 + noise;
@@ -176,52 +170,56 @@ impl DiscreteTimeCrystal {
         let omega_0 = 2.0 * PI * self.config.drive_frequency;
         let n = self.config.n_oscillators;
 
-        trajectory.iter().enumerate().map(|(step, positions)| {
-            let _t = step as f64 * self.config.dt;
+        trajectory
+            .iter()
+            .enumerate()
+            .map(|(step, positions)| {
+                let _t = step as f64 * self.config.dt;
 
-            // Compute phases relative to drive
-            let mut sum_real = 0.0;
-            let mut sum_imag = 0.0;
+                // Compute phases relative to drive
+                let mut sum_real = 0.0;
+                let mut sum_imag = 0.0;
 
-            for i in 0..n {
-                // Phase of oscillator i
-                let phase = positions[i].atan2(1.0); // Simplified phase extraction
-                let arg = k as f64 * omega_0 * phase;
-                sum_real += arg.cos();
-                sum_imag += arg.sin();
-            }
+                for i in 0..n {
+                    // Phase of oscillator i
+                    let phase = positions[i].atan2(1.0); // Simplified phase extraction
+                    let arg = k as f64 * omega_0 * phase;
+                    sum_real += arg.cos();
+                    sum_imag += arg.sin();
+                }
 
-            // Order parameter: |<e^(ik*omega*phi)>|
-            let m_k = ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt();
-            m_k
-        }).collect()
+                // Order parameter: |<e^(ik*omega*phi)>|
+                let m_k = ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt();
+                m_k
+            })
+            .collect()
     }
 
     /// Compute power spectral density to detect subharmonics
     pub fn compute_psd(&self, signal: &[f64], sample_rate: f64) -> (Vec<f64>, Vec<f64>) {
         // Simple FFT-based PSD
-        use rustfft::{FftPlanner, num_complex::Complex};
+        use rustfft::{num_complex::Complex, FftPlanner};
 
         let n = signal.len();
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(n);
 
         // Convert to complex
-        let mut buffer: Vec<Complex<f64>> = signal.iter()
-            .map(|&x| Complex { re: x, im: 0.0 })
-            .collect();
+        let mut buffer: Vec<Complex<f64>> =
+            signal.iter().map(|&x| Complex { re: x, im: 0.0 }).collect();
 
         // Apply FFT
         fft.process(&mut buffer);
 
         // Compute power
-        let power: Vec<f64> = buffer.iter()
+        let power: Vec<f64> = buffer
+            .iter()
             .take(n / 2)
             .map(|c| (c.re * c.re + c.im * c.im) / n as f64)
             .collect();
 
         // Frequency bins
-        let freqs: Vec<f64> = (0..n/2)
+        let freqs: Vec<f64> = (0..n / 2)
             .map(|i| i as f64 * sample_rate / n as f64)
             .collect();
 
@@ -231,7 +229,8 @@ impl DiscreteTimeCrystal {
     /// Detect period-doubling by comparing power at f and f/2
     pub fn detect_period_doubling(&self, trajectory: &[Array1<f64>]) -> (f64, bool) {
         // Average activity across all oscillators
-        let signal: Vec<f64> = trajectory.iter()
+        let signal: Vec<f64> = trajectory
+            .iter()
             .map(|positions| positions.mean().unwrap())
             .collect();
 
@@ -245,12 +244,16 @@ impl DiscreteTimeCrystal {
         // Find power at these frequencies (within tolerance)
         let tol = 0.5; // Hz tolerance
 
-        let p_drive: f64 = freqs.iter().zip(&power)
+        let p_drive: f64 = freqs
+            .iter()
+            .zip(&power)
             .filter(|(f, _)| (*f - drive_freq).abs() < tol)
             .map(|(_, p)| p)
             .fold(0.0_f64, |acc, &p| acc.max(p));
 
-        let p_half: f64 = freqs.iter().zip(&power)
+        let p_half: f64 = freqs
+            .iter()
+            .zip(&power)
             .filter(|(f, _)| (*f - half_freq).abs() < tol)
             .map(|(_, p)| p)
             .fold(0.0_f64, |acc, &p| acc.max(p));
@@ -275,17 +278,17 @@ pub mod analysis {
     pub fn autocorrelation(signal: &[f64], max_lag: usize) -> Vec<f64> {
         let n = signal.len();
         let mean = signal.iter().sum::<f64>() / n as f64;
-        let variance = signal.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f64>() / n as f64;
+        let variance = signal.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / n as f64;
 
-        (0..max_lag).map(|lag| {
-            let mut sum = 0.0;
-            for i in 0..(n - lag) {
-                sum += (signal[i] - mean) * (signal[i + lag] - mean);
-            }
-            sum / ((n - lag) as f64 * variance)
-        }).collect()
+        (0..max_lag)
+            .map(|lag| {
+                let mut sum = 0.0;
+                for i in 0..(n - lag) {
+                    sum += (signal[i] - mean) * (signal[i + lag] - mean);
+                }
+                sum / ((n - lag) as f64 * variance)
+            })
+            .collect()
     }
 
     /// Fit autocorrelation to detect power-law vs exponential decay
@@ -295,7 +298,8 @@ pub mod analysis {
         // Log-linear fit for exponential: log(C) ~ -τ/τ_c
 
         let lags: Vec<f64> = (1..autocorr.len()).map(|i| i as f64).collect();
-        let log_autocorr: Vec<f64> = autocorr.iter()
+        let log_autocorr: Vec<f64> = autocorr
+            .iter()
             .skip(1)
             .map(|&c| c.max(1e-10).ln())
             .collect();
@@ -309,7 +313,11 @@ pub mod analysis {
 
         // Compare R^2 values
         let is_power_law = power_law_fit.1 > exp_fit.1; // Better R^2 for power law
-        let exponent = if is_power_law { -power_law_fit.0 } else { -exp_fit.0 };
+        let exponent = if is_power_law {
+            -power_law_fit.0
+        } else {
+            -exp_fit.0
+        };
 
         (is_power_law, exponent)
     }
@@ -327,7 +335,9 @@ pub mod analysis {
         // Compute R^2
         let mean_y = sum_y / n;
         let ss_tot: f64 = y.iter().map(|&yi| (yi - mean_y).powi(2)).sum();
-        let ss_res: f64 = x.iter().zip(y)
+        let ss_res: f64 = x
+            .iter()
+            .zip(y)
             .map(|(&xi, &yi)| {
                 let pred = slope * xi + (sum_y - slope * sum_x) / n;
                 (yi - pred).powi(2)

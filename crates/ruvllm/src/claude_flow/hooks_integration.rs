@@ -44,21 +44,20 @@ use crate::{
         ModelRouter, ReasoningBankConfig, ReasoningBankIntegration, TaskComplexityAnalyzer,
     },
     context::{
-        AgenticMemory, AgenticMemoryConfig, ClaudeFlowMemoryBridge, ClaudeFlowBridgeConfig,
-        IntelligentContextManager, ContextManagerConfig, SemanticToolCache, SemanticCacheConfig,
+        AgenticMemory, AgenticMemoryConfig, ClaudeFlowBridgeConfig, ClaudeFlowMemoryBridge,
+        ContextManagerConfig, IntelligentContextManager, SemanticCacheConfig, SemanticToolCache,
     },
     quality::{
-        QualityScoringEngine, ScoringConfig, QualityMetrics, CoherenceValidator, CoherenceConfig,
-        DiversityAnalyzer, DiversityConfig,
+        CoherenceConfig, CoherenceValidator, DiversityAnalyzer, DiversityConfig, QualityMetrics,
+        QualityScoringEngine, ScoringConfig,
     },
     reasoning_bank::{
-        PatternConsolidator, ConsolidationConfig, PatternStore, PatternStoreConfig,
-        TrajectoryRecorder, Trajectory, TrajectoryStep, StepOutcome,
-        Verdict, RootCause, MemoryDistiller, DistillationConfig,
-        Pattern, PatternCategory,
+        ConsolidationConfig, DistillationConfig, MemoryDistiller, Pattern, PatternCategory,
+        PatternConsolidator, PatternStore, PatternStoreConfig, RootCause, StepOutcome, Trajectory,
+        TrajectoryRecorder, TrajectoryStep, Verdict,
     },
     reflection::{
-        ErrorPatternLearner, ErrorPatternLearnerConfig, ConfidenceChecker, ConfidenceConfig,
+        ConfidenceChecker, ConfidenceConfig, ErrorPatternLearner, ErrorPatternLearnerConfig,
     },
     Result, RuvLLMError,
 };
@@ -387,38 +386,42 @@ impl HooksIntegration {
         };
 
         // Initialize pattern learning if enabled
-        let (reasoning_bank, pattern_store, pattern_consolidator) = if config.enable_pattern_learning {
-            let rb_config = ReasoningBankConfig::default();
-            let ps_config = PatternStoreConfig {
-                embedding_dim: config.embedding_dim,
-                ..Default::default()
-            };
-            let pc_config = ConsolidationConfig::default();
+        let (reasoning_bank, pattern_store, pattern_consolidator) =
+            if config.enable_pattern_learning {
+                let rb_config = ReasoningBankConfig::default();
+                let ps_config = PatternStoreConfig {
+                    embedding_dim: config.embedding_dim,
+                    ..Default::default()
+                };
+                let pc_config = ConsolidationConfig::default();
 
-            (
-                Some(ReasoningBankIntegration::new(rb_config)),
-                Some(PatternStore::new(ps_config)?),
-                Some(PatternConsolidator::new(pc_config)),
-            )
-        } else {
-            (None, None, None)
-        };
+                (
+                    Some(ReasoningBankIntegration::new(rb_config)),
+                    Some(PatternStore::new(ps_config)?),
+                    Some(PatternConsolidator::new(pc_config)),
+                )
+            } else {
+                (None, None, None)
+            };
 
         // Initialize quality scoring if enabled
-        let (scoring_engine, coherence_validator, diversity_analyzer) = if config.enable_quality_scoring {
-            (
-                Some(QualityScoringEngine::new()),
-                Some(CoherenceValidator::new(CoherenceConfig::default())),
-                Some(DiversityAnalyzer::new(DiversityConfig::default())),
-            )
-        } else {
-            (None, None, None)
-        };
+        let (scoring_engine, coherence_validator, diversity_analyzer) =
+            if config.enable_quality_scoring {
+                (
+                    Some(QualityScoringEngine::new()),
+                    Some(CoherenceValidator::new(CoherenceConfig::default())),
+                    Some(DiversityAnalyzer::new(DiversityConfig::default())),
+                )
+            } else {
+                (None, None, None)
+            };
 
         // Initialize error learning if enabled
         let (error_learner, confidence_checker) = if config.enable_error_learning {
             (
-                Some(ErrorPatternLearner::new(ErrorPatternLearnerConfig::default())),
+                Some(ErrorPatternLearner::new(
+                    ErrorPatternLearnerConfig::default(),
+                )),
                 Some(ConfidenceChecker::new(ConfidenceConfig::default())),
             )
         } else {
@@ -426,16 +429,19 @@ impl HooksIntegration {
         };
 
         // Initialize memory systems if enabled
-        let (agentic_memory, context_manager, semantic_cache, memory_bridge) = if config.enable_memory_bridge {
-            (
-                AgenticMemory::new(AgenticMemoryConfig::default()).ok(),
-                IntelligentContextManager::new(ContextManagerConfig::default()).ok(),
-                SemanticToolCache::new(SemanticCacheConfig::default()).ok(),
-                Some(ClaudeFlowMemoryBridge::new(ClaudeFlowBridgeConfig::default())),
-            )
-        } else {
-            (None, None, None, None)
-        };
+        let (agentic_memory, context_manager, semantic_cache, memory_bridge) =
+            if config.enable_memory_bridge {
+                (
+                    AgenticMemory::new(AgenticMemoryConfig::default()).ok(),
+                    IntelligentContextManager::new(ContextManagerConfig::default()).ok(),
+                    SemanticToolCache::new(SemanticCacheConfig::default()).ok(),
+                    Some(ClaudeFlowMemoryBridge::new(
+                        ClaudeFlowBridgeConfig::default(),
+                    )),
+                )
+            } else {
+                (None, None, None, None)
+            };
 
         let session_state = SessionState {
             session_id: Uuid::new_v4().to_string(),
@@ -483,7 +489,8 @@ impl HooksIntegration {
         );
 
         // Check for Agent Booster (simple transforms that skip LLM)
-        let (agent_booster_available, agent_booster_intent) = self.check_agent_booster(&input.description);
+        let (agent_booster_available, agent_booster_intent) =
+            self.check_agent_booster(&input.description);
 
         // Get agent recommendation from HNSW if available
         let (recommended_agent, confidence, similar_patterns, suggested_approach) =
@@ -494,21 +501,30 @@ impl HooksIntegration {
                 match router.route_by_similarity(&embedding) {
                     Ok(result) => {
                         // Get similar patterns through a separate search
-                        let patterns: Vec<PatternMatch> = router.search_similar(&embedding, 3)
+                        let patterns: Vec<PatternMatch> = router
+                            .search_similar(&embedding, 3)
                             .ok()
-                            .map(|results| results.iter().map(|(pattern, similarity)| PatternMatch {
-                                description: format!("{:?}", pattern.task_type),
-                                agent: format!("{:?}", pattern.agent_type),
-                                similarity: *similarity,
-                                quality: pattern.success_rate,
-                            }).collect())
+                            .map(|results| {
+                                results
+                                    .iter()
+                                    .map(|(pattern, similarity)| PatternMatch {
+                                        description: format!("{:?}", pattern.task_type),
+                                        agent: format!("{:?}", pattern.agent_type),
+                                        similarity: *similarity,
+                                        quality: pattern.success_rate,
+                                    })
+                                    .collect()
+                            })
                             .unwrap_or_default();
 
                         let approach = if !patterns.is_empty() {
                             Some(format!(
                                 "Based on {} similar successful tasks, consider: {}",
                                 patterns.len(),
-                                patterns.first().map(|p| &p.description).unwrap_or(&String::new())
+                                patterns
+                                    .first()
+                                    .map(|p| &p.description)
+                                    .unwrap_or(&String::new())
                             ))
                         } else {
                             None
@@ -590,7 +606,9 @@ impl HooksIntegration {
         // Learn error pattern if failed
         let mut error_learned = false;
         if !input.success {
-            if let (Some(ref mut learner), Some(error_msg)) = (&mut self.error_learner, &input.error_message) {
+            if let (Some(ref mut learner), Some(error_msg)) =
+                (&mut self.error_learner, &input.error_message)
+            {
                 // Record error for learning
                 learner.record_error(error_msg);
                 error_learned = true;
@@ -606,7 +624,8 @@ impl HooksIntegration {
 
             // Update running average quality
             let n = state.tasks_completed as f32;
-            state.avg_quality = ((n - 1.0) * state.avg_quality + quality_assessment.overall_score) / n;
+            state.avg_quality =
+                ((n - 1.0) * state.avg_quality + quality_assessment.overall_score) / n;
         }
 
         // Check if consolidation needed
@@ -657,14 +676,20 @@ impl HooksIntegration {
             let query = format!("{} {} {}", input.operation, ext, input.file_path);
             let embedding = self.create_simple_embedding(&query);
 
-            router.search_similar(&embedding, 3)
+            router
+                .search_similar(&embedding, 3)
                 .ok()
-                .map(|results| results.iter().map(|(pattern, similarity)| PatternMatch {
-                    description: format!("{:?}", pattern.task_type),
-                    agent: format!("{:?}", pattern.agent_type),
-                    similarity: *similarity,
-                    quality: pattern.success_rate,
-                }).collect())
+                .map(|results| {
+                    results
+                        .iter()
+                        .map(|(pattern, similarity)| PatternMatch {
+                            description: format!("{:?}", pattern.task_type),
+                            agent: format!("{:?}", pattern.agent_type),
+                            similarity: *similarity,
+                            quality: pattern.success_rate,
+                        })
+                        .collect()
+                })
                 .unwrap_or_default()
         } else {
             Vec::new()
@@ -677,7 +702,8 @@ impl HooksIntegration {
             "create" => "low",
             "update" => "low",
             _ => "medium",
-        }.to_string();
+        }
+        .to_string();
 
         Ok(PreEditResult {
             recommended_agent,
@@ -699,7 +725,8 @@ impl HooksIntegration {
                 let ext = input.file_path.rsplit('.').next().unwrap_or("");
                 let pattern_desc = format!("edit {} file: {}", ext, input.file_path);
                 // Get embedding before mutable borrow
-                let embedding = create_simple_embedding_static(&pattern_desc, self.config.embedding_dim);
+                let embedding =
+                    create_simple_embedding_static(&pattern_desc, self.config.embedding_dim);
 
                 if let Some(ref mut store) = self.pattern_store {
                     let pattern = Pattern::new(
@@ -733,8 +760,14 @@ impl HooksIntegration {
     }
 
     /// Session start hook: initialize and optionally restore state
-    pub fn session_start(&mut self, session_id: Option<&str>, restore_latest: bool) -> Result<SessionState> {
-        let session_id = session_id.unwrap_or(&Uuid::new_v4().to_string()).to_string();
+    pub fn session_start(
+        &mut self,
+        session_id: Option<&str>,
+        restore_latest: bool,
+    ) -> Result<SessionState> {
+        let session_id = session_id
+            .unwrap_or(&Uuid::new_v4().to_string())
+            .to_string();
 
         // Initialize new session state
         let state = SessionState {
@@ -759,17 +792,23 @@ impl HooksIntegration {
     }
 
     /// Session end hook: persist state and distill patterns
-    pub fn session_end(&mut self, export_metrics: bool, persist_state: bool) -> Result<SessionEndResult> {
+    pub fn session_end(
+        &mut self,
+        export_metrics: bool,
+        persist_state: bool,
+    ) -> Result<SessionEndResult> {
         let state = self.session_state.read().clone();
 
         // Complete any active trajectories
-        let incomplete_trajectories: Vec<String> = self.active_trajectories
+        let incomplete_trajectories: Vec<String> = self
+            .active_trajectories
             .iter()
             .map(|r| r.key().clone())
             .collect();
 
         for task_id in incomplete_trajectories {
-            let _ = self.complete_trajectory(&task_id, false, "unknown", 0.5, Some("Session ended"));
+            let _ =
+                self.complete_trajectory(&task_id, false, "unknown", 0.5, Some("Session ended"));
         }
 
         // Consolidate patterns before ending
@@ -861,7 +900,10 @@ impl HooksIntegration {
         (false, None)
     }
 
-    fn fallback_routing(&self, description: &str) -> (String, f32, Vec<PatternMatch>, Option<String>) {
+    fn fallback_routing(
+        &self,
+        description: &str,
+    ) -> (String, f32, Vec<PatternMatch>, Option<String>) {
         let desc_lower = description.to_lowercase();
 
         // Simple keyword-based routing
@@ -894,7 +936,9 @@ impl HooksIntegration {
         let mut embedding = vec![0.0f32; self.config.embedding_dim];
 
         for (i, word) in text.split_whitespace().enumerate() {
-            let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let hash = word
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             let idx = (hash % self.config.embedding_dim as u64) as usize;
             embedding[idx] += 1.0 / (i + 1) as f32;
         }
@@ -934,7 +978,8 @@ impl HooksIntegration {
             started_at: Utc::now(),
         };
 
-        self.active_trajectories.insert(task_id.to_string(), trajectory);
+        self.active_trajectories
+            .insert(task_id.to_string(), trajectory);
 
         // Update session state
         let mut state = self.session_state.write();
@@ -955,16 +1000,13 @@ impl HooksIntegration {
             // Store pattern if successful and high quality
             if success && quality >= self.config.min_pattern_confidence {
                 // Get embedding before mutable borrow
-                let embedding = create_simple_embedding_static(&traj.description, self.config.embedding_dim);
+                let embedding =
+                    create_simple_embedding_static(&traj.description, self.config.embedding_dim);
 
                 if let Some(ref mut store) = self.pattern_store {
-                    let pattern = Pattern::new(
-                        embedding,
-                        PatternCategory::General,
-                        quality,
-                    )
-                    .with_lesson(traj.description.clone())
-                    .with_action(format!("Task completed by {}", agent));
+                    let pattern = Pattern::new(embedding, PatternCategory::General, quality)
+                        .with_lesson(traj.description.clone())
+                        .with_action(format!("Task completed by {}", agent));
 
                     if store.store_pattern(pattern).is_ok() {
                         *self.patterns_added.write() += 1;
@@ -1031,7 +1073,9 @@ fn create_simple_embedding_static(text: &str, embedding_dim: usize) -> Vec<f32> 
     let mut embedding = vec![0.0f32; embedding_dim];
 
     for (i, word) in text.split_whitespace().enumerate() {
-        let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let hash = word
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         let idx = (hash % embedding_dim as u64) as usize;
         embedding[idx] += 1.0 / (i + 1) as f32;
     }
@@ -1063,7 +1107,11 @@ mod tests {
         if let Err(ref e) = hooks {
             eprintln!("HooksIntegration creation error: {:?}", e);
         }
-        assert!(hooks.is_ok(), "Failed to create HooksIntegration: {:?}", hooks.err());
+        assert!(
+            hooks.is_ok(),
+            "Failed to create HooksIntegration: {:?}",
+            hooks.err()
+        );
     }
 
     #[test]

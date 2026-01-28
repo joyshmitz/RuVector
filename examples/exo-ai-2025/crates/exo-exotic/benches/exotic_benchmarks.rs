@@ -12,20 +12,16 @@
 //! 9. Emergence Detection - Causal emergence scoring
 //! 10. Cognitive Black Holes - Attractor dynamics
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::time::Duration;
 
 use exo_exotic::{
-    StrangeLoop, TangledHierarchy, SelfAspect,
-    DreamEngine, DreamState,
-    FreeEnergyMinimizer, PredictiveModel,
-    MorphogeneticField, CognitiveEmbryogenesis, ReactionParams,
-    CollectiveConsciousness, HiveMind, SubstrateSpecialization,
-    TemporalQualia, SubjectiveTime, TimeCrystal, TemporalEvent,
-    MultipleSelvesSystem, EmotionalTone,
-    CognitiveThermodynamics, CognitivePhase,
-    EmergenceDetector, AggregationType,
-    CognitiveBlackHole, TrapType, EscapeMethod,
+    AggregationType, CognitiveBlackHole, CognitiveEmbryogenesis, CognitivePhase,
+    CognitiveThermodynamics, CollectiveConsciousness, DreamEngine, DreamState, EmergenceDetector,
+    EmotionalTone, EscapeMethod, FreeEnergyMinimizer, HiveMind, MorphogeneticField,
+    MultipleSelvesSystem, PredictiveModel, ReactionParams, SelfAspect, StrangeLoop, SubjectiveTime,
+    SubstrateSpecialization, TangledHierarchy, TemporalEvent, TemporalQualia, TimeCrystal,
+    TrapType,
 };
 
 use uuid::Uuid;
@@ -62,9 +58,7 @@ fn bench_strange_loops(c: &mut Criterion) {
     // Meta-reasoning
     group.bench_function("meta_reasoning", |b| {
         let mut sl = StrangeLoop::new(5);
-        b.iter(|| {
-            black_box(sl.meta_reason("I think about thinking about thinking"))
-        })
+        b.iter(|| black_box(sl.meta_reason("I think about thinking about thinking")))
     });
 
     // Self-reference creation
@@ -268,7 +262,7 @@ fn bench_collective(c: &mut Criterion) {
 
             // Connect all pairs
             for i in 0..ids.len() {
-                for j in i+1..ids.len() {
+                for j in i + 1..ids.len() {
                     collective.connect(ids[i], ids[j], 0.5, true);
                 }
             }
@@ -284,11 +278,7 @@ fn bench_collective(c: &mut Criterion) {
 
         b.iter(|| {
             for i in 0..100 {
-                collective.share_memory(
-                    &format!("key_{}", i),
-                    vec![i as f64; 8],
-                    owner,
-                );
+                collective.share_memory(&format!("key_{}", i), vec![i as f64; 8], owner);
             }
             for i in 0..100 {
                 black_box(collective.access_memory(&format!("key_{}", i)));
@@ -343,11 +333,7 @@ fn bench_temporal(c: &mut Criterion) {
     group.bench_function("time_crystals", |b| {
         let mut tq = TemporalQualia::new();
         for i in 0..5 {
-            tq.add_time_crystal(
-                (i + 1) as f64 * 10.0,
-                1.0 / (i + 1) as f64,
-                vec![0.1; 4],
-            );
+            tq.add_time_crystal((i + 1) as f64 * 10.0, 1.0 / (i + 1) as f64, vec![0.1; 4]);
         }
 
         b.iter(|| {
@@ -386,11 +372,14 @@ fn bench_multiple_selves(c: &mut Criterion) {
         b.iter(|| {
             let mut system = MultipleSelvesSystem::new();
             for i in 0..5 {
-                system.add_self(&format!("Self_{}", i), EmotionalTone {
-                    valence: (i as f64 - 2.0) / 2.0,
-                    arousal: 0.5,
-                    dominance: 0.3 + i as f64 * 0.1,
-                });
+                system.add_self(
+                    &format!("Self_{}", i),
+                    EmotionalTone {
+                        valence: (i as f64 - 2.0) / 2.0,
+                        arousal: 0.5,
+                        dominance: 0.3 + i as f64 * 0.1,
+                    },
+                );
             }
             black_box(system.measure_coherence())
         })
@@ -400,12 +389,22 @@ fn bench_multiple_selves(c: &mut Criterion) {
     group.bench_function("conflict_resolution", |b| {
         b.iter(|| {
             let mut system = MultipleSelvesSystem::new();
-            let id1 = system.add_self("Self1", EmotionalTone {
-                valence: 0.8, arousal: 0.6, dominance: 0.7
-            });
-            let id2 = system.add_self("Self2", EmotionalTone {
-                valence: -0.3, arousal: 0.4, dominance: 0.5
-            });
+            let id1 = system.add_self(
+                "Self1",
+                EmotionalTone {
+                    valence: 0.8,
+                    arousal: 0.6,
+                    dominance: 0.7,
+                },
+            );
+            let id2 = system.add_self(
+                "Self2",
+                EmotionalTone {
+                    valence: -0.3,
+                    arousal: 0.4,
+                    dominance: 0.5,
+                },
+            );
 
             system.create_conflict(id1, id2);
             black_box(system.resolve_conflict(id1, id2))
@@ -416,12 +415,22 @@ fn bench_multiple_selves(c: &mut Criterion) {
     group.bench_function("merge_selves", |b| {
         b.iter(|| {
             let mut system = MultipleSelvesSystem::new();
-            let id1 = system.add_self("Part1", EmotionalTone {
-                valence: 0.5, arousal: 0.5, dominance: 0.5
-            });
-            let id2 = system.add_self("Part2", EmotionalTone {
-                valence: 0.5, arousal: 0.5, dominance: 0.5
-            });
+            let id1 = system.add_self(
+                "Part1",
+                EmotionalTone {
+                    valence: 0.5,
+                    arousal: 0.5,
+                    dominance: 0.5,
+                },
+            );
+            let id2 = system.add_self(
+                "Part2",
+                EmotionalTone {
+                    valence: 0.5,
+                    arousal: 0.5,
+                    dominance: 0.5,
+                },
+            );
             black_box(system.merge(id1, id2))
         })
     });
@@ -507,7 +516,7 @@ fn bench_emergence(c: &mut Criterion) {
             let micro_state: Vec<f64> = (0..64).map(|i| i as f64 * 0.01).collect();
 
             let groupings: Vec<Vec<usize>> = (0..16)
-                .map(|i| vec![i*4, i*4+1, i*4+2, i*4+3])
+                .map(|i| vec![i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 3])
                 .collect();
             detector.set_coarse_graining(groupings, AggregationType::Mean);
 
@@ -521,9 +530,7 @@ fn bench_emergence(c: &mut Criterion) {
         b.iter(|| {
             let mut detector = EmergenceDetector::new();
             for i in 0..100 {
-                let micro_state: Vec<f64> = (0..32)
-                    .map(|j| ((i + j) as f64 * 0.1).sin())
-                    .collect();
+                let micro_state: Vec<f64> = (0..32).map(|j| ((i + j) as f64 * 0.1).sin()).collect();
                 detector.set_micro_state(micro_state);
                 detector.detect_emergence();
             }
@@ -545,11 +552,7 @@ fn bench_black_holes(c: &mut Criterion) {
     // Thought processing
     group.bench_function("process_100_thoughts", |b| {
         b.iter(|| {
-            let mut bh = CognitiveBlackHole::with_params(
-                vec![0.0; 8],
-                1.5,
-                TrapType::Rumination,
-            );
+            let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 1.5, TrapType::Rumination);
             for i in 0..100 {
                 let thought = vec![i as f64 * 0.01; 8];
                 black_box(bh.process_thought(thought));
@@ -560,11 +563,7 @@ fn bench_black_holes(c: &mut Criterion) {
     // Escape attempts
     group.bench_function("escape_attempts", |b| {
         b.iter(|| {
-            let mut bh = CognitiveBlackHole::with_params(
-                vec![0.0; 8],
-                2.0,
-                TrapType::Anxiety,
-            );
+            let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 2.0, TrapType::Anxiety);
 
             // Capture some thoughts
             for _ in 0..10 {
@@ -668,7 +667,7 @@ fn bench_scaling(c: &mut Criterion) {
                         .collect();
 
                     for i in 0..ids.len() {
-                        for j in i+1..ids.len() {
+                        for j in i + 1..ids.len() {
                             collective.connect(ids[i], ids[j], 0.5, true);
                         }
                     }
@@ -688,7 +687,9 @@ fn rand_f64() -> f64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(12345) as u64;
-    let result = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let result = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (result as f64) / (u64::MAX as f64)
 }
 

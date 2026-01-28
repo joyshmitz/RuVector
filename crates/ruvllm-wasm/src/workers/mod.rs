@@ -371,8 +371,8 @@ impl ParallelInference {
                 for j in 0..seq_len {
                     let mut dot = 0.0f32;
                     for d in 0..head_dim {
-                        dot += q[head_offset + i * head_dim + d]
-                            * k[head_offset + j * head_dim + d];
+                        dot +=
+                            q[head_offset + i * head_dim + d] * k[head_offset + j * head_dim + d];
                     }
                     scores[i * seq_len + j] = dot * scale;
                 }

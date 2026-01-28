@@ -338,10 +338,10 @@ impl SparseResidualAttention {
             // Ensure minimum connections by adding highest-residual pairs if needed
             if query_connections.len() < self.config.min_connections {
                 // Sort all pairs by residual (descending) and take top k
-                let mut all_pairs: Vec<(usize, f32)> = (0..n_k)
-                    .map(|j| (j, residuals[i * n_k + j]))
-                    .collect();
-                all_pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                let mut all_pairs: Vec<(usize, f32)> =
+                    (0..n_k).map(|j| (j, residuals[i * n_k + j])).collect();
+                all_pairs
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 for (j, r) in all_pairs.into_iter().take(self.config.min_connections) {
                     if !query_connections.iter().any(|(jj, _)| *jj == j) {
@@ -354,9 +354,8 @@ impl SparseResidualAttention {
             let max_connections = ((1.0 - self.config.max_sparsity) * n_k as f32).ceil() as usize;
             if query_connections.len() > max_connections {
                 // Sort by residual (descending) and keep top max_connections
-                query_connections.sort_by(|a, b| {
-                    b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-                });
+                query_connections
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                 query_connections.truncate(max_connections);
             }
 
@@ -368,10 +367,8 @@ impl SparseResidualAttention {
         }
 
         // Sort connections by (i, j) for CSR conversion
-        let mut paired: Vec<((usize, usize), f32)> = connections
-            .into_iter()
-            .zip(connection_residuals)
-            .collect();
+        let mut paired: Vec<((usize, usize), f32)> =
+            connections.into_iter().zip(connection_residuals).collect();
         paired.sort_by_key(|((i, j), _)| (*i, *j));
 
         let connections: Vec<(usize, usize)> = paired.iter().map(|(c, _)| *c).collect();
@@ -460,7 +457,11 @@ impl SparseResidualAttention {
         values: &[&[f32]],
     ) -> Vec<Vec<f32>> {
         let n_queries = row_ptr.len() - 1;
-        let dim = if values.is_empty() { 0 } else { values[0].len() };
+        let dim = if values.is_empty() {
+            0
+        } else {
+            values[0].len()
+        };
 
         let mut outputs = vec![vec![0.0; dim]; n_queries];
 

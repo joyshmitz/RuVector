@@ -6,12 +6,12 @@
 use super::buffer::{BufferUsage, GpuBufferManager, GpuEdge, GpuParams, GpuRestrictionMap};
 use super::error::{GpuError, GpuResult};
 use super::kernels::{
-    ComputeEnergyKernel, ComputeResidualsKernel, EnergyParams,
-    SheafAttentionKernel, TokenRoutingKernel,
+    ComputeEnergyKernel, ComputeResidualsKernel, EnergyParams, SheafAttentionKernel,
+    TokenRoutingKernel,
 };
 use crate::coherence::{CoherenceEnergy as CpuCoherenceEnergy, EdgeEnergy};
 use crate::substrate::restriction::MatrixStorage;
-use crate::substrate::{SheafGraph, NodeId, EdgeId};
+use crate::substrate::{EdgeId, NodeId, SheafGraph};
 
 use chrono::Utc;
 use std::collections::HashMap;
@@ -312,17 +312,13 @@ impl GpuCoherenceEngine {
 
                 // Convert restriction maps
                 let rho_source_idx = restriction_maps.len() as u32;
-                let gpu_rho_source = Self::convert_restriction_map(
-                    &edge.rho_source,
-                    &mut restriction_data,
-                );
+                let gpu_rho_source =
+                    Self::convert_restriction_map(&edge.rho_source, &mut restriction_data);
                 restriction_maps.push(gpu_rho_source);
 
                 let rho_target_idx = restriction_maps.len() as u32;
-                let gpu_rho_target = Self::convert_restriction_map(
-                    &edge.rho_target,
-                    &mut restriction_data,
-                );
+                let gpu_rho_target =
+                    Self::convert_restriction_map(&edge.rho_target, &mut restriction_data);
                 restriction_maps.push(gpu_rho_target);
 
                 edges.push(GpuEdge {
@@ -349,11 +345,8 @@ impl GpuCoherenceEngine {
             "node_states",
         )?;
 
-        self.buffer_manager.allocate_with_data(
-            &edges,
-            BufferUsage::EdgeData,
-            "edges",
-        )?;
+        self.buffer_manager
+            .allocate_with_data(&edges, BufferUsage::EdgeData, "edges")?;
 
         self.buffer_manager.allocate_with_data(
             &restriction_maps,
@@ -368,21 +361,19 @@ impl GpuCoherenceEngine {
         )?;
 
         // Allocate output buffers
-        let max_comparison_dim = edges.iter().map(|e| e.comparison_dim).max().unwrap_or(state_dim);
+        let max_comparison_dim = edges
+            .iter()
+            .map(|e| e.comparison_dim)
+            .max()
+            .unwrap_or(state_dim);
         let residuals_size = (num_edges * max_comparison_dim) as usize * std::mem::size_of::<f32>();
         let energies_size = num_edges as usize * std::mem::size_of::<f32>();
 
-        self.buffer_manager.allocate(
-            residuals_size,
-            BufferUsage::Residuals,
-            "residuals",
-        )?;
+        self.buffer_manager
+            .allocate(residuals_size, BufferUsage::Residuals, "residuals")?;
 
-        self.buffer_manager.allocate(
-            energies_size,
-            BufferUsage::Energies,
-            "edge_energies",
-        )?;
+        self.buffer_manager
+            .allocate(energies_size, BufferUsage::Energies, "edge_energies")?;
 
         // Pre-allocate computation buffers to eliminate per-frame allocations
         let num_workgroups = ComputeEnergyKernel::workgroup_count(num_edges);
@@ -407,7 +398,9 @@ impl GpuCoherenceEngine {
         let partial_sums_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("partial_sums_preallocated"),
             size: ((num_workgroups as usize).max(1) * std::mem::size_of::<f32>()) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -423,7 +416,9 @@ impl GpuCoherenceEngine {
         let total_energy_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("total_energy_preallocated"),
             size: std::mem::size_of::<f32>() as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -497,7 +492,9 @@ impl GpuCoherenceEngine {
                 data.extend(csr.values.iter().cloned());
                 (3, csr.values.len() as u32)
             }
-            MatrixStorage::Dense { data: matrix_data, .. } => {
+            MatrixStorage::Dense {
+                data: matrix_data, ..
+            } => {
                 data.extend(matrix_data.iter().cloned());
                 (3, matrix_data.len() as u32)
             }
@@ -518,7 +515,9 @@ impl GpuCoherenceEngine {
     pub async fn compute_energy(&mut self) -> GpuResult<GpuCoherenceEnergy> {
         let start = std::time::Instant::now();
 
-        let graph_data = self.graph_data.as_ref()
+        let graph_data = self
+            .graph_data
+            .as_ref()
             .ok_or_else(|| GpuError::Internal("Graph not uploaded".into()))?;
 
         let num_edges = graph_data.num_edges;
@@ -535,27 +534,44 @@ impl GpuCoherenceEngine {
             threshold_lane2: self.config.threshold_lane2,
             store_residuals: 1, // Store residuals by default for gradient computation
         };
-        self.queue.write_buffer(&graph_data.params_buffer, 0, bytemuck::bytes_of(&params));
+        self.queue
+            .write_buffer(&graph_data.params_buffer, 0, bytemuck::bytes_of(&params));
 
         // Write energy params to pre-allocated buffer (no allocation)
         let energy_params = EnergyParams {
             num_elements: num_edges,
             _padding: [0; 7],
         };
-        self.queue.write_buffer(&graph_data.energy_params_buffer, 0, bytemuck::bytes_of(&energy_params));
+        self.queue.write_buffer(
+            &graph_data.energy_params_buffer,
+            0,
+            bytemuck::bytes_of(&energy_params),
+        );
 
         // Get managed buffers for bind group creation
-        let node_states_buf = self.buffer_manager.get("node_states")
+        let node_states_buf = self
+            .buffer_manager
+            .get("node_states")
             .ok_or_else(|| GpuError::Internal("Node states buffer not found".into()))?;
-        let edges_buf = self.buffer_manager.get("edges")
+        let edges_buf = self
+            .buffer_manager
+            .get("edges")
             .ok_or_else(|| GpuError::Internal("Edges buffer not found".into()))?;
-        let restriction_maps_buf = self.buffer_manager.get("restriction_maps")
+        let restriction_maps_buf = self
+            .buffer_manager
+            .get("restriction_maps")
             .ok_or_else(|| GpuError::Internal("Restriction maps buffer not found".into()))?;
-        let restriction_data_buf = self.buffer_manager.get("restriction_data")
+        let restriction_data_buf = self
+            .buffer_manager
+            .get("restriction_data")
             .ok_or_else(|| GpuError::Internal("Restriction data buffer not found".into()))?;
-        let residuals_buf = self.buffer_manager.get("residuals")
+        let residuals_buf = self
+            .buffer_manager
+            .get("residuals")
             .ok_or_else(|| GpuError::Internal("Residuals buffer not found".into()))?;
-        let energies_buf = self.buffer_manager.get("edge_energies")
+        let energies_buf = self
+            .buffer_manager
+            .get("edge_energies")
             .ok_or_else(|| GpuError::Internal("Edge energies buffer not found".into()))?;
 
         // Create bind group for residuals kernel using pre-allocated params buffer
@@ -579,9 +595,11 @@ impl GpuCoherenceEngine {
         );
 
         // Create command encoder
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("compute_energy_encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("compute_energy_encoder"),
+            });
 
         // Dispatch residuals computation
         {
@@ -618,7 +636,11 @@ impl GpuCoherenceEngine {
                 num_elements: num_workgroups,
                 _padding: [0; 7],
             };
-            self.queue.write_buffer(&graph_data.final_params_buffer, 0, bytemuck::bytes_of(&final_params));
+            self.queue.write_buffer(
+                &graph_data.final_params_buffer,
+                0,
+                bytemuck::bytes_of(&final_params),
+            );
 
             let final_bind_group = self.energy_kernel.create_bind_group_raw(
                 &self.device,
@@ -670,8 +692,14 @@ impl GpuCoherenceEngine {
         self.queue.submit(std::iter::once(encoder.finish()));
 
         // Read back results from pre-allocated staging buffers
-        let edge_energies = Self::read_buffer_f32(&self.device, &graph_data.energies_staging, num_edges as usize).await?;
-        let total_energy = Self::read_buffer_f32(&self.device, &graph_data.total_staging, 1).await?[0];
+        let edge_energies = Self::read_buffer_f32(
+            &self.device,
+            &graph_data.energies_staging,
+            num_edges as usize,
+        )
+        .await?;
+        let total_energy =
+            Self::read_buffer_f32(&self.device, &graph_data.total_staging, 1).await?[0];
 
         let compute_time_us = start.elapsed().as_micros() as u64;
 
@@ -710,8 +738,8 @@ impl GpuCoherenceEngine {
             .map_err(|e| GpuError::BufferRead(e.to_string()))?;
 
         let data = buffer_slice.get_mapped_range();
-        let result: Vec<f32> = bytemuck::cast_slice(&data[..count * std::mem::size_of::<f32>()])
-            .to_vec();
+        let result: Vec<f32> =
+            bytemuck::cast_slice(&data[..count * std::mem::size_of::<f32>()]).to_vec();
 
         drop(data);
         buffer.unmap();

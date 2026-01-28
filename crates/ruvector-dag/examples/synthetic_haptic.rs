@@ -26,12 +26,12 @@ use std::time::{Duration, Instant};
 #[derive(Clone, Debug)]
 pub struct SensorFrame {
     pub t_us: u64,
-    pub position: f32,      // Normalized position [-1, 1]
-    pub velocity: f32,      // Rate of change
-    pub force: f32,         // Applied force
-    pub contact: f32,       // Contact intensity [0, 1]
-    pub temperature: f32,   // Thermal signal
-    pub vibration: f32,     // High-frequency component
+    pub position: f32,    // Normalized position [-1, 1]
+    pub velocity: f32,    // Rate of change
+    pub force: f32,       // Applied force
+    pub contact: f32,     // Contact intensity [0, 1]
+    pub temperature: f32, // Thermal signal
+    pub vibration: f32,   // High-frequency component
 }
 
 impl SensorFrame {
@@ -119,7 +119,11 @@ impl Sensor for SimulatedSensor {
 
         let noise = self.pseudo_random() * 0.05;
         let temperature = 0.5 + self.phase.sin() * 0.1 + noise;
-        let vibration = if self.contact_mode { 0.3 + noise } else { noise.abs() };
+        let vibration = if self.contact_mode {
+            0.3 + noise
+        } else {
+            noise.abs()
+        };
 
         SensorFrame {
             t_us,
@@ -145,20 +149,20 @@ impl Sensor for SimulatedSensor {
 /// Homeostatic state derived from DAG analysis
 #[derive(Clone, Debug)]
 pub struct HomeostasisState {
-    pub tension: f32,        // Deviation from equilibrium [0, 1]
-    pub coherence: f32,      // Stability of internal state [0, 1]
-    pub cut_value: f32,      // MinCut flow capacity
-    pub criticality: f32,    // Node criticality max
-    pub reflex: ReflexMode,  // Current reflex state
+    pub tension: f32,       // Deviation from equilibrium [0, 1]
+    pub coherence: f32,     // Stability of internal state [0, 1]
+    pub cut_value: f32,     // MinCut flow capacity
+    pub criticality: f32,   // Node criticality max
+    pub reflex: ReflexMode, // Current reflex state
 }
 
 /// Reflex modes mapped to DAG tension levels
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReflexMode {
-    Calm,     // Tension < 0.20: minimal response, learning allowed
-    Active,   // Tension 0.20-0.55: proportional response
-    Spike,    // Tension 0.55-0.85: heightened response, haptic feedback
-    Protect,  // Tension > 0.85: protective shutdown, no output
+    Calm,    // Tension < 0.20: minimal response, learning allowed
+    Active,  // Tension 0.20-0.55: proportional response
+    Spike,   // Tension 0.55-0.85: heightened response, haptic feedback
+    Protect, // Tension > 0.85: protective shutdown, no output
 }
 
 impl ReflexMode {
@@ -179,9 +183,9 @@ impl ReflexMode {
 pub struct ReflexArc {
     mincut_engine: DagMinCutEngine,
     dag: QueryDag,
-    tension_ema: f32,      // Exponential moving average
-    coherence_ema: f32,    // Coherence smoothing
-    alpha: f32,            // EMA decay rate
+    tension_ema: f32,   // Exponential moving average
+    coherence_ema: f32, // Coherence smoothing
+    alpha: f32,         // EMA decay rate
 }
 
 impl ReflexArc {
@@ -293,8 +297,7 @@ impl ReflexArc {
         // Coherence drops when tension is high or changing rapidly
         let tension_delta = (raw_tension - self.tension_ema).abs();
         let raw_coherence = 1.0 - (self.tension_ema * 0.4 + tension_delta * 0.6);
-        self.coherence_ema =
-            self.alpha * raw_coherence + (1.0 - self.alpha) * self.coherence_ema;
+        self.coherence_ema = self.alpha * raw_coherence + (1.0 - self.alpha) * self.coherence_ema;
 
         let tension = self.tension_ema.clamp(0.0, 1.0);
         let coherence = self.coherence_ema.clamp(0.0, 1.0);
@@ -549,7 +552,8 @@ impl LearningController {
         // Process pending trajectories
         for traj in self.pending_trajectories.drain(..) {
             if traj.quality > 0.6 {
-                self.sona_engine.reasoning_bank_store(traj.embedding, traj.quality);
+                self.sona_engine
+                    .reasoning_bank_store(traj.embedding, traj.quality);
             }
         }
 
@@ -599,10 +603,10 @@ impl SonaEngineExt for DagSonaEngine {
 /// Actuator command with energy constraints
 #[derive(Clone, Debug)]
 pub struct ActuatorCommand {
-    pub force: f32,         // Output force [-1, 1]
-    pub vibro_freq: f32,    // Vibration frequency Hz
-    pub vibro_amp: f32,     // Vibration amplitude [0, 1]
-    pub energy_used: f32,   // Energy consumed this tick
+    pub force: f32,       // Output force [-1, 1]
+    pub vibro_freq: f32,  // Vibration frequency Hz
+    pub vibro_amp: f32,   // Vibration amplitude [0, 1]
+    pub energy_used: f32, // Energy consumed this tick
 }
 
 impl ActuatorCommand {
@@ -683,11 +687,7 @@ impl ActuationRenderer {
     }
 
     /// Render actuator command from sensor and homeostasis
-    pub fn render(
-        &self,
-        frame: &SensorFrame,
-        state: &HomeostasisState,
-    ) -> ActuatorCommand {
+    pub fn render(&self, frame: &SensorFrame, state: &HomeostasisState) -> ActuatorCommand {
         // Base PD controller
         let kp = 0.4;
         let kd = 8.0;
@@ -862,11 +862,7 @@ impl SyntheticHapticController {
             if tick % 50 == 0 {
                 println!(
                     "tick={:4} tension={:.2} coherence={:.2} reflex={:?} loop_us={}",
-                    tick,
-                    state.tension,
-                    state.coherence,
-                    state.reflex,
-                    self.stats.avg_loop_time_us
+                    tick, state.tension, state.coherence, state.reflex, self.stats.avg_loop_time_us
                 );
             }
 
@@ -939,7 +935,12 @@ fn main() {
     println!("Learned patterns:   {}", controller.pattern_count());
     println!("\nReflex mode distribution:");
     for (mode, count) in &stats.reflex_counts {
-        println!("  {:10}: {} ({:.1}%)", mode, count, *count as f64 / stats.tick_count as f64 * 100.0);
+        println!(
+            "  {:10}: {} ({:.1}%)",
+            mode,
+            count,
+            *count as f64 / stats.tick_count as f64 * 100.0
+        );
     }
 
     println!("\n✓ Intelligence as homeostasis, rendered as touch.");
@@ -1004,7 +1005,10 @@ mod tests {
         let key2 = HdcKey::encode(&frame2, 256, 0xDEADBEEF);
 
         let similarity = key1.similarity(&key2);
-        assert!(similarity > 0.9, "Similar frames should have high similarity");
+        assert!(
+            similarity > 0.9,
+            "Similar frames should have high similarity"
+        );
     }
 
     #[test]

@@ -145,8 +145,8 @@ impl EpochConfig {
         EpochConfig {
             enabled: true,
             tick_interval_ms: 1,
-            default_budget: 100,  // 100ms
-            max_budget: 1000,     // 1 second max
+            default_budget: 100, // 100ms
+            max_budget: 1000,    // 1 second max
         }
     }
 
@@ -266,10 +266,7 @@ mod tests {
 
         let controller = EpochController::new(Duration::from_millis(10));
         assert_eq!(controller.ticks_to_duration(100), Duration::from_secs(1));
-        assert_eq!(
-            controller.duration_to_ticks(Duration::from_secs(1)),
-            100
-        );
+        assert_eq!(controller.duration_to_ticks(Duration::from_secs(1)), 100);
     }
 
     #[test]

@@ -2,8 +2,8 @@
 
 use crate::types::{PatternId, SubstrateTime};
 use dashmap::DashMap;
-use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::algo::dijkstra;
+use petgraph::graph::{DiGraph, NodeIndex};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -31,7 +31,8 @@ pub struct CausalGraph {
     /// Pattern timestamps for light cone calculations
     timestamps: DashMap<PatternId, SubstrateTime>,
     /// Cached graph representation for path finding
-    graph_cache: Arc<parking_lot::RwLock<Option<(DiGraph<PatternId, ()>, HashMap<PatternId, NodeIndex>)>>>,
+    graph_cache:
+        Arc<parking_lot::RwLock<Option<(DiGraph<PatternId, ()>, HashMap<PatternId, NodeIndex>)>>>,
 }
 
 impl CausalGraph {
@@ -86,18 +87,12 @@ impl CausalGraph {
 
     /// Get out-degree (number of effects)
     pub fn out_degree(&self, pattern: PatternId) -> usize {
-        self.forward
-            .get(&pattern)
-            .map(|v| v.len())
-            .unwrap_or(0)
+        self.forward.get(&pattern).map(|v| v.len()).unwrap_or(0)
     }
 
     /// Get in-degree (number of causes)
     pub fn in_degree(&self, pattern: PatternId) -> usize {
-        self.backward
-            .get(&pattern)
-            .map(|v| v.len())
-            .unwrap_or(0)
+        self.backward.get(&pattern).map(|v| v.len()).unwrap_or(0)
     }
 
     /// Compute shortest path distance between two patterns
@@ -224,9 +219,7 @@ impl CausalGraph {
     ) -> Vec<PatternId> {
         candidates
             .iter()
-            .filter(|&&id| {
-                self.is_in_light_cone(id, reference, reference_time, cone_type)
-            })
+            .filter(|&&id| self.is_in_light_cone(id, reference, reference_time, cone_type))
             .copied()
             .collect()
     }

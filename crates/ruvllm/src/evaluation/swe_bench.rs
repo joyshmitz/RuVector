@@ -26,8 +26,8 @@
 //! let eval_tasks: Vec<EvalTask> = tasks.into_iter().map(|t| t.into()).collect();
 //! ```
 
-use super::harness::EvalTask;
 use super::correctness::VerificationLevel;
+use super::harness::EvalTask;
 use crate::error::{Result, RuvLLMError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,8 +35,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// SWE-Bench dataset URLs
-pub const SWE_BENCH_LITE_URL: &str = "https://raw.githubusercontent.com/princeton-nlp/SWE-bench/main/swe-bench-lite.json";
-pub const SWE_BENCH_FULL_URL: &str = "https://raw.githubusercontent.com/princeton-nlp/SWE-bench/main/swe-bench.json";
+pub const SWE_BENCH_LITE_URL: &str =
+    "https://raw.githubusercontent.com/princeton-nlp/SWE-bench/main/swe-bench-lite.json";
+pub const SWE_BENCH_FULL_URL: &str =
+    "https://raw.githubusercontent.com/princeton-nlp/SWE-bench/main/swe-bench.json";
 
 /// Configuration for SWE-Bench loader
 #[derive(Debug, Clone)]
@@ -249,8 +251,9 @@ impl SweBenchLoader {
     /// Load tasks from a local JSON file
     pub fn load_from_file<P: AsRef<Path>>(&self, path: P) -> Result<Vec<SweBenchTask>> {
         let path = path.as_ref();
-        let content = fs::read_to_string(path)
-            .map_err(|e| RuvLLMError::Storage(format!("Failed to read {}: {}", path.display(), e)))?;
+        let content = fs::read_to_string(path).map_err(|e| {
+            RuvLLMError::Storage(format!("Failed to read {}: {}", path.display(), e))
+        })?;
 
         self.parse_tasks(&content)
     }
@@ -258,8 +261,9 @@ impl SweBenchLoader {
     /// Load tasks from a JSONL file (one JSON object per line)
     pub fn load_from_jsonl<P: AsRef<Path>>(&self, path: P) -> Result<Vec<SweBenchTask>> {
         let path = path.as_ref();
-        let content = fs::read_to_string(path)
-            .map_err(|e| RuvLLMError::Storage(format!("Failed to read {}: {}", path.display(), e)))?;
+        let content = fs::read_to_string(path).map_err(|e| {
+            RuvLLMError::Storage(format!("Failed to read {}: {}", path.display(), e))
+        })?;
 
         let mut tasks = Vec::new();
         for (i, line) in content.lines().enumerate() {
@@ -284,8 +288,9 @@ impl SweBenchLoader {
             Ok(arr) => arr,
             Err(_) => {
                 // Try parsing as single object
-                let task: SweBenchTask = serde_json::from_str(content)
-                    .map_err(|e| RuvLLMError::Serialization(format!("Failed to parse JSON: {}", e)))?;
+                let task: SweBenchTask = serde_json::from_str(content).map_err(|e| {
+                    RuvLLMError::Serialization(format!("Failed to parse JSON: {}", e))
+                })?;
                 vec![task]
             }
         };
@@ -377,17 +382,21 @@ impl SweBenchLoader {
                 instance_id: "django__django-11099".to_string(),
                 repo: "django/django".to_string(),
                 base_commit: "abc123".to_string(),
-                problem_statement: "UsernameValidator allows trailing newline in username".to_string(),
-                hints_text: "The regex in UsernameValidator should use \\Z instead of $".to_string(),
+                problem_statement: "UsernameValidator allows trailing newline in username"
+                    .to_string(),
+                hints_text: "The regex in UsernameValidator should use \\Z instead of $"
+                    .to_string(),
                 patch: r#"--- a/django/contrib/auth/validators.py
 +++ b/django/contrib/auth/validators.py
 @@ -8,7 +8,7 @@ class ASCIIUsernameValidator(validators.RegexValidator):
 -    regex = r'^[\w.@+-]+$'
 +    regex = r'^[\w.@+-]+\Z'
-"#.to_string(),
+"#
+                .to_string(),
                 test_patch: String::new(),
                 expected_files: vec!["django/contrib/auth/validators.py".to_string()],
-                test_cmd: "python -m pytest django/contrib/auth/tests/test_validators.py".to_string(),
+                test_cmd: "python -m pytest django/contrib/auth/tests/test_validators.py"
+                    .to_string(),
                 env_setup_cmd: String::new(),
                 version: "3.8".to_string(),
                 difficulty: Some("easy".to_string()),
@@ -397,7 +406,8 @@ impl SweBenchLoader {
                 instance_id: "requests__requests-4356".to_string(),
                 repo: "psf/requests".to_string(),
                 base_commit: "def456".to_string(),
-                problem_statement: "Session.request does not honor the `json` parameter".to_string(),
+                problem_statement: "Session.request does not honor the `json` parameter"
+                    .to_string(),
                 hints_text: "Check how json parameter is passed in Session.request".to_string(),
                 patch: r#"--- a/requests/sessions.py
 +++ b/requests/sessions.py
@@ -407,7 +417,8 @@ impl SweBenchLoader {
              url=url,
 +            json=json,
              headers=headers,
-"#.to_string(),
+"#
+                .to_string(),
                 test_patch: String::new(),
                 expected_files: vec!["requests/sessions.py".to_string()],
                 test_cmd: "python -m pytest tests/test_requests.py".to_string(),
@@ -424,7 +435,10 @@ impl SweBenchLoader {
                 hints_text: "Need to detect and await async functions in dispatch".to_string(),
                 patch: String::new(), // No gold patch - harder task
                 test_patch: String::new(),
-                expected_files: vec!["src/flask/app.py".to_string(), "src/flask/views.py".to_string()],
+                expected_files: vec![
+                    "src/flask/app.py".to_string(),
+                    "src/flask/views.py".to_string(),
+                ],
                 test_cmd: "python -m pytest tests/".to_string(),
                 env_setup_cmd: String::new(),
                 version: "3.10".to_string(),
@@ -487,12 +501,18 @@ impl std::fmt::Display for SweBenchStats {
         writeln!(f, "SWE-Bench Dataset Statistics")?;
         writeln!(f, "============================")?;
         writeln!(f, "Total tasks: {}", self.total_tasks)?;
-        writeln!(f, "With gold patches: {} ({:.1}%)",
+        writeln!(
+            f,
+            "With gold patches: {} ({:.1}%)",
             self.with_gold_patch,
-            self.with_gold_patch as f64 / self.total_tasks as f64 * 100.0)?;
-        writeln!(f, "With test commands: {} ({:.1}%)",
+            self.with_gold_patch as f64 / self.total_tasks as f64 * 100.0
+        )?;
+        writeln!(
+            f,
+            "With test commands: {} ({:.1}%)",
             self.with_tests,
-            self.with_tests as f64 / self.total_tasks as f64 * 100.0)?;
+            self.with_tests as f64 / self.total_tasks as f64 * 100.0
+        )?;
 
         writeln!(f, "\nBy Repository:")?;
         let mut repos: Vec<_> = self.repos.iter().collect();
@@ -542,7 +562,8 @@ mod tests {
 +new
 --- a/file2.py
 +++ b/file2.py
-"#.to_string(),
+"#
+            .to_string(),
             ..Default::default()
         };
 

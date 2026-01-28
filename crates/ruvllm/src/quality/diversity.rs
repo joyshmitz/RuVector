@@ -300,7 +300,8 @@ impl DiversityAnalyzer {
             || repeated_patterns.len() > samples.len() / 4;
 
         let collapse_severity = if has_collapse {
-            ((avg_similarity - self.config.mode_collapse_threshold) / (1.0 - self.config.mode_collapse_threshold))
+            ((avg_similarity - self.config.mode_collapse_threshold)
+                / (1.0 - self.config.mode_collapse_threshold))
                 .clamp(0.0, 1.0)
                 * 0.5
                 + dominant_percentage * 0.3
@@ -451,7 +452,12 @@ impl DiversityAnalyzer {
                     all_bigrams.insert(format!("{} {}", tokens[i], tokens[i + 1]));
                 }
                 if i + 2 < tokens.len() {
-                    all_trigrams.insert(format!("{} {} {}", tokens[i], tokens[i + 1], tokens[i + 2]));
+                    all_trigrams.insert(format!(
+                        "{} {} {}",
+                        tokens[i],
+                        tokens[i + 1],
+                        tokens[i + 2]
+                    ));
                 }
             }
         }
@@ -653,7 +659,8 @@ impl DiversityAnalyzer {
 
         for (i, word) in words.iter().enumerate() {
             for (j, c) in word.chars().enumerate() {
-                let idx = ((c as usize * 31 + j * 17 + i * 13) % self.config.embedding_dim) as usize;
+                let idx =
+                    ((c as usize * 31 + j * 17 + i * 13) % self.config.embedding_dim) as usize;
                 embedding[idx] += 1.0;
             }
         }

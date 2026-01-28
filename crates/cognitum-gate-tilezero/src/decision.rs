@@ -96,7 +96,13 @@ pub struct DecisionOutcome {
 impl DecisionOutcome {
     /// Create a permit outcome
     #[inline]
-    pub fn permit(confidence: f64, structural: f64, shift: f64, evidence: f64, mincut: f64) -> Self {
+    pub fn permit(
+        confidence: f64,
+        structural: f64,
+        shift: f64,
+        evidence: f64,
+        mincut: f64,
+    ) -> Self {
         Self {
             decision: GateDecision::Permit,
             confidence,

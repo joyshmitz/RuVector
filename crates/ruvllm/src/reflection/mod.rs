@@ -93,7 +93,7 @@ mod reflective_agent;
 
 // Re-export all public types
 pub use confidence::{
-    ConfidenceChecker, ConfidenceCheckRecord, ConfidenceConfig, ConfidenceFactorWeights,
+    ConfidenceCheckRecord, ConfidenceChecker, ConfidenceConfig, ConfidenceFactorWeights,
     ConfidenceLevel, RevisionResult, WeakPoint, WeaknessType,
 };
 pub use error_recovery::{

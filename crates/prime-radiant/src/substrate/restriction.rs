@@ -649,10 +649,7 @@ impl RestrictionMap {
             }
 
             MatrixStorage::Sparse {
-                rows,
-                cols,
-                values,
-                ..
+                rows, cols, values, ..
             } => {
                 output.fill(0.0);
                 for ((&r, &c), &v) in rows.iter().zip(cols.iter()).zip(values.iter()) {
@@ -1038,11 +1035,7 @@ mod tests {
         // Create a simple 2x3 matrix:
         // [ 1  0  2 ]
         // [ 0  3  0 ]
-        let csr = CsrMatrix::from_coo(
-            2,
-            3,
-            vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)],
-        );
+        let csr = CsrMatrix::from_coo(2, 3, vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)]);
 
         assert_eq!(csr.rows, 2);
         assert_eq!(csr.cols, 3);
@@ -1057,11 +1050,7 @@ mod tests {
         // Create a 2x3 matrix:
         // [ 1  0  2 ]
         // [ 0  3  0 ]
-        let csr = CsrMatrix::from_coo(
-            2,
-            3,
-            vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)],
-        );
+        let csr = CsrMatrix::from_coo(2, 3, vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)]);
 
         let input = vec![1.0, 2.0, 3.0];
         let output = csr.matvec(&input);
@@ -1073,11 +1062,7 @@ mod tests {
 
     #[test]
     fn test_csr_matvec_into() {
-        let csr = CsrMatrix::from_coo(
-            2,
-            3,
-            vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)],
-        );
+        let csr = CsrMatrix::from_coo(2, 3, vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)]);
 
         let input = vec![1.0, 2.0, 3.0];
         let mut output = vec![0.0; 2];
@@ -1190,11 +1175,7 @@ mod tests {
 
     #[test]
     fn test_csr_matvec_add_into() {
-        let csr = CsrMatrix::from_coo(
-            2,
-            3,
-            vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)],
-        );
+        let csr = CsrMatrix::from_coo(2, 3, vec![(0, 0, 1.0), (0, 2, 2.0), (1, 1, 3.0)]);
 
         let input = vec![1.0, 2.0, 3.0];
         let mut output = vec![1.0, 1.0]; // Pre-existing values

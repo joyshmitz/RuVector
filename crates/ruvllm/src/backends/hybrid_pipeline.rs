@@ -52,7 +52,7 @@
 //! | RoPE | N/A | 16.7 | GPU |
 
 use super::{
-    AneCapabilities, ComputeUnits, CoreMLBackend, DeviceType, DType, GenerateParams,
+    AneCapabilities, ComputeUnits, CoreMLBackend, DType, DeviceType, GenerateParams,
     GeneratedToken, LlmBackend, ModelArchitecture, ModelConfig, ModelInfo, Quantization,
     SpecialTokens, StreamEvent, TokenStream, Tokenizer,
 };
@@ -164,11 +164,7 @@ impl OperationType {
     pub fn ane_supported(&self) -> bool {
         matches!(
             self,
-            Self::MatMul
-                | Self::Activation
-                | Self::Normalization
-                | Self::Softmax
-                | Self::Embedding
+            Self::MatMul | Self::Activation | Self::Normalization | Self::Softmax | Self::Embedding
         )
     }
 }
@@ -585,7 +581,12 @@ impl HybridPipeline {
 
         let reason = match accelerator {
             AcceleratorType::Ane => {
-                format!("ANE optimal for {} (batch={}, dim={})", op_name(op), batch_size, dim)
+                format!(
+                    "ANE optimal for {} (batch={}, dim={})",
+                    op_name(op),
+                    batch_size,
+                    dim
+                )
             }
             AcceleratorType::Metal => {
                 format!(
@@ -631,8 +632,11 @@ impl HybridPipeline {
             let seq_len = query.len() / (config.num_heads * config.head_dim);
             let kv_len = key.len() / (config.num_kv_heads * config.head_dim);
             // Attention FLOPs: 2 * seq_len * kv_len * head_dim * num_heads (QK^T and softmax@V)
-            let flops =
-                2 * seq_len as u64 * kv_len as u64 * config.head_dim as u64 * config.num_heads as u64;
+            let flops = 2
+                * seq_len as u64
+                * kv_len as u64
+                * config.head_dim as u64
+                * config.num_heads as u64;
             let bytes = (query.len() + key.len() + value.len() + result.len()) * 4;
             self.metal_metrics
                 .record_operation(duration_ns, flops, bytes as u64);
@@ -679,10 +683,22 @@ impl HybridPipeline {
         })?;
 
         // Gate projection: hidden @ gate_weight.T
-        let gate = ctx.gemm_f32(hidden, gate_weight, batch_size, intermediate_size, hidden_size)?;
+        let gate = ctx.gemm_f32(
+            hidden,
+            gate_weight,
+            batch_size,
+            intermediate_size,
+            hidden_size,
+        )?;
 
         // Up projection: hidden @ up_weight.T
-        let up = ctx.gemm_f32(hidden, up_weight, batch_size, intermediate_size, hidden_size)?;
+        let up = ctx.gemm_f32(
+            hidden,
+            up_weight,
+            batch_size,
+            intermediate_size,
+            hidden_size,
+        )?;
 
         // SwiGLU activation: silu(gate) * up
         let activated = if let Some(_) = ctx.has_m4_pro_optimizations().then_some(()) {
@@ -710,7 +726,8 @@ impl HybridPipeline {
         if self.config.collect_metrics {
             let duration_ns = start.elapsed().as_nanos() as u64;
             // MLP FLOPs: 3 matmuls + activation
-            let flops = 2 * batch_size as u64
+            let flops = 2
+                * batch_size as u64
                 * (hidden_size as u64 * intermediate_size as u64 * 2
                     + intermediate_size as u64 * hidden_size as u64);
             let bytes = (hidden.len()
@@ -846,9 +863,8 @@ impl HybridPipeline {
 
     /// Get summary of accelerator utilization
     pub fn utilization_summary(&self) -> String {
-        let total_ops = self.metal_metrics.total_ops
-            + self.ane_metrics.total_ops
-            + self.cpu_metrics.total_ops;
+        let total_ops =
+            self.metal_metrics.total_ops + self.ane_metrics.total_ops + self.cpu_metrics.total_ops;
 
         if total_ops == 0 {
             return "No operations executed yet".to_string();

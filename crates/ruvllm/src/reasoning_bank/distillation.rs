@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::{Trajectory, Verdict, PatternCategory};
+use super::{PatternCategory, Trajectory, Verdict};
 
 /// Configuration for memory distillation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +71,8 @@ pub struct CompressedTrajectory {
 impl CompressedTrajectory {
     /// Create from a trajectory
     pub fn from_trajectory(trajectory: &Trajectory) -> Self {
-        let action_summary: Vec<String> = trajectory.steps
+        let action_summary: Vec<String> = trajectory
+            .steps
             .iter()
             .filter(|s| s.outcome.is_success())
             .take(5)
@@ -96,7 +97,11 @@ impl CompressedTrajectory {
     pub fn estimated_size(&self) -> usize {
         std::mem::size_of::<Self>()
             + self.key_embedding.len() * std::mem::size_of::<f32>()
-            + self.preserved_lessons.iter().map(|s| s.len()).sum::<usize>()
+            + self
+                .preserved_lessons
+                .iter()
+                .map(|s| s.len())
+                .sum::<usize>()
             + self.action_summary.iter().map(|s| s.len()).sum::<usize>()
     }
 }
@@ -187,12 +192,8 @@ impl KeyLesson {
         let content1_lower = self.content.to_lowercase();
         let content2_lower = other.content.to_lowercase();
 
-        let words1: std::collections::HashSet<&str> = content1_lower
-            .split_whitespace()
-            .collect();
-        let words2: std::collections::HashSet<&str> = content2_lower
-            .split_whitespace()
-            .collect();
+        let words1: std::collections::HashSet<&str> = content1_lower.split_whitespace().collect();
+        let words2: std::collections::HashSet<&str> = content2_lower.split_whitespace().collect();
 
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
@@ -210,7 +211,12 @@ impl KeyLesson {
             return 0.0;
         }
 
-        let dot: f32 = self.embedding.iter().zip(&other.embedding).map(|(a, b)| a * b).sum();
+        let dot: f32 = self
+            .embedding
+            .iter()
+            .zip(&other.embedding)
+            .map(|(a, b)| a * b)
+            .sum();
         let norm_a: f32 = self.embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = other.embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
 
@@ -327,10 +333,7 @@ impl MemoryDistiller {
             .iter()
             .map(|t| estimate_trajectory_size(t))
             .sum();
-        let compressed_size: usize = compressed
-            .iter()
-            .map(|c| c.estimated_size())
-            .sum();
+        let compressed_size: usize = compressed.iter().map(|c| c.estimated_size()).sum();
         let memory_saved = original_size.saturating_sub(compressed_size);
 
         let compression_ratio = if original_size > 0 {
@@ -366,7 +369,8 @@ impl MemoryDistiller {
 
             // Extract implicit lessons from successful patterns
             if trajectory.is_success() {
-                let action_pattern: String = trajectory.steps
+                let action_pattern: String = trajectory
+                    .steps
                     .iter()
                     .filter(|s| s.outcome.is_success())
                     .take(3)
@@ -390,7 +394,11 @@ impl MemoryDistiller {
             }
 
             // Extract lessons from recovered attempts
-            if let Verdict::RecoveredViaReflection { reflection_attempts, .. } = trajectory.verdict {
+            if let Verdict::RecoveredViaReflection {
+                reflection_attempts,
+                ..
+            } = trajectory.verdict
+            {
                 let lesson_content = format!(
                     "Recovery possible after {} attempts via reflection",
                     reflection_attempts
@@ -406,7 +414,9 @@ impl MemoryDistiller {
         lessons.sort_by(|a, b| {
             let score_a = a.importance * (a.observation_count as f32).ln_1p();
             let score_b = b.importance * (b.observation_count as f32).ln_1p();
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         lessons
@@ -414,7 +424,8 @@ impl MemoryDistiller {
 
     /// Create a lesson from trajectory context
     fn create_lesson(&self, content: String, trajectory: &Trajectory) -> KeyLesson {
-        let example_actions: Vec<String> = trajectory.steps
+        let example_actions: Vec<String> = trajectory
+            .steps
             .iter()
             .filter(|s| s.outcome.is_success())
             .take(3)
@@ -465,7 +476,9 @@ impl MemoryDistiller {
                 if let Some(most_similar) = deduplicated.iter_mut().max_by(|a, b| {
                     let sim_a = lesson.content_similarity(a);
                     let sim_b = lesson.content_similarity(b);
-                    sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
+                    sim_a
+                        .partial_cmp(&sim_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 }) {
                     most_similar.merge(&lesson);
                 }
@@ -476,7 +489,10 @@ impl MemoryDistiller {
     }
 
     /// Compress old trajectories
-    pub fn compress_old_trajectories(&self, trajectories: &[Trajectory]) -> Vec<CompressedTrajectory> {
+    pub fn compress_old_trajectories(
+        &self,
+        trajectories: &[Trajectory],
+    ) -> Vec<CompressedTrajectory> {
         let now = Utc::now();
         let min_age = chrono::Duration::seconds(self.config.min_age_for_distillation_secs as i64);
 
@@ -606,17 +622,22 @@ fn infer_category(trajectory: &Trajectory) -> PatternCategory {
 fn estimate_trajectory_size(trajectory: &Trajectory) -> usize {
     let base_size = std::mem::size_of::<Trajectory>();
     let embedding_size = trajectory.query_embedding.len() * std::mem::size_of::<f32>();
-    let response_embedding_size = trajectory.response_embedding
+    let response_embedding_size = trajectory
+        .response_embedding
         .as_ref()
         .map(|e| e.len() * std::mem::size_of::<f32>())
         .unwrap_or(0);
-    let steps_size: usize = trajectory.steps
+    let steps_size: usize = trajectory
+        .steps
         .iter()
         .map(|s| {
             std::mem::size_of_val(s)
                 + s.action.len()
                 + s.rationale.len()
-                + s.context_embedding.as_ref().map(|e| e.len() * 4).unwrap_or(0)
+                + s.context_embedding
+                    .as_ref()
+                    .map(|e| e.len() * 4)
+                    .unwrap_or(0)
         })
         .sum();
     let lessons_size: usize = trajectory.lessons.iter().map(|l| l.len()).sum();
@@ -626,8 +647,8 @@ fn estimate_trajectory_size(trajectory: &Trajectory) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use super::super::trajectory::{StepOutcome, TrajectoryRecorder};
     use super::*;
-    use super::super::trajectory::{TrajectoryRecorder, StepOutcome};
 
     fn make_trajectory(id: u64, quality: f32) -> Trajectory {
         let mut recorder = TrajectoryRecorder::new(vec![0.1; 64]);
@@ -648,7 +669,9 @@ mod tests {
         let mut trajectory = recorder.complete(if quality > 0.5 {
             Verdict::Success
         } else {
-            Verdict::Partial { completion_ratio: quality }
+            Verdict::Partial {
+                completion_ratio: quality,
+            }
         });
 
         // Override the auto-generated ID
@@ -751,9 +774,7 @@ mod tests {
         let distiller = MemoryDistiller::new(config);
 
         // Create test trajectories
-        let trajectories: Vec<Trajectory> = (0..10)
-            .map(|i| make_trajectory(i, 0.7))
-            .collect();
+        let trajectories: Vec<Trajectory> = (0..10).map(|i| make_trajectory(i, 0.7)).collect();
 
         let result = distiller.extract_key_lessons(&trajectories).unwrap();
 
@@ -770,9 +791,7 @@ mod tests {
         };
         let distiller = MemoryDistiller::new(config);
 
-        let trajectories: Vec<Trajectory> = (0..10)
-            .map(|i| make_trajectory(i, 0.7))
-            .collect();
+        let trajectories: Vec<Trajectory> = (0..10).map(|i| make_trajectory(i, 0.7)).collect();
 
         let result = distiller.extract_key_lessons(&trajectories);
         assert!(result.is_err());
@@ -804,9 +823,21 @@ mod tests {
         let distiller = MemoryDistiller::new(config);
 
         let lessons = vec![
-            KeyLesson::new("Test lesson one".to_string(), vec![1.0, 0.0], PatternCategory::General),
-            KeyLesson::new("Test lesson one".to_string(), vec![1.0, 0.0], PatternCategory::General),
-            KeyLesson::new("Different lesson".to_string(), vec![0.0, 1.0], PatternCategory::General),
+            KeyLesson::new(
+                "Test lesson one".to_string(),
+                vec![1.0, 0.0],
+                PatternCategory::General,
+            ),
+            KeyLesson::new(
+                "Test lesson one".to_string(),
+                vec![1.0, 0.0],
+                PatternCategory::General,
+            ),
+            KeyLesson::new(
+                "Different lesson".to_string(),
+                vec![0.0, 1.0],
+                PatternCategory::General,
+            ),
         ];
 
         let deduped = distiller.deduplicate_lessons(lessons);

@@ -18,7 +18,7 @@ const EPS: f32 = 1e-10;
 pub struct LorentzPoint {
     /// Coordinates in ℝⁿ⁺¹ (x₀ is time-like, x₁..xₙ space-like)
     pub coords: Vec<f32>,
-    pub curvature: f32,  // K parameter
+    pub curvature: f32, // K parameter
 }
 
 impl LorentzPoint {
@@ -83,10 +83,7 @@ pub fn minkowski_inner(x: &[f32], y: &[f32]) -> f32 {
     debug_assert!(!x.is_empty());
 
     let time_part = -x[0] * y[0];
-    let space_part: f32 = x[1..].iter()
-        .zip(&y[1..])
-        .map(|(xi, yi)| xi * yi)
-        .sum();
+    let space_part: f32 = x[1..].iter().zip(&y[1..]).map(|(xi, yi)| xi * yi).sum();
 
     time_part + space_part
 }
@@ -192,9 +189,7 @@ pub fn parallel_transport(x: &[f32], y: &[f32], v: &[f32], curvature: f32) -> Ve
     v.iter()
         .zip(y.iter())
         .zip(x.iter())
-        .map(|((&vi, &yi), &xi)| {
-            vi + coef * (inner_xv * yi + inner_yv * xi)
-        })
+        .map(|((&vi, &yi), &xi)| vi + coef * (inner_xv * yi + inner_yv * xi))
         .collect()
 }
 
@@ -213,12 +208,7 @@ pub fn lorentz_boost(x: &[f32], v: &[f32], curvature: f32) -> Vec<f32> {
 /// Lorentz rotation: rotation in space-like plane
 ///
 /// Rotates spatial coordinates by angle θ in plane (i, j).
-pub fn lorentz_rotation(
-    x: &[f32],
-    angle: f32,
-    plane_i: usize,
-    plane_j: usize,
-) -> Vec<f32> {
+pub fn lorentz_rotation(x: &[f32], angle: f32, plane_i: usize, plane_j: usize) -> Vec<f32> {
     let mut result = x.to_vec();
 
     if plane_i == 0 || plane_j == 0 {
@@ -276,11 +266,7 @@ pub fn lorentz_to_poincare(lorentz: &[f32], curvature: f32) -> Vec<f32> {
 // =============================================================================
 
 /// Compute all distances from query to database
-pub fn batch_lorentz_distances(
-    query: &[f32],
-    database: &[Vec<f32>],
-    curvature: f32,
-) -> Vec<f32> {
+pub fn batch_lorentz_distances(query: &[f32], database: &[Vec<f32>], curvature: f32) -> Vec<f32> {
     database
         .iter()
         .map(|point| lorentz_distance(query, point, curvature))
@@ -376,7 +362,7 @@ mod tests {
         let k = 1.0;
         let x = LorentzPoint::from_spatial(vec![0.1, 0.0], k);
         let y = LorentzPoint::from_spatial(vec![0.2, 0.0], k);
-        let v = vec![0.0, 0.1, 0.2];  // Tangent vector at x
+        let v = vec![0.0, 0.1, 0.2]; // Tangent vector at x
 
         let v_transported = parallel_transport(&x.coords, &y.coords, &v, k);
 

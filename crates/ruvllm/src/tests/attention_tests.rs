@@ -4,10 +4,9 @@
 //! output correctness, memory allocation, pre-allocated buffer reuse, and benchmarks.
 
 use crate::kernels::{
-    flash_attention_neon, flash_attention_v2, flash_attention_auto,
-    multi_query_attention_neon, grouped_query_attention_neon,
-    paged_attention_neon, PagedKvCache, AttentionConfig,
-    select_block_size, BLOCK_SIZE_SMALL, BLOCK_SIZE_MEDIUM, BLOCK_SIZE_LARGE,
+    flash_attention_auto, flash_attention_neon, flash_attention_v2, grouped_query_attention_neon,
+    multi_query_attention_neon, paged_attention_neon, select_block_size, AttentionConfig,
+    PagedKvCache, BLOCK_SIZE_LARGE, BLOCK_SIZE_MEDIUM, BLOCK_SIZE_SMALL,
 };
 use std::time::Instant;
 
@@ -29,7 +28,8 @@ fn attention_reference(
     let mut scores = Vec::with_capacity(kv_len);
     for t in 0..kv_len {
         let k_offset = t * head_dim;
-        let score: f32 = query.iter()
+        let score: f32 = query
+            .iter()
             .zip(&key[k_offset..k_offset + head_dim])
             .map(|(q, k)| q * k * scale)
             .sum();
@@ -63,8 +63,12 @@ fn generate_test_data(head_dim: usize, kv_len: usize, seed: u64) -> (Vec<f32>, V
     };
 
     let query: Vec<f32> = (0..head_dim).map(|_| next_float(&mut rng_state)).collect();
-    let key: Vec<f32> = (0..kv_len * head_dim).map(|_| next_float(&mut rng_state)).collect();
-    let value: Vec<f32> = (0..kv_len * head_dim).map(|_| next_float(&mut rng_state)).collect();
+    let key: Vec<f32> = (0..kv_len * head_dim)
+        .map(|_| next_float(&mut rng_state))
+        .collect();
+    let value: Vec<f32> = (0..kv_len * head_dim)
+        .map(|_| next_float(&mut rng_state))
+        .collect();
 
     (query, key, value)
 }
@@ -74,7 +78,9 @@ fn vectors_approx_equal(a: &[f32], b: &[f32], tolerance: f32) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    a.iter().zip(b.iter()).all(|(x, y)| (x - y).abs() < tolerance)
+    a.iter()
+        .zip(b.iter())
+        .all(|(x, y)| (x - y).abs() < tolerance)
 }
 
 // ============================================================================
@@ -93,8 +99,15 @@ fn test_flash_attention_basic() {
     let scale = 1.0 / (head_dim as f32).sqrt();
     let output = flash_attention_neon(&query, &key, &value, scale, false);
 
-    assert_eq!(output.len(), head_dim, "Output should have head_dim elements");
-    assert!(output.iter().all(|&x| x.is_finite()), "All outputs should be finite");
+    assert_eq!(
+        output.len(),
+        head_dim,
+        "Output should have head_dim elements"
+    );
+    assert!(
+        output.iter().all(|&x| x.is_finite()),
+        "All outputs should be finite"
+    );
 }
 
 #[test]
@@ -140,7 +153,10 @@ fn test_flash_attention_single_token() {
 
     // With single KV token, output should be proportional to the value
     // (after softmax, the single token gets weight 1.0)
-    assert!(vectors_approx_equal(&output, &value, 1e-5), "Single token attention should return value directly");
+    assert!(
+        vectors_approx_equal(&output, &value, 1e-5),
+        "Single token attention should return value directly"
+    );
 }
 
 // ============================================================================
@@ -227,7 +243,10 @@ fn test_select_block_size_long_sequence() {
 
     // Long sequences with small head_dim can use large blocks
     let block = select_block_size(2048, head_dim);
-    assert!(block >= BLOCK_SIZE_MEDIUM, "Long sequences should use at least medium blocks");
+    assert!(
+        block >= BLOCK_SIZE_MEDIUM,
+        "Long sequences should use at least medium blocks"
+    );
 }
 
 #[test]
@@ -399,7 +418,8 @@ fn test_mqa_shared_kv() {
 
     // All queries identical
     let query_head: Vec<f32> = vec![1.0; config.head_dim];
-    let queries: Vec<f32> = query_head.iter()
+    let queries: Vec<f32> = query_head
+        .iter()
         .cloned()
         .cycle()
         .take(config.num_heads * config.head_dim)
@@ -409,9 +429,7 @@ fn test_mqa_shared_kv() {
     let keys: Vec<f32> = (0..kv_len * config.head_dim)
         .map(|i| (i as f32) * 0.1)
         .collect();
-    let values: Vec<f32> = (0..kv_len * config.head_dim)
-        .map(|_| 1.0)
-        .collect();
+    let values: Vec<f32> = (0..kv_len * config.head_dim).map(|_| 1.0).collect();
 
     let output = multi_query_attention_neon(&queries, &keys, &values, &config);
 
@@ -502,14 +520,27 @@ fn test_gqa_head_grouping() {
     let output = grouped_query_attention_neon(&queries, &keys, &values, &config);
 
     // Heads 0,1 should have values around 1.0, heads 2,3 around 2.0
-    let head_outputs: Vec<f32> = output.chunks(config.head_dim)
+    let head_outputs: Vec<f32> = output
+        .chunks(config.head_dim)
         .map(|h| h.iter().sum::<f32>() / config.head_dim as f32)
         .collect();
 
-    assert!((head_outputs[0] - 1.0).abs() < 0.1, "Head 0 should use KV head 0");
-    assert!((head_outputs[1] - 1.0).abs() < 0.1, "Head 1 should use KV head 0");
-    assert!((head_outputs[2] - 2.0).abs() < 0.1, "Head 2 should use KV head 1");
-    assert!((head_outputs[3] - 2.0).abs() < 0.1, "Head 3 should use KV head 1");
+    assert!(
+        (head_outputs[0] - 1.0).abs() < 0.1,
+        "Head 0 should use KV head 0"
+    );
+    assert!(
+        (head_outputs[1] - 1.0).abs() < 0.1,
+        "Head 1 should use KV head 0"
+    );
+    assert!(
+        (head_outputs[2] - 2.0).abs() < 0.1,
+        "Head 2 should use KV head 1"
+    );
+    assert!(
+        (head_outputs[3] - 2.0).abs() < 0.1,
+        "Head 3 should use KV head 1"
+    );
 }
 
 // ============================================================================
@@ -550,19 +581,35 @@ fn test_attention_config_effective_scale() {
 #[test]
 fn test_attention_config_gqa_ratios() {
     // Standard MHA (1:1)
-    let mha = AttentionConfig { num_heads: 32, num_kv_heads: 32, ..Default::default() };
+    let mha = AttentionConfig {
+        num_heads: 32,
+        num_kv_heads: 32,
+        ..Default::default()
+    };
     assert_eq!(mha.gqa_ratio(), 1);
 
     // GQA 4:1
-    let gqa_4 = AttentionConfig { num_heads: 32, num_kv_heads: 8, ..Default::default() };
+    let gqa_4 = AttentionConfig {
+        num_heads: 32,
+        num_kv_heads: 8,
+        ..Default::default()
+    };
     assert_eq!(gqa_4.gqa_ratio(), 4);
 
     // GQA 8:1
-    let gqa_8 = AttentionConfig { num_heads: 32, num_kv_heads: 4, ..Default::default() };
+    let gqa_8 = AttentionConfig {
+        num_heads: 32,
+        num_kv_heads: 4,
+        ..Default::default()
+    };
     assert_eq!(gqa_8.gqa_ratio(), 8);
 
     // MQA (all heads share 1 KV)
-    let mqa = AttentionConfig { num_heads: 32, num_kv_heads: 1, ..Default::default() };
+    let mqa = AttentionConfig {
+        num_heads: 32,
+        num_kv_heads: 1,
+        ..Default::default()
+    };
     assert_eq!(mqa.gqa_ratio(), 32);
 }
 
@@ -598,7 +645,11 @@ fn test_attention_output_size_correct() {
 
     let output = flash_attention_neon(&query, &key, &value, scale, false);
 
-    assert_eq!(output.len(), head_dim, "Output should exactly match head_dim");
+    assert_eq!(
+        output.len(),
+        head_dim,
+        "Output should exactly match head_dim"
+    );
 }
 
 // ============================================================================
@@ -627,7 +678,11 @@ fn test_attention_benchmark_short_sequence() {
     let duration = start.elapsed();
 
     let avg_us = duration.as_micros() as f64 / iterations as f64;
-    assert!(avg_us < 1000.0, "Short sequence attention should be fast: {}us", avg_us);
+    assert!(
+        avg_us < 1000.0,
+        "Short sequence attention should be fast: {}us",
+        avg_us
+    );
 }
 
 #[test]
@@ -652,7 +707,11 @@ fn test_attention_benchmark_long_sequence() {
     let duration = start.elapsed();
 
     let avg_ms = duration.as_millis() as f64 / iterations as f64;
-    assert!(avg_ms < 50.0, "Long sequence attention should complete in <50ms: {}ms", avg_ms);
+    assert!(
+        avg_ms < 50.0,
+        "Long sequence attention should complete in <50ms: {}ms",
+        avg_ms
+    );
 }
 
 #[test]
@@ -709,7 +768,10 @@ fn test_attention_large_logits() {
     let output = flash_attention_neon(&query, &key, &value, scale, false);
 
     // Output should be finite
-    assert!(output.iter().all(|&x| x.is_finite()), "Should handle large dot products");
+    assert!(
+        output.iter().all(|&x| x.is_finite()),
+        "Should handle large dot products"
+    );
 }
 
 #[test]
@@ -726,7 +788,10 @@ fn test_attention_small_values() {
     let output = flash_attention_neon(&query, &key, &value, scale, false);
 
     // Output should be finite
-    assert!(output.iter().all(|&x| x.is_finite()), "Should handle small values");
+    assert!(
+        output.iter().all(|&x| x.is_finite()),
+        "Should handle small values"
+    );
 }
 
 #[test]
@@ -735,8 +800,12 @@ fn test_attention_mixed_signs() {
     let kv_len = 8;
 
     // Mix of positive and negative values
-    let query: Vec<f32> = (0..head_dim).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
-    let key: Vec<f32> = (0..kv_len * head_dim).map(|i| if i % 3 == 0 { -0.5 } else { 0.5 }).collect();
+    let query: Vec<f32> = (0..head_dim)
+        .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+        .collect();
+    let key: Vec<f32> = (0..kv_len * head_dim)
+        .map(|i| if i % 3 == 0 { -0.5 } else { 0.5 })
+        .collect();
     let value: Vec<f32> = (0..kv_len * head_dim).map(|i| (i as f32) * 0.01).collect();
 
     let scale = 1.0 / (head_dim as f32).sqrt();
@@ -791,7 +860,11 @@ fn test_attention_power_of_two_dims() {
         let output = flash_attention_neon(&query, &key, &value, scale, false);
 
         assert_eq!(output.len(), head_dim);
-        assert!(output.iter().all(|&x| x.is_finite()), "Failed for head_dim={}", head_dim);
+        assert!(
+            output.iter().all(|&x| x.is_finite()),
+            "Failed for head_dim={}",
+            head_dim
+        );
     }
 }
 
@@ -807,6 +880,10 @@ fn test_attention_non_power_of_two_dims() {
         let output = flash_attention_neon(&query, &key, &value, scale, false);
 
         assert_eq!(output.len(), head_dim);
-        assert!(output.iter().all(|&x| x.is_finite()), "Failed for head_dim={}", head_dim);
+        assert!(
+            output.iter().all(|&x| x.is_finite()),
+            "Failed for head_dim={}",
+            head_dim
+        );
     }
 }

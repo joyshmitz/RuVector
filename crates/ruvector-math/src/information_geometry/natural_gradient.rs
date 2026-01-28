@@ -15,9 +15,9 @@
 //! - **Faster convergence**: 3-5x fewer iterations than SGD/Adam on well-conditioned problems
 //! - **Better generalization**: Follows geodesics in probability space
 
+use super::FisherInformation;
 use crate::error::{MathError, Result};
 use crate::utils::EPS;
-use super::FisherInformation;
 
 /// Natural gradient optimizer state
 #[derive(Debug, Clone)]
@@ -157,7 +157,10 @@ impl NaturalGradient {
     /// Apply update to parameters
     pub fn apply_update(parameters: &mut [f64], update: &[f64]) -> Result<()> {
         if parameters.len() != update.len() {
-            return Err(MathError::dimension_mismatch(parameters.len(), update.len()));
+            return Err(MathError::dimension_mismatch(
+                parameters.len(),
+                update.len(),
+            ));
         }
 
         for (p, &u) in parameters.iter_mut().zip(update.iter()) {
@@ -266,16 +269,14 @@ mod tests {
 
     #[test]
     fn test_natural_gradient_with_fim() {
-        let mut ng = NaturalGradient::new(0.1).with_diagonal(true).with_damping(0.0);
+        let mut ng = NaturalGradient::new(0.1)
+            .with_diagonal(true)
+            .with_damping(0.0);
 
         let gradient = vec![2.0, 4.0];
 
         // Provide gradient samples for FIM estimation
-        let samples = vec![
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-            vec![1.0, 1.0],
-        ];
+        let samples = vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 1.0]];
 
         let update = ng.step(&gradient, Some(&samples)).unwrap();
 

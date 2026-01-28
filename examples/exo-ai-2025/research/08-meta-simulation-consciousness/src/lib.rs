@@ -47,22 +47,20 @@ pub mod meta_sim_awareness;
 pub mod simd_ops;
 
 // Re-export main types
-pub use closed_form_phi::{ClosedFormPhi, ErgodicPhiResult, shannon_entropy};
+pub use closed_form_phi::{shannon_entropy, ClosedFormPhi, ErgodicPhiResult};
 pub use ergodic_consciousness::{
-    ErgodicityAnalyzer, ErgodicityResult, ErgodicPhase,
-    ConsciousnessErgodicityMetrics, ErgodicPhaseDetector,
+    ConsciousnessErgodicityMetrics, ErgodicPhase, ErgodicPhaseDetector, ErgodicityAnalyzer,
+    ErgodicityResult,
 };
 pub use hierarchical_phi::{
-    HierarchicalPhiBatcher, HierarchicalPhiResults,
-    PhiLevelStats, ConsciousnessParameterSpace,
+    ConsciousnessParameterSpace, HierarchicalPhiBatcher, HierarchicalPhiResults, PhiLevelStats,
 };
 pub use meta_sim_awareness::{
-    MetaConsciousnessSimulator, MetaSimConfig,
-    MetaSimulationResults, ConsciousnessHotspot,
+    ConsciousnessHotspot, MetaConsciousnessSimulator, MetaSimConfig, MetaSimulationResults,
 };
 pub use simd_ops::{
-    simd_matvec_multiply, simd_batch_entropy, simd_entropy,
-    SimdCounterfactualBrancher, SimulationTreeExplorer,
+    simd_batch_entropy, simd_entropy, simd_matvec_multiply, SimdCounterfactualBrancher,
+    SimulationTreeExplorer,
 };
 
 /// Library version
@@ -101,10 +99,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// println!("Ergodic: {}", result.is_ergodic);
 /// println!("Computation time: {} μs", result.computation_time_us);
 /// ```
-pub fn measure_consciousness(
-    adjacency: &[Vec<f64>],
-    node_ids: &[u64],
-) -> ErgodicPhiResult {
+pub fn measure_consciousness(adjacency: &[Vec<f64>], node_ids: &[u64]) -> ErgodicPhiResult {
     let calculator = ClosedFormPhi::default();
     calculator.compute_phi_ergodic(adjacency, node_ids)
 }

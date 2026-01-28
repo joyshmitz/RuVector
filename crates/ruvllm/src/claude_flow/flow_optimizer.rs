@@ -2,9 +2,9 @@
 //!
 //! Optimizes RuvLTRA for Claude Flow workflows with SONA pretraining.
 
-use super::{AgentRouter, TaskClassifier, ClaudeFlowAgent, ClaudeFlowTask};
-use crate::sona::{SonaConfig, SonaStats};
+use super::{AgentRouter, ClaudeFlowAgent, ClaudeFlowTask, TaskClassifier};
 use crate::models::RuvLtraConfig;
+use crate::sona::{SonaConfig, SonaStats};
 use std::collections::HashMap;
 
 /// Optimization configuration
@@ -116,7 +116,13 @@ impl FlowOptimizer {
     }
 
     /// Train on a sample task
-    pub fn train_sample(&mut self, task: &str, embedding: &[f32], correct_agent: ClaudeFlowAgent, success: bool) {
+    pub fn train_sample(
+        &mut self,
+        task: &str,
+        embedding: &[f32],
+        correct_agent: ClaudeFlowAgent,
+        success: bool,
+    ) {
         self.samples_processed += 1;
 
         // Route the task
@@ -124,7 +130,8 @@ impl FlowOptimizer {
 
         // Record feedback
         let agent_type = correct_agent.into();
-        self.router.record_feedback(task, embedding, agent_type, success);
+        self.router
+            .record_feedback(task, embedding, agent_type, success);
     }
 
     /// Train on batch of samples
@@ -169,7 +176,9 @@ impl FlowOptimizer {
         OptimizationResult {
             baseline_accuracy: baseline.routing_accuracy,
             optimized_accuracy: current_accuracy,
-            improvement_pct: ((current_accuracy - baseline.routing_accuracy) / baseline.routing_accuracy.max(0.01)) * 100.0,
+            improvement_pct: ((current_accuracy - baseline.routing_accuracy)
+                / baseline.routing_accuracy.max(0.01))
+                * 100.0,
             patterns_learned: sona_stats.patterns_learned,
             task_performance,
             memory_reduction_pct: memory_reduction,
@@ -187,7 +196,10 @@ impl FlowOptimizer {
         }
     }
 
-    fn generate_use_case_samples(&self, use_case: ClaudeFlowTask) -> Vec<(String, Vec<f32>, ClaudeFlowAgent, bool)> {
+    fn generate_use_case_samples(
+        &self,
+        use_case: ClaudeFlowTask,
+    ) -> Vec<(String, Vec<f32>, ClaudeFlowAgent, bool)> {
         let mut samples = Vec::new();
 
         let (tasks, agent) = match use_case {
@@ -260,7 +272,11 @@ impl FlowOptimizer {
     }
 
     /// Route a task to optimal agent
-    pub fn route_task(&mut self, description: &str, embedding: Option<&[f32]>) -> super::agent_router::RoutingDecision {
+    pub fn route_task(
+        &mut self,
+        description: &str,
+        embedding: Option<&[f32]>,
+    ) -> super::agent_router::RoutingDecision {
         self.router.route(description, embedding)
     }
 }
@@ -294,6 +310,9 @@ mod tests {
         let optimizer = FlowOptimizer::new(config);
 
         let result = optimizer.classify_task("implement a caching layer in Rust");
-        assert_eq!(result.task_type, super::super::task_classifier::TaskType::Code);
+        assert_eq!(
+            result.task_type,
+            super::super::task_classifier::TaskType::Code
+        );
     }
 }

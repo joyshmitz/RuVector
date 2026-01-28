@@ -75,26 +75,26 @@ pub use candle_backend::*;
 
 // Core ML backend for Apple Neural Engine (ANE) acceleration
 mod coreml_backend;
-pub use coreml_backend::{CoreMLBackend, ComputeUnits, AneCapabilities};
+pub use coreml_backend::{AneCapabilities, ComputeUnits, CoreMLBackend};
 
 // Hybrid GPU+ANE pipeline coordinator
 #[cfg(feature = "hybrid-ane")]
 mod hybrid_pipeline;
 #[cfg(feature = "hybrid-ane")]
 pub use hybrid_pipeline::{
-    HybridPipeline, HybridPipelineConfig, AneStrategy, OperationType,
-    AcceleratorType, AcceleratorMetrics, RoutingDecision, HybridTensor, DataFormat,
+    AcceleratorMetrics, AcceleratorType, AneStrategy, DataFormat, HybridPipeline,
+    HybridPipelineConfig, HybridTensor, OperationType, RoutingDecision,
 };
 
 // Model architecture implementations
-pub mod phi3;
 pub mod gemma2;
+pub mod phi3;
 
-pub use phi3::{Phi3Config, Phi3Model, Phi3Attention, Phi3MLP, Phi3DecoderLayer};
 pub use gemma2::{
-    Gemma2Config, Gemma2Model, Gemma2Attention, Gemma2MLP, Gemma2DecoderLayer,
-    logit_soft_cap, ATTENTION_SOFTCAP, FINAL_LOGIT_SOFTCAP,
+    logit_soft_cap, Gemma2Attention, Gemma2Config, Gemma2DecoderLayer, Gemma2MLP, Gemma2Model,
+    ATTENTION_SOFTCAP, FINAL_LOGIT_SOFTCAP,
 };
+pub use phi3::{Phi3Attention, Phi3Config, Phi3DecoderLayer, Phi3MLP, Phi3Model};
 
 // mistral-rs backend - always available, but full functionality requires the feature
 mod mistral_backend;
@@ -199,7 +199,10 @@ impl ModelArchitecture {
 
     /// Check if this architecture uses GQA (Grouped Query Attention)
     pub fn uses_gqa(&self) -> bool {
-        matches!(self, Self::Mistral | Self::Llama | Self::Gemma | Self::Gemma2 | Self::Qwen)
+        matches!(
+            self,
+            Self::Mistral | Self::Llama | Self::Gemma | Self::Gemma2 | Self::Qwen
+        )
     }
 
     /// Check if this architecture uses sliding window attention
@@ -359,7 +362,9 @@ impl Default for ModelConfig {
 }
 
 /// Device type for inference
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum DeviceType {
     /// CPU inference
     Cpu,
@@ -371,7 +376,9 @@ pub enum DeviceType {
 }
 
 /// Data type for tensor operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum DType {
     /// 32-bit floating point
     F32,

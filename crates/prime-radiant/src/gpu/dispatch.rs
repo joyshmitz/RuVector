@@ -152,9 +152,7 @@ impl GpuDispatcher {
         let mut encoder = self
             .device
             .device()
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some(label),
-            });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -210,9 +208,7 @@ impl GpuDispatcher {
         let mut encoder = self
             .device
             .device()
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some(label),
-            });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -261,14 +257,16 @@ impl GpuDispatcher {
         }
 
         let label = config.label.as_deref().unwrap_or("dispatch_chain");
-        debug!("Dispatching chain '{}' with {} kernels", label, dispatches.len());
+        debug!(
+            "Dispatching chain '{}' with {} kernels",
+            label,
+            dispatches.len()
+        );
 
         let mut encoder = self
             .device
             .device()
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some(label),
-            });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
 
         for (i, (pipeline, bind_group, workgroups)) in dispatches.iter().enumerate() {
             trace!(

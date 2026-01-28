@@ -7,7 +7,7 @@
 //! - `governance_tests`: Policy bundles and witness chain integrity
 //! - `gate_tests`: Compute ladder escalation and persistence detection
 
-mod graph_tests;
 mod coherence_tests;
-mod governance_tests;
 mod gate_tests;
+mod governance_tests;
+mod graph_tests;

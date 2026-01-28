@@ -192,9 +192,7 @@ impl<T: Clone> LWWRegister<T> {
 
     /// Set the value
     pub fn set(&mut self, value: T, timestamp: u64, replica: ReplicaId) {
-        if timestamp > self.timestamp
-            || (timestamp == self.timestamp && replica > self.replica)
-        {
+        if timestamp > self.timestamp || (timestamp == self.timestamp && replica > self.replica) {
             self.delta = Some((value.clone(), timestamp, replica.clone()));
             self.value = Some(value);
             self.timestamp = timestamp;
@@ -393,7 +391,10 @@ impl<T: Clone + Eq + Hash + Send + Sync> DeltaCrdt for ORSet<T> {
 
         // Merge elements
         for (element, other_tags) in &other.elements {
-            let tags = self.elements.entry(element.clone()).or_insert_with(HashSet::new);
+            let tags = self
+                .elements
+                .entry(element.clone())
+                .or_insert_with(HashSet::new);
             for tag in other_tags {
                 if !self.tombstones.contains(tag) {
                     tags.insert(tag.clone());

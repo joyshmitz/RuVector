@@ -1,13 +1,13 @@
 //! Gating subsystem benchmarks
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
 use ruvector_fpga_transformer::{
-    artifact::{ModelArtifact, Manifest},
+    artifact::{Manifest, ModelArtifact},
     backend::native_sim::NativeSimBackend,
     backend::TransformerBackend,
-    gating::{CoherenceGate, DefaultCoherenceGate, CoherenceConfig},
+    gating::{CoherenceConfig, CoherenceGate, DefaultCoherenceGate},
     types::{ComputeClass, FixedShape, GateDecision, GateHint, InferenceRequest, QuantSpec},
 };
 
@@ -70,13 +70,8 @@ fn bench_early_exit_histogram(c: &mut Criterion) {
                 let hint = GateHint::new(coherence, false, ComputeClass::Deliberative);
 
                 b.iter(|| {
-                    let req = InferenceRequest::new(
-                        model_id,
-                        shape,
-                        black_box(&tokens),
-                        &mask,
-                        hint,
-                    );
+                    let req =
+                        InferenceRequest::new(model_id, shape, black_box(&tokens), &mask, hint);
                     let result = backend.infer(req).unwrap();
                     result.witness.gate_decision
                 })
@@ -124,9 +119,18 @@ fn bench_mincut_gating(c: &mut Criterion) {
     let gate = MincutCoherenceGate::new(config, 50, 200);
 
     let hints = [
-        ("high_lambda", GateHint::new(500, false, ComputeClass::Deliberative)),
-        ("low_lambda", GateHint::new(100, false, ComputeClass::Deliberative)),
-        ("boundary_crossed", GateHint::new(300, true, ComputeClass::Deliberative)),
+        (
+            "high_lambda",
+            GateHint::new(500, false, ComputeClass::Deliberative),
+        ),
+        (
+            "low_lambda",
+            GateHint::new(100, false, ComputeClass::Deliberative),
+        ),
+        (
+            "boundary_crossed",
+            GateHint::new(300, true, ComputeClass::Deliberative),
+        ),
     ];
 
     let mut group = c.benchmark_group("mincut_gating");

@@ -60,9 +60,9 @@ pub struct ThresholdConfig {
 impl Default for ThresholdConfig {
     fn default() -> Self {
         Self {
-            reflex: 0.1,     // Low energy: proceed without checks
-            retrieval: 0.3,  // Medium energy: fetch evidence
-            heavy: 0.7,      // High energy: deep reasoning
+            reflex: 0.1,    // Low energy: proceed without checks
+            retrieval: 0.3, // Medium energy: fetch evidence
+            heavy: 0.7,     // High energy: deep reasoning
             persistence_window_secs: 5,
         }
     }

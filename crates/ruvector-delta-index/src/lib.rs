@@ -53,7 +53,7 @@ use ruvector_delta_core::{Delta, DeltaStream, VectorDelta};
 pub use error::{IndexError, Result};
 pub use incremental::IncrementalUpdater;
 pub use quality::{QualityMetrics, QualityMonitor, RecallEstimate};
-pub use repair::{RepairStrategy, RepairConfig, GraphRepairer};
+pub use repair::{GraphRepairer, RepairConfig, RepairStrategy};
 
 /// Configuration for Delta HNSW index
 #[derive(Debug, Clone)]
@@ -257,10 +257,7 @@ impl DeltaHnsw {
     }
 
     /// Batch apply deltas
-    pub fn apply_deltas_batch(
-        &mut self,
-        updates: &[(String, VectorDelta)],
-    ) -> Result<Vec<u32>> {
+    pub fn apply_deltas_batch(&mut self, updates: &[(String, VectorDelta)]) -> Result<Vec<u32>> {
         let mut repaired = Vec::new();
 
         for (id, delta) in updates {
@@ -423,7 +420,11 @@ impl DeltaHnsw {
         for l in (0..=level.min(entry.level)).rev() {
             let neighbors = self.search_layer(vector, current, l, self.config.ef_construction);
 
-            let max_conn = if l == 0 { self.config.m0 } else { self.config.m };
+            let max_conn = if l == 0 {
+                self.config.m0
+            } else {
+                self.config.m
+            };
 
             // Select best neighbors
             let selected: Vec<u32> = neighbors
@@ -491,13 +492,7 @@ impl DeltaHnsw {
         current
     }
 
-    fn search_layer(
-        &self,
-        query: &[f32],
-        start: u32,
-        level: usize,
-        ef: usize,
-    ) -> Vec<(u32, f32)> {
+    fn search_layer(&self, query: &[f32], start: u32, level: usize, ef: usize) -> Vec<(u32, f32)> {
         use std::cmp::Ordering;
         use std::collections::BinaryHeap;
         use std::collections::HashSet;
@@ -525,7 +520,10 @@ impl DeltaHnsw {
         impl Ord for Candidate {
             fn cmp(&self, other: &Self) -> Ordering {
                 // Min-heap by distance
-                other.dist.partial_cmp(&self.dist).unwrap_or(Ordering::Equal)
+                other
+                    .dist
+                    .partial_cmp(&self.dist)
+                    .unwrap_or(Ordering::Equal)
             }
         }
 
@@ -569,7 +567,10 @@ impl DeltaHnsw {
                 let should_add = results.len() < ef || dist < -results.peek().unwrap().dist;
 
                 if should_add {
-                    candidates.push(Candidate { idx: neighbor, dist });
+                    candidates.push(Candidate {
+                        idx: neighbor,
+                        dist,
+                    });
                     results.push(Candidate {
                         idx: neighbor,
                         dist: -dist,
@@ -582,10 +583,7 @@ impl DeltaHnsw {
             }
         }
 
-        results
-            .into_iter()
-            .map(|c| (c.idx, -c.dist))
-            .collect()
+        results.into_iter().map(|c| (c.idx, -c.dist)).collect()
     }
 
     fn distance(&self, query: &[f32], node_idx: u32) -> f32 {
@@ -672,7 +670,11 @@ impl DeltaHnsw {
         for l in (0..=level.min(entry.level)).rev() {
             let neighbors = self.search_layer(vector, current, l, self.config.ef_construction);
 
-            let max_conn = if l == 0 { self.config.m0 } else { self.config.m };
+            let max_conn = if l == 0 {
+                self.config.m0
+            } else {
+                self.config.m
+            };
 
             // Filter out self
             let selected: Vec<u32> = neighbors

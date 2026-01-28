@@ -344,8 +344,9 @@ impl SinkhornSolver {
                         for i in 0..n {
                             let weight = plan.plan[i][j] * support_size as f64;
                             for d in 0..dim {
-                                displacements[j][d] +=
-                                    barycenter_weights[dist_idx] * weight * (distribution[i][d] - barycenter[j][d]);
+                                displacements[j][d] += barycenter_weights[dist_idx]
+                                    * weight
+                                    * (distribution[i][d] - barycenter[j][d]);
                             }
                         }
                     }

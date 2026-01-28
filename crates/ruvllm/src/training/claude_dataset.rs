@@ -29,14 +29,14 @@
 //! dataset.export_parquet("training_data.parquet")?;
 //! ```
 
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
 
 /// Task categories matching Claude Flow agents
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -245,21 +245,18 @@ impl ClaudeTaskDataset {
 
         for example in examples {
             // Count by category
-            *stats.examples_per_category
+            *stats
+                .examples_per_category
                 .entry(example.metadata.category.name().to_string())
                 .or_insert(0) += 1;
 
             // Count by complexity
             let complexity = format!("{:?}", example.metadata.complexity);
-            *stats.examples_per_complexity
-                .entry(complexity)
-                .or_insert(0) += 1;
+            *stats.examples_per_complexity.entry(complexity).or_insert(0) += 1;
 
             // Count by domain
             let domain = format!("{:?}", example.metadata.domain);
-            *stats.examples_per_domain
-                .entry(domain)
-                .or_insert(0) += 1;
+            *stats.examples_per_domain.entry(domain).or_insert(0) += 1;
 
             total_quality += example.metadata.quality_score;
         }
@@ -300,8 +297,21 @@ impl ClaudeTaskDataset {
     }
 
     /// Split dataset into train/validation/test sets
-    pub fn split(&self, train: f32, val: f32, test: f32, seed: u64) -> (Vec<ClaudeTaskExample>, Vec<ClaudeTaskExample>, Vec<ClaudeTaskExample>) {
-        assert!((train + val + test - 1.0).abs() < 1e-6, "Split ratios must sum to 1.0");
+    pub fn split(
+        &self,
+        train: f32,
+        val: f32,
+        test: f32,
+        seed: u64,
+    ) -> (
+        Vec<ClaudeTaskExample>,
+        Vec<ClaudeTaskExample>,
+        Vec<ClaudeTaskExample>,
+    ) {
+        assert!(
+            (train + val + test - 1.0).abs() < 1e-6,
+            "Split ratios must sum to 1.0"
+        );
 
         let mut rng = StdRng::seed_from_u64(seed);
         let mut examples = self.examples.clone();
@@ -620,7 +630,8 @@ impl DatasetGenerator {
             // Cryptography templates
             TaskTemplate {
                 input: "Review cryptographic implementation of {feature}",
-                context: "Algorithm: {algorithm}. Key management: {key_mgmt}. Standards: {standards}",
+                context:
+                    "Algorithm: {algorithm}. Key management: {key_mgmt}. Standards: {standards}",
                 complexity: ComplexityLevel::Complex,
                 domain: DomainType::Security,
                 tags: vec!["security", "cryptography"],
@@ -829,7 +840,11 @@ impl DatasetGenerator {
     }
 
     /// Instantiate a template with random values
-    fn instantiate_template(&mut self, template: &TaskTemplate, category: TaskCategory) -> ClaudeTaskExample {
+    fn instantiate_template(
+        &mut self,
+        template: &TaskTemplate,
+        category: TaskCategory,
+    ) -> ClaudeTaskExample {
         let input = self.fill_template(&template.input);
         let context = self.fill_template(&template.context);
         let expected_model = category.recommended_model(template.complexity);
@@ -867,21 +882,97 @@ impl DatasetGenerator {
     fn get_template_replacements(&self) -> HashMap<&'static str, Vec<&'static str>> {
         let mut map = HashMap::new();
 
-        map.insert("language", vec!["Rust", "TypeScript", "Python", "Go", "Java"]);
-        map.insert("framework", vec!["React", "Vue", "Angular", "Svelte", "Next.js"]);
-        map.insert("function_type", vec!["async", "recursive", "higher-order", "pure", "generic"]);
-        map.insert("component_type", vec!["form", "table", "modal", "dashboard", "navigation"]);
-        map.insert("data_structure", vec!["binary tree", "hash map", "linked list", "priority queue", "trie"]);
-        map.insert("issue_type", vec!["null pointer", "type mismatch", "race condition", "deadlock", "stack overflow"]);
-        map.insert("quality_attribute", vec!["readability", "maintainability", "performance", "testability", "modularity"]);
-        map.insert("pattern", vec!["singleton", "factory", "observer", "strategy", "repository"]);
-        map.insert("api_name", vec!["Stripe", "Twilio", "SendGrid", "AWS S3", "OpenAI"]);
+        map.insert(
+            "language",
+            vec!["Rust", "TypeScript", "Python", "Go", "Java"],
+        );
+        map.insert(
+            "framework",
+            vec!["React", "Vue", "Angular", "Svelte", "Next.js"],
+        );
+        map.insert(
+            "function_type",
+            vec!["async", "recursive", "higher-order", "pure", "generic"],
+        );
+        map.insert(
+            "component_type",
+            vec!["form", "table", "modal", "dashboard", "navigation"],
+        );
+        map.insert(
+            "data_structure",
+            vec![
+                "binary tree",
+                "hash map",
+                "linked list",
+                "priority queue",
+                "trie",
+            ],
+        );
+        map.insert(
+            "issue_type",
+            vec![
+                "null pointer",
+                "type mismatch",
+                "race condition",
+                "deadlock",
+                "stack overflow",
+            ],
+        );
+        map.insert(
+            "quality_attribute",
+            vec![
+                "readability",
+                "maintainability",
+                "performance",
+                "testability",
+                "modularity",
+            ],
+        );
+        map.insert(
+            "pattern",
+            vec!["singleton", "factory", "observer", "strategy", "repository"],
+        );
+        map.insert(
+            "api_name",
+            vec!["Stripe", "Twilio", "SendGrid", "AWS S3", "OpenAI"],
+        );
         map.insert("http_method", vec!["GET", "POST", "PUT", "DELETE", "PATCH"]);
-        map.insert("vulnerability_type", vec!["SQL injection", "XSS", "CSRF", "authentication", "authorization"]);
-        map.insert("attack_type", vec!["DDoS", "man-in-the-middle", "replay", "privilege escalation"]);
-        map.insert("security_control", vec!["rate limiting", "CORS", "CSP", "input sanitization"]);
-        map.insert("system_type", vec!["distributed", "event-driven", "real-time", "batch processing"]);
-        map.insert("resource_type", vec!["users", "products", "orders", "payments", "inventory"]);
+        map.insert(
+            "vulnerability_type",
+            vec![
+                "SQL injection",
+                "XSS",
+                "CSRF",
+                "authentication",
+                "authorization",
+            ],
+        );
+        map.insert(
+            "attack_type",
+            vec![
+                "DDoS",
+                "man-in-the-middle",
+                "replay",
+                "privilege escalation",
+            ],
+        );
+        map.insert(
+            "security_control",
+            vec!["rate limiting", "CORS", "CSP", "input sanitization"],
+        );
+        map.insert(
+            "system_type",
+            vec![
+                "distributed",
+                "event-driven",
+                "real-time",
+                "batch processing",
+            ],
+        );
+        map.insert(
+            "resource_type",
+            vec!["users", "products", "orders", "payments", "inventory"],
+        );
 
         map
     }
@@ -925,7 +1016,10 @@ impl DatasetGenerator {
             ("design", vec!["architect", "plan", "structure", "outline"]),
             ("fix", vec!["resolve", "correct", "repair", "patch"]),
             ("optimize", vec!["improve", "enhance", "refine", "tune"]),
-        ].iter().cloned().collect();
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         let mut paraphrased_input = example.input.clone();
         for (original, alternatives) in &paraphrase_map {
@@ -1047,7 +1141,9 @@ mod tests {
 
         // Check category distribution
         for category in TaskCategory::all() {
-            let count = dataset.stats.examples_per_category
+            let count = dataset
+                .stats
+                .examples_per_category
                 .get(category.name())
                 .unwrap_or(&0);
             assert_eq!(*count, 10);

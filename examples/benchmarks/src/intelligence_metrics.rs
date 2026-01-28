@@ -77,7 +77,12 @@ impl CapabilityScores {
         if total_weight == 0.0 {
             return 0.0;
         }
-        scores.iter().zip(weights.iter()).map(|(s, w)| s * w).sum::<f64>() / total_weight
+        scores
+            .iter()
+            .zip(weights.iter())
+            .map(|(s, w)| s * w)
+            .sum::<f64>()
+            / total_weight
     }
 }
 
@@ -432,11 +437,8 @@ impl IntelligenceCalculator {
         }
 
         // Sample efficiency: accuracy per episode
-        learning.sample_efficiency = raw.episodes
-            .iter()
-            .map(|e| e.accuracy)
-            .sum::<f64>()
-            / raw.episodes.len() as f64;
+        learning.sample_efficiency =
+            raw.episodes.iter().map(|e| e.accuracy).sum::<f64>() / raw.episodes.len() as f64;
 
         // Regret sublinearity: check if cumulative regret grows sublinearly
         // True sublinearity means R_k/k → 0 as k → ∞ (regret per episode decreasing)
@@ -469,14 +471,18 @@ impl IntelligenceCalculator {
             // Also check cumulative average
             let last = raw.episodes.last().unwrap();
             let avg_regret = last.cumulative_regret / n;
-            let first_half_avg = raw.episodes.iter()
+            let first_half_avg = raw
+                .episodes
+                .iter()
                 .take(raw.episodes.len() / 2)
                 .map(|e| e.regret)
-                .sum::<f64>() / (n / 2.0);
+                .sum::<f64>()
+                / (n / 2.0);
 
             // If second half has lower per-episode regret, that's sublinear
             if avg_regret < first_half_avg && learning.regret_sublinearity == 0.0 {
-                learning.regret_sublinearity = ((first_half_avg - avg_regret) / first_half_avg).max(0.0);
+                learning.regret_sublinearity =
+                    ((first_half_avg - avg_regret) / first_half_avg).max(0.0);
             }
         }
 
@@ -489,16 +495,17 @@ impl IntelligenceCalculator {
 
         // Generalization: consistency across difficulties
         if raw.by_difficulty.len() >= 2 {
-            let accuracies: Vec<f64> = raw.by_difficulty.values()
+            let accuracies: Vec<f64> = raw
+                .by_difficulty
+                .values()
                 .filter(|s| s.attempted > 0)
                 .map(|s| s.correct as f64 / s.attempted as f64)
                 .collect();
 
             if !accuracies.is_empty() {
                 let mean = accuracies.iter().sum::<f64>() / accuracies.len() as f64;
-                let variance = accuracies.iter()
-                    .map(|a| (a - mean).powi(2))
-                    .sum::<f64>() / accuracies.len() as f64;
+                let variance = accuracies.iter().map(|a| (a - mean).powi(2)).sum::<f64>()
+                    / accuracies.len() as f64;
                 let std_dev = variance.sqrt();
 
                 // Lower variance = better generalization
@@ -537,7 +544,7 @@ impl IntelligenceCalculator {
             selection_appropriateness,
             utilization_effectiveness,
             composition_ability: avg_tools.min(1.0), // Using multiple tools
-            discovery_ability: accuracy, // Finding solutions
+            discovery_ability: accuracy,             // Finding solutions
         }
     }
 
@@ -554,8 +561,16 @@ impl IntelligenceCalculator {
 
         // Strategy adaptation: improvement over episodes
         let strategy_adaptation = if raw.episodes.len() >= 3 {
-            let trend: f64 = raw.episodes.windows(2)
-                .map(|w| if w[1].accuracy > w[0].accuracy { 1.0 } else { 0.0 })
+            let trend: f64 = raw
+                .episodes
+                .windows(2)
+                .map(|w| {
+                    if w[1].accuracy > w[0].accuracy {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                })
                 .sum::<f64>();
             trend / (raw.episodes.len() - 1) as f64
         } else {
@@ -609,8 +624,11 @@ impl IntelligenceCalculator {
             * 100.0;
 
         // Weighted average
-        (cap_score * 0.3 + reasoning_score * 0.25 + learning_score * 0.2
-            + tool_score * 0.15 + meta_score * 0.1)
+        (cap_score * 0.3
+            + reasoning_score * 0.25
+            + learning_score * 0.2
+            + tool_score * 0.15
+            + meta_score * 0.1)
     }
 }
 
@@ -620,43 +638,109 @@ pub fn print_intelligence_report(assessment: &IntelligenceAssessment) {
     println!("║              Intelligence Assessment Report                   ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!("🧠 Overall Intelligence Score: {:.1}/100", assessment.overall_score);
+    println!(
+        "🧠 Overall Intelligence Score: {:.1}/100",
+        assessment.overall_score
+    );
     println!();
 
     println!("📊 Capability Scores:");
-    println!("   Temporal Reasoning:     {:5.1}", assessment.capabilities.temporal_reasoning);
-    println!("   Constraint Satisfaction:{:5.1}", assessment.capabilities.constraint_satisfaction);
-    println!("   Information Retrieval:  {:5.1}", assessment.capabilities.information_retrieval);
-    println!("   Pattern Recognition:    {:5.1}", assessment.capabilities.pattern_recognition);
-    println!("   Planning:               {:5.1}", assessment.capabilities.planning);
-    println!("   Adaptation:             {:5.1}", assessment.capabilities.adaptation);
+    println!(
+        "   Temporal Reasoning:     {:5.1}",
+        assessment.capabilities.temporal_reasoning
+    );
+    println!(
+        "   Constraint Satisfaction:{:5.1}",
+        assessment.capabilities.constraint_satisfaction
+    );
+    println!(
+        "   Information Retrieval:  {:5.1}",
+        assessment.capabilities.information_retrieval
+    );
+    println!(
+        "   Pattern Recognition:    {:5.1}",
+        assessment.capabilities.pattern_recognition
+    );
+    println!(
+        "   Planning:               {:5.1}",
+        assessment.capabilities.planning
+    );
+    println!(
+        "   Adaptation:             {:5.1}",
+        assessment.capabilities.adaptation
+    );
     println!();
 
     println!("🔍 Reasoning Quality:");
-    println!("   Logical Coherence:      {:.2}", assessment.reasoning.logical_coherence);
-    println!("   Constraint Satisfaction:{:.2}", assessment.reasoning.constraint_satisfaction_rate);
-    println!("   Solution Optimality:    {:.2}", assessment.reasoning.solution_optimality);
-    println!("   Reasoning Efficiency:   {:.2}", assessment.reasoning.reasoning_efficiency);
-    println!("   Error Rate:             {:.2}", assessment.reasoning.error_rate);
+    println!(
+        "   Logical Coherence:      {:.2}",
+        assessment.reasoning.logical_coherence
+    );
+    println!(
+        "   Constraint Satisfaction:{:.2}",
+        assessment.reasoning.constraint_satisfaction_rate
+    );
+    println!(
+        "   Solution Optimality:    {:.2}",
+        assessment.reasoning.solution_optimality
+    );
+    println!(
+        "   Reasoning Efficiency:   {:.2}",
+        assessment.reasoning.reasoning_efficiency
+    );
+    println!(
+        "   Error Rate:             {:.2}",
+        assessment.reasoning.error_rate
+    );
     println!();
 
     println!("📈 Learning Metrics:");
-    println!("   Sample Efficiency:      {:.2}", assessment.learning.sample_efficiency);
-    println!("   Regret Sublinearity:    {:.2}", assessment.learning.regret_sublinearity);
-    println!("   Learning Rate:          {:.2}", assessment.learning.learning_rate);
-    println!("   Generalization:         {:.2}", assessment.learning.generalization);
+    println!(
+        "   Sample Efficiency:      {:.2}",
+        assessment.learning.sample_efficiency
+    );
+    println!(
+        "   Regret Sublinearity:    {:.2}",
+        assessment.learning.regret_sublinearity
+    );
+    println!(
+        "   Learning Rate:          {:.2}",
+        assessment.learning.learning_rate
+    );
+    println!(
+        "   Generalization:         {:.2}",
+        assessment.learning.generalization
+    );
     println!();
 
     println!("🔧 Tool Use Proficiency:");
-    println!("   Selection:              {:.2}", assessment.tool_use.selection_appropriateness);
-    println!("   Effectiveness:          {:.2}", assessment.tool_use.utilization_effectiveness);
-    println!("   Composition:            {:.2}", assessment.tool_use.composition_ability);
+    println!(
+        "   Selection:              {:.2}",
+        assessment.tool_use.selection_appropriateness
+    );
+    println!(
+        "   Effectiveness:          {:.2}",
+        assessment.tool_use.utilization_effectiveness
+    );
+    println!(
+        "   Composition:            {:.2}",
+        assessment.tool_use.composition_ability
+    );
     println!();
 
     println!("🪞 Meta-Cognitive Indicators:");
-    println!("   Self-Correction:        {:.2}", assessment.meta_cognition.self_correction_rate);
-    println!("   Strategy Adaptation:    {:.2}", assessment.meta_cognition.strategy_adaptation);
-    println!("   Progress Monitoring:    {:.2}", assessment.meta_cognition.progress_monitoring);
+    println!(
+        "   Self-Correction:        {:.2}",
+        assessment.meta_cognition.self_correction_rate
+    );
+    println!(
+        "   Strategy Adaptation:    {:.2}",
+        assessment.meta_cognition.strategy_adaptation
+    );
+    println!(
+        "   Progress Monitoring:    {:.2}",
+        assessment.meta_cognition.progress_monitoring
+    );
 }
 
 #[cfg(test)]

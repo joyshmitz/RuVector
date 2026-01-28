@@ -89,7 +89,8 @@ impl TangentSpaceMapper {
             return vec![0.0f32; point.len()];
         }
 
-        let scale = (2.0 / self.lambda_origin) * (sqrt_c * diff_norm).atanh() / (sqrt_c * diff_norm);
+        let scale =
+            (2.0 / self.lambda_origin) * (sqrt_c * diff_norm).atanh() / (sqrt_c * diff_norm);
 
         diff.iter().map(|&d| scale * d).collect()
     }
@@ -150,7 +151,11 @@ impl TangentSpaceMapper {
     }
 
     /// Compute similarities in tangent space (all pairwise with query)
-    pub fn batch_tangent_similarity(&self, query_tangent: &[f32], keys_tangent: &[&[f32]]) -> Vec<f32> {
+    pub fn batch_tangent_similarity(
+        &self,
+        query_tangent: &[f32],
+        keys_tangent: &[&[f32]],
+    ) -> Vec<f32> {
         keys_tangent
             .iter()
             .map(|k| Self::dot_product_simd(query_tangent, k))
@@ -232,9 +237,7 @@ mod tests {
         let config = TangentSpaceConfig::default();
         let mapper = TangentSpaceMapper::new(config);
 
-        let points: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32 * 0.05; 32])
-            .collect();
+        let points: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32 * 0.05; 32]).collect();
         let points_refs: Vec<&[f32]> = points.iter().map(|p| p.as_slice()).collect();
 
         let tangents = mapper.batch_log_map(&points_refs);

@@ -4,8 +4,7 @@ use super::adjustment::{AdjustmentReason, ThresholdAdjustment};
 use super::config::{ThresholdConfig, TunerConfig};
 use super::error::{SonaTuningError, SonaTuningResult};
 use ruvector_sona::{
-    EwcConfig, EwcPlusPlus, PatternConfig, ReasoningBank, SonaConfig, SonaEngine,
-    TrajectoryBuilder,
+    EwcConfig, EwcPlusPlus, PatternConfig, ReasoningBank, SonaConfig, SonaEngine, TrajectoryBuilder,
 };
 use std::collections::VecDeque;
 
@@ -88,8 +87,8 @@ impl RegimeTracker {
 
         let half = self.energy_history.len() / 2;
         let first_half_avg: f32 = self.energy_history.iter().take(half).sum::<f32>() / half as f32;
-        let second_half_avg: f32 =
-            self.energy_history.iter().skip(half).sum::<f32>() / (self.energy_history.len() - half) as f32;
+        let second_half_avg: f32 = self.energy_history.iter().skip(half).sum::<f32>()
+            / (self.energy_history.len() - half) as f32;
 
         second_half_avg - first_half_avg
     }
@@ -207,7 +206,11 @@ impl SonaThresholdTuner {
 
         // Convert energy trace to embedding
         let mut embedding = vec![0.0; self.config.embedding_dim];
-        for (i, &e) in energy_trace.iter().take(self.config.embedding_dim).enumerate() {
+        for (i, &e) in energy_trace
+            .iter()
+            .take(self.config.embedding_dim)
+            .enumerate()
+        {
             embedding[i] = e;
         }
 
@@ -216,10 +219,8 @@ impl SonaThresholdTuner {
 
         // Start regime tracking
         let regime_id = format!("regime_{}", current_time_ms());
-        self.regime_tracker.start_regime(
-            &regime_id,
-            energy_trace.last().copied().unwrap_or(0.0),
-        );
+        self.regime_tracker
+            .start_regime(&regime_id, energy_trace.last().copied().unwrap_or(0.0));
 
         self.state = TunerState::TrackingRegime;
 
@@ -317,7 +318,11 @@ impl SonaThresholdTuner {
     pub fn find_similar_regime(&self, current_energy: &[f32]) -> Option<ThresholdConfig> {
         // Convert current energy to query embedding
         let mut query = vec![0.0; self.config.embedding_dim];
-        for (i, &e) in current_energy.iter().take(self.config.embedding_dim).enumerate() {
+        for (i, &e) in current_energy
+            .iter()
+            .take(self.config.embedding_dim)
+            .enumerate()
+        {
             query[i] = e;
         }
 

@@ -960,8 +960,7 @@ impl HybridRouter {
         };
 
         // If HNSW has high confidence, prefer it
-        if hnsw_result.confidence > self.min_hnsw_confidence
-            && hnsw_result.patterns_considered >= 3
+        if hnsw_result.confidence > self.min_hnsw_confidence && hnsw_result.patterns_considered >= 3
         {
             return Ok(hnsw_result.into());
         }
@@ -1083,12 +1082,8 @@ mod tests {
                 ClaudeFlowTask::Testing
             };
 
-            let mut pattern = TaskPattern::new(
-                embedding,
-                agent_type,
-                task_type,
-                format!("task {}", i),
-            );
+            let mut pattern =
+                TaskPattern::new(embedding, agent_type, task_type, format!("task {}", i));
             pattern.usage_count = 10;
             pattern.success_count = 8;
             pattern.success_rate = 0.8;
@@ -1159,7 +1154,10 @@ mod tests {
 
         let stats = router.stats();
         assert_eq!(stats.total_patterns, 1);
-        assert_eq!(*stats.patterns_by_agent.get(&AgentType::Researcher).unwrap(), 1);
+        assert_eq!(
+            *stats.patterns_by_agent.get(&AgentType::Researcher).unwrap(),
+            1
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use exo_hypergraph::{HypergraphSubstrate, HypergraphConfig};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use exo_core::{EntityId, Relation, RelationType};
+use exo_hypergraph::{HypergraphConfig, HypergraphSubstrate};
 
 fn create_test_hypergraph() -> HypergraphSubstrate {
     let config = HypergraphConfig::default();
@@ -31,10 +31,7 @@ fn benchmark_hyperedge_creation(c: &mut Criterion) {
             edge_size,
             |b, &size| {
                 b.iter(|| {
-                    let entity_set: Vec<EntityId> = entities.iter()
-                        .take(size)
-                        .copied()
-                        .collect();
+                    let entity_set: Vec<EntityId> = entities.iter().take(size).copied().collect();
                     graph.create_hyperedge(black_box(&entity_set), black_box(&relation))
                 });
             },
@@ -65,24 +62,15 @@ fn benchmark_query_performance(c: &mut Criterion) {
         };
 
         for _ in 0..*num_edges {
-            let entity_set: Vec<EntityId> = entities.iter()
-                .take(5)
-                .copied()
-                .collect();
+            let entity_set: Vec<EntityId> = entities.iter().take(5).copied().collect();
             graph.create_hyperedge(&entity_set, &relation).unwrap();
         }
 
         let query_entity = entities[0];
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(num_edges),
-            num_edges,
-            |b, _| {
-                b.iter(|| {
-                    graph.hyperedges_for_entity(black_box(&query_entity))
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(num_edges), num_edges, |b, _| {
+            b.iter(|| graph.hyperedges_for_entity(black_box(&query_entity)));
+        });
     }
 
     group.finish();
@@ -105,17 +93,12 @@ fn benchmark_betti_numbers(c: &mut Criterion) {
     };
 
     for _ in 0..500 {
-        let entity_set: Vec<EntityId> = entities.iter()
-            .take(5)
-            .copied()
-            .collect();
+        let entity_set: Vec<EntityId> = entities.iter().take(5).copied().collect();
         graph.create_hyperedge(&entity_set, &relation).unwrap();
     }
 
     c.bench_function("hypergraph_betti_numbers", |b| {
-        b.iter(|| {
-            graph.betti_numbers(black_box(3))
-        });
+        b.iter(|| graph.betti_numbers(black_box(3)));
     });
 }
 

@@ -261,9 +261,7 @@ impl<'a> DeltaAwareTraversal<'a> {
             }
 
             // Filter by edge type
-            if !self.config.edge_types.is_empty()
-                && !self.config.edge_types.contains(edge_type)
-            {
+            if !self.config.edge_types.is_empty() && !self.config.edge_types.contains(edge_type) {
                 continue;
             }
 

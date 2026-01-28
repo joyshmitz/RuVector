@@ -9,21 +9,20 @@
 //! - Consciousness metrics (IIT)
 //! - Thermodynamic tracking
 
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 // EXO-AI crates
-use exo_core::{Pattern, PatternId, Metadata, SubstrateTime};
-use exo_core::consciousness::{ConsciousnessCalculator, SubstrateRegion, NodeState};
-use exo_core::thermodynamics::{ThermodynamicTracker, Operation};
+use exo_core::consciousness::{ConsciousnessCalculator, NodeState, SubstrateRegion};
+use exo_core::thermodynamics::{Operation, ThermodynamicTracker};
+use exo_core::{Metadata, Pattern, PatternId, SubstrateTime};
 use exo_temporal::{
-    TemporalMemory, TemporalConfig, Query,
-    ConsolidationConfig,
-    anticipation::{SequentialPatternTracker, PrefetchCache},
-    causal::{CausalGraph, CausalConeType},
+    anticipation::{PrefetchCache, SequentialPatternTracker},
+    causal::{CausalConeType, CausalGraph},
     consolidation::compute_salience,
     long_term::LongTermStore,
     types::TemporalPattern,
+    ConsolidationConfig, Query, TemporalConfig, TemporalMemory,
 };
 
 const VECTOR_DIM: usize = 384;
@@ -82,8 +81,10 @@ impl BenchmarkResult {
     }
 
     fn print(&self) {
-        println!("  {}: {:?} total, {:?}/op, {:.0} ops/sec",
-            self.name, self.total_time, self.per_op, self.ops_per_sec);
+        println!(
+            "  {}: {:?} total, {:?}/op, {:.0} ops/sec",
+            self.name, self.total_time, self.per_op, self.ops_per_sec
+        );
     }
 }
 
@@ -129,18 +130,31 @@ fn benchmark_sequential_pattern_learning() {
     let p3 = patterns[2];
 
     // Train: p1 -> p2 (10 times), p1 -> p3 (3 times)
-    for _ in 0..10 { tracker.record_sequence(p1, p2); }
-    for _ in 0..3 { tracker.record_sequence(p1, p3); }
+    for _ in 0..10 {
+        tracker.record_sequence(p1, p2);
+    }
+    for _ in 0..3 {
+        tracker.record_sequence(p1, p3);
+    }
 
     let predictions = tracker.predict_next(p1, 2);
     println!("\n  Learning Accuracy Test:");
     println!("    Pattern p1 -> p2 trained 10x, p1 -> p3 trained 3x");
-    println!("    Top prediction correct: {}", predictions.first() == Some(&p2));
+    println!(
+        "    Top prediction correct: {}",
+        predictions.first() == Some(&p2)
+    );
     println!("    Prediction count: {}", predictions.len());
 
     println!("\n  Summary:");
-    println!("    Record throughput: {:.0} sequences/sec", record_result.ops_per_sec);
-    println!("    Predict throughput: {:.0} predictions/sec", predict_result.ops_per_sec);
+    println!(
+        "    Record throughput: {:.0} sequences/sec",
+        record_result.ops_per_sec
+    );
+    println!(
+        "    Predict throughput: {:.0} predictions/sec",
+        predict_result.ops_per_sec
+    );
 }
 
 // ============================================================================
@@ -231,8 +245,14 @@ fn benchmark_causal_graph_operations() {
 
     println!("\n  Summary:");
     println!("    Edge insertion: {:.0} ops/sec", edge_result.ops_per_sec);
-    println!("    Path finding: {:.0} ops/sec", distance_result.ops_per_sec);
-    println!("    Transitive closure: {:.0} ops/sec", past_result.ops_per_sec);
+    println!(
+        "    Path finding: {:.0} ops/sec",
+        distance_result.ops_per_sec
+    );
+    println!(
+        "    Transitive closure: {:.0} ops/sec",
+        past_result.ops_per_sec
+    );
 }
 
 // ============================================================================
@@ -284,12 +304,20 @@ fn benchmark_salience_computation() {
     salience_result.print();
 
     println!("\n  Salience Distribution:");
-    println!("    Average salience: {:.4}", total_salience / iterations as f32);
-    println!("    Weights: freq={:.1}, recency={:.1}, causal={:.1}, surprise={:.1}",
-        config.w_frequency, config.w_recency, config.w_causal, config.w_surprise);
+    println!(
+        "    Average salience: {:.4}",
+        total_salience / iterations as f32
+    );
+    println!(
+        "    Weights: freq={:.1}, recency={:.1}, causal={:.1}, surprise={:.1}",
+        config.w_frequency, config.w_recency, config.w_causal, config.w_surprise
+    );
 
     println!("\n  Summary:");
-    println!("    Salience computation: {:.0} ops/sec", salience_result.ops_per_sec);
+    println!(
+        "    Salience computation: {:.0} ops/sec",
+        salience_result.ops_per_sec
+    );
     println!("    Per pattern overhead: {:?}", salience_result.per_op);
 }
 
@@ -350,7 +378,10 @@ fn benchmark_anticipation_prediction() {
     let lookup_result = BenchmarkResult::new("Cache lookup", iterations, start.elapsed());
     lookup_result.print();
 
-    println!("    Cache hit rate: {:.1}%", (hits as f64 / iterations as f64) * 100.0);
+    println!(
+        "    Cache hit rate: {:.1}%",
+        (hits as f64 / iterations as f64) * 100.0
+    );
 
     // Benchmark: Sequential anticipation
     let seq_tracker = SequentialPatternTracker::new();
@@ -370,12 +401,19 @@ fn benchmark_anticipation_prediction() {
             // Would normally fetch from long-term
         }
     }
-    let anticipate_result = BenchmarkResult::new("Anticipate + predict", iterations, start.elapsed());
+    let anticipate_result =
+        BenchmarkResult::new("Anticipate + predict", iterations, start.elapsed());
     anticipate_result.print();
 
     println!("\n  Summary:");
-    println!("    Cache throughput: {:.0} ops/sec", lookup_result.ops_per_sec);
-    println!("    Anticipation throughput: {:.0} ops/sec", anticipate_result.ops_per_sec);
+    println!(
+        "    Cache throughput: {:.0} ops/sec",
+        lookup_result.ops_per_sec
+    );
+    println!(
+        "    Anticipation throughput: {:.0} ops/sec",
+        anticipate_result.ops_per_sec
+    );
 }
 
 // ============================================================================
@@ -412,11 +450,15 @@ fn benchmark_memory_consolidation() {
         let consolidate_time = start.elapsed();
 
         println!("  Batch size {}: {:?}", batch_size, consolidate_time);
-        println!("    Consolidated: {}, Forgotten: {}",
-            result.num_consolidated, result.num_forgotten);
+        println!(
+            "    Consolidated: {}, Forgotten: {}",
+            result.num_consolidated, result.num_forgotten
+        );
         println!("    Per pattern: {:?}", consolidate_time / batch_size);
-        println!("    Throughput: {:.0} patterns/sec",
-            batch_size as f64 / consolidate_time.as_secs_f64());
+        println!(
+            "    Throughput: {:.0} patterns/sec",
+            batch_size as f64 / consolidate_time.as_secs_f64()
+        );
     }
 
     // Benchmark strategic forgetting
@@ -476,10 +518,13 @@ fn benchmark_consciousness_metrics() {
 
         let mut states = HashMap::new();
         for &node in &nodes {
-            states.insert(node, NodeState {
-                activation: (node as f64 * 0.1).sin().abs(),
-                previous_activation: (node as f64 * 0.1 - 0.1).sin().abs(),
-            });
+            states.insert(
+                node,
+                NodeState {
+                    activation: (node as f64 * 0.1).sin().abs(),
+                    previous_activation: (node as f64 * 0.1 - 0.1).sin().abs(),
+                },
+            );
         }
 
         let region = SubstrateRegion {
@@ -506,8 +551,10 @@ fn benchmark_consciousness_metrics() {
             println!("  {} nodes, {} perturbations:", num_nodes, perturbations);
             println!("    Time per Φ: {:?}", phi_time / iterations);
             println!("    Average Φ: {:.4}", total_phi / iterations as f64);
-            println!("    Throughput: {:.0} calcs/sec",
-                iterations as f64 / phi_time.as_secs_f64());
+            println!(
+                "    Throughput: {:.0} calcs/sec",
+                iterations as f64 / phi_time.as_secs_f64()
+            );
         }
         println!();
     }
@@ -530,7 +577,13 @@ fn benchmark_consciousness_metrics() {
         states: {
             let mut s = HashMap::new();
             for i in 1..=5 {
-                s.insert(i, NodeState { activation: 0.5, previous_activation: 0.4 });
+                s.insert(
+                    i,
+                    NodeState {
+                        activation: 0.5,
+                        previous_activation: 0.4,
+                    },
+                );
             }
             s
         },
@@ -553,7 +606,13 @@ fn benchmark_consciousness_metrics() {
         states: {
             let mut s = HashMap::new();
             for i in 1..=5 {
-                s.insert(i, NodeState { activation: 0.5, previous_activation: 0.4 });
+                s.insert(
+                    i,
+                    NodeState {
+                        activation: 0.5,
+                        previous_activation: 0.4,
+                    },
+                );
             }
             s
         },
@@ -565,8 +624,14 @@ fn benchmark_consciousness_metrics() {
     let ff_result = calculator.compute_phi(&ff_region);
     let re_result = calculator.compute_phi(&re_region);
 
-    println!("    Feed-forward Φ: {:.4} (level: {:?})", ff_result.phi, ff_result.consciousness_level);
-    println!("    Reentrant Φ: {:.4} (level: {:?})", re_result.phi, re_result.consciousness_level);
+    println!(
+        "    Feed-forward Φ: {:.4} (level: {:?})",
+        ff_result.phi, ff_result.consciousness_level
+    );
+    println!(
+        "    Reentrant Φ: {:.4} (level: {:?})",
+        re_result.phi, re_result.consciousness_level
+    );
 
     println!("\n  Summary:");
     println!("    IIT Φ computation scales with O(n²) in nodes");
@@ -612,25 +677,47 @@ fn benchmark_thermodynamic_tracking() {
 
     let report = tracker.efficiency_report();
     println!("\n  Efficiency Report:");
-    println!("    Total bit erasures: {:.2e}", report.total_bit_erasures as f64);
-    println!("    Landauer minimum: {:.2e} J", report.landauer_minimum_joules);
-    println!("    Estimated actual: {:.2e} J", report.estimated_actual_joules);
-    println!("    Efficiency ratio: {:.0}x above Landauer limit", report.efficiency_ratio);
-    println!("    Reversible savings potential: {:.2e} J", report.reversible_savings_potential);
+    println!(
+        "    Total bit erasures: {:.2e}",
+        report.total_bit_erasures as f64
+    );
+    println!(
+        "    Landauer minimum: {:.2e} J",
+        report.landauer_minimum_joules
+    );
+    println!(
+        "    Estimated actual: {:.2e} J",
+        report.estimated_actual_joules
+    );
+    println!(
+        "    Efficiency ratio: {:.0}x above Landauer limit",
+        report.efficiency_ratio
+    );
+    println!(
+        "    Reversible savings potential: {:.2e} J",
+        report.reversible_savings_potential
+    );
 
     // Test different temperatures
     println!("\n  Temperature Sensitivity:");
-    for temp in [77.0, 300.0, 400.0] { // Liquid nitrogen, room temp, hot
+    for temp in [77.0, 300.0, 400.0] {
+        // Liquid nitrogen, room temp, hot
         let temp_tracker = ThermodynamicTracker::new(temp);
         for _ in 0..1000 {
             temp_tracker.record_operation(Operation::VectorSimilarity { dimensions: 384 });
         }
         let temp_report = temp_tracker.efficiency_report();
-        println!("    {}K: Landauer min = {:.2e} J", temp, temp_report.landauer_minimum_joules);
+        println!(
+            "    {}K: Landauer min = {:.2e} J",
+            temp, temp_report.landauer_minimum_joules
+        );
     }
 
     println!("\n  Summary:");
-    println!("    Tracking overhead: {:?} per operation", record_result.per_op);
+    println!(
+        "    Tracking overhead: {:?} per operation",
+        record_result.per_op
+    );
     println!("    Landauer limit scales with kT*ln(2)");
 }
 
@@ -670,7 +757,8 @@ fn benchmark_comprehensive_comparison() {
     let search_iterations = 100;
     let start = Instant::now();
     for _ in 0..search_iterations {
-        let mut scores: Vec<(usize, f32)> = base_store.iter()
+        let mut scores: Vec<(usize, f32)> = base_store
+            .iter()
             .map(|(id, vec)| {
                 let dot: f32 = query.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
                 let mag_q: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -682,8 +770,14 @@ fn benchmark_comprehensive_comparison() {
         let _ = scores.into_iter().take(10).collect::<Vec<_>>();
     }
     let base_search_time = start.elapsed();
-    println!("  Search {} queries: {:?}", search_iterations, base_search_time);
-    println!("    Per search: {:?}", base_search_time / search_iterations as u32);
+    println!(
+        "  Search {} queries: {:?}",
+        search_iterations, base_search_time
+    );
+    println!(
+        "    Per search: {:?}",
+        base_search_time / search_iterations as u32
+    );
 
     // -------------------------------------------------------------------------
     // EXO-AI with full cognitive features
@@ -716,7 +810,9 @@ fn benchmark_comprehensive_comparison() {
         }
 
         // Record thermodynamics
-        thermodynamics.record_operation(Operation::MemoryWrite { bytes: (VECTOR_DIM * 4) as u64 });
+        thermodynamics.record_operation(Operation::MemoryWrite {
+            bytes: (VECTOR_DIM * 4) as u64,
+        });
     }
     let exo_insert_time = start.elapsed();
     println!("  Insert {} patterns: {:?}", iterations, exo_insert_time);
@@ -727,8 +823,10 @@ fn benchmark_comprehensive_comparison() {
     let consolidation_result = exo_memory.consolidate();
     let consolidate_time = start.elapsed();
     println!("  Consolidate: {:?}", consolidate_time);
-    println!("    Patterns kept: {}, forgotten: {}",
-        consolidation_result.num_consolidated, consolidation_result.num_forgotten);
+    println!(
+        "    Patterns kept: {}, forgotten: {}",
+        consolidation_result.num_consolidated, consolidation_result.num_forgotten
+    );
 
     // EXO search with temporal context
     let search_iterations = 100;
@@ -736,11 +834,19 @@ fn benchmark_comprehensive_comparison() {
     for _ in 0..search_iterations {
         let query = Query::from_embedding(generate_random_vector(VECTOR_DIM, 888888));
         let _ = exo_memory.long_term().search(&query);
-        thermodynamics.record_operation(Operation::VectorSimilarity { dimensions: VECTOR_DIM });
+        thermodynamics.record_operation(Operation::VectorSimilarity {
+            dimensions: VECTOR_DIM,
+        });
     }
     let exo_search_time = start.elapsed();
-    println!("  Search {} queries: {:?}", search_iterations, exo_search_time);
-    println!("    Per search: {:?}", exo_search_time / search_iterations as u32);
+    println!(
+        "  Search {} queries: {:?}",
+        search_iterations, exo_search_time
+    );
+    println!(
+        "    Per search: {:?}",
+        exo_search_time / search_iterations as u32
+    );
 
     // Causal query
     let start = Instant::now();
@@ -750,8 +856,14 @@ fn benchmark_comprehensive_comparison() {
         let _ = exo_memory.causal_query(&query, SubstrateTime::now(), CausalConeType::Future);
     }
     let causal_search_time = start.elapsed();
-    println!("  Causal query {} times: {:?}", search_iterations, causal_search_time);
-    println!("    Per causal query: {:?}", causal_search_time / search_iterations as u32);
+    println!(
+        "  Causal query {} times: {:?}",
+        search_iterations, causal_search_time
+    );
+    println!(
+        "    Per causal query: {:?}",
+        causal_search_time / search_iterations as u32
+    );
 
     // Anticipation
     let start = Instant::now();
@@ -760,7 +872,10 @@ fn benchmark_comprehensive_comparison() {
         let _predicted = seq_tracker.predict_next(current, 5);
     }
     let anticipate_time = start.elapsed();
-    println!("  Anticipate {} times: {:?}", search_iterations, anticipate_time);
+    println!(
+        "  Anticipate {} times: {:?}",
+        search_iterations, anticipate_time
+    );
 
     // -------------------------------------------------------------------------
     // Comparison Summary
@@ -779,16 +894,28 @@ fn benchmark_comprehensive_comparison() {
 
     println!("  ║ Operation          │ Base      │ EXO-AI    │ Overhead   ║");
     println!("  ╠════════════════════╪═══════════╪═══════════╪════════════╣");
-    println!("  ║ Insert             │ {:>7}µs │ {:>7}µs │ {:>6.1}x     ║",
-        base_insert_per_op, exo_insert_per_op, insert_overhead);
-    println!("  ║ Search             │ {:>7}µs │ {:>7}µs │ {:>6.1}x     ║",
-        base_search_per_op / 1000, exo_search_per_op / 1000, search_overhead);
-    println!("  ║ Causal Query       │    N/A    │ {:>7}µs │ NEW        ║",
-        causal_search_time.as_micros() / 100);
-    println!("  ║ Anticipation       │    N/A    │ {:>7}µs │ NEW        ║",
-        anticipate_time.as_micros() / 100);
-    println!("  ║ Consolidation      │    N/A    │ {:>7}ms │ NEW        ║",
-        consolidate_time.as_millis());
+    println!(
+        "  ║ Insert             │ {:>7}µs │ {:>7}µs │ {:>6.1}x     ║",
+        base_insert_per_op, exo_insert_per_op, insert_overhead
+    );
+    println!(
+        "  ║ Search             │ {:>7}µs │ {:>7}µs │ {:>6.1}x     ║",
+        base_search_per_op / 1000,
+        exo_search_per_op / 1000,
+        search_overhead
+    );
+    println!(
+        "  ║ Causal Query       │    N/A    │ {:>7}µs │ NEW        ║",
+        causal_search_time.as_micros() / 100
+    );
+    println!(
+        "  ║ Anticipation       │    N/A    │ {:>7}µs │ NEW        ║",
+        anticipate_time.as_micros() / 100
+    );
+    println!(
+        "  ║ Consolidation      │    N/A    │ {:>7}ms │ NEW        ║",
+        consolidate_time.as_millis()
+    );
     println!("  ╠══════════════════════════════════════════════════════════════╣");
     println!("  ║                    COGNITIVE CAPABILITIES                    ║");
     println!("  ╠══════════════════════════════════════════════════════════════╣");
@@ -805,9 +932,18 @@ fn benchmark_comprehensive_comparison() {
     // Print thermodynamic report
     let report = thermodynamics.efficiency_report();
     println!("\n  Thermodynamic Efficiency:");
-    println!("    Operations tracked: {:.2e} bit erasures", report.total_bit_erasures as f64);
-    println!("    Theoretical minimum (Landauer): {:.2e} J", report.landauer_minimum_joules);
-    println!("    Current system: {:.0}x above minimum", report.efficiency_ratio);
+    println!(
+        "    Operations tracked: {:.2e} bit erasures",
+        report.total_bit_erasures as f64
+    );
+    println!(
+        "    Theoretical minimum (Landauer): {:.2e} J",
+        report.landauer_minimum_joules
+    );
+    println!(
+        "    Current system: {:.0}x above minimum",
+        report.efficiency_ratio
+    );
 }
 
 // ============================================================================
@@ -844,8 +980,10 @@ fn benchmark_scaling_characteristics() {
         memory.consolidate();
         let consolidate_time = start.elapsed();
 
-        println!("    {:>5} patterns: insert {:>8?}, consolidate {:>8?}",
-            scale, insert_time, consolidate_time);
+        println!(
+            "    {:>5} patterns: insert {:>8?}, consolidate {:>8?}",
+            scale, insert_time, consolidate_time
+        );
     }
 
     println!("\n  Search Scaling (vs store size):");
@@ -877,10 +1015,12 @@ fn benchmark_scaling_characteristics() {
         }
         let search_time = start.elapsed();
 
-        println!("    {:>5} patterns: {:>6?} per search ({:.0} qps)",
+        println!(
+            "    {:>5} patterns: {:>6?} per search ({:.0} qps)",
             scale,
             search_time / iterations,
-            iterations as f64 / search_time.as_secs_f64());
+            iterations as f64 / search_time.as_secs_f64()
+        );
     }
 
     println!("\n  Causal Graph Scaling:");
@@ -917,10 +1057,12 @@ fn benchmark_scaling_characteristics() {
         }
         let future_time = start2.elapsed();
 
-        println!("    {:>5} nodes: distance {:>6?}, future {:>6?}",
+        println!(
+            "    {:>5} nodes: distance {:>6?}, future {:>6?}",
             scale,
             distance_time / iterations,
-            future_time / iterations);
+            future_time / iterations
+        );
     }
 
     println!("\n  Summary:");

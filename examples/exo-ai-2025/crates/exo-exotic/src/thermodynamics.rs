@@ -19,8 +19,8 @@
 //! - Szilard Engine - Information thermodynamics
 //! - Jarzynski Equality - Non-equilibrium thermodynamics
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// Cognitive thermodynamics system
@@ -222,7 +222,12 @@ impl CognitiveThermodynamics {
     }
 
     /// Perform reversible computation
-    pub fn reversible_compute<T>(&mut self, input: T, forward: impl Fn(T) -> T, _backward: impl Fn(T) -> T) -> T {
+    pub fn reversible_compute<T>(
+        &mut self,
+        input: T,
+        forward: impl Fn(T) -> T,
+        _backward: impl Fn(T) -> T,
+    ) -> T {
         // Reversible computation has no erasure cost
         // Only the logical transformation happens
 
@@ -558,8 +563,8 @@ mod tests {
         let input = 5;
         let output = thermo.reversible_compute(
             input,
-            |x| x * 2,  // forward
-            |x| x / 2,  // backward
+            |x| x * 2, // forward
+            |x| x / 2, // backward
         );
 
         assert_eq!(output, 10);

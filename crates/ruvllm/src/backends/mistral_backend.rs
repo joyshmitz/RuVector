@@ -39,8 +39,8 @@
 //! ```
 
 use super::{
-    DeviceType, DType, GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture,
-    ModelConfig, ModelInfo, Quantization, SpecialTokens, Tokenizer,
+    DType, DeviceType, GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture, ModelConfig,
+    ModelInfo, Quantization, SpecialTokens, Tokenizer,
 };
 use crate::error::{Result, RuvLLMError};
 use crate::paged_attention::{PagedAttention, PagedAttentionConfig};
@@ -57,12 +57,9 @@ use serde::{Deserialize, Serialize};
 // Conditional imports for mistral-rs crate integration
 #[cfg(feature = "mistral-rs")]
 use mistralrs::{
-    GGUFLoaderBuilder, GGUFSpecificConfig,
-    MistralRs, MistralRsBuilder,
-    PagedAttentionMetaBuilder, SchedulerConfig,
-    TokenSource, Device as MistralDevice,
-    NormalRequest, Request, RequestMessage,
-    Response, SamplingParams, Constraint,
+    Constraint, Device as MistralDevice, GGUFLoaderBuilder, GGUFSpecificConfig, MistralRs,
+    MistralRsBuilder, NormalRequest, PagedAttentionMetaBuilder, Request, RequestMessage, Response,
+    SamplingParams, SchedulerConfig, TokenSource,
 };
 #[cfg(feature = "mistral-rs")]
 use tokio::sync::mpsc::channel as tokio_channel;
@@ -384,7 +381,9 @@ impl XLoraManager {
         };
 
         self.adapters.insert(name.to_string(), adapter);
-        self.stats.adapter_usage.insert(name.to_string(), AtomicU64::new(0));
+        self.stats
+            .adapter_usage
+            .insert(name.to_string(), AtomicU64::new(0));
 
         tracing::info!("Loaded X-LoRA adapter: {} from {:?}", name, path);
         Ok(())
@@ -463,10 +462,7 @@ impl XLoraManager {
         );
 
         // Apply temperature and softmax
-        let scaled: Vec<f32> = logits
-            .iter()
-            .map(|x| x / self.config.temperature)
-            .collect();
+        let scaled: Vec<f32> = logits.iter().map(|x| x / self.config.temperature).collect();
         let probs = softmax(&scaled);
 
         // Select top-k adapters
@@ -527,11 +523,7 @@ impl XLoraManager {
     }
 
     /// Apply X-LoRA to hidden states
-    pub fn apply(
-        &self,
-        hidden_states: &[f32],
-        layer_name: &str,
-    ) -> Vec<f32> {
+    pub fn apply(&self, hidden_states: &[f32], layer_name: &str) -> Vec<f32> {
         let routing = self.route(hidden_states);
         let mut output = vec![0.0; hidden_states.len()];
 
@@ -576,12 +568,7 @@ impl XLoraManager {
     }
 
     /// Apply a single adapter
-    fn apply_adapter(
-        &self,
-        input: &[f32],
-        adapter: &AdapterWeights,
-        layer_name: &str,
-    ) -> Vec<f32> {
+    fn apply_adapter(&self, input: &[f32], adapter: &AdapterWeights, layer_name: &str) -> Vec<f32> {
         let lora_a = adapter.lora_a.get(layer_name);
         let lora_b = adapter.lora_b.get(layer_name);
 
@@ -666,16 +653,17 @@ pub struct MistralTokenizer {
 #[cfg(feature = "mistral-rs")]
 impl Tokenizer for MistralTokenizer {
     fn encode(&self, text: &str) -> Result<Vec<u32>> {
-        let encoding = self.inner.encode(text, false).map_err(|e| {
-            RuvLLMError::Tokenization(format!("Tokenization failed: {}", e))
-        })?;
+        let encoding = self
+            .inner
+            .encode(text, false)
+            .map_err(|e| RuvLLMError::Tokenization(format!("Tokenization failed: {}", e)))?;
         Ok(encoding.get_ids().to_vec())
     }
 
     fn decode(&self, tokens: &[u32]) -> Result<String> {
-        self.inner.decode(tokens, true).map_err(|e| {
-            RuvLLMError::Tokenization(format!("Decoding failed: {}", e))
-        })
+        self.inner
+            .decode(tokens, true)
+            .map_err(|e| RuvLLMError::Tokenization(format!("Decoding failed: {}", e)))
     }
 
     fn vocab_size(&self) -> usize {
@@ -759,17 +747,18 @@ impl MistralBackend {
                 page_size: pa_config.block_size,
                 max_pages_per_sequence: pa_config.max_pages / 256, // Sequences share pages
                 page_table_capacity: pa_config.max_pages,
-                num_heads: 32,  // Will be updated on model load
-                head_dim: 128,  // Will be updated on model load
+                num_heads: 32,   // Will be updated on model load
+                head_dim: 128,   // Will be updated on model load
                 num_kv_heads: 8, // Will be updated on model load
                 ..Default::default()
             })
         });
 
         // Initialize X-LoRA if configured
-        let xlora_manager = config.xlora.as_ref().map(|xlora_config| {
-            XLoraManager::new(xlora_config.clone())
-        });
+        let xlora_manager = config
+            .xlora
+            .as_ref()
+            .map(|xlora_config| XLoraManager::new(xlora_config.clone()));
 
         Ok(Self {
             config,
@@ -820,17 +809,19 @@ impl MistralBackend {
 
     /// Load X-LoRA adapter
     pub fn load_xlora_adapter(&self, name: &str, path: &Path) -> Result<()> {
-        let manager = self.xlora_manager.as_ref().ok_or_else(|| {
-            RuvLLMError::Config("X-LoRA not configured".to_string())
-        })?;
+        let manager = self
+            .xlora_manager
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::Config("X-LoRA not configured".to_string()))?;
         manager.load_adapter(name, path)
     }
 
     /// Set active X-LoRA adapters
     pub fn set_xlora_adapters(&self, adapters: Vec<(&str, f32)>) -> Result<()> {
-        let manager = self.xlora_manager.as_ref().ok_or_else(|| {
-            RuvLLMError::Config("X-LoRA not configured".to_string())
-        })?;
+        let manager = self
+            .xlora_manager
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::Config("X-LoRA not configured".to_string()))?;
         manager.set_active(adapters)
     }
 
@@ -842,9 +833,11 @@ impl MistralBackend {
             ));
         }
 
-        let _isq_config = self.config.isq.as_ref().ok_or_else(|| {
-            RuvLLMError::Config("ISQ not configured".to_string())
-        })?;
+        let _isq_config = self
+            .config
+            .isq
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::Config("ISQ not configured".to_string()))?;
 
         // In a real implementation, this would quantize model weights in-place
         // using the configured ISQ method (AWQ, GPTQ, RTN, etc.)
@@ -943,25 +936,29 @@ impl MistralBackend {
         });
 
         // Send request to model
-        model.get_sender().map_err(|e| {
-            RuvLLMError::Compute(format!("Failed to get model sender: {}", e))
-        })?.blocking_send(request).map_err(|e| {
-            RuvLLMError::Compute(format!("Failed to send request to model: {}", e))
-        })?;
+        model
+            .get_sender()
+            .map_err(|e| RuvLLMError::Compute(format!("Failed to get model sender: {}", e)))?
+            .blocking_send(request)
+            .map_err(|e| RuvLLMError::Compute(format!("Failed to send request to model: {}", e)))?;
 
         // Wait for response
-        let response = rx.recv().map_err(|e| {
-            RuvLLMError::Compute(format!("Failed to receive response: {}", e))
-        })?;
+        let response = rx
+            .recv()
+            .map_err(|e| RuvLLMError::Compute(format!("Failed to receive response: {}", e)))?;
 
         match response {
             Response::Done(completion) => {
-                let output_text = completion.choices.first()
+                let output_text = completion
+                    .choices
+                    .first()
                     .map(|c| c.message.content.clone().unwrap_or_default())
                     .unwrap_or_default();
 
                 // Build generated tokens from the response
-                let generated_tokens = completion.choices.first()
+                let generated_tokens = completion
+                    .choices
+                    .first()
                     .map(|c| {
                         // mistral-rs doesn't provide individual tokens in non-streaming mode
                         // so we return a single token representing the full output
@@ -985,9 +982,7 @@ impl MistralBackend {
             Response::ModelError(msg, _) => {
                 Err(RuvLLMError::Compute(format!("Model error: {}", msg)))
             }
-            _ => {
-                Err(RuvLLMError::Compute("Unexpected response type".to_string()))
-            }
+            _ => Err(RuvLLMError::Compute("Unexpected response type".to_string())),
         }
     }
 
@@ -997,9 +992,10 @@ impl MistralBackend {
         prompt: &str,
         params: &GenerateParams,
     ) -> Result<(String, Vec<GeneratedToken>)> {
-        let tokenizer = self.tokenizer.as_ref().ok_or_else(|| {
-            RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-        })?;
+        let tokenizer = self
+            .tokenizer
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
         // Encode prompt
         let input_ids = tokenizer.encode(prompt)?;
@@ -1110,9 +1106,8 @@ impl LlmBackend for MistralBackend {
 
         #[cfg(feature = "mistral-rs")]
         {
-            let inner = tokenizers::Tokenizer::from_file(&tokenizer_path).map_err(|e| {
-                RuvLLMError::Storage(format!("Failed to load tokenizer: {}", e))
-            })?;
+            let inner = tokenizers::Tokenizer::from_file(&tokenizer_path)
+                .map_err(|e| RuvLLMError::Storage(format!("Failed to load tokenizer: {}", e)))?;
 
             let special_tokens = SpecialTokens {
                 bos_token_id: inner.token_to_id("<s>"),
@@ -1166,8 +1161,14 @@ impl LlmBackend for MistralBackend {
             let is_gguf = model_path.extension().map(|e| e == "gguf").unwrap_or(false)
                 || model_path.join("model.gguf").exists()
                 || std::fs::read_dir(&model_path)
-                    .map(|entries| entries.filter_map(|e| e.ok())
-                        .any(|e| e.path().extension().map(|ext| ext == "gguf").unwrap_or(false)))
+                    .map(|entries| {
+                        entries.filter_map(|e| e.ok()).any(|e| {
+                            e.path()
+                                .extension()
+                                .map(|ext| ext == "gguf")
+                                .unwrap_or(false)
+                        })
+                    })
                     .unwrap_or(false);
 
             if is_gguf {
@@ -1182,7 +1183,9 @@ impl LlmBackend for MistralBackend {
                 // Determine the device
                 let device = match self.config.device {
                     DeviceType::Cpu => MistralDevice::Cpu,
-                    DeviceType::Cuda(id) => MistralDevice::new_cuda(id).unwrap_or(MistralDevice::Cpu),
+                    DeviceType::Cuda(id) => {
+                        MistralDevice::new_cuda(id).unwrap_or(MistralDevice::Cpu)
+                    }
                     DeviceType::Metal => MistralDevice::new_metal(0).unwrap_or(MistralDevice::Cpu),
                     _ => MistralDevice::Cpu,
                 };
@@ -1197,7 +1200,12 @@ impl LlmBackend for MistralBackend {
                         .and_then(|entries| {
                             entries
                                 .filter_map(|e| e.ok())
-                                .find(|e| e.path().extension().map(|ext| ext == "gguf").unwrap_or(false))
+                                .find(|e| {
+                                    e.path()
+                                        .extension()
+                                        .map(|ext| ext == "gguf")
+                                        .unwrap_or(false)
+                                })
                                 .map(|e| e.path())
                         })
                         .unwrap_or_else(|| model_path.join("model.gguf"))
@@ -1221,9 +1229,8 @@ impl LlmBackend for MistralBackend {
                 } else {
                     SchedulerConfig::DefaultScheduler {
                         method: mistralrs::DefaultSchedulerMethod::Fixed(
-                            std::num::NonZeroUsize::new(self.config.max_batch_size).unwrap_or(
-                                std::num::NonZeroUsize::new(1).unwrap()
-                            )
+                            std::num::NonZeroUsize::new(self.config.max_batch_size)
+                                .unwrap_or(std::num::NonZeroUsize::new(1).unwrap()),
                         ),
                     }
                 };
@@ -1246,7 +1253,10 @@ impl LlmBackend for MistralBackend {
                         tracing::info!("Loaded mistral-rs GGUF model from {:?}", gguf_file);
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to load mistral-rs model: {}. Falling back to stub.", e);
+                        tracing::warn!(
+                            "Failed to load mistral-rs model: {}. Falling back to stub.",
+                            e
+                        );
                         self.mistral_model = None;
                     }
                 }
@@ -1289,9 +1299,7 @@ impl LlmBackend for MistralBackend {
 
     fn generate(&self, prompt: &str, params: GenerateParams) -> Result<String> {
         if !self.is_model_loaded() {
-            return Err(RuvLLMError::InvalidOperation(
-                "No model loaded".to_string(),
-            ));
+            return Err(RuvLLMError::InvalidOperation("No model loaded".to_string()));
         }
 
         let (output, _tokens) = self.generate_internal(prompt, &params)?;
@@ -1304,9 +1312,7 @@ impl LlmBackend for MistralBackend {
         params: GenerateParams,
     ) -> Result<Box<dyn Iterator<Item = Result<GeneratedToken>> + Send + '_>> {
         if !self.is_model_loaded() {
-            return Err(RuvLLMError::InvalidOperation(
-                "No model loaded".to_string(),
-            ));
+            return Err(RuvLLMError::InvalidOperation("No model loaded".to_string()));
         }
 
         // For streaming, we generate all tokens and return an iterator
@@ -1325,9 +1331,7 @@ impl LlmBackend for MistralBackend {
         use std::time::Instant;
 
         if !self.is_model_loaded() {
-            return Err(RuvLLMError::InvalidOperation(
-                "No model loaded".to_string(),
-            ));
+            return Err(RuvLLMError::InvalidOperation("No model loaded".to_string()));
         }
 
         let (tx, stream) = TokenStream::channel();
@@ -1358,14 +1362,13 @@ impl LlmBackend for MistralBackend {
 
     fn get_embeddings(&self, text: &str) -> Result<Vec<f32>> {
         if !self.is_model_loaded() {
-            return Err(RuvLLMError::InvalidOperation(
-                "No model loaded".to_string(),
-            ));
+            return Err(RuvLLMError::InvalidOperation("No model loaded".to_string()));
         }
 
-        let tokenizer = self.tokenizer.as_ref().ok_or_else(|| {
-            RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-        })?;
+        let tokenizer = self
+            .tokenizer
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
         let _tokens = tokenizer.encode(text)?;
 
@@ -1447,7 +1450,8 @@ fn softmax(logits: &[f32]) -> Vec<f32> {
 /// Estimate number of parameters
 fn estimate_parameters(hidden_size: usize, num_layers: usize, vocab_size: usize) -> usize {
     let embedding_params = vocab_size * hidden_size;
-    let layer_params = num_layers * (4 * hidden_size * hidden_size + 8 * hidden_size * hidden_size / 3);
+    let layer_params =
+        num_layers * (4 * hidden_size * hidden_size + 8 * hidden_size * hidden_size / 3);
     let output_params = vocab_size * hidden_size;
     embedding_params + layer_params + output_params
 }
@@ -1501,8 +1505,8 @@ mod tests {
 
     #[test]
     fn test_xlora_config() {
-        let config = MistralBackendConfig::default()
-            .with_xlora_adapters(vec!["code", "chat", "math"]);
+        let config =
+            MistralBackendConfig::default().with_xlora_adapters(vec!["code", "chat", "math"]);
 
         assert!(config.xlora.is_some());
         let xlora = config.xlora.unwrap();
@@ -1548,8 +1552,16 @@ mod tests {
         // Note: This is an approximation, not exact parameter count
         let params = estimate_parameters(4096, 32, 32000);
         // Should be in the billions (rough estimate for a 7B-class model)
-        assert!(params > 3_000_000_000, "Expected > 3B params, got {}", params);
-        assert!(params < 10_000_000_000, "Expected < 10B params, got {}", params);
+        assert!(
+            params > 3_000_000_000,
+            "Expected > 3B params, got {}",
+            params
+        );
+        assert!(
+            params < 10_000_000_000,
+            "Expected < 10B params, got {}",
+            params
+        );
     }
 
     #[test]

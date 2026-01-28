@@ -38,19 +38,21 @@
 #![warn(missing_docs)]
 #![allow(dead_code)]
 
-pub mod sparse_boundary;
 pub mod apparent_pairs;
 pub mod simd_filtration;
-pub mod streaming_homology;
 pub mod simd_matrix_ops;
+pub mod sparse_boundary;
+pub mod streaming_homology;
 
 // Re-export main types for convenience
-pub use sparse_boundary::{SparseBoundaryMatrix, SparseColumn, MatrixStats};
-pub use apparent_pairs::{Filtration, Simplex, identify_apparent_pairs, identify_apparent_pairs_fast};
-pub use simd_filtration::{DistanceMatrix, euclidean_distance_matrix, correlation_distance_matrix};
+pub use apparent_pairs::{
+    identify_apparent_pairs, identify_apparent_pairs_fast, Filtration, Simplex,
+};
+pub use simd_filtration::{correlation_distance_matrix, euclidean_distance_matrix, DistanceMatrix};
+pub use sparse_boundary::{MatrixStats, SparseBoundaryMatrix, SparseColumn};
 pub use streaming_homology::{
-    PersistenceDiagram, PersistenceFeature, StreamingPersistence,
-    ConsciousnessMonitor, TopologicalFeatures
+    ConsciousnessMonitor, PersistenceDiagram, PersistenceFeature, StreamingPersistence,
+    TopologicalFeatures,
 };
 
 /// Betti numbers computation
@@ -157,9 +159,7 @@ pub mod persistence_vectors {
 
             // Sort features by persistence (descending)
             let mut sorted_features: Vec<_> = features.iter().collect();
-            sorted_features.sort_by(|a, b| {
-                b.persistence().partial_cmp(&a.persistence()).unwrap()
-            });
+            sorted_features.sort_by(|a, b| b.persistence().partial_cmp(&a.persistence()).unwrap());
 
             // Construct landscape levels
             for (i, feature) in sorted_features.iter().enumerate() {
@@ -218,14 +218,8 @@ pub mod persistence_vectors {
             let mut pixels = vec![vec![0.0; resolution]; resolution];
 
             // Find bounds
-            let max_birth = features
-                .iter()
-                .map(|f| f.birth)
-                .fold(0.0, f64::max);
-            let max_pers = features
-                .iter()
-                .map(|f| f.persistence())
-                .fold(0.0, f64::max);
+            let max_birth = features.iter().map(|f| f.birth).fold(0.0, f64::max);
+            let max_pers = features.iter().map(|f| f.persistence()).fold(0.0, f64::max);
 
             // Rasterize with Gaussian weighting
             for feature in features {

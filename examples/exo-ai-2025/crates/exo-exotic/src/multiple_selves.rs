@@ -18,8 +18,8 @@
 //! - Marvin Minsky's "Society of Mind"
 //! - Global Workspace Theory
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// System managing multiple sub-personalities
@@ -76,9 +76,9 @@ pub struct Goal {
 /// Emotional baseline of a sub-personality
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionalTone {
-    pub valence: f64,      // -1 (negative) to 1 (positive)
-    pub arousal: f64,      // 0 (calm) to 1 (excited)
-    pub dominance: f64,    // 0 (submissive) to 1 (dominant)
+    pub valence: f64,   // -1 (negative) to 1 (positive)
+    pub arousal: f64,   // 0 (calm) to 1 (excited)
+    pub dominance: f64, // 0 (submissive) to 1 (dominant)
 }
 
 /// Relationship between sub-personalities
@@ -135,10 +135,10 @@ pub struct Decision {
 
 #[derive(Debug, Clone)]
 pub enum DecisionOutcome {
-    Unanimous(Uuid),           // All agreed, winner's id
-    Majority(Uuid, f64),       // Majority, winner and margin
-    Executive(Uuid),           // Executive decided
-    Conflict,                  // Unresolved conflict
+    Unanimous(Uuid),     // All agreed, winner's id
+    Majority(Uuid, f64), // Majority, winner and margin
+    Executive(Uuid),     // Executive decided
+    Conflict,            // Unresolved conflict
 }
 
 /// Measure of self-coherence
@@ -238,7 +238,7 @@ impl MultipleSelvesSystem {
         let mut count = 0;
 
         for i in 0..self.selves.len() {
-            for j in i+1..self.selves.len() {
+            for j in i + 1..self.selves.len() {
                 let sim = self.belief_similarity(&self.selves[i], &self.selves[j]);
                 total_similarity += sim;
                 count += 1;
@@ -294,8 +294,12 @@ impl MultipleSelvesSystem {
         for self_entity in &self.selves {
             for (_, rel) in &self_entity.relationships {
                 total_relationships += 1;
-                if matches!(rel.relationship_type,
-                    RelationshipType::Ally | RelationshipType::Protector | RelationshipType::Neutral) {
+                if matches!(
+                    rel.relationship_type,
+                    RelationshipType::Ally
+                        | RelationshipType::Protector
+                        | RelationshipType::Neutral
+                ) {
                     positive_relationships += 1;
                 }
             }
@@ -329,7 +333,9 @@ impl MultipleSelvesSystem {
     }
 
     fn update_dominant(&mut self) {
-        self.dominant = self.selves.iter()
+        self.dominant = self
+            .selves
+            .iter()
             .max_by(|a, b| a.activation.partial_cmp(&b.activation).unwrap())
             .map(|s| s.id);
     }
@@ -337,19 +343,25 @@ impl MultipleSelvesSystem {
     /// Create conflict between selves
     pub fn create_conflict(&mut self, self1: Uuid, self2: Uuid) {
         if let Some(s1) = self.selves.iter_mut().find(|s| s.id == self1) {
-            s1.relationships.insert(self2, Relationship {
-                other_id: self2,
-                relationship_type: RelationshipType::Rival,
-                strength: 0.7,
-            });
+            s1.relationships.insert(
+                self2,
+                Relationship {
+                    other_id: self2,
+                    relationship_type: RelationshipType::Rival,
+                    strength: 0.7,
+                },
+            );
         }
 
         if let Some(s2) = self.selves.iter_mut().find(|s| s.id == self2) {
-            s2.relationships.insert(self1, Relationship {
-                other_id: self1,
-                relationship_type: RelationshipType::Rival,
-                strength: 0.7,
-            });
+            s2.relationships.insert(
+                self1,
+                Relationship {
+                    other_id: self1,
+                    relationship_type: RelationshipType::Rival,
+                    strength: 0.7,
+                },
+            );
         }
 
         self.integration_history.push(IntegrationEvent {
@@ -421,7 +433,11 @@ impl MultipleSelvesSystem {
         };
 
         // Remove old selves (handle indices carefully)
-        let (first, second) = if s1_idx > s2_idx { (s1_idx, s2_idx) } else { (s2_idx, s1_idx) };
+        let (first, second) = if s1_idx > s2_idx {
+            (s1_idx, s2_idx)
+        } else {
+            (s2_idx, s1_idx)
+        };
         self.selves.remove(first);
         self.selves.remove(second);
 
@@ -442,7 +458,8 @@ impl MultipleSelvesSystem {
 
     /// Get dominant self
     pub fn get_dominant(&self) -> Option<&SubPersonality> {
-        self.dominant.and_then(|id| self.selves.iter().find(|s| s.id == id))
+        self.dominant
+            .and_then(|id| self.selves.iter().find(|s| s.id == id))
     }
 
     /// Get all selves
@@ -511,13 +528,12 @@ impl ExecutiveFunction {
             }
             ResolutionStyle::TurnTaking => {
                 // Alternate based on history
-                let last_winner = self.decisions.last()
-                    .and_then(|d| match &d.outcome {
-                        DecisionOutcome::Unanimous(id) |
-                        DecisionOutcome::Majority(id, _) |
-                        DecisionOutcome::Executive(id) => Some(*id),
-                        _ => None,
-                    });
+                let last_winner = self.decisions.last().and_then(|d| match &d.outcome {
+                    DecisionOutcome::Unanimous(id)
+                    | DecisionOutcome::Majority(id, _)
+                    | DecisionOutcome::Executive(id) => Some(*id),
+                    _ => None,
+                });
 
                 let winner = match last_winner {
                     Some(w) if w == id1 => id2,
@@ -529,9 +545,9 @@ impl ExecutiveFunction {
         };
 
         let winner = match &outcome {
-            DecisionOutcome::Unanimous(id) |
-            DecisionOutcome::Majority(id, _) |
-            DecisionOutcome::Executive(id) => Some(*id),
+            DecisionOutcome::Unanimous(id)
+            | DecisionOutcome::Majority(id, _)
+            | DecisionOutcome::Executive(id) => Some(*id),
             DecisionOutcome::Conflict => None,
         };
 
@@ -601,17 +617,23 @@ mod tests {
     fn test_add_selves() {
         let mut system = MultipleSelvesSystem::new();
 
-        let id1 = system.add_self("Protector", EmotionalTone {
-            valence: 0.3,
-            arousal: 0.7,
-            dominance: 0.8,
-        });
+        let id1 = system.add_self(
+            "Protector",
+            EmotionalTone {
+                valence: 0.3,
+                arousal: 0.7,
+                dominance: 0.8,
+            },
+        );
 
-        let id2 = system.add_self("Inner Child", EmotionalTone {
-            valence: 0.8,
-            arousal: 0.6,
-            dominance: 0.3,
-        });
+        let id2 = system.add_self(
+            "Inner Child",
+            EmotionalTone {
+                valence: 0.8,
+                arousal: 0.6,
+                dominance: 0.3,
+            },
+        );
 
         assert_eq!(system.self_count(), 2);
         assert_ne!(id1, id2);
@@ -622,11 +644,14 @@ mod tests {
         let mut system = MultipleSelvesSystem::new();
 
         // Single self = high coherence
-        system.add_self("Core", EmotionalTone {
-            valence: 0.5,
-            arousal: 0.5,
-            dominance: 0.5,
-        });
+        system.add_self(
+            "Core",
+            EmotionalTone {
+                valence: 0.5,
+                arousal: 0.5,
+                dominance: 0.5,
+            },
+        );
 
         let coherence = system.measure_coherence();
         assert!(coherence >= 0.0 && coherence <= 1.0);
@@ -636,11 +661,14 @@ mod tests {
     fn test_activation() {
         let mut system = MultipleSelvesSystem::new();
 
-        let id = system.add_self("Test", EmotionalTone {
-            valence: 0.5,
-            arousal: 0.5,
-            dominance: 0.5,
-        });
+        let id = system.add_self(
+            "Test",
+            EmotionalTone {
+                valence: 0.5,
+                arousal: 0.5,
+                dominance: 0.5,
+            },
+        );
 
         system.activate(id, 0.9);
 
@@ -653,17 +681,23 @@ mod tests {
     fn test_conflict_and_resolution() {
         let mut system = MultipleSelvesSystem::new();
 
-        let id1 = system.add_self("Self1", EmotionalTone {
-            valence: 0.8,
-            arousal: 0.5,
-            dominance: 0.7,
-        });
+        let id1 = system.add_self(
+            "Self1",
+            EmotionalTone {
+                valence: 0.8,
+                arousal: 0.5,
+                dominance: 0.7,
+            },
+        );
 
-        let id2 = system.add_self("Self2", EmotionalTone {
-            valence: 0.2,
-            arousal: 0.5,
-            dominance: 0.3,
-        });
+        let id2 = system.add_self(
+            "Self2",
+            EmotionalTone {
+                valence: 0.2,
+                arousal: 0.5,
+                dominance: 0.3,
+            },
+        );
 
         system.create_conflict(id1, id2);
         let initial_coherence = system.measure_coherence();
@@ -679,17 +713,23 @@ mod tests {
     fn test_merge() {
         let mut system = MultipleSelvesSystem::new();
 
-        let id1 = system.add_self("Part1", EmotionalTone {
-            valence: 0.6,
-            arousal: 0.4,
-            dominance: 0.5,
-        });
+        let id1 = system.add_self(
+            "Part1",
+            EmotionalTone {
+                valence: 0.6,
+                arousal: 0.4,
+                dominance: 0.5,
+            },
+        );
 
-        let id2 = system.add_self("Part2", EmotionalTone {
-            valence: 0.4,
-            arousal: 0.6,
-            dominance: 0.5,
-        });
+        let id2 = system.add_self(
+            "Part2",
+            EmotionalTone {
+                valence: 0.4,
+                arousal: 0.6,
+                dominance: 0.5,
+            },
+        );
 
         assert_eq!(system.self_count(), 2);
 
@@ -708,7 +748,11 @@ mod tests {
                 name: "Strong".to_string(),
                 beliefs: Vec::new(),
                 goals: Vec::new(),
-                emotional_tone: EmotionalTone { valence: 0.5, arousal: 0.5, dominance: 0.9 },
+                emotional_tone: EmotionalTone {
+                    valence: 0.5,
+                    arousal: 0.5,
+                    dominance: 0.9,
+                },
                 activation: 0.8,
                 age: 10,
                 relationships: HashMap::new(),
@@ -718,7 +762,11 @@ mod tests {
                 name: "Weak".to_string(),
                 beliefs: Vec::new(),
                 goals: Vec::new(),
-                emotional_tone: EmotionalTone { valence: 0.5, arousal: 0.5, dominance: 0.1 },
+                emotional_tone: EmotionalTone {
+                    valence: 0.5,
+                    arousal: 0.5,
+                    dominance: 0.1,
+                },
                 activation: 0.2,
                 age: 5,
                 relationships: HashMap::new(),

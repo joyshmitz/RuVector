@@ -14,7 +14,6 @@
 /// - Column access: O(1)
 /// - Column addition: O(nnz_col)
 /// - Reduction: O(m² log m) practical (vs O(m³) worst-case)
-
 use std::collections::HashMap;
 
 /// Sparse column represented as sorted vector of row indices
@@ -383,23 +382,20 @@ mod tests {
         // e02[ 0   0   0   1  ]
 
         let boundaries = vec![
-            vec![],       // v0 (dim 0)
-            vec![],       // v1 (dim 0)
-            vec![],       // v2 (dim 0)
-            vec![0, 1],   // e01 (dim 1): boundary = {v0, v1}
-            vec![1, 2],   // e12 (dim 1): boundary = {v1, v2}
-            vec![0, 2],   // e02 (dim 1): boundary = {v0, v2}
+            vec![],        // v0 (dim 0)
+            vec![],        // v1 (dim 0)
+            vec![],        // v2 (dim 0)
+            vec![0, 1],    // e01 (dim 1): boundary = {v0, v1}
+            vec![1, 2],    // e12 (dim 1): boundary = {v1, v2}
+            vec![0, 2],    // e02 (dim 1): boundary = {v0, v2}
             vec![3, 4, 5], // f012 (dim 2): boundary = {e01, e12, e02}
         ];
 
         let dimensions = vec![0, 0, 0, 1, 1, 1, 2];
         let apparent_pairs = vec![];
 
-        let mut matrix = SparseBoundaryMatrix::from_filtration(
-            boundaries,
-            dimensions,
-            apparent_pairs,
-        );
+        let mut matrix =
+            SparseBoundaryMatrix::from_filtration(boundaries, dimensions, apparent_pairs);
 
         let pairs = matrix.reduce();
 
@@ -416,11 +412,7 @@ mod tests {
         let dimensions = vec![0, 1, 1, 2];
         let apparent_pairs = vec![];
 
-        let matrix = SparseBoundaryMatrix::from_filtration(
-            boundaries,
-            dimensions,
-            apparent_pairs,
-        );
+        let matrix = SparseBoundaryMatrix::from_filtration(boundaries, dimensions, apparent_pairs);
 
         let stats = matrix.stats();
         assert_eq!(stats.ncols, 4);

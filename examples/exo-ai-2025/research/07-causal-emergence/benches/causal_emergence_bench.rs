@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
 use causal_emergence::*;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 /// Generates a random-like transition matrix
 fn generate_transition_matrix(n: usize) -> Vec<f32> {
@@ -21,13 +21,13 @@ fn generate_transition_matrix(n: usize) -> Vec<f32> {
 
 /// Generates synthetic time-series data with multi-scale structure
 fn generate_time_series(n: usize) -> Vec<f32> {
-    (0..n).map(|t| {
-        let t_f = t as f32;
-        // Three scales: slow, medium, fast oscillations
-        0.5 * (t_f * 0.01).sin() +
-        0.3 * (t_f * 0.05).cos() +
-        0.2 * (t_f * 0.2).sin()
-    }).collect()
+    (0..n)
+        .map(|t| {
+            let t_f = t as f32;
+            // Three scales: slow, medium, fast oscillations
+            0.5 * (t_f * 0.01).sin() + 0.3 * (t_f * 0.05).cos() + 0.2 * (t_f * 0.2).sin()
+        })
+        .collect()
 }
 
 /// Benchmark: Effective Information computation with SIMD
@@ -39,9 +39,7 @@ fn bench_effective_information(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements((n * n) as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, &n| {
-            b.iter(|| {
-                compute_ei_simd(black_box(&matrix), black_box(n))
-            });
+            b.iter(|| compute_ei_simd(black_box(&matrix), black_box(n)));
         });
     }
 
@@ -59,9 +57,7 @@ fn bench_entropy(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, _| {
-            b.iter(|| {
-                entropy_simd(black_box(&probs))
-            });
+            b.iter(|| entropy_simd(black_box(&probs)));
         });
     }
 
@@ -77,9 +73,7 @@ fn bench_coarse_graining(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, &n| {
-            b.iter(|| {
-                ScaleHierarchy::build_sequential(black_box(matrix.clone()), black_box(2))
-            });
+            b.iter(|| ScaleHierarchy::build_sequential(black_box(matrix.clone()), black_box(2)));
         });
     }
 
@@ -96,9 +90,7 @@ fn bench_transfer_entropy(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, _| {
-            b.iter(|| {
-                transfer_entropy(black_box(&x), black_box(&y), black_box(1), black_box(1))
-            });
+            b.iter(|| transfer_entropy(black_box(&x), black_box(&y), black_box(1), black_box(1)));
         });
     }
 
@@ -119,7 +111,7 @@ fn bench_consciousness_assessment(c: &mut Criterion) {
                     black_box(&data),
                     black_box(2),
                     black_box(false),
-                    black_box(5.0)
+                    black_box(5.0),
                 )
             });
         });
@@ -137,9 +129,7 @@ fn bench_emergence_detection(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, _| {
-            b.iter(|| {
-                detect_emergence(black_box(&data), black_box(2), black_box(0.5))
-            });
+            b.iter(|| detect_emergence(black_box(&data), black_box(2), black_box(0.5)));
         });
     }
 
@@ -156,11 +146,7 @@ fn bench_causal_hierarchy(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, _| {
             b.iter(|| {
-                CausalHierarchy::from_time_series(
-                    black_box(&data),
-                    black_box(2),
-                    black_box(false)
-                )
+                CausalHierarchy::from_time_series(black_box(&data), black_box(2), black_box(false))
             });
         });
     }
@@ -199,14 +185,10 @@ fn bench_multi_scale_ei(c: &mut Criterion) {
         })
         .collect();
 
-    let state_counts: Vec<usize> = (0..num_scales)
-        .map(|i| 256 >> i)
-        .collect();
+    let state_counts: Vec<usize> = (0..num_scales).map(|i| 256 >> i).collect();
 
     group.bench_function("5_scales", |b| {
-        b.iter(|| {
-            compute_ei_multi_scale(black_box(&matrices), black_box(&state_counts))
-        });
+        b.iter(|| compute_ei_multi_scale(black_box(&matrices), black_box(&state_counts)));
     });
 
     group.finish();
@@ -220,15 +202,11 @@ fn bench_coarse_graining_methods(c: &mut Criterion) {
     let matrix = generate_transition_matrix(n);
 
     group.bench_function("sequential", |b| {
-        b.iter(|| {
-            ScaleHierarchy::build_sequential(black_box(matrix.clone()), black_box(2))
-        });
+        b.iter(|| ScaleHierarchy::build_sequential(black_box(matrix.clone()), black_box(2)));
     });
 
     group.bench_function("optimal", |b| {
-        b.iter(|| {
-            ScaleHierarchy::build_optimal(black_box(matrix.clone()), black_box(2))
-        });
+        b.iter(|| ScaleHierarchy::build_optimal(black_box(matrix.clone()), black_box(2)));
     });
 
     group.finish();

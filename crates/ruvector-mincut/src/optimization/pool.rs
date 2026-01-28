@@ -133,8 +133,8 @@ impl LevelData {
 
     /// Update memory size estimate
     pub fn update_memory_size(&mut self) {
-        self.memory_size = self.vertices.len() * std::mem::size_of::<u16>()
-            + self.adjacency.memory_size();
+        self.memory_size =
+            self.vertices.len() * std::mem::size_of::<u16>() + self.adjacency.memory_size();
     }
 
     /// Get memory size
@@ -271,7 +271,8 @@ impl LevelPool {
     /// Check if level is materialized
     pub fn is_materialized(&self, level_idx: usize) -> bool {
         let levels = self.levels.read().unwrap();
-        levels.get(&level_idx)
+        levels
+            .get(&level_idx)
             .map(|l| l.is_materialized())
             .unwrap_or(false)
     }
@@ -325,13 +326,9 @@ impl LevelPool {
         let mut levels = self.levels.write().unwrap();
 
         if let Some(level) = levels.get(&level_idx) {
-            let last_vertex_count = level.data()
-                .map(|d| d.vertices.len())
-                .unwrap_or(0);
+            let last_vertex_count = level.data().map(|d| d.vertices.len()).unwrap_or(0);
 
-            let memory_freed = level.data()
-                .map(|d| d.memory_size())
-                .unwrap_or(0);
+            let memory_freed = level.data().map(|d| d.memory_size()).unwrap_or(0);
 
             // Try to recycle the allocation
             if self.config.lazy_dealloc {
@@ -357,9 +354,7 @@ impl LevelPool {
     /// Ensure we have capacity (evict if needed)
     fn ensure_capacity(&self) {
         let levels = self.levels.read().unwrap();
-        let materialized_count = levels.values()
-            .filter(|l| l.is_materialized())
-            .count();
+        let materialized_count = levels.values().filter(|l| l.is_materialized()).count();
         drop(levels);
 
         if materialized_count >= self.config.max_materialized_levels {
@@ -422,9 +417,7 @@ impl LevelPool {
     /// Get pool statistics
     pub fn stats(&self) -> PoolStats {
         let levels = self.levels.read().unwrap();
-        let materialized_count = levels.values()
-            .filter(|l| l.is_materialized())
-            .count();
+        let materialized_count = levels.values().filter(|l| l.is_materialized()).count();
 
         PoolStats {
             allocations: self.allocations.load(Ordering::Relaxed),
@@ -549,11 +542,7 @@ mod tests {
 
     #[test]
     fn test_compact_adjacency() {
-        let edges = vec![
-            (0u16, 1u16, 10u16),
-            (1, 2, 20),
-            (2, 0, 30),
-        ];
+        let edges = vec![(0u16, 1u16, 10u16), (1, 2, 20), (2, 0, 30)];
 
         let adj = CompactAdjacency::from_edges(&edges, 3);
 

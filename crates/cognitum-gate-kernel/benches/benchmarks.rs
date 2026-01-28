@@ -13,7 +13,9 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 
 use cognitum_gate_kernel::{
     delta::{Delta, Observation},
-    evidence::{EvidenceAccumulator, HypothesisState, LogEValue, f32_to_log_e, LOG_LR_CONNECTIVITY_POS},
+    evidence::{
+        f32_to_log_e, EvidenceAccumulator, HypothesisState, LogEValue, LOG_LR_CONNECTIVITY_POS,
+    },
     report::TileReport,
     shard::{CompactGraph, MAX_SHARD_VERTICES},
     TileState, MAX_DELTA_BUFFER,
@@ -400,8 +402,8 @@ fn bench_mixture_evalue(c: &mut Criterion) {
     // Scalar baseline
     group.bench_function("aggregate_16_scalar", |b| {
         let log_e_values: [LogEValue; 16] = [
-            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768,
-            65536, 65536, 38550, -65536, 65536, 38550, 65536, 38550,
+            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768, 65536, 65536, 38550, -65536,
+            65536, 38550, 65536, 38550,
         ];
 
         b.iter(|| {
@@ -413,8 +415,8 @@ fn bench_mixture_evalue(c: &mut Criterion) {
     // Parallel lanes pattern (SIMD-friendly)
     group.bench_function("aggregate_16_parallel_lanes", |b| {
         let log_e_values: [LogEValue; 16] = [
-            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768,
-            65536, 65536, 38550, -65536, 65536, 38550, 65536, 38550,
+            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768, 65536, 65536, 38550, -65536,
+            65536, 38550, 65536, 38550,
         ];
 
         b.iter(|| {
@@ -431,8 +433,8 @@ fn bench_mixture_evalue(c: &mut Criterion) {
     // Chunked processing (auto-vectorization friendly)
     group.bench_function("aggregate_16_chunked", |b| {
         let log_e_values: [LogEValue; 16] = [
-            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768,
-            65536, 65536, 38550, -65536, 65536, 38550, 65536, 38550,
+            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768, 65536, 65536, 38550, -65536,
+            65536, 38550, 65536, 38550,
         ];
 
         b.iter(|| {
@@ -460,8 +462,8 @@ fn bench_mixture_evalue(c: &mut Criterion) {
     // Mixture with product (exp-log pattern)
     group.bench_function("mixture_product_16", |b| {
         let log_e_values: [LogEValue; 16] = [
-            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768,
-            65536, 65536, 38550, -65536, 65536, 38550, 65536, 38550,
+            65536, 38550, -65536, 65536, 38550, 65536, 38550, -32768, 65536, 65536, 38550, -65536,
+            65536, 38550, 65536, 38550,
         ];
 
         b.iter(|| {
@@ -628,23 +630,11 @@ fn bench_memory_patterns(c: &mut Criterion) {
 // Criterion Groups
 // ============================================================================
 
-criterion_group!(
-    edge_benches,
-    bench_edge_insert,
-    bench_edge_batch,
-);
+criterion_group!(edge_benches, bench_edge_insert, bench_edge_batch,);
 
-criterion_group!(
-    tick_benches,
-    bench_tick,
-    bench_tick_under_load,
-);
+criterion_group!(tick_benches, bench_tick, bench_tick_under_load,);
 
-criterion_group!(
-    evidence_benches,
-    bench_evalue_update,
-    bench_mixture_evalue,
-);
+criterion_group!(evidence_benches, bench_evalue_update, bench_mixture_evalue,);
 
 criterion_group!(
     misc_benches,

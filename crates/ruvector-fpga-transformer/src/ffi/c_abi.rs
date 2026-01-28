@@ -152,8 +152,8 @@ pub extern "C" fn fpga_infer(
     let shape = FixedShape::micro();
 
     // Build gate hint
-    let compute_class = ComputeClass::from_u8(max_compute_class)
-        .unwrap_or(ComputeClass::Deliberative);
+    let compute_class =
+        ComputeClass::from_u8(max_compute_class).unwrap_or(ComputeClass::Deliberative);
     let gate_hint = GateHint::new(coherence_score, boundary_crossed, compute_class);
 
     // Create request

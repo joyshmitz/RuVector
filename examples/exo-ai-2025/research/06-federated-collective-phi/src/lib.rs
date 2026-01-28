@@ -8,28 +8,27 @@
 // Research by: Comprehensive literature synthesis (2023-2025)
 // Nobel-level breakthrough potential: Yes
 
-pub mod distributed_phi;
 pub mod consciousness_crdt;
-pub mod qualia_consensus;
+pub mod distributed_phi;
 pub mod federation_emergence;
+pub mod qualia_consensus;
 
 pub use distributed_phi::{
     AgentId, DistributedPhiCalculator, DistributedPhiCoordinator, SpectralPhiApproximator,
 };
 
 pub use consciousness_crdt::{
-    ConsciousnessState, Quale, PhiCounter, QualiaSet, AttentionRegister,
-    WorkingMemory, VectorClock,
+    AttentionRegister, ConsciousnessState, PhiCounter, Quale, QualiaSet, VectorClock, WorkingMemory,
 };
 
 pub use qualia_consensus::{
-    QualiaConsensusNode, QualiaVotingConsensus, QualiaMessage, ConsensusResult,
-    ConsensusCoordinator, qualia_distance,
+    qualia_distance, ConsensusCoordinator, ConsensusResult, QualiaConsensusNode, QualiaMessage,
+    QualiaVotingConsensus,
 };
 
 pub use federation_emergence::{
-    EmergenceDetector, EmergenceIndicators, TopologyMetrics, ConsciousnessPhase,
-    CriticalCouplingCalculator, EmergencePrediction,
+    ConsciousnessPhase, CriticalCouplingCalculator, EmergenceDetector, EmergenceIndicators,
+    EmergencePrediction, TopologyMetrics,
 };
 
 /// Version of the FCΦ framework

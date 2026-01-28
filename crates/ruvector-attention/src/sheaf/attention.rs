@@ -339,10 +339,7 @@ impl SheafAttention {
                 })
                 .collect()
         } else {
-            energies
-                .iter()
-                .map(|&e| -self.config.beta * e)
-                .collect()
+            energies.iter().map(|&e| -self.config.beta * e).collect()
         };
 
         let attention_weights = stable_softmax(&logits);
@@ -464,10 +461,7 @@ impl Attention for SheafAttention {
                 })
                 .collect()
         } else {
-            energies
-                .iter()
-                .map(|&e| -self.config.beta * e)
-                .collect()
+            energies.iter().map(|&e| -self.config.beta * e).collect()
         };
 
         let attention_weights = stable_softmax(&logits);
@@ -569,12 +563,8 @@ mod tests {
         // With identity-like restriction maps, identical vectors should have low energy
         let config = SheafAttentionConfig::new(4);
         let rho = RestrictionMap::identity(4);
-        let attention = SheafAttention::with_restriction_maps(
-            config,
-            rho.clone(),
-            rho.clone(),
-            rho,
-        );
+        let attention =
+            SheafAttention::with_restriction_maps(config, rho.clone(), rho.clone(), rho);
 
         let v = vec![1.0, 2.0, 3.0, 4.0];
         let energy = attention.compute_energy(&v, &v).unwrap();
@@ -697,12 +687,8 @@ mod tests {
             rho.clone(),
             rho.clone(),
         );
-        let attention_high = SheafAttention::with_restriction_maps(
-            config_high,
-            rho.clone(),
-            rho.clone(),
-            rho,
-        );
+        let attention_high =
+            SheafAttention::with_restriction_maps(config_high, rho.clone(), rho.clone(), rho);
 
         let query = vec![1.0; 8];
         let k1 = vec![1.0; 8];

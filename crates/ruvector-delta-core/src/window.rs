@@ -126,7 +126,10 @@ where
             self.window_start_ns = timestamp_ns;
         }
 
-        self.entries.push_back(WindowEntry { delta, timestamp_ns });
+        self.entries.push_back(WindowEntry {
+            delta,
+            timestamp_ns,
+        });
 
         // Enforce max items
         while self.entries.len() > self.config.max_items {
@@ -238,10 +241,7 @@ where
             return None;
         }
 
-        let window_entries: Vec<_> = self
-            .entries
-            .drain(..self.config.size)
-            .collect();
+        let window_entries: Vec<_> = self.entries.drain(..self.config.size).collect();
 
         Some(self.compose_entries(&window_entries))
     }

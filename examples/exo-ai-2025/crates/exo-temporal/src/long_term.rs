@@ -5,11 +5,11 @@
 //! - Batch integration with deferred index sorting
 //! - Early-exit similarity search for hot patterns
 
-use crate::types::{TemporalPattern, PatternId, Query, SearchResult, SubstrateTime, TimeRange};
+use crate::types::{PatternId, Query, SearchResult, SubstrateTime, TemporalPattern, TimeRange};
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Configuration for long-term store
 #[derive(Debug, Clone)]
@@ -109,7 +109,8 @@ impl LongTermStore {
 
         for entry in self.patterns.iter() {
             let temporal_pattern = entry.value();
-            let score = cosine_similarity_simd(&query.embedding, &temporal_pattern.pattern.embedding);
+            let score =
+                cosine_similarity_simd(&query.embedding, &temporal_pattern.pattern.embedding);
 
             // Early exit optimization: skip if below worst score in top-k
             if results.len() >= k && score <= results.last().map(|r| r.score).unwrap_or(0.0) {
@@ -124,18 +125,30 @@ impl LongTermStore {
 
             // Keep sorted and bounded
             if results.len() > k {
-                results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 results.truncate(k);
             }
         }
 
         // Final sort
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
     /// Search with time range filter (SIMD-accelerated)
-    pub fn search_with_time_range(&self, query: &Query, time_range: TimeRange) -> Vec<SearchResult> {
+    pub fn search_with_time_range(
+        &self,
+        query: &Query,
+        time_range: TimeRange,
+    ) -> Vec<SearchResult> {
         let k = query.k;
         let mut results: Vec<SearchResult> = Vec::with_capacity(k + 1);
 
@@ -147,7 +160,8 @@ impl LongTermStore {
                 continue;
             }
 
-            let score = cosine_similarity_simd(&query.embedding, &temporal_pattern.pattern.embedding);
+            let score =
+                cosine_similarity_simd(&query.embedding, &temporal_pattern.pattern.embedding);
 
             // Early exit optimization
             if results.len() >= k && score <= results.last().map(|r| r.score).unwrap_or(0.0) {
@@ -161,12 +175,20 @@ impl LongTermStore {
             });
 
             if results.len() > k {
-                results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 results.truncate(k);
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -252,7 +274,11 @@ impl LongTermStore {
         let size = self.patterns.len();
 
         // Compute average salience
-        let total_salience: f32 = self.patterns.iter().map(|e| e.value().pattern.salience).sum();
+        let total_salience: f32 = self
+            .patterns
+            .iter()
+            .map(|e| e.value().pattern.salience)
+            .sum();
         let avg_salience = if size > 0 {
             total_salience / size as f32
         } else {
@@ -368,7 +394,8 @@ mod tests {
     fn test_long_term_store() {
         let store = LongTermStore::default();
 
-        let temporal_pattern = TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
+        let temporal_pattern =
+            TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
         let id = temporal_pattern.pattern.id;
 
         store.integrate(temporal_pattern);
@@ -400,7 +427,8 @@ mod tests {
     fn test_decay() {
         let store = LongTermStore::default();
 
-        let mut temporal_pattern = TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
+        let mut temporal_pattern =
+            TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
         temporal_pattern.pattern.salience = 0.15; // Just above minimum
         let id = temporal_pattern.pattern.id;
 

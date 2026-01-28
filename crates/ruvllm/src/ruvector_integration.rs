@@ -47,14 +47,12 @@
 //! ```
 
 use crate::capabilities::{
-    RuvectorCapabilities, ATTENTION_AVAILABLE, GNN_AVAILABLE, GRAPH_AVAILABLE,
-    HNSW_AVAILABLE, SONA_AVAILABLE,
+    RuvectorCapabilities, ATTENTION_AVAILABLE, GNN_AVAILABLE, GRAPH_AVAILABLE, HNSW_AVAILABLE,
+    SONA_AVAILABLE,
 };
 use crate::claude_flow::{AgentRouter, AgentType};
 use crate::error::{Result, RuvLLMError};
-use crate::sona::{
-    RoutingRecommendation, SonaConfig, SonaIntegration, SonaStats, Trajectory,
-};
+use crate::sona::{RoutingRecommendation, SonaConfig, SonaIntegration, SonaStats, Trajectory};
 use parking_lot::RwLock;
 use ruvector_core::index::hnsw::HnswIndex;
 use ruvector_core::index::VectorIndex;
@@ -193,7 +191,9 @@ impl Clone for UnifiedIndexStats {
             total_vectors: AtomicU64::new(self.total_vectors.load(Ordering::Relaxed)),
             total_searches: AtomicU64::new(self.total_searches.load(Ordering::Relaxed)),
             successful_matches: AtomicU64::new(self.successful_matches.load(Ordering::Relaxed)),
-            avg_search_latency_us: AtomicU64::new(self.avg_search_latency_us.load(Ordering::Relaxed)),
+            avg_search_latency_us: AtomicU64::new(
+                self.avg_search_latency_us.load(Ordering::Relaxed),
+            ),
             patterns_learned: AtomicU64::new(self.patterns_learned.load(Ordering::Relaxed)),
         }
     }
@@ -431,7 +431,9 @@ impl Clone for IntelligenceStats {
         Self {
             routing_decisions: AtomicU64::new(self.routing_decisions.load(Ordering::Relaxed)),
             successful_routings: AtomicU64::new(self.successful_routings.load(Ordering::Relaxed)),
-            pattern_based_routings: AtomicU64::new(self.pattern_based_routings.load(Ordering::Relaxed)),
+            pattern_based_routings: AtomicU64::new(
+                self.pattern_based_routings.load(Ordering::Relaxed),
+            ),
             learning_updates: AtomicU64::new(self.learning_updates.load(Ordering::Relaxed)),
             ewc_consolidations: AtomicU64::new(self.ewc_consolidations.load(Ordering::Relaxed)),
         }
@@ -637,7 +639,9 @@ impl IntelligenceLayer {
             let id = format!("pattern-{}", uuid::Uuid::new_v4());
             self.index.add(id, embedding.to_vec(), metadata)?;
 
-            self.stats.successful_routings.fetch_add(1, Ordering::SeqCst);
+            self.stats
+                .successful_routings
+                .fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(())
@@ -993,7 +997,9 @@ mod tests {
             ..Default::default()
         };
 
-        index.add("test-1".to_string(), embedding.clone(), metadata).unwrap();
+        index
+            .add("test-1".to_string(), embedding.clone(), metadata)
+            .unwrap();
 
         let results = index.search(&embedding, 5).unwrap();
         assert_eq!(results.len(), 1);
@@ -1072,10 +1078,7 @@ mod tests {
         );
 
         // Simple tasks with high confidence should get tier 0
-        assert_eq!(
-            IntelligenceLayer::determine_model_tier("fix typo", 0.9),
-            0
-        );
+        assert_eq!(IntelligenceLayer::determine_model_tier("fix typo", 0.9), 0);
 
         // Default should be tier 1
         assert_eq!(

@@ -12,8 +12,8 @@ pub use verify::{verify_artifact, verify_signature};
 
 use crate::error::{Error, Result};
 use crate::types::{FixedShape, ModelId, QuantSpec};
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Complete model artifact
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,11 +123,14 @@ impl ModelArtifact {
         self.manifest.validate()?;
 
         // Validate shape
-        self.manifest.shape.validate().map_err(|e| Error::InvalidArtifact(e))?;
+        self.manifest
+            .shape
+            .validate()
+            .map_err(|e| Error::InvalidArtifact(e))?;
 
         // Check weights size is reasonable
-        let min_weight_size = self.manifest.shape.embedding_params()
-            / self.manifest.quant.weights_per_byte();
+        let min_weight_size =
+            self.manifest.shape.embedding_params() / self.manifest.quant.weights_per_byte();
         if self.weights.len() < min_weight_size {
             return Err(Error::InvalidArtifact(format!(
                 "Weights too small: {} bytes, expected at least {} for embeddings",
@@ -193,13 +196,7 @@ mod tests {
     #[test]
     fn test_model_id_computation() {
         let manifest = create_test_manifest();
-        let artifact = ModelArtifact::new(
-            manifest,
-            vec![0u8; 4096 * 64],
-            None,
-            None,
-            vec![],
-        );
+        let artifact = ModelArtifact::new(manifest, vec![0u8; 4096 * 64], None, None, vec![]);
 
         let id1 = artifact.model_id();
         let id2 = artifact.model_id();
@@ -209,13 +206,7 @@ mod tests {
     #[test]
     fn test_model_hash() {
         let manifest = create_test_manifest();
-        let artifact = ModelArtifact::new(
-            manifest,
-            vec![42u8; 4096 * 64],
-            None,
-            None,
-            vec![],
-        );
+        let artifact = ModelArtifact::new(manifest, vec![42u8; 4096 * 64], None, None, vec![]);
 
         let hash = artifact.model_hash();
         assert_ne!(hash, [0u8; 32]); // Non-zero hash

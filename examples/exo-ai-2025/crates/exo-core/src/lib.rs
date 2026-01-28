@@ -300,11 +300,7 @@ pub trait SubstrateBackend: Send + Sync {
     ) -> Result<Vec<SearchResult>>;
 
     /// Deform manifold to incorporate new pattern
-    fn manifold_deform(
-        &self,
-        pattern: &Pattern,
-        learning_rate: f32,
-    ) -> Result<ManifoldDelta>;
+    fn manifold_deform(&self, pattern: &Pattern, learning_rate: f32) -> Result<ManifoldDelta>;
 
     /// Get embedding dimension
     fn dimension(&self) -> usize;

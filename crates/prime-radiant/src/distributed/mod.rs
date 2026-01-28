@@ -134,7 +134,12 @@ impl DistributedCoherence {
     /// Update energy for an edge
     ///
     /// This operation goes through Raft consensus and is replicated to all nodes.
-    pub fn update_energy(&mut self, source: u64, target: u64, energy: f32) -> Result<CommandResult> {
+    pub fn update_energy(
+        &mut self,
+        source: u64,
+        target: u64,
+        energy: f32,
+    ) -> Result<CommandResult> {
         let result = self.raft.update_energy((source, target), energy)?;
 
         // Apply to local state machine

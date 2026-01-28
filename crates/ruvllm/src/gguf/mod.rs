@@ -60,11 +60,11 @@
 //! )?;
 //! ```
 
+pub mod loader;
+pub mod model_init;
 pub mod parser;
 pub mod quantization;
 pub mod tensors;
-pub mod loader;
-pub mod model_init;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -74,20 +74,20 @@ use std::path::Path;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
 
-use crate::error::{Result, RuvLLMError};
 use crate::backends::ModelArchitecture;
+use crate::error::{Result, RuvLLMError};
 
-pub use parser::{GgufHeader, GgufValue, parse_header, parse_metadata, parse_tensor_infos};
-pub use quantization::{GgufQuantType, QuantizedTensor, dequantize_block};
-pub use tensors::TensorInfo;
 pub use loader::{
-    GgufLoader, LoadConfig, LoadProgress, LoadedWeights, LoadedTensor,
-    TensorCategory, TensorNameMapper, StreamingLoader, ProgressCallback,
+    GgufLoader, LoadConfig, LoadProgress, LoadedTensor, LoadedWeights, ProgressCallback,
+    StreamingLoader, TensorCategory, TensorNameMapper,
 };
 pub use model_init::{
-    ModelInitializer, ModelWeights, LayerWeights, WeightTensor, QuantizedWeight,
-    ProgressModelBuilder,
+    LayerWeights, ModelInitializer, ModelWeights, ProgressModelBuilder, QuantizedWeight,
+    WeightTensor,
 };
+pub use parser::{parse_header, parse_metadata, parse_tensor_infos, GgufHeader, GgufValue};
+pub use quantization::{dequantize_block, GgufQuantType, QuantizedTensor};
+pub use tensors::TensorInfo;
 
 // ============================================================================
 // GGUF File Magic and Constants
@@ -176,9 +176,8 @@ impl GgufFile {
     /// - The file is not a valid GGUF file
     /// - The GGUF version is not supported
     pub fn open(path: &Path) -> Result<Self> {
-        let file = File::open(path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to open GGUF file: {}", e))
-        })?;
+        let file = File::open(path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to open GGUF file: {}", e)))?;
         let mut reader = BufReader::new(file);
 
         // Parse header
@@ -213,9 +212,9 @@ impl GgufFile {
         let tensors = parse_tensor_infos(&mut reader, header.tensor_count)?;
 
         // Calculate data offset (aligned)
-        let current_pos = reader.stream_position().map_err(|e| {
-            RuvLLMError::Model(format!("Failed to get stream position: {}", e))
-        })?;
+        let current_pos = reader
+            .stream_position()
+            .map_err(|e| RuvLLMError::Model(format!("Failed to get stream position: {}", e)))?;
         let data_offset = align_offset(current_pos, alignment as u64);
 
         Ok(Self {
@@ -249,14 +248,12 @@ impl GgufFile {
     pub fn open_mmap(path: &Path) -> Result<Self> {
         let mut gguf = Self::open(path)?;
 
-        let file = File::open(path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to open file for mmap: {}", e))
-        })?;
+        let file = File::open(path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to open file for mmap: {}", e)))?;
 
         let mmap = unsafe {
-            memmap2::Mmap::map(&file).map_err(|e| {
-                RuvLLMError::Model(format!("Failed to memory map file: {}", e))
-            })?
+            memmap2::Mmap::map(&file)
+                .map_err(|e| RuvLLMError::Model(format!("Failed to memory map file: {}", e)))?
         };
 
         gguf.mmap = Some(MmapData { mmap });
@@ -269,9 +266,8 @@ impl GgufFile {
         let mut gguf = Self::open(path)?;
 
         // Read entire file into memory as fallback
-        let data = std::fs::read(path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to read file: {}", e))
-        })?;
+        let data = std::fs::read(path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to read file: {}", e)))?;
 
         gguf.mmap = Some(MmapData { data });
         Ok(gguf)
@@ -307,9 +303,9 @@ impl GgufFile {
     ///
     /// Returns an error if the tensor is not found or cannot be read
     pub fn load_tensor_f32(&self, name: &str) -> Result<Vec<f32>> {
-        let info = self.get_tensor(name).ok_or_else(|| {
-            RuvLLMError::NotFound(format!("Tensor not found: {}", name))
-        })?;
+        let info = self
+            .get_tensor(name)
+            .ok_or_else(|| RuvLLMError::NotFound(format!("Tensor not found: {}", name)))?;
 
         let raw_data = self.read_tensor_bytes(info)?;
         let num_elements: usize = info.shape.iter().product();
@@ -332,9 +328,9 @@ impl GgufFile {
     ///
     /// A `QuantizedTensor` containing the raw quantized data
     pub fn load_tensor_quantized(&self, name: &str) -> Result<QuantizedTensor> {
-        let info = self.get_tensor(name).ok_or_else(|| {
-            RuvLLMError::NotFound(format!("Tensor not found: {}", name))
-        })?;
+        let info = self
+            .get_tensor(name)
+            .ok_or_else(|| RuvLLMError::NotFound(format!("Tensor not found: {}", name)))?;
 
         let data = self.read_tensor_bytes(info)?;
         let num_elements: usize = info.shape.iter().product();
@@ -396,9 +392,9 @@ impl GgufFile {
     where
         F: FnMut(&[f32]) -> Result<()>,
     {
-        let info = self.get_tensor(name).ok_or_else(|| {
-            RuvLLMError::NotFound(format!("Tensor not found: {}", name))
-        })?;
+        let info = self
+            .get_tensor(name)
+            .ok_or_else(|| RuvLLMError::NotFound(format!("Tensor not found: {}", name)))?;
 
         let _num_elements: usize = info.shape.iter().product();
 
@@ -438,14 +434,15 @@ impl GgufFile {
 
     /// Get the model architecture as enum.
     pub fn architecture_type(&self) -> Option<ModelArchitecture> {
-        self.architecture().and_then(|arch| match arch.to_lowercase().as_str() {
-            "llama" => Some(ModelArchitecture::Llama),
-            "mistral" => Some(ModelArchitecture::Mistral),
-            "phi" | "phi2" | "phi3" => Some(ModelArchitecture::Phi),
-            "qwen" | "qwen2" => Some(ModelArchitecture::Qwen),
-            "gemma" => Some(ModelArchitecture::Gemma),
-            _ => None,
-        })
+        self.architecture()
+            .and_then(|arch| match arch.to_lowercase().as_str() {
+                "llama" => Some(ModelArchitecture::Llama),
+                "mistral" => Some(ModelArchitecture::Mistral),
+                "phi" | "phi2" | "phi3" => Some(ModelArchitecture::Phi),
+                "qwen" | "qwen2" => Some(ModelArchitecture::Qwen),
+                "gemma" => Some(ModelArchitecture::Gemma),
+                _ => None,
+            })
     }
 
     /// Get the context length (max sequence length).
@@ -538,16 +535,12 @@ impl GgufFile {
 
     /// Get the model name.
     pub fn model_name(&self) -> Option<&str> {
-        self.metadata
-            .get("general.name")
-            .and_then(|v| v.as_str())
+        self.metadata.get("general.name").and_then(|v| v.as_str())
     }
 
     /// Get the model author.
     pub fn author(&self) -> Option<&str> {
-        self.metadata
-            .get("general.author")
-            .and_then(|v| v.as_str())
+        self.metadata.get("general.author").and_then(|v| v.as_str())
     }
 
     /// Get the quantization type description.
@@ -585,9 +578,8 @@ impl GgufFile {
         }
 
         // Read from file
-        let mut file = File::open(&self.path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to open file: {}", e))
-        })?;
+        let mut file = File::open(&self.path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to open file: {}", e)))?;
 
         file.seek(SeekFrom::Start(self.data_offset + info.offset))
             .map_err(|e| RuvLLMError::Model(format!("Failed to seek: {}", e)))?;
@@ -604,9 +596,8 @@ impl GgufFile {
         F: FnMut(&[f32]) -> Result<()>,
     {
         let num_elements: usize = info.shape.iter().product();
-        let mut file = File::open(&self.path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to open file: {}", e))
-        })?;
+        let mut file = File::open(&self.path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to open file: {}", e)))?;
 
         file.seek(SeekFrom::Start(self.data_offset + info.offset))
             .map_err(|e| RuvLLMError::Model(format!("Failed to seek: {}", e)))?;
@@ -639,9 +630,8 @@ impl GgufFile {
         F: FnMut(&[f32]) -> Result<()>,
     {
         let num_elements: usize = info.shape.iter().product();
-        let mut file = File::open(&self.path).map_err(|e| {
-            RuvLLMError::Model(format!("Failed to open file: {}", e))
-        })?;
+        let mut file = File::open(&self.path)
+            .map_err(|e| RuvLLMError::Model(format!("Failed to open file: {}", e)))?;
 
         file.seek(SeekFrom::Start(self.data_offset + info.offset))
             .map_err(|e| RuvLLMError::Model(format!("Failed to seek: {}", e)))?;
@@ -760,7 +750,10 @@ impl GgufModelLoader {
             }
         }
 
-        counts.into_iter().max_by_key(|(_, count)| *count).map(|(dtype, _)| dtype)
+        counts
+            .into_iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(dtype, _)| dtype)
     }
 
     /// Convert to a Candle-compatible model (stub for integration).

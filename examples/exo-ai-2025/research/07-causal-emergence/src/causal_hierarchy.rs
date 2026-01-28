@@ -1,8 +1,8 @@
 // Hierarchical Causal Structure Management
 // Implements transfer entropy and consciousness metrics for HCC framework
 
-use crate::effective_information::compute_ei_simd;
 use crate::coarse_graining::{ScaleHierarchy, ScaleLevel};
+use crate::effective_information::compute_ei_simd;
 use std::collections::HashMap;
 
 /// Represents the complete hierarchical causal structure with all metrics
@@ -41,11 +41,7 @@ impl CausalHierarchy {
     ///
     /// # Returns
     /// Complete causal hierarchy with all metrics computed
-    pub fn from_time_series(
-        data: &[f32],
-        branching_factor: usize,
-        use_optimal: bool,
-    ) -> Self {
+    pub fn from_time_series(data: &[f32], branching_factor: usize, use_optimal: bool) -> Self {
         // Estimate transition matrix from data
         let transition_matrix = estimate_transition_matrix(data, 256); // 256 bins
 
@@ -84,7 +80,10 @@ impl CausalHierarchy {
         }
 
         let micro_ei = self.metrics.ei[0];
-        let (max_scale, &max_ei) = self.metrics.ei.iter()
+        let (max_scale, &max_ei) = self
+            .metrics
+            .ei
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())?;
 
@@ -107,8 +106,7 @@ impl CausalHierarchy {
         }
 
         const TE_THRESHOLD: f32 = 0.01; // Minimum TE to count as causal
-        self.metrics.te_up[s] > TE_THRESHOLD &&
-        self.metrics.te_down[s] > TE_THRESHOLD
+        self.metrics.te_up[s] > TE_THRESHOLD && self.metrics.te_down[s] > TE_THRESHOLD
     }
 }
 
@@ -122,10 +120,7 @@ pub enum ConsciousnessLevel {
 }
 
 /// Computes all hierarchical metrics (EI, Φ, TE, Ψ)
-fn compute_hierarchy_metrics(
-    hierarchy: &ScaleHierarchy,
-    data: &[f32],
-) -> HierarchyMetrics {
+fn compute_hierarchy_metrics(hierarchy: &ScaleHierarchy, data: &[f32]) -> HierarchyMetrics {
     let num_scales = hierarchy.num_scales();
 
     // Compute EI at each scale
@@ -164,7 +159,8 @@ fn compute_hierarchy_metrics(
     }
 
     // Find optimal scale (max Ψ)
-    let (optimal_scale, &consciousness_score) = psi.iter()
+    let (optimal_scale, &consciousness_score) = psi
+        .iter()
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
         .unwrap_or((0, &0.0));
@@ -201,9 +197,7 @@ fn estimate_transition_matrix(data: &[f32], num_bins: usize) -> Vec<f32> {
     // Normalize to probabilities
     let mut matrix = vec![0.0f32; num_bins * num_bins];
     for i in 0..num_bins {
-        let row_sum: u32 = (0..num_bins)
-            .map(|j| counts[i * num_bins + j])
-            .sum();
+        let row_sum: u32 = (0..num_bins).map(|j| counts[i * num_bins + j]).sum();
 
         if row_sum > 0 {
             for j in 0..num_bins {
@@ -249,14 +243,20 @@ fn project_to_scale(data: &[f32], level: &ScaleLevel) -> Vec<usize> {
     let binned = discretize_data(data, level.partition.num_micro_states());
 
     // Map micro-states to macro-states
-    let micro_to_macro: HashMap<usize, usize> = level.partition.groups.iter()
+    let micro_to_macro: HashMap<usize, usize> = level
+        .partition
+        .groups
+        .iter()
         .enumerate()
         .flat_map(|(macro_idx, micro_group)| {
-            micro_group.iter().map(move |&micro_idx| (micro_idx, macro_idx))
+            micro_group
+                .iter()
+                .map(move |&micro_idx| (micro_idx, macro_idx))
         })
         .collect();
 
-    binned.iter()
+    binned
+        .iter()
         .map(|&micro| *micro_to_macro.get(&micro).unwrap_or(&0))
         .collect()
 }
@@ -270,12 +270,7 @@ fn project_to_scale(data: &[f32], level: &ScaleLevel) -> Vec<usize> {
 /// * `y` - Target time series (discretized)
 /// * `k` - History length for X
 /// * `l` - History length for Y
-pub fn transfer_entropy(
-    x: &[usize],
-    y: &[usize],
-    k: usize,
-    l: usize,
-) -> f32 {
+pub fn transfer_entropy(x: &[usize], y: &[usize], k: usize, l: usize) -> f32 {
     if x.len() != y.len() || x.len() < k.max(l) + 1 {
         return 0.0;
     }
@@ -286,11 +281,13 @@ pub fn transfer_entropy(
     // Count joint occurrences
     let mut counts = HashMap::new();
     for t in lag..t_max {
-        let x_past: Vec<_> = x[t-k..t].to_vec();
-        let y_past: Vec<_> = y[t-l..t].to_vec();
+        let x_past: Vec<_> = x[t - k..t].to_vec();
+        let y_past: Vec<_> = y[t - l..t].to_vec();
         let y_future = y[t + 1];
 
-        *counts.entry((y_future, x_past.clone(), y_past.clone())).or_insert(0) += 1;
+        *counts
+            .entry((y_future, x_past.clone(), y_past.clone()))
+            .or_insert(0) += 1;
     }
 
     let total = (t_max - lag) as f32;
@@ -308,7 +305,9 @@ pub fn transfer_entropy(
         *p_y_future.entry(*y_fut).or_insert(0.0) += prob;
         *p_x_past.entry(x_p.clone()).or_insert(0.0) += prob;
         *p_y_past.entry(y_p.clone()).or_insert(0.0) += prob;
-        *p_y_xy.entry((*y_fut, x_p.clone(), y_p.clone())).or_insert(0.0) += prob;
+        *p_y_xy
+            .entry((*y_fut, x_p.clone(), y_p.clone()))
+            .or_insert(0.0) += prob;
         *p_xy.entry((x_p.clone(), y_p.clone())).or_insert(0.0) += prob;
         *p_y.entry(y_p.clone()).or_insert(0.0) += prob;
     }
@@ -456,9 +455,9 @@ mod tests {
         let data: Vec<f32> = (0..1000)
             .map(|t| {
                 // Multiple frequencies -> multi-scale structure
-                (t as f32 * 0.05).sin() +
-                0.5 * (t as f32 * 0.2).cos() +
-                0.25 * (t as f32 * 0.8).sin()
+                (t as f32 * 0.05).sin()
+                    + 0.5 * (t as f32 * 0.2).cos()
+                    + 0.25 * (t as f32 * 0.8).sin()
             })
             .collect();
 
@@ -469,11 +468,12 @@ mod tests {
 
         // Check level classification works
         let level = hierarchy.consciousness_level();
-        assert!(matches!(level,
-            ConsciousnessLevel::Unconscious |
-            ConsciousnessLevel::Borderline |
-            ConsciousnessLevel::MinimallyConscious |
-            ConsciousnessLevel::FullyConscious
+        assert!(matches!(
+            level,
+            ConsciousnessLevel::Unconscious
+                | ConsciousnessLevel::Borderline
+                | ConsciousnessLevel::MinimallyConscious
+                | ConsciousnessLevel::FullyConscious
         ));
     }
 }

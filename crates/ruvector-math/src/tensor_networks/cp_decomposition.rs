@@ -48,13 +48,18 @@ impl CPDecomposition {
         let r = config.rank;
 
         // Initialize factors randomly
-        let mut factors: Vec<Vec<f64>> = tensor.shape.iter()
+        let mut factors: Vec<Vec<f64>> = tensor
+            .shape
+            .iter()
             .enumerate()
             .map(|(k, &n_k)| {
-                (0..n_k * r).map(|i| {
-                    let x = ((i * 2654435769 + k * 1103515245) as f64 / 4294967296.0) * 2.0 - 1.0;
-                    x
-                }).collect()
+                (0..n_k * r)
+                    .map(|i| {
+                        let x =
+                            ((i * 2654435769 + k * 1103515245) as f64 / 4294967296.0) * 2.0 - 1.0;
+                        x
+                    })
+                    .collect()
             })
             .collect();
 

@@ -6,7 +6,9 @@
 //! - TTL validation
 //! - Security tests (invalid signatures, replay attacks, tamper detection)
 
-use cognitum_gate_tilezero::permit::{PermitState, PermitToken, TokenDecodeError, Verifier, VerifyError};
+use cognitum_gate_tilezero::permit::{
+    PermitState, PermitToken, TokenDecodeError, Verifier, VerifyError,
+};
 use cognitum_gate_tilezero::GateDecision;
 
 fn create_test_token(action_id: &str, sequence: u64) -> PermitToken {
@@ -372,10 +374,8 @@ mod base64_encoding {
     #[test]
     fn test_decode_invalid_json() {
         // Valid base64 but not JSON
-        let encoded = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            b"not json",
-        );
+        let encoded =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, b"not json");
         let result = PermitToken::decode_base64(&encoded);
         assert!(matches!(result, Err(TokenDecodeError::InvalidJson)));
     }

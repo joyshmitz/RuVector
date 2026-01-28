@@ -150,16 +150,16 @@ impl RuvLtraPretrainConfig {
     pub fn for_ruvltra_small() -> Self {
         Self {
             sona: SonaConfig {
-                hidden_dim: 128,        // Smaller for 0.5B
-                embedding_dim: 384,     // Match model hidden/2
-                micro_lora_rank: 1,     // Minimal overhead for small model
-                base_lora_rank: 4,      // Conservative for 0.5B
+                hidden_dim: 128,              // Smaller for 0.5B
+                embedding_dim: 384,           // Match model hidden/2
+                micro_lora_rank: 1,           // Minimal overhead for small model
+                base_lora_rank: 4,            // Conservative for 0.5B
                 instant_learning_rate: 0.005, // Slightly lower for stability
                 background_learning_rate: 0.0005,
-                ewc_lambda: 500.0,      // Lower lambda for small model (less to protect)
+                ewc_lambda: 500.0, // Lower lambda for small model (less to protect)
                 pattern_capacity: 5000, // Smaller capacity
                 background_interval_secs: 1800, // 30 minutes
-                deep_interval_secs: 259200,     // 3 days
+                deep_interval_secs: 259200, // 3 days
                 quality_threshold: 0.6, // Higher threshold for small model
             },
             dataset: DatasetConfig {
@@ -171,7 +171,7 @@ impl RuvLtraPretrainConfig {
                 quality_threshold: 0.6,
             },
             routing: RoutingPretrainConfig {
-                num_clusters: 50,       // Fewer clusters for small model
+                num_clusters: 50, // Fewer clusters for small model
                 learning_rate: 0.001,
                 epochs: 5,
                 min_samples_per_class: 100,
@@ -181,7 +181,7 @@ impl RuvLtraPretrainConfig {
                 num_buckets: 5,
                 learning_rate: 0.001,
                 epochs: 3,
-                use_regression: false,  // Classification easier for small model
+                use_regression: false, // Classification easier for small model
             },
             seeding: SeedingConfig {
                 patterns_per_category: 20,
@@ -421,7 +421,10 @@ impl RuvLtraPretrainer {
     /// Pretrain routing patterns (query -> model routing)
     ///
     /// Learns which types of queries should be routed to which model size.
-    pub fn pretrain_routing_patterns(&mut self, samples: &[PretrainSample]) -> RoutingPretrainResult {
+    pub fn pretrain_routing_patterns(
+        &mut self,
+        samples: &[PretrainSample],
+    ) -> RoutingPretrainResult {
         let mut centroids = Vec::new();
         let mut model_assignments = Vec::new();
         let mut loss_history = Vec::new();
@@ -511,7 +514,10 @@ impl RuvLtraPretrainer {
     /// Pretrain quality prediction patterns
     ///
     /// Learns to predict expected quality based on query characteristics.
-    pub fn pretrain_quality_patterns(&mut self, samples: &[PretrainSample]) -> QualityPretrainResult {
+    pub fn pretrain_quality_patterns(
+        &mut self,
+        samples: &[PretrainSample],
+    ) -> QualityPretrainResult {
         let mut loss_history = Vec::new();
         let num_buckets = self.config.quality.num_buckets;
 
@@ -605,7 +611,8 @@ impl RuvLtraPretrainer {
                 pattern.pattern_type = category.pattern_type.clone();
 
                 // Create trajectory and add to bank
-                let trajectory = QueryTrajectory::new(total_seeded as u64, pattern.centroid.clone());
+                let trajectory =
+                    QueryTrajectory::new(total_seeded as u64, pattern.centroid.clone());
                 self.reasoning_bank.add_trajectory(&trajectory);
 
                 total_quality += pattern.avg_quality;

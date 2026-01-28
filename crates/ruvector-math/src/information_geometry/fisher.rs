@@ -213,11 +213,7 @@ impl FisherInformation {
     }
 
     /// Compute natural gradient: F⁻¹ ∇L
-    pub fn natural_gradient(
-        &self,
-        fim: &[Vec<f64>],
-        gradient: &[f64],
-    ) -> Result<Vec<f64>> {
+    pub fn natural_gradient(&self, fim: &[Vec<f64>], gradient: &[f64]) -> Result<Vec<f64>> {
         let fim_inv = self.invert_fim(fim)?;
         let n = gradient.len();
 

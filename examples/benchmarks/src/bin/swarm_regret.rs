@@ -121,7 +121,13 @@ fn main() -> Result<()> {
         }
 
         // Record episode
-        controller.complete_episode(solved, correct, total_steps, total_tool_calls, total_latency);
+        controller.complete_episode(
+            solved,
+            correct,
+            total_steps,
+            total_tool_calls,
+            total_latency,
+        );
 
         // Get status
         let summary = controller.regret.summary();
@@ -188,7 +194,10 @@ fn main() -> Result<()> {
     );
     println!();
     println!("📈 Performance:");
-    println!("   Average accuracy:    {:.1}%", summary.average_accuracy * 100.0);
+    println!(
+        "   Average accuracy:    {:.1}%",
+        summary.average_accuracy * 100.0
+    );
     println!("   Average reward:      {:.2}", summary.average_reward);
     println!(
         "   Moving avg reward:   {:.2}",

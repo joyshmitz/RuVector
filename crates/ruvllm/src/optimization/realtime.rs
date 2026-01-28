@@ -49,7 +49,7 @@ impl Default for RealtimeConfig {
             min_batch_size: 1,
             max_batch_size: 64,
             kv_cache_pressure_threshold: 0.8,
-            enable_speculative: true,  // Enabled by default for 2-3x decode speedup
+            enable_speculative: true, // Enabled by default for 2-3x decode speedup
             speculative: SpeculativeConfig::default(),
             batch_strategy: BatchSizeStrategy::Adaptive,
             kv_policy: KvCachePressurePolicy::Evict,
@@ -272,9 +272,7 @@ impl RealtimeOptimizer {
         let new_batch_size = match config.batch_strategy {
             BatchSizeStrategy::Fixed => current_batch,
 
-            BatchSizeStrategy::Adaptive => {
-                self.adaptive_batch_size(&config, recent_latencies)
-            }
+            BatchSizeStrategy::Adaptive => self.adaptive_batch_size(&config, recent_latencies),
 
             BatchSizeStrategy::Aggressive => {
                 // Maximize batch size while staying under latency target
@@ -306,7 +304,8 @@ impl RealtimeOptimizer {
             }
         };
 
-        self.current_batch_size.store(new_batch_size, Ordering::Relaxed);
+        self.current_batch_size
+            .store(new_batch_size, Ordering::Relaxed);
         new_batch_size
     }
 
@@ -384,7 +383,8 @@ impl RealtimeOptimizer {
             let predicted_throughput = avg_throughput * batch_ratio; // Throughput grows linearly
 
             let pred_latency_norm = (predicted_latency / config.latency_target_ms).min(2.0);
-            let pred_throughput_norm = (predicted_throughput / config.throughput_target_tps).min(2.0);
+            let pred_throughput_norm =
+                (predicted_throughput / config.throughput_target_tps).min(2.0);
 
             let predicted_utility = alpha * pred_throughput_norm - beta * pred_latency_norm;
 
@@ -424,7 +424,10 @@ impl RealtimeOptimizer {
         let mut sorted_requests: Vec<(usize, &Request)> = requests.iter().enumerate().collect();
         sorted_requests.sort_by(|(_, a), (_, b)| {
             // Higher priority first
-            let priority_cmp = b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal);
+            let priority_cmp = b
+                .priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal);
             if priority_cmp != std::cmp::Ordering::Equal {
                 return priority_cmp;
             }
@@ -460,14 +463,17 @@ impl RealtimeOptimizer {
 
             let estimated_completion = self.estimate_completion_time(request, batch_slot);
 
-            allocations.push((original_idx, TokenBudgetAllocation {
-                request_id: request.id.clone(),
-                max_tokens,
-                priority: request.priority,
-                deadline: request.deadline,
-                batch_slot,
-                estimated_completion_ms: estimated_completion,
-            }));
+            allocations.push((
+                original_idx,
+                TokenBudgetAllocation {
+                    request_id: request.id.clone(),
+                    max_tokens,
+                    priority: request.priority,
+                    deadline: request.deadline,
+                    batch_slot,
+                    estimated_completion_ms: estimated_completion,
+                },
+            ));
         }
 
         // Sort back to original order
@@ -628,7 +634,8 @@ impl RealtimeOptimizer {
         let kv_pressure = *self.kv_cache_pressure.read();
         let (should_evict, evict_count) = if kv_pressure >= config.kv_cache_pressure_threshold {
             let excess_pressure = kv_pressure - config.kv_cache_pressure_threshold;
-            let evict_ratio = (excess_pressure / (1.0 - config.kv_cache_pressure_threshold)).min(0.5);
+            let evict_ratio =
+                (excess_pressure / (1.0 - config.kv_cache_pressure_threshold)).min(0.5);
             (true, (evict_ratio * 1000.0) as usize) // Evict proportionally
         } else {
             (false, 0)
@@ -653,7 +660,8 @@ impl RealtimeOptimizer {
         };
 
         // Estimate outcomes
-        let batch_ratio = batch_size as f32 / self.current_batch_size.load(Ordering::Relaxed).max(1) as f32;
+        let batch_ratio =
+            batch_size as f32 / self.current_batch_size.load(Ordering::Relaxed).max(1) as f32;
         let estimated_latency = snapshot.ttft_avg_ms * batch_ratio.sqrt();
         let estimated_tps = snapshot.tps_avg * batch_ratio;
 
@@ -758,8 +766,7 @@ impl RealtimeOptimizer {
 
         // Increase acceptance threshold when latency is high
         if avg_latency > config.latency_target_ms {
-            spec_config.acceptance_threshold =
-                (spec_config.acceptance_threshold + 0.1).min(0.95);
+            spec_config.acceptance_threshold = (spec_config.acceptance_threshold + 0.1).min(0.95);
         }
 
         spec_config
@@ -939,7 +946,11 @@ mod tests {
             let latencies = vec![50.0, 55.0, 45.0];
             let batch = optimizer.optimize_batch_size(&latencies);
 
-            assert!(batch >= 1 && batch <= 16, "Strategy {:?} produced invalid batch size", strategy);
+            assert!(
+                batch >= 1 && batch <= 16,
+                "Strategy {:?} produced invalid batch size",
+                strategy
+            );
         }
     }
 }

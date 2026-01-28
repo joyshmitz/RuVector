@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use exo_manifold::ManifoldEngine;
-use exo_core::{ManifoldConfig, Pattern, Metadata, PatternId, SubstrateTime};
 use burn::backend::NdArray;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use exo_core::{ManifoldConfig, Metadata, Pattern, PatternId, SubstrateTime};
+use exo_manifold::ManifoldEngine;
 
 type TestBackend = NdArray;
 
@@ -48,9 +48,7 @@ fn benchmark_retrieval(c: &mut Criterion) {
             BenchmarkId::from_parameter(num_patterns),
             num_patterns,
             |b, _| {
-                b.iter(|| {
-                    engine.retrieve(black_box(&query), black_box(10))
-                });
+                b.iter(|| engine.retrieve(black_box(&query), black_box(10)));
             },
         );
     }
@@ -91,9 +89,7 @@ fn benchmark_forgetting(c: &mut Criterion) {
     }
 
     c.bench_function("manifold_forgetting", |b| {
-        b.iter(|| {
-            engine.forget(black_box(0.5), black_box(0.1))
-        });
+        b.iter(|| engine.forget(black_box(0.5), black_box(0.1)));
     });
 }
 

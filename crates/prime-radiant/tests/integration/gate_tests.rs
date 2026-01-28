@@ -125,7 +125,9 @@ impl CoherenceGate {
 
         let next_lane = match self.current_lane {
             ComputeLane::Local => Some(ComputeLane::Neighborhood { k: 2 }),
-            ComputeLane::Neighborhood { k } if k < 5 => Some(ComputeLane::Neighborhood { k: k + 1 }),
+            ComputeLane::Neighborhood { k } if k < 5 => {
+                Some(ComputeLane::Neighborhood { k: k + 1 })
+            }
             ComputeLane::Neighborhood { .. } => Some(ComputeLane::Global),
             ComputeLane::Global => Some(ComputeLane::Spectral),
             ComputeLane::Spectral => None, // Already at max
@@ -145,7 +147,9 @@ impl CoherenceGate {
     fn deescalate(&mut self) -> Option<ComputeLane> {
         let prev_lane = match self.current_lane {
             ComputeLane::Local => None,
-            ComputeLane::Neighborhood { k } if k > 2 => Some(ComputeLane::Neighborhood { k: k - 1 }),
+            ComputeLane::Neighborhood { k } if k > 2 => {
+                Some(ComputeLane::Neighborhood { k: k - 1 })
+            }
             ComputeLane::Neighborhood { .. } => Some(ComputeLane::Local),
             ComputeLane::Global => Some(ComputeLane::Neighborhood { k: 5 }),
             ComputeLane::Spectral => Some(ComputeLane::Global),
@@ -228,7 +232,10 @@ fn test_throttle_factor_increases_with_energy() {
 
     match (decision_low, decision_high) {
         (GateDecision::Throttle { factor: f1 }, GateDecision::Throttle { factor: f2 }) => {
-            assert!(f2 > f1, "Higher energy should produce higher throttle factor");
+            assert!(
+                f2 > f1,
+                "Higher energy should produce higher throttle factor"
+            );
         }
         _ => panic!("Expected both to be Throttle decisions"),
     }

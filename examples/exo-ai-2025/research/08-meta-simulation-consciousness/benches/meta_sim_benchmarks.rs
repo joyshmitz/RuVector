@@ -15,9 +15,7 @@ fn bench_closed_form_phi(c: &mut Criterion) {
 
             let calculator = ClosedFormPhi::default();
 
-            b.iter(|| {
-                black_box(calculator.compute_phi_ergodic(&adj, &nodes))
-            });
+            b.iter(|| black_box(calculator.compute_phi_ergodic(&adj, &nodes)));
         });
     }
 
@@ -36,9 +34,7 @@ fn bench_cei_computation(c: &mut Criterion) {
 
             let calculator = ClosedFormPhi::default();
 
-            b.iter(|| {
-                black_box(calculator.compute_cei(&adj, 1.0))
-            });
+            b.iter(|| black_box(calculator.compute_cei(&adj, 1.0)));
         });
     }
 
@@ -58,9 +54,7 @@ fn bench_ergodicity_test(c: &mut Criterion) {
             let analyzer = ErgodicityAnalyzer::default();
             let observable = |state: &[f64]| state[0];
 
-            b.iter(|| {
-                black_box(analyzer.test_ergodicity(&transition, observable))
-            });
+            b.iter(|| black_box(analyzer.test_ergodicity(&transition, observable)));
         });
     }
 
@@ -72,7 +66,11 @@ fn bench_hierarchical_phi(c: &mut Criterion) {
 
     group.bench_function("batch_64_depth_3", |b| {
         let param_space = ConsciousnessParameterSpace::new(4);
-        let networks: Vec<_> = param_space.generate_networks().into_iter().take(64).collect();
+        let networks: Vec<_> = param_space
+            .generate_networks()
+            .into_iter()
+            .take(64)
+            .collect();
 
         b.iter(|| {
             let mut batcher = HierarchicalPhiBatcher::new(64, 3, 4);

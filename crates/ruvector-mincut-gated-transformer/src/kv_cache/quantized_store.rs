@@ -9,7 +9,7 @@ use alloc::{vec, vec::Vec};
 #[cfg(not(feature = "no_std_gateway"))]
 use std::vec::Vec;
 
-use super::kivi::{KiviQuantizer, QuantizedKV, QuantScheme};
+use super::kivi::{KiviQuantizer, QuantScheme, QuantizedKV};
 use super::tier::CacheTier;
 
 /// A single quantized entry in the store
@@ -94,17 +94,11 @@ impl QuantizedStoreConfig {
         let warm_bytes_per_token = (self.head_dim * self.warm_bits as usize + 7) / 8;
         let archive_bytes_per_token = (self.head_dim * self.archive_bits as usize + 7) / 8;
 
-        let warm_total = self.num_layers
-            * self.num_heads
-            * self.warm_capacity
-            * warm_bytes_per_token
-            * 2; // keys + values
+        let warm_total =
+            self.num_layers * self.num_heads * self.warm_capacity * warm_bytes_per_token * 2; // keys + values
 
-        let archive_total = self.num_layers
-            * self.num_heads
-            * self.archive_capacity
-            * archive_bytes_per_token
-            * 2;
+        let archive_total =
+            self.num_layers * self.num_heads * self.archive_capacity * archive_bytes_per_token * 2;
 
         // Add scale overhead (8 bytes per token for min/max)
         let scale_overhead = (self.warm_capacity + self.archive_capacity) * 8 * self.num_layers;
@@ -177,8 +171,10 @@ impl QuantizedStore {
                 layer_warm_key_scales.push(vec![(0.0f32, 0.0f32); config.warm_capacity]);
                 layer_warm_value_scales.push(vec![(0.0f32, 0.0f32); config.warm_capacity]);
 
-                layer_archive_keys.push(vec![0u8; config.archive_capacity * archive_bytes_per_token]);
-                layer_archive_values.push(vec![0u8; config.archive_capacity * archive_bytes_per_token]);
+                layer_archive_keys
+                    .push(vec![0u8; config.archive_capacity * archive_bytes_per_token]);
+                layer_archive_values
+                    .push(vec![0u8; config.archive_capacity * archive_bytes_per_token]);
                 layer_archive_key_scales.push(vec![(0.0f32, 0.0f32); config.archive_capacity]);
                 layer_archive_value_scales.push(vec![(0.0f32, 0.0f32); config.archive_capacity]);
             }
@@ -195,7 +191,12 @@ impl QuantizedStore {
         }
 
         let scratch = (0..config.num_layers)
-            .map(|_| DequantizedKV::with_capacity(config.warm_capacity + config.archive_capacity, config.head_dim))
+            .map(|_| {
+                DequantizedKV::with_capacity(
+                    config.warm_capacity + config.archive_capacity,
+                    config.head_dim,
+                )
+            })
             .collect();
 
         Self {
@@ -232,7 +233,8 @@ impl QuantizedStore {
         // Quantize key with per-channel scheme
         let (key_q, key_min, key_max) = self.warm_quantizer.quantize(key, QuantScheme::PerChannel);
         // Quantize value with per-token scheme
-        let (value_q, value_min, value_max) = self.warm_quantizer.quantize(value, QuantScheme::PerToken);
+        let (value_q, value_min, value_max) =
+            self.warm_quantizer.quantize(value, QuantScheme::PerToken);
 
         // Store quantized data
         let bytes_per_token = (self.config.head_dim * self.config.warm_bits as usize + 7) / 8;
@@ -268,25 +270,31 @@ impl QuantizedStore {
                 // Get warm entry
                 let warm_offset = i * warm_bytes;
                 let warm_key = &self.warm_keys[layer][head][warm_offset..warm_offset + warm_bytes];
-                let warm_value = &self.warm_values[layer][head][warm_offset..warm_offset + warm_bytes];
+                let warm_value =
+                    &self.warm_values[layer][head][warm_offset..warm_offset + warm_bytes];
                 let (key_min, key_max) = self.warm_key_scales[layer][head][i];
                 let (value_min, value_max) = self.warm_value_scales[layer][head][i];
 
                 // Dequantize from warm
                 let key_fp32 = self.warm_quantizer.dequantize(warm_key, key_min, key_max);
-                let value_fp32 = self.warm_quantizer.dequantize(warm_value, value_min, value_max);
+                let value_fp32 = self
+                    .warm_quantizer
+                    .dequantize(warm_value, value_min, value_max);
 
                 // Re-quantize for archive (more aggressive)
-                let (archive_key, ak_min, ak_max) =
-                    self.archive_quantizer.quantize(&key_fp32, QuantScheme::PerChannel);
-                let (archive_value, av_min, av_max) =
-                    self.archive_quantizer.quantize(&value_fp32, QuantScheme::PerToken);
+                let (archive_key, ak_min, ak_max) = self
+                    .archive_quantizer
+                    .quantize(&key_fp32, QuantScheme::PerChannel);
+                let (archive_value, av_min, av_max) = self
+                    .archive_quantizer
+                    .quantize(&value_fp32, QuantScheme::PerToken);
 
                 // Store in archive
                 let archive_offset = archive_pos * archive_bytes;
                 self.archive_keys[layer][head][archive_offset..archive_offset + archive_key.len()]
                     .copy_from_slice(&archive_key);
-                self.archive_values[layer][head][archive_offset..archive_offset + archive_value.len()]
+                self.archive_values[layer][head]
+                    [archive_offset..archive_offset + archive_value.len()]
                     .copy_from_slice(&archive_value);
                 self.archive_key_scales[layer][head][archive_pos] = (ak_min, ak_max);
                 self.archive_value_scales[layer][head][archive_pos] = (av_min, av_max);
@@ -321,7 +329,8 @@ impl QuantizedStore {
             // Shift scales
             for i in 0..remaining {
                 self.warm_key_scales[layer][head][i] = self.warm_key_scales[layer][head][i + count];
-                self.warm_value_scales[layer][head][i] = self.warm_value_scales[layer][head][i + count];
+                self.warm_value_scales[layer][head][i] =
+                    self.warm_value_scales[layer][head][i + count];
             }
         }
 

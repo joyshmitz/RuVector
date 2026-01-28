@@ -143,10 +143,7 @@ pub fn apply_scaled(base: &mut [f32], delta: &VectorDelta, scale: f32) -> Result
 }
 
 /// Batch apply to multiple vectors
-pub fn apply_batch(
-    bases: &mut [&mut [f32]],
-    delta: &VectorDelta,
-) -> Result<(), &'static str> {
+pub fn apply_batch(bases: &mut [&mut [f32]], delta: &VectorDelta) -> Result<(), &'static str> {
     for base in bases {
         apply_delta(*base, delta)?;
     }
@@ -154,10 +151,7 @@ pub fn apply_batch(
 }
 
 /// Apply multiple deltas to a single vector
-pub fn apply_sequence(
-    base: &mut [f32],
-    deltas: &[VectorDelta],
-) -> Result<(), &'static str> {
+pub fn apply_sequence(base: &mut [f32], deltas: &[VectorDelta]) -> Result<(), &'static str> {
     for delta in deltas {
         apply_delta(base, delta)?;
     }

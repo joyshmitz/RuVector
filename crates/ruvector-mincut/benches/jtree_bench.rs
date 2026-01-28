@@ -97,7 +97,11 @@ fn generate_dense_graph(n: usize, seed: u64) -> Vec<(u64, u64, f64)> {
 
 /// Generate a graph with known minimum cut (two cliques connected by k edges)
 #[allow(dead_code)]
-fn generate_known_mincut_graph(n_per_side: usize, mincut_value: usize, seed: u64) -> Vec<(u64, u64, f64)> {
+fn generate_known_mincut_graph(
+    n_per_side: usize,
+    mincut_value: usize,
+    seed: u64,
+) -> Vec<(u64, u64, f64)> {
     let mut edges = Vec::new();
     let mut rng = StdRng::seed_from_u64(seed);
 
@@ -241,25 +245,19 @@ fn bench_point_to_point_query(c: &mut Criterion) {
 
         // Baseline benchmark
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(
-            BenchmarkId::new("baseline", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let graph = Arc::new(DynamicGraph::new());
-                        for (u, v, w) in &edges {
-                            let _ = graph.insert_edge(*u, *v, *w);
-                        }
-                        (BaselineMinCut::new(graph), 0u64, (size / 2) as u64)
-                    },
-                    |(baseline, s, t)| {
-                        black_box(baseline.point_to_point_mincut(s, t))
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("baseline", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let graph = Arc::new(DynamicGraph::new());
+                    for (u, v, w) in &edges {
+                        let _ = graph.insert_edge(*u, *v, *w);
+                    }
+                    (BaselineMinCut::new(graph), 0u64, (size / 2) as u64)
+                },
+                |(baseline, s, t)| black_box(baseline.point_to_point_mincut(s, t)),
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // J-Tree hierarchical decomposition benchmark
         group.bench_with_input(
@@ -287,27 +285,23 @@ fn bench_point_to_point_query(c: &mut Criterion) {
         // Subpolynomial min-cut benchmark (BMSSP-based)
         if size <= 10_000 {
             // Limit for reasonable benchmark time
-            group.bench_with_input(
-                BenchmarkId::new("subpoly_bmssp", size),
-                &size,
-                |b, _| {
-                    b.iter_batched(
-                        || {
-                            let mut mincut = SubpolynomialMinCut::for_size(size);
-                            for (u, v, w) in &edges {
-                                let _ = mincut.insert_edge(*u, *v, *w);
-                            }
-                            mincut.build();
-                            mincut
-                        },
-                        |mincut| {
-                            // Query is O(1) after hierarchy is built
-                            black_box(mincut.min_cut_value())
-                        },
-                        criterion::BatchSize::SmallInput,
-                    );
-                },
-            );
+            group.bench_with_input(BenchmarkId::new("subpoly_bmssp", size), &size, |b, _| {
+                b.iter_batched(
+                    || {
+                        let mut mincut = SubpolynomialMinCut::for_size(size);
+                        for (u, v, w) in &edges {
+                            let _ = mincut.insert_edge(*u, *v, *w);
+                        }
+                        mincut.build();
+                        mincut
+                    },
+                    |mincut| {
+                        // Query is O(1) after hierarchy is built
+                        black_box(mincut.min_cut_value())
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
+            });
         }
     }
 
@@ -343,9 +337,7 @@ fn bench_multi_terminal_query(c: &mut Criterion) {
                         }
                         (BaselineMinCut::new(graph), terminals.clone())
                     },
-                    |(baseline, terms)| {
-                        black_box(baseline.multi_terminal_mincut(&terms))
-                    },
+                    |(baseline, terms)| black_box(baseline.multi_terminal_mincut(&terms)),
                     criterion::BatchSize::SmallInput,
                 );
             },
@@ -418,25 +410,19 @@ fn bench_all_pairs_query(c: &mut Criterion) {
 
         // Baseline: O(n² · mn) total
         group.throughput(Throughput::Elements((size * size) as u64));
-        group.bench_with_input(
-            BenchmarkId::new("baseline", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let graph = Arc::new(DynamicGraph::new());
-                        for (u, v, w) in &edges {
-                            let _ = graph.insert_edge(*u, *v, *w);
-                        }
-                        BaselineMinCut::new(graph)
-                    },
-                    |baseline| {
-                        black_box(baseline.all_pairs_mincut())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("baseline", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let graph = Arc::new(DynamicGraph::new());
+                    for (u, v, w) in &edges {
+                        let _ = graph.insert_edge(*u, *v, *w);
+                    }
+                    BaselineMinCut::new(graph)
+                },
+                |baseline| black_box(baseline.all_pairs_mincut()),
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // J-Tree hierarchical: O(n² · log^(2/3) n) via hierarchy
         group.bench_with_input(
@@ -481,9 +467,7 @@ fn bench_all_pairs_query(c: &mut Criterion) {
                         hierarchy.build();
                         hierarchy
                     },
-                    |hierarchy| {
-                        black_box(hierarchy.global_min_cut)
-                    },
+                    |hierarchy| black_box(hierarchy.global_min_cut),
                     criterion::BatchSize::SmallInput,
                 );
             },
@@ -546,7 +530,8 @@ fn bench_edge_insertion(c: &mut Criterion) {
                             for (u, v, w) in &initial_edges {
                                 let _ = graph.insert_edge(*u, *v, *w);
                             }
-                            let mut decomp = HierarchicalDecomposition::build(graph.clone()).unwrap();
+                            let mut decomp =
+                                HierarchicalDecomposition::build(graph.clone()).unwrap();
                             let mut rng = StdRng::seed_from_u64(456);
                             let new_u = rng.gen_range(0..size as u64);
                             let new_v = rng.gen_range(0..size as u64);
@@ -642,38 +627,34 @@ fn bench_edge_deletion(c: &mut Criterion) {
         );
 
         // J-Tree warm-start (reuse previous decomposition)
-        group.bench_with_input(
-            BenchmarkId::new("jtree_warm_start", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let graph = Arc::new(DynamicGraph::new());
-                        for (u, v, w) in &initial_edges {
-                            let _ = graph.insert_edge(*u, *v, *w);
-                        }
-                        let mut decomp = HierarchicalDecomposition::build(graph.clone()).unwrap();
-                        let edges_list = graph.edges();
-                        let idx = 42 % edges_list.len().max(1);
-                        let edge = if !edges_list.is_empty() {
-                            Some((edges_list[idx].source, edges_list[idx].target))
-                        } else {
-                            None
-                        };
-                        (decomp, graph, edge)
-                    },
-                    |(mut decomp, graph, edge)| {
-                        if let Some((u, v)) = edge {
-                            let _ = graph.delete_edge(u, v);
-                            // Warm-start: only update affected subtree
-                            let _ = decomp.delete_edge(u, v);
-                        }
-                        black_box(decomp.min_cut_value())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("jtree_warm_start", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let graph = Arc::new(DynamicGraph::new());
+                    for (u, v, w) in &initial_edges {
+                        let _ = graph.insert_edge(*u, *v, *w);
+                    }
+                    let mut decomp = HierarchicalDecomposition::build(graph.clone()).unwrap();
+                    let edges_list = graph.edges();
+                    let idx = 42 % edges_list.len().max(1);
+                    let edge = if !edges_list.is_empty() {
+                        Some((edges_list[idx].source, edges_list[idx].target))
+                    } else {
+                        None
+                    };
+                    (decomp, graph, edge)
+                },
+                |(mut decomp, graph, edge)| {
+                    if let Some((u, v)) = edge {
+                        let _ = graph.delete_edge(u, v);
+                        // Warm-start: only update affected subtree
+                        let _ = decomp.delete_edge(u, v);
+                    }
+                    black_box(decomp.min_cut_value())
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // Subpolynomial warm-start
         group.bench_with_input(
@@ -838,55 +819,43 @@ fn bench_memory_full_vs_lazy(c: &mut Criterion) {
         let edges = generate_sparse_graph(size, 42);
 
         // Full hierarchy build (materialized)
-        group.bench_with_input(
-            BenchmarkId::new("full_hierarchy", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let graph = Arc::new(DynamicGraph::new());
-                    for (u, v, w) in &edges {
-                        let _ = graph.insert_edge(*u, *v, *w);
-                    }
-                    let decomp = HierarchicalDecomposition::build(graph).unwrap();
-                    // Force full materialization
-                    let _ = decomp.min_cut_partition();
-                    black_box(decomp.num_nodes())
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("full_hierarchy", size), &size, |b, _| {
+            b.iter(|| {
+                let graph = Arc::new(DynamicGraph::new());
+                for (u, v, w) in &edges {
+                    let _ = graph.insert_edge(*u, *v, *w);
+                }
+                let decomp = HierarchicalDecomposition::build(graph).unwrap();
+                // Force full materialization
+                let _ = decomp.min_cut_partition();
+                black_box(decomp.num_nodes())
+            });
+        });
 
         // Lazy evaluation (only compute on demand)
-        group.bench_with_input(
-            BenchmarkId::new("lazy_evaluation", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let graph = Arc::new(DynamicGraph::new());
-                    for (u, v, w) in &edges {
-                        let _ = graph.insert_edge(*u, *v, *w);
-                    }
-                    // Just build, don't materialize partitions
-                    let decomp = HierarchicalDecomposition::build(graph).unwrap();
-                    black_box(decomp.min_cut_value())
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("lazy_evaluation", size), &size, |b, _| {
+            b.iter(|| {
+                let graph = Arc::new(DynamicGraph::new());
+                for (u, v, w) in &edges {
+                    let _ = graph.insert_edge(*u, *v, *w);
+                }
+                // Just build, don't materialize partitions
+                let decomp = HierarchicalDecomposition::build(graph).unwrap();
+                black_box(decomp.min_cut_value())
+            });
+        });
 
         // Three-level hierarchy (more memory efficient structure)
-        group.bench_with_input(
-            BenchmarkId::new("three_level", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let mut hierarchy = ThreeLevelHierarchy::with_defaults();
-                    for (u, v, w) in &edges {
-                        hierarchy.insert_edge(*u, *v, *w);
-                    }
-                    hierarchy.build();
-                    black_box(hierarchy.stats())
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("three_level", size), &size, |b, _| {
+            b.iter(|| {
+                let mut hierarchy = ThreeLevelHierarchy::with_defaults();
+                for (u, v, w) in &edges {
+                    hierarchy.insert_edge(*u, *v, *w);
+                }
+                hierarchy.build();
+                black_box(hierarchy.stats())
+            });
+        });
     }
 
     group.finish();
@@ -976,69 +945,53 @@ fn bench_bmssp_scaling(c: &mut Criterion) {
         group.throughput(Throughput::Elements(1));
 
         // Subpolynomial query (should scale as O(m·log^(2/3) n))
-        group.bench_with_input(
-            BenchmarkId::new("subpoly_query", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let mut mincut = SubpolynomialMinCut::for_size(size);
-                        for (u, v, w) in &edges {
-                            let _ = mincut.insert_edge(*u, *v, *w);
-                        }
-                        mincut.build();
-                        mincut
-                    },
-                    |mincut| {
-                        black_box(mincut.min_cut_value())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("subpoly_query", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let mut mincut = SubpolynomialMinCut::for_size(size);
+                    for (u, v, w) in &edges {
+                        let _ = mincut.insert_edge(*u, *v, *w);
+                    }
+                    mincut.build();
+                    mincut
+                },
+                |mincut| black_box(mincut.min_cut_value()),
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // J-Tree query for comparison
-        group.bench_with_input(
-            BenchmarkId::new("jtree_query", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let graph = Arc::new(DynamicGraph::new());
-                        for (u, v, w) in &edges {
-                            let _ = graph.insert_edge(*u, *v, *w);
-                        }
-                        HierarchicalDecomposition::build(graph).unwrap()
-                    },
-                    |decomp| {
-                        black_box(decomp.min_cut_value())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("jtree_query", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let graph = Arc::new(DynamicGraph::new());
+                    for (u, v, w) in &edges {
+                        let _ = graph.insert_edge(*u, *v, *w);
+                    }
+                    HierarchicalDecomposition::build(graph).unwrap()
+                },
+                |decomp| black_box(decomp.min_cut_value()),
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // Baseline (O(mn)) for comparison
-        group.bench_with_input(
-            BenchmarkId::new("baseline_query", size),
-            &size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let graph = Arc::new(DynamicGraph::new());
-                        for (u, v, w) in &edges {
-                            let _ = graph.insert_edge(*u, *v, *w);
-                        }
-                        BaselineMinCut::new(graph)
-                    },
-                    |baseline| {
-                        // Simplified O(n) query
-                        black_box(baseline.point_to_point_mincut(0, (size / 2) as u64))
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("baseline_query", size), &size, |b, _| {
+            b.iter_batched(
+                || {
+                    let graph = Arc::new(DynamicGraph::new());
+                    for (u, v, w) in &edges {
+                        let _ = graph.insert_edge(*u, *v, *w);
+                    }
+                    BaselineMinCut::new(graph)
+                },
+                |baseline| {
+                    // Simplified O(n) query
+                    black_box(baseline.point_to_point_mincut(0, (size / 2) as u64))
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // Log scaling info
         eprintln!(
@@ -1263,9 +1216,7 @@ fn bench_polylog_connectivity(c: &mut Criterion) {
                         let query_v = rng.gen_range(0..size as u64);
                         (conn, query_u, query_v)
                     },
-                    |(mut conn, query_u, query_v)| {
-                        black_box(conn.connected(query_u, query_v))
-                    },
+                    |(mut conn, query_u, query_v)| black_box(conn.connected(query_u, query_v)),
                     criterion::BatchSize::SmallInput,
                 );
             },

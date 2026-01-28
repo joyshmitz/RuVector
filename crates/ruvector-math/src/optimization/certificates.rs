@@ -2,8 +2,8 @@
 //!
 //! Provable guarantees via SOS/SDP methods.
 
-use super::polynomial::{Polynomial, Term, Monomial};
-use super::sos::{SOSChecker, SOSResult, SOSConfig};
+use super::polynomial::{Monomial, Polynomial, Term};
+use super::sos::{SOSChecker, SOSConfig, SOSResult};
 
 /// Certificate that a polynomial is non-negative
 #[derive(Debug, Clone)]
@@ -241,7 +241,12 @@ impl MonotonicityCertificate {
             .terms()
             .filter_map(|(m, &c)| {
                 // Find power of var in monomial
-                let power = m.powers.iter().find(|&&(i, _)| i == var).map(|&(_, p)| p).unwrap_or(0);
+                let power = m
+                    .powers
+                    .iter()
+                    .find(|&&(i, _)| i == var)
+                    .map(|&(_, p)| p)
+                    .unwrap_or(0);
 
                 if power == 0 {
                     return None;
@@ -254,13 +259,7 @@ impl MonotonicityCertificate {
                 let new_powers: Vec<(usize, usize)> = m
                     .powers
                     .iter()
-                    .map(|&(i, p)| {
-                        if i == var {
-                            (i, p - 1)
-                        } else {
-                            (i, p)
-                        }
-                    })
+                    .map(|&(i, p)| if i == var { (i, p - 1) } else { (i, p) })
                     .filter(|&(_, p)| p > 0)
                     .collect();
 

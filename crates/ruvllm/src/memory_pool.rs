@@ -40,12 +40,12 @@ use crate::error::{Result, RuvLLMError};
 use parking_lot::{Mutex, RwLock};
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::cell::UnsafeCell;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread::ThreadId;
-#[cfg(not(target_arch = "wasm32"))]
-use std::collections::HashMap;
 
 /// Cache line size for M4 Pro and most modern CPUs (64 bytes)
 pub const CACHE_LINE_SIZE: usize = 64;
@@ -124,11 +124,13 @@ impl InferenceArena {
         // Round up to cache line size
         let aligned_capacity = (capacity + DEFAULT_ALIGNMENT - 1) & !(DEFAULT_ALIGNMENT - 1);
 
-        let layout = Layout::from_size_align(aligned_capacity, DEFAULT_ALIGNMENT)
-            .map_err(|_| RuvLLMError::OutOfMemory(format!(
-                "Invalid arena layout: size={}, align={}",
-                aligned_capacity, DEFAULT_ALIGNMENT
-            )))?;
+        let layout =
+            Layout::from_size_align(aligned_capacity, DEFAULT_ALIGNMENT).map_err(|_| {
+                RuvLLMError::OutOfMemory(format!(
+                    "Invalid arena layout: size={}, align={}",
+                    aligned_capacity, DEFAULT_ALIGNMENT
+                ))
+            })?;
 
         // SAFETY: Layout is valid and we track the allocation
         let memory = unsafe { alloc_zeroed(layout) };
@@ -214,16 +216,16 @@ impl InferenceArena {
         }
 
         // Try to bump the offset atomically
-        match self.offset.compare_exchange(
-            current,
-            new_offset,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
+        match self
+            .offset
+            .compare_exchange(current, new_offset, Ordering::AcqRel, Ordering::Acquire)
+        {
             Ok(_) => {
                 // Update statistics
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
-                let _ = self.high_water_mark.fetch_max(new_offset, Ordering::Relaxed);
+                let _ = self
+                    .high_water_mark
+                    .fetch_max(new_offset, Ordering::Relaxed);
 
                 // SAFETY: We've reserved this memory region atomically
                 unsafe {
@@ -260,15 +262,15 @@ impl InferenceArena {
             return None;
         }
 
-        match self.offset.compare_exchange(
-            current,
-            new_offset,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
+        match self
+            .offset
+            .compare_exchange(current, new_offset, Ordering::AcqRel, Ordering::Acquire)
+        {
             Ok(_) => {
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
-                let _ = self.high_water_mark.fetch_max(new_offset, Ordering::Relaxed);
+                let _ = self
+                    .high_water_mark
+                    .fetch_max(new_offset, Ordering::Relaxed);
 
                 let ptr = self.memory.add(aligned_offset) as *mut T;
                 Some(std::slice::from_raw_parts_mut(ptr, count))
@@ -449,13 +451,7 @@ impl BufferSize {
 
     /// Get all buffer sizes in order.
     pub const fn all() -> [BufferSize; 5] {
-        [
-            Self::KB1,
-            Self::KB4,
-            Self::KB16,
-            Self::KB64,
-            Self::KB256,
-        ]
+        [Self::KB1, Self::KB4, Self::KB16, Self::KB64, Self::KB256]
     }
 }
 
@@ -490,13 +486,13 @@ impl PooledBuffer {
     #[inline]
     pub fn as_slice<T: Copy>(&self) -> &[T] {
         let size = std::mem::size_of::<T>();
-        assert!(self.data.len() % size == 0, "Buffer size not aligned to type");
+        assert!(
+            self.data.len() % size == 0,
+            "Buffer size not aligned to type"
+        );
         // SAFETY: Buffer is aligned and size is checked
         unsafe {
-            std::slice::from_raw_parts(
-                self.data.as_ptr() as *const T,
-                self.data.len() / size,
-            )
+            std::slice::from_raw_parts(self.data.as_ptr() as *const T, self.data.len() / size)
         }
     }
 
@@ -504,13 +500,13 @@ impl PooledBuffer {
     #[inline]
     pub fn as_slice_mut<T: Copy>(&mut self) -> &mut [T] {
         let size = std::mem::size_of::<T>();
-        assert!(self.data.len() % size == 0, "Buffer size not aligned to type");
+        assert!(
+            self.data.len() % size == 0,
+            "Buffer size not aligned to type"
+        );
         // SAFETY: Buffer is aligned and size is checked
         unsafe {
-            std::slice::from_raw_parts_mut(
-                self.data.as_mut_ptr() as *mut T,
-                self.data.len() / size,
-            )
+            std::slice::from_raw_parts_mut(self.data.as_mut_ptr() as *mut T, self.data.len() / size)
         }
     }
 
@@ -650,11 +646,12 @@ impl BufferPoolInner {
 
     fn allocate_buffer(size_class: BufferSize) -> Result<Box<[u8]>> {
         let size = size_class.bytes();
-        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT)
-            .map_err(|_| RuvLLMError::OutOfMemory(format!(
+        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT).map_err(|_| {
+            RuvLLMError::OutOfMemory(format!(
                 "Invalid buffer layout: size={}, align={}",
                 size, DEFAULT_ALIGNMENT
-            )))?;
+            ))
+        })?;
 
         // SAFETY: Layout is valid
         unsafe {
@@ -871,11 +868,12 @@ struct ThreadScratch {
 #[cfg(not(target_arch = "wasm32"))]
 impl ThreadScratch {
     fn new(size: usize) -> Result<Self> {
-        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT)
-            .map_err(|_| RuvLLMError::OutOfMemory(format!(
+        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT).map_err(|_| {
+            RuvLLMError::OutOfMemory(format!(
                 "Invalid scratch layout: size={}, align={}",
                 size, DEFAULT_ALIGNMENT
-            )))?;
+            ))
+        })?;
 
         // SAFETY: Layout is valid
         let data = unsafe {
@@ -1083,11 +1081,12 @@ struct WasmScratch {
 #[cfg(target_arch = "wasm32")]
 impl WasmScratch {
     fn new(size: usize) -> Result<Self> {
-        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT)
-            .map_err(|_| RuvLLMError::OutOfMemory(format!(
+        let layout = Layout::from_size_align(size, DEFAULT_ALIGNMENT).map_err(|_| {
+            RuvLLMError::OutOfMemory(format!(
                 "Invalid scratch layout: size={}, align={}",
                 size, DEFAULT_ALIGNMENT
-            )))?;
+            ))
+        })?;
 
         // SAFETY: Layout is valid
         let data = unsafe {
@@ -1666,7 +1665,10 @@ mod tests {
         assert_eq!(arena_buf.len(), 100);
 
         // Use pool
-        let pool_buf = manager.pool.acquire(BufferSize::KB4).expect("acquire failed");
+        let pool_buf = manager
+            .pool
+            .acquire(BufferSize::KB4)
+            .expect("acquire failed");
         assert_eq!(pool_buf.capacity(), 4096);
 
         // Use scratch

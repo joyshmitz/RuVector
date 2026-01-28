@@ -81,8 +81,8 @@ pub use advanced_features::{
 
 #[cfg(feature = "storage")]
 pub use agenticdb::{
-    AgenticDB, PolicyMemoryStore, PolicyEntry, PolicyAction,
-    SessionStateIndex, SessionTurn, WitnessLog, WitnessEntry,
+    AgenticDB, PolicyAction, PolicyEntry, PolicyMemoryStore, SessionStateIndex, SessionTurn,
+    WitnessEntry, WitnessLog,
 };
 
 #[cfg(feature = "api-embeddings")]
@@ -110,23 +110,18 @@ pub use vector_db::VectorDB;
 
 // Quantization types (ADR-001)
 pub use quantization::{
-    ScalarQuantized, ProductQuantized, BinaryQuantized, Int4Quantized,
-    QuantizedVector,
+    BinaryQuantized, Int4Quantized, ProductQuantized, QuantizedVector, ScalarQuantized,
 };
 
 // Memory management types (ADR-001)
-pub use arena::{
-    Arena, ArenaVec, CacheAlignedVec, BatchVectorAllocator,
-    CACHE_LINE_SIZE,
-};
+pub use arena::{Arena, ArenaVec, BatchVectorAllocator, CacheAlignedVec, CACHE_LINE_SIZE};
 
 // Lock-free structures (requires parallel feature)
 #[cfg(all(feature = "parallel", not(target_arch = "wasm32")))]
 pub use lockfree::{
-    LockFreeCounter, LockFreeStats, StatsSnapshot,
-    ObjectPool, PooledObject, LockFreeWorkQueue,
-    AtomicVectorPool, VectorPoolStats, PooledVector,
-    LockFreeBatchProcessor, BatchItem, BatchResult,
+    AtomicVectorPool, BatchItem, BatchResult, LockFreeBatchProcessor, LockFreeCounter,
+    LockFreeStats, LockFreeWorkQueue, ObjectPool, PooledObject, PooledVector, StatsSnapshot,
+    VectorPoolStats,
 };
 
 // Cache-optimized storage

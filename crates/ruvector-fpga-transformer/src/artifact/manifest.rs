@@ -1,8 +1,8 @@
 //! Manifest schema for model artifacts
 
-use serde::{Deserialize, Serialize};
-use crate::types::{FixedShape, Layout, QuantSpec};
 use crate::error::{Error, Result};
+use crate::types::{FixedShape, Layout, QuantSpec};
+use serde::{Deserialize, Serialize};
 
 /// Model manifest containing all metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,11 +25,7 @@ pub struct Manifest {
 
 impl Manifest {
     /// Create a new manifest
-    pub fn new(
-        name: impl Into<String>,
-        shape: FixedShape,
-        quant: QuantSpec,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, shape: FixedShape, quant: QuantSpec) -> Self {
         Self {
             name: name.into(),
             model_hash: String::new(),
@@ -48,7 +44,9 @@ impl Manifest {
         }
 
         // Validate shape
-        self.shape.validate().map_err(|e| Error::InvalidArtifact(e))?;
+        self.shape
+            .validate()
+            .map_err(|e| Error::InvalidArtifact(e))?;
 
         // Validate quantization bits
         if !matches!(self.quant.w_bits, 1 | 2 | 4 | 8 | 16) {

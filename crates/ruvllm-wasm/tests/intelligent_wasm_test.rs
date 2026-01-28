@@ -258,7 +258,9 @@ impl MockSONA {
         scored_patterns.sort_by(|a, b| {
             let score_a = a.1 * a.2;
             let score_b = b.1 * b.2;
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(scored_patterns

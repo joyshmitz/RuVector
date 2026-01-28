@@ -24,8 +24,8 @@ pub use policy::{
 };
 
 pub use witness::{
-    ComputeLane as WitnessComputeLane, EnergySnapshot, GateDecision,
-    WitnessChainError, WitnessError, WitnessId, WitnessRecord,
+    ComputeLane as WitnessComputeLane, EnergySnapshot, GateDecision, WitnessChainError,
+    WitnessError, WitnessId, WitnessRecord,
 };
 
 pub use lineage::{EntityRef, LineageError, LineageId, LineageRecord, Operation};

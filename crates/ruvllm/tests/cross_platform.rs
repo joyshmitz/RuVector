@@ -3,9 +3,7 @@
 //! These tests verify that the scalar fallback implementations produce
 //! correct results and work on all platforms (including non-NEON and WASM).
 
-use ruvllm::kernels::{
-    flash_attention_neon, gemm_neon, gemv_neon, layer_norm_neon, rms_norm_neon,
-};
+use ruvllm::kernels::{flash_attention_neon, gemm_neon, gemv_neon, layer_norm_neon, rms_norm_neon};
 
 // ========== Scalar Reference Implementations ==========
 
@@ -106,11 +104,13 @@ fn test_cross_platform_gemv() {
         (32, 64),
         (64, 128),
         (100, 50),
-        (7, 13),   // Non-aligned
+        (7, 13), // Non-aligned
     ];
 
     for (m, n) in test_cases {
-        let a: Vec<f32> = (0..m * n).map(|i| ((i % 100) as f32 - 50.0) / 50.0).collect();
+        let a: Vec<f32> = (0..m * n)
+            .map(|i| ((i % 100) as f32 - 50.0) / 50.0)
+            .collect();
         let x: Vec<f32> = (0..n).map(|i| ((i % 20) as f32 - 10.0) / 10.0).collect();
 
         let mut y_neon = vec![0.0; m];
@@ -125,7 +125,12 @@ fn test_cross_platform_gemv() {
             assert!(
                 rel_error < 0.001 || abs_error < 1e-5,
                 "Cross-platform GEMV mismatch at ({},{}) index {}: {} vs {} (rel: {:.6})",
-                m, n, i, y_neon[i], y_scalar[i], rel_error
+                m,
+                n,
+                i,
+                y_neon[i],
+                y_scalar[i],
+                rel_error
             );
         }
     }
@@ -138,12 +143,16 @@ fn test_cross_platform_gemm() {
         (8, 16, 8),
         (16, 32, 16),
         (32, 64, 32),
-        (7, 11, 13),   // Non-aligned
+        (7, 11, 13), // Non-aligned
     ];
 
     for (m, k, n) in test_cases {
-        let a: Vec<f32> = (0..m * k).map(|i| ((i % 100) as f32 - 50.0) / 100.0).collect();
-        let b: Vec<f32> = (0..k * n).map(|i| ((i % 50) as f32 - 25.0) / 50.0).collect();
+        let a: Vec<f32> = (0..m * k)
+            .map(|i| ((i % 100) as f32 - 50.0) / 100.0)
+            .collect();
+        let b: Vec<f32> = (0..k * n)
+            .map(|i| ((i % 50) as f32 - 25.0) / 50.0)
+            .collect();
 
         let mut c_neon = vec![0.0; m * n];
         let mut c_scalar = vec![0.0; m * n];
@@ -157,7 +166,13 @@ fn test_cross_platform_gemm() {
             assert!(
                 rel_error < 0.01 || abs_error < 0.001,
                 "Cross-platform GEMM mismatch at ({},{},{}) index {}: {} vs {} (rel: {:.6})",
-                m, k, n, i, c_neon[i], c_scalar[i], rel_error
+                m,
+                k,
+                n,
+                i,
+                c_neon[i],
+                c_scalar[i],
+                rel_error
             );
         }
     }
@@ -165,19 +180,20 @@ fn test_cross_platform_gemm() {
 
 #[test]
 fn test_cross_platform_attention() {
-    let test_cases = [
-        (16, 4),
-        (32, 8),
-        (64, 16),
-        (128, 32),
-    ];
+    let test_cases = [(16, 4), (32, 8), (64, 16), (128, 32)];
 
     for (head_dim, kv_len) in test_cases {
         let scale = 1.0 / (head_dim as f32).sqrt();
 
-        let query: Vec<f32> = (0..head_dim).map(|i| ((i % 7) as f32 - 3.0) / 10.0).collect();
-        let key: Vec<f32> = (0..kv_len * head_dim).map(|i| ((i % 11) as f32 - 5.0) / 20.0).collect();
-        let value: Vec<f32> = (0..kv_len * head_dim).map(|i| ((i % 13) as f32 - 6.0) / 15.0).collect();
+        let query: Vec<f32> = (0..head_dim)
+            .map(|i| ((i % 7) as f32 - 3.0) / 10.0)
+            .collect();
+        let key: Vec<f32> = (0..kv_len * head_dim)
+            .map(|i| ((i % 11) as f32 - 5.0) / 20.0)
+            .collect();
+        let value: Vec<f32> = (0..kv_len * head_dim)
+            .map(|i| ((i % 13) as f32 - 6.0) / 15.0)
+            .collect();
 
         let output_neon = flash_attention_neon(&query, &key, &value, scale, false);
         let output_scalar = attention_scalar(&query, &key, &value, head_dim, kv_len, scale);
@@ -201,7 +217,9 @@ fn test_cross_platform_rms_norm() {
     let test_cases = [8, 16, 32, 64, 128];
 
     for dim in test_cases {
-        let mut x_neon: Vec<f32> = (0..dim).map(|i| (i as f32 - dim as f32 / 2.0) / 10.0).collect();
+        let mut x_neon: Vec<f32> = (0..dim)
+            .map(|i| (i as f32 - dim as f32 / 2.0) / 10.0)
+            .collect();
         let mut x_scalar = x_neon.clone();
         let weight: Vec<f32> = (0..dim).map(|i| 0.5 + (i as f32) * 0.01).collect();
         let eps = 1e-6;
@@ -214,7 +232,11 @@ fn test_cross_platform_rms_norm() {
             assert!(
                 abs_error < 1e-4,
                 "Cross-platform RMSNorm mismatch at dim={}, index {}: {} vs {} (abs: {:.6})",
-                dim, i, x_neon[i], x_scalar[i], abs_error
+                dim,
+                i,
+                x_neon[i],
+                x_scalar[i],
+                abs_error
             );
         }
     }
@@ -239,7 +261,11 @@ fn test_cross_platform_layer_norm() {
             assert!(
                 abs_error < 1e-4,
                 "Cross-platform LayerNorm mismatch at dim={}, index {}: {} vs {} (abs: {:.6})",
-                dim, i, x_neon[i], x_scalar[i], abs_error
+                dim,
+                i,
+                x_neon[i],
+                x_scalar[i],
+                abs_error
             );
         }
     }
@@ -255,7 +281,10 @@ fn test_scalar_fallback_edge_cases() {
     let mut y = vec![0.0f32; 4];
 
     gemv_neon(&a_zero, &x_zero, &mut y, 4, 4);
-    assert!(y.iter().all(|&v| v == 0.0), "Zero input should give zero output");
+    assert!(
+        y.iter().all(|&v| v == 0.0),
+        "Zero input should give zero output"
+    );
 
     // Single element
     let a_single = vec![3.0f32];
@@ -266,12 +295,19 @@ fn test_scalar_fallback_edge_cases() {
     assert!((y_single[0] - 12.0).abs() < 1e-5, "1x1 GEMV failed");
 
     // Negative values
-    let a_neg: Vec<f32> = (0..16).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
-    let x_neg: Vec<f32> = (0..4).map(|i| if i % 2 == 0 { -1.0 } else { 1.0 }).collect();
+    let a_neg: Vec<f32> = (0..16)
+        .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+        .collect();
+    let x_neg: Vec<f32> = (0..4)
+        .map(|i| if i % 2 == 0 { -1.0 } else { 1.0 })
+        .collect();
     let mut y_neg = vec![0.0f32; 4];
 
     gemv_neon(&a_neg, &x_neg, &mut y_neg, 4, 4);
-    assert!(y_neg.iter().all(|&v| v.is_finite()), "Negative values should produce finite output");
+    assert!(
+        y_neg.iter().all(|&v| v.is_finite()),
+        "Negative values should produce finite output"
+    );
 }
 
 #[test]
@@ -282,7 +318,10 @@ fn test_scalar_fallback_numerical_stability() {
     let mut y_small = vec![0.0f32; 8];
 
     gemv_neon(&a_small, &x_small, &mut y_small, 8, 8);
-    assert!(y_small.iter().all(|&v| v.is_finite()), "Very small values should produce finite output");
+    assert!(
+        y_small.iter().all(|&v| v.is_finite()),
+        "Very small values should produce finite output"
+    );
 
     // Large values (but not overflow)
     let a_large: Vec<f32> = vec![1e10; 64];
@@ -290,15 +329,23 @@ fn test_scalar_fallback_numerical_stability() {
     let mut y_large = vec![0.0f32; 8];
 
     gemv_neon(&a_large, &x_large, &mut y_large, 8, 8);
-    assert!(y_large.iter().all(|&v| v.is_finite()), "Large values with small x should produce finite output");
+    assert!(
+        y_large.iter().all(|&v| v.is_finite()),
+        "Large values with small x should produce finite output"
+    );
 
     // Mixed magnitudes
-    let a_mixed: Vec<f32> = (0..64).map(|i| if i % 2 == 0 { 1e5 } else { 1e-5 }).collect();
+    let a_mixed: Vec<f32> = (0..64)
+        .map(|i| if i % 2 == 0 { 1e5 } else { 1e-5 })
+        .collect();
     let x_mixed: Vec<f32> = vec![1.0; 8];
     let mut y_mixed = vec![0.0f32; 8];
 
     gemv_neon(&a_mixed, &x_mixed, &mut y_mixed, 8, 8);
-    assert!(y_mixed.iter().all(|&v| v.is_finite()), "Mixed magnitude values should produce finite output");
+    assert!(
+        y_mixed.iter().all(|&v| v.is_finite()),
+        "Mixed magnitude values should produce finite output"
+    );
 }
 
 #[test]
@@ -350,7 +397,10 @@ fn test_wasm_compatible_operations() {
     gemm_neon(&a_gemm, &b_gemm, &mut c_gemm, 2, 2, 2);
     // A * I = A
     for i in 0..4 {
-        assert!((c_gemm[i] - a_gemm[i]).abs() < 1e-5, "GEMM with identity failed");
+        assert!(
+            (c_gemm[i] - a_gemm[i]).abs() < 1e-5,
+            "GEMM with identity failed"
+        );
     }
 
     // Small attention
@@ -374,14 +424,23 @@ fn test_scalar_path_verification() {
     let mut y = vec![0.0; 1];
     gemv_neon(&a, &x, &mut y, 1, 3);
     let expected = 1.0 + 4.0 + 9.0; // 1*1 + 2*2 + 3*3 = 14
-    assert!((y[0] - expected).abs() < 1e-5, "Scalar GEMV expected {}, got {}", expected, y[0]);
+    assert!(
+        (y[0] - expected).abs() < 1e-5,
+        "Scalar GEMV expected {}, got {}",
+        expected,
+        y[0]
+    );
 
     // Verify GEMM with 1x1
     let a1 = vec![5.0f32];
     let b1 = vec![3.0f32];
     let mut c1 = vec![0.0f32];
     gemm_neon(&a1, &b1, &mut c1, 1, 1, 1);
-    assert!((c1[0] - 15.0).abs() < 1e-5, "1x1 GEMM expected 15, got {}", c1[0]);
+    assert!(
+        (c1[0] - 15.0).abs() < 1e-5,
+        "1x1 GEMM expected 15, got {}",
+        c1[0]
+    );
 
     // Verify normalization with small vector
     let mut x_norm = vec![3.0, 4.0];

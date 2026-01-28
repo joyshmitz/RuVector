@@ -368,7 +368,11 @@ fn test_manhattan_simd_vs_scalar_non_aligned() {
 fn test_manhattan_simd_identical_vectors() {
     let v = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     let result = manhattan_distance_simd(&v, &v);
-    assert!(result < 1e-6, "Manhattan to self should be 0, got {}", result);
+    assert!(
+        result < 1e-6,
+        "Manhattan to self should be 0, got {}",
+        result
+    );
 }
 
 // ============================================================================
@@ -473,7 +477,11 @@ fn test_simd_batch_consistency() {
         .collect();
 
     // Compare
-    for (i, (simd, scalar)) in simd_distances.iter().zip(scalar_distances.iter()).enumerate() {
+    for (i, (simd, scalar)) in simd_distances
+        .iter()
+        .zip(scalar_distances.iter())
+        .enumerate()
+    {
         assert!(
             (simd - scalar).abs() < 0.01,
             "Vector {} mismatch: SIMD={}, scalar={}",
@@ -537,5 +545,8 @@ fn test_simd_many_operations() {
 
     // Final verification
     let result = euclidean_distance_simd(&a, &b);
-    assert!(result.is_finite(), "Result should be finite after stress test");
+    assert!(
+        result.is_finite(),
+        "Result should be finite after stress test"
+    );
 }

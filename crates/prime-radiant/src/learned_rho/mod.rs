@@ -46,7 +46,7 @@ mod error;
 mod map;
 mod training;
 
-pub use config::{RestrictionMapConfig, OptimizerConfig, SchedulerConfig};
+pub use config::{OptimizerConfig, RestrictionMapConfig, SchedulerConfig};
 pub use error::{LearnedRhoError, LearnedRhoResult};
 pub use map::{LearnedRestrictionMap, MapState};
 pub use training::{TrainingBatch, TrainingMetrics, TrainingResult};

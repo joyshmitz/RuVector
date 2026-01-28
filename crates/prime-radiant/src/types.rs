@@ -528,7 +528,11 @@ pub struct Version {
 impl Version {
     /// Create a new version
     pub const fn new(major: u32, minor: u32, patch: u32) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 
     /// Initial version (0.1.0)
@@ -573,9 +577,15 @@ impl std::str::FromStr for Version {
             return Err(format!("Invalid version format: {}", s));
         }
 
-        let major = parts[0].parse().map_err(|e| format!("Invalid major: {}", e))?;
-        let minor = parts[1].parse().map_err(|e| format!("Invalid minor: {}", e))?;
-        let patch = parts[2].parse().map_err(|e| format!("Invalid patch: {}", e))?;
+        let major = parts[0]
+            .parse()
+            .map_err(|e| format!("Invalid major: {}", e))?;
+        let minor = parts[1]
+            .parse()
+            .map_err(|e| format!("Invalid minor: {}", e))?;
+        let patch = parts[2]
+            .parse()
+            .map_err(|e| format!("Invalid patch: {}", e))?;
 
         Ok(Self::new(major, minor, patch))
     }

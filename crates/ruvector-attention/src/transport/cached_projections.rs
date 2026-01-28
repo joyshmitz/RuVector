@@ -116,10 +116,7 @@ impl WindowCache {
         let num_proj = proj_cache.num_projections;
 
         // Project all keys
-        let key_projections: Vec<Vec<f32>> = keys
-            .iter()
-            .map(|k| proj_cache.project(k))
-            .collect();
+        let key_projections: Vec<Vec<f32>> = keys.iter().map(|k| proj_cache.project(k)).collect();
 
         // Sort indices and values for each projection
         let mut sorted_indices = vec![Vec::with_capacity(num_keys); num_proj];
@@ -131,7 +128,9 @@ impl WindowCache {
                 .enumerate()
                 .map(|(i, projs)| (i, projs[p]))
                 .collect();
-            indexed.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            indexed.sort_unstable_by(|a, b| {
+                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             sorted_indices[p] = indexed.iter().map(|(i, _)| *i).collect();
             sorted_values[p] = indexed.iter().map(|(_, v)| *v).collect();
@@ -212,9 +211,7 @@ mod tests {
     fn test_window_cache() {
         let proj_cache = ProjectionCache::new(32, 4, 42);
 
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32 * 0.1; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32 * 0.1; 32]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let window_cache = WindowCache::build(&keys_refs, &proj_cache);
@@ -227,9 +224,7 @@ mod tests {
     fn test_histograms() {
         let proj_cache = ProjectionCache::new(16, 2, 42);
 
-        let keys: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32 * 0.05; 16])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32 * 0.05; 16]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let mut window_cache = WindowCache::build(&keys_refs, &proj_cache);

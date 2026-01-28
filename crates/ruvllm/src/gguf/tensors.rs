@@ -58,9 +58,7 @@ impl TensorInfo {
 
     /// Check if this is a feed-forward tensor.
     pub fn is_ffn(&self) -> bool {
-        self.name.contains("ffn")
-            || self.name.contains("feed_forward")
-            || self.name.contains("mlp")
+        self.name.contains("ffn") || self.name.contains("feed_forward") || self.name.contains("mlp")
     }
 
     /// Check if this is a normalization tensor.
@@ -282,11 +280,24 @@ fn extract_layer_index(name: &str) -> Option<usize> {
 
 fn extract_tensor_type(name: &str) -> String {
     let suffixes = [
-        "weight", "bias", "scale", "norm",
-        "wq", "wk", "wv", "wo",
-        "w1", "w2", "w3",
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
+        "weight",
+        "bias",
+        "scale",
+        "norm",
+        "wq",
+        "wk",
+        "wv",
+        "wo",
+        "w1",
+        "w2",
+        "w3",
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
     ];
 
     for suffix in &suffixes {
@@ -348,7 +359,10 @@ mod tests {
     #[test]
     fn test_layer_index_parsing() {
         assert_eq!(make_tensor("model.layers.0.weight").layer_index(), Some(0));
-        assert_eq!(make_tensor("model.layers.15.weight").layer_index(), Some(15));
+        assert_eq!(
+            make_tensor("model.layers.15.weight").layer_index(),
+            Some(15)
+        );
         assert_eq!(make_tensor("transformer.h.7.weight").layer_index(), Some(7));
         assert_eq!(make_tensor("model.embed_tokens.weight").layer_index(), None);
     }

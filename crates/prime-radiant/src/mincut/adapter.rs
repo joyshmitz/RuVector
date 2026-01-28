@@ -154,10 +154,7 @@ impl MinCutAdapter {
     }
 
     /// Compute isolation for high-energy vertices
-    pub fn compute_isolation(
-        &self,
-        high_energy_vertices: &HashSet<VertexId>,
-    ) -> Result<CutResult> {
+    pub fn compute_isolation(&self, high_energy_vertices: &HashSet<VertexId>) -> Result<CutResult> {
         if high_energy_vertices.is_empty() {
             return Ok(CutResult {
                 isolated_set: HashSet::new(),

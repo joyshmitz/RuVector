@@ -4,8 +4,8 @@
 // cognitive superposition into definite conscious states. Implements
 // continuous weak measurement, Zeno effect, and entropy dynamics.
 
+use crate::quantum_cognitive_state::{Amplitude, CognitiveState, SuperpositionBuilder};
 use num_complex::Complex64;
-use crate::quantum_cognitive_state::{CognitiveState, Amplitude, SuperpositionBuilder};
 use std::collections::VecDeque;
 
 /// Attention mechanism implementing measurement-induced collapse
@@ -98,11 +98,8 @@ impl AttentionOperator {
             cumulative += wp;
             if r < cumulative {
                 // Collapse to state i
-                let collapsed = CognitiveState::definite(
-                    i,
-                    state.dimension(),
-                    state.labels.clone()
-                );
+                let collapsed =
+                    CognitiveState::definite(i, state.dimension(), state.labels.clone());
 
                 // Track entropy reduction
                 self.entropy_history.push_back(0.0);
@@ -177,7 +174,13 @@ impl AttentionOperator {
             return 0.0;
         }
 
-        let recent: Vec<f64> = self.entropy_history.iter().rev().take(10).copied().collect();
+        let recent: Vec<f64> = self
+            .entropy_history
+            .iter()
+            .rev()
+            .take(10)
+            .copied()
+            .collect();
 
         if recent.len() < 2 {
             return 0.0;
@@ -225,7 +228,7 @@ pub fn quantum_zeno_effect(
         let mut attention = AttentionOperator::full_attention(
             measurement_operator_index,
             current_state.dimension(),
-            1.0 / dt
+            1.0 / dt,
         );
 
         current_state = attention.apply(&current_state);
@@ -277,7 +280,8 @@ impl DecoherenceModel {
 
         for (i, amplitude) in new_amplitudes.iter_mut().enumerate() {
             // Add random phase from decoherence
-            let gamma_avg: f64 = self.gamma_matrix[i].iter().sum::<f64>() / self.gamma_matrix[i].len() as f64;
+            let gamma_avg: f64 =
+                self.gamma_matrix[i].iter().sum::<f64>() / self.gamma_matrix[i].len() as f64;
 
             if gamma_avg > 0.0 {
                 let phase_noise = Normal::new(0.0, (gamma_avg * dt).sqrt()).unwrap();
@@ -347,7 +351,8 @@ mod tests {
 
     #[test]
     fn test_full_attention_collapse() {
-        let state = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let state =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
         let initial_entropy = state.von_neumann_entropy();
 
         let mut attention = AttentionOperator::full_attention(1, 3, 10.0);
@@ -366,7 +371,7 @@ mod tests {
         let mut attention = AttentionOperator::distributed_attention(
             vec![0.9, 0.1],
             0.1, // Weak
-            10.0
+            10.0,
         );
 
         let new_state = attention.apply(&state);
@@ -391,7 +396,8 @@ mod tests {
 
     #[test]
     fn test_decoherence() {
-        let state = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let state =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
 
         let decoherence = DecoherenceModel::from_attention(&[1.0, 0.5, 0.0], 1.0);
 
@@ -406,11 +412,16 @@ mod tests {
         let threshold = ConsciousnessThreshold::new(0.3);
 
         // Pure state: low Φ (no integration)
-        let pure = CognitiveState::definite(0, 3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let pure = CognitiveState::definite(
+            0,
+            3,
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+        );
         assert!(!threshold.is_conscious(&pure));
 
         // Uniform state: low Φ (maximal entropy, no structure)
-        let uniform = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let uniform =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
         let phi_uniform = threshold.estimate_phi(&uniform);
 
         // Partially mixed: potentially high Φ
@@ -427,7 +438,8 @@ mod tests {
 
     #[test]
     fn test_continuous_evolution() {
-        let state = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let state =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
 
         let mut attention = AttentionOperator::full_attention(0, 3, 5.0);
 
@@ -438,6 +450,9 @@ mod tests {
 
         // Entropy should generally decrease (may have fluctuations)
         let entropy_history = attention.get_entropy_history();
-        println!("Entropy samples: {:?}", entropy_history.iter().take(10).collect::<Vec<_>>());
+        println!(
+            "Entropy samples: {:?}",
+            entropy_history.iter().take(10).collect::<Vec<_>>()
+        );
     }
 }

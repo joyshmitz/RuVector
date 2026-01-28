@@ -7,8 +7,8 @@
 use super::cocycle::{Cocycle, SheafCoboundary};
 use super::laplacian::{HarmonicRepresentative, LaplacianConfig, SheafLaplacian};
 use super::sheaf::{Sheaf, SheafSection};
-use crate::substrate::SheafGraph;
 use crate::substrate::NodeId;
+use crate::substrate::SheafGraph;
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -80,12 +80,7 @@ pub struct Obstruction {
 
 impl Obstruction {
     /// Create a new obstruction
-    pub fn new(
-        id: u64,
-        degree: usize,
-        energy: f64,
-        severity: ObstructionSeverity,
-    ) -> Self {
+    pub fn new(id: u64, degree: usize, energy: f64, severity: ObstructionSeverity) -> Self {
         Self {
             id,
             degree,
@@ -101,7 +96,8 @@ impl Obstruction {
 
     /// Add edge contribution
     pub fn add_edge_contribution(&mut self, source: NodeId, target: NodeId, contribution: f64) {
-        self.edge_contributions.insert((source, target), contribution);
+        self.edge_contributions
+            .insert((source, target), contribution);
     }
 
     /// Set hotspots
@@ -124,7 +120,9 @@ impl Obstruction {
 
     /// Get top k contributing edges
     pub fn top_edges(&self, k: usize) -> Vec<((NodeId, NodeId), f64)> {
-        let mut edges: Vec<_> = self.edge_contributions.iter()
+        let mut edges: Vec<_> = self
+            .edge_contributions
+            .iter()
             .map(|(&e, &c)| (e, c))
             .collect();
         edges.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -263,10 +261,9 @@ impl ObstructionDetector {
         let mut edge_energies: HashMap<(NodeId, NodeId), f64> = HashMap::new();
         for edge_id in graph.edge_ids() {
             if let Some(edge) = graph.get_edge(edge_id) {
-                if let (Some(source_node), Some(target_node)) = (
-                    graph.get_node(edge.source),
-                    graph.get_node(edge.target),
-                ) {
+                if let (Some(source_node), Some(target_node)) =
+                    (graph.get_node(edge.source), graph.get_node(edge.target))
+                {
                     let residual = edge.weighted_residual_energy(
                         source_node.state.as_slice(),
                         target_node.state.as_slice(),
@@ -325,9 +322,7 @@ impl ObstructionDetector {
 
         for node_id in graph.node_ids() {
             if let Some(node) = graph.get_node(node_id) {
-                let values: Vec<f64> = node.state.as_slice().iter()
-                    .map(|&x| x as f64)
-                    .collect();
+                let values: Vec<f64> = node.state.as_slice().iter().map(|&x| x as f64).collect();
                 section.set(node_id, Array1::from_vec(values));
             }
         }
@@ -372,7 +367,11 @@ impl ObstructionDetector {
                 ObstructionSeverity::Moderate => {
                     recommendations.push(format!(
                         "Moderate obstruction. Focus on hotspot nodes: {:?}",
-                        obs.hotspots.iter().take(3).map(|(n, _)| n).collect::<Vec<_>>()
+                        obs.hotspots
+                            .iter()
+                            .take(3)
+                            .map(|(n, _)| n)
+                            .collect::<Vec<_>>()
                     ));
                 }
                 ObstructionSeverity::Severe | ObstructionSeverity::Critical => {
@@ -380,9 +379,8 @@ impl ObstructionDetector {
                         "Severe obstruction with energy {:.4}. Immediate review required.",
                         obs.energy
                     ));
-                    recommendations.push(
-                        "Consider isolating incoherent region using MinCut".to_string()
-                    );
+                    recommendations
+                        .push("Consider isolating incoherent region using MinCut".to_string());
                 }
                 _ => {}
             }
@@ -390,7 +388,7 @@ impl ObstructionDetector {
 
         if report.spectral_gap.is_some_and(|g| g < 0.1) {
             recommendations.push(
-                "Small spectral gap indicates near-obstruction. Monitor for drift.".to_string()
+                "Small spectral gap indicates near-obstruction. Monitor for drift.".to_string(),
             );
         }
 
@@ -495,15 +493,9 @@ mod tests {
     fn test_obstruction_hotspots() {
         let graph = SheafGraph::new();
 
-        let node1 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
-        let node2 = SheafNodeBuilder::new()
-            .state_from_slice(&[5.0])
-            .build();
-        let node3 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.5])
-            .build();
+        let node1 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
+        let node2 = SheafNodeBuilder::new().state_from_slice(&[5.0]).build();
+        let node3 = SheafNodeBuilder::new().state_from_slice(&[1.5]).build();
 
         let id1 = graph.add_node(node1);
         let id2 = graph.add_node(node2);

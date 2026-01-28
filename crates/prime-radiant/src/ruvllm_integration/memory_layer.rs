@@ -65,9 +65,9 @@
 //!
 //! - ADR-CE-019: Memory as Nodes
 
+use crate::substrate::edge::{EdgeId, SheafEdge, SheafEdgeBuilder};
 use crate::substrate::graph::SheafGraph;
 use crate::substrate::node::{NodeId, NodeMetadata, SheafNode, SheafNodeBuilder, StateVector};
-use crate::substrate::edge::{EdgeId, SheafEdge, SheafEdgeBuilder};
 use crate::substrate::restriction::RestrictionMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -267,7 +267,11 @@ impl MemoryEntry {
     }
 
     /// Add metadata to the entry
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
+    pub fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
         self.metadata.insert(key.into(), value.into());
         self
     }
@@ -562,16 +566,12 @@ impl MemoryCoherenceLayer {
         // Store in appropriate memory storage
         match memory_type {
             MemoryType::Agentic => {
-                self.agentic_memories.insert(
-                    entry.key.clone(),
-                    (memory_id, entry.embedding.clone()),
-                );
+                self.agentic_memories
+                    .insert(entry.key.clone(), (memory_id, entry.embedding.clone()));
             }
             MemoryType::Working => {
-                self.working_memories.insert(
-                    entry.key.clone(),
-                    (memory_id, entry.embedding.clone()),
-                );
+                self.working_memories
+                    .insert(entry.key.clone(), (memory_id, entry.embedding.clone()));
             }
             MemoryType::Episodic => {
                 self.episodic_memories.push((
@@ -616,7 +616,9 @@ impl MemoryCoherenceLayer {
 
     /// Remove a memory entry
     pub fn remove_memory(&mut self, id: MemoryId) -> Result<()> {
-        let node_id = self.memory_to_node.remove(&id)
+        let node_id = self
+            .memory_to_node
+            .remove(&id)
             .ok_or(MemoryCoherenceError::MemoryNotFound(id))?;
 
         self.node_to_memory.remove(&node_id);
@@ -748,12 +750,9 @@ impl MemoryCoherenceLayer {
         // Create edges
         for (other_id, _) in candidates {
             if let Some(&other_node) = self.memory_to_node.get(&other_id) {
-                if let Some(edge_id) = self.create_edge(
-                    other_node,
-                    node_id,
-                    MemoryEdgeType::Semantic,
-                    dim,
-                )? {
+                if let Some(edge_id) =
+                    self.create_edge(other_node, node_id, MemoryEdgeType::Semantic, dim)?
+                {
                     edges.push(edge_id);
                 }
             }
@@ -789,8 +788,8 @@ impl MemoryCoherenceLayer {
         let mut edges = Vec::new();
         for pattern_node in pattern_nodes {
             if let Some(edge_id) = self.create_edge(
-                pattern_node,  // Pattern is source (general)
-                node_id,       // Memory is target (specific)
+                pattern_node, // Pattern is source (general)
+                node_id,      // Memory is target (specific)
                 MemoryEdgeType::Hierarchical,
                 dim,
             )? {
@@ -893,7 +892,9 @@ impl AgenticMemory for MemoryCoherenceLayer {
     }
 
     fn get_pattern(&self, key: &str) -> Option<&[f32]> {
-        self.agentic_memories.get(key).map(|(_, emb)| emb.as_slice())
+        self.agentic_memories
+            .get(key)
+            .map(|(_, emb)| emb.as_slice())
     }
 
     fn pattern_keys(&self) -> Vec<String> {
@@ -922,7 +923,9 @@ impl WorkingMemory for MemoryCoherenceLayer {
     }
 
     fn get_context(&self, key: &str) -> Option<&[f32]> {
-        self.working_memories.get(key).map(|(_, emb)| emb.as_slice())
+        self.working_memories
+            .get(key)
+            .map(|(_, emb)| emb.as_slice())
     }
 
     fn clear(&mut self) {
@@ -954,7 +957,9 @@ impl EpisodicMemory for MemoryCoherenceLayer {
             return None;
         }
         let idx = (sequence - 1) as usize;
-        self.episodic_memories.get(idx).map(|(_, _, emb)| emb.as_slice())
+        self.episodic_memories
+            .get(idx)
+            .map(|(_, _, emb)| emb.as_slice())
     }
 
     fn recent_episodes(&self, n: usize) -> Vec<(u64, &[f32])> {
@@ -1131,7 +1136,10 @@ mod tests {
         let id = layer.store_pattern("user_preference", &embedding).unwrap();
 
         assert!(layer.has_pattern("user_preference"));
-        assert_eq!(layer.get_pattern("user_preference"), Some(embedding.as_slice()));
+        assert_eq!(
+            layer.get_pattern("user_preference"),
+            Some(embedding.as_slice())
+        );
 
         let keys = layer.pattern_keys();
         assert_eq!(keys.len(), 1);
@@ -1222,8 +1230,13 @@ mod tests {
 
     #[test]
     fn test_edge_type_weights() {
-        assert!(MemoryEdgeType::Temporal.default_weight() > MemoryEdgeType::Semantic.default_weight());
-        assert!(MemoryEdgeType::Semantic.default_weight() > MemoryEdgeType::Hierarchical.default_weight());
+        assert!(
+            MemoryEdgeType::Temporal.default_weight() > MemoryEdgeType::Semantic.default_weight()
+        );
+        assert!(
+            MemoryEdgeType::Semantic.default_weight()
+                > MemoryEdgeType::Hierarchical.default_weight()
+        );
     }
 
     #[test]
@@ -1238,6 +1251,9 @@ mod tests {
         let entry = MemoryEntry::new("test", wrong_dim, MemoryType::Agentic);
         let result = layer.add_with_coherence(entry);
 
-        assert!(matches!(result, Err(MemoryCoherenceError::InvalidDimension { .. })));
+        assert!(matches!(
+            result,
+            Err(MemoryCoherenceError::InvalidDimension { .. })
+        ));
     }
 }

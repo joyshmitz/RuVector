@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use ruvector_delta_core::{Delta, VectorDelta};
 
-pub use causal::{CausalOrder, VectorClock, HybridLogicalClock};
+pub use causal::{CausalOrder, HybridLogicalClock, VectorClock};
 pub use conflict::{ConflictResolver, ConflictStrategy, MergeResult};
 pub use crdt::{DeltaCrdt, GCounter, LWWRegister, ORSet, PNCounter};
 pub use error::{ConsensusError, Result};
@@ -437,11 +437,7 @@ mod tests {
         let consensus = DeltaConsensus::new(config);
 
         let delta = VectorDelta::from_dense(vec![1.0, 2.0, 3.0]);
-        let causal = CausalDelta::new(
-            delta,
-            "replica2".to_string(),
-            VectorClock::new(),
-        );
+        let causal = CausalDelta::new(delta, "replica2".to_string(), VectorClock::new());
 
         let status = consensus.receive(causal).unwrap();
         assert_eq!(status, DeliveryStatus::Delivered);
@@ -461,17 +457,9 @@ mod tests {
             c
         };
 
-        let d1 = CausalDelta::new(
-            VectorDelta::from_dense(vec![1.0]),
-            "r1".to_string(),
-            clock1,
-        );
+        let d1 = CausalDelta::new(VectorDelta::from_dense(vec![1.0]), "r1".to_string(), clock1);
 
-        let d2 = CausalDelta::new(
-            VectorDelta::from_dense(vec![2.0]),
-            "r1".to_string(),
-            clock2,
-        );
+        let d2 = CausalDelta::new(VectorDelta::from_dense(vec![2.0]), "r1".to_string(), clock2);
 
         assert!(d1.is_before(&d2));
         assert!(!d2.is_before(&d1));
@@ -491,17 +479,9 @@ mod tests {
             c
         };
 
-        let d1 = CausalDelta::new(
-            VectorDelta::from_dense(vec![1.0]),
-            "r1".to_string(),
-            clock1,
-        );
+        let d1 = CausalDelta::new(VectorDelta::from_dense(vec![1.0]), "r1".to_string(), clock1);
 
-        let d2 = CausalDelta::new(
-            VectorDelta::from_dense(vec![2.0]),
-            "r2".to_string(),
-            clock2,
-        );
+        let d2 = CausalDelta::new(VectorDelta::from_dense(vec![2.0]), "r2".to_string(), clock2);
 
         assert!(d1.is_concurrent(&d2));
     }

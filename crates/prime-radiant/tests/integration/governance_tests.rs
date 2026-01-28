@@ -134,7 +134,11 @@ impl PolicyBundle {
         }
 
         // Check for duplicate approver
-        if self.approvals.iter().any(|a| a.approver_id == approval.approver_id) {
+        if self
+            .approvals
+            .iter()
+            .any(|a| a.approver_id == approval.approver_id)
+        {
             return Err("Approver has already approved");
         }
 
@@ -393,21 +397,27 @@ fn test_policy_bundle_creation() {
 fn test_policy_bundle_with_thresholds() {
     let mut policy = PolicyBundle::new("policy-001");
 
-    policy.add_threshold("global", ThresholdConfig {
-        name: "global".to_string(),
-        green_threshold: 0.05,
-        amber_threshold: 0.3,
-        red_threshold: 0.8,
-        escalation_enabled: true,
-    });
+    policy.add_threshold(
+        "global",
+        ThresholdConfig {
+            name: "global".to_string(),
+            green_threshold: 0.05,
+            amber_threshold: 0.3,
+            red_threshold: 0.8,
+            escalation_enabled: true,
+        },
+    );
 
-    policy.add_threshold("finance", ThresholdConfig {
-        name: "finance".to_string(),
-        green_threshold: 0.02,
-        amber_threshold: 0.1,
-        red_threshold: 0.5,
-        escalation_enabled: true,
-    });
+    policy.add_threshold(
+        "finance",
+        ThresholdConfig {
+            name: "finance".to_string(),
+            green_threshold: 0.02,
+            amber_threshold: 0.1,
+            red_threshold: 0.5,
+            escalation_enabled: true,
+        },
+    );
 
     assert_eq!(policy.thresholds.len(), 2);
     assert!(policy.thresholds.contains_key("global"));
@@ -439,21 +449,25 @@ fn test_policy_bundle_approval_workflow() {
     policy.submit_for_approval().unwrap();
 
     // Add first approval
-    policy.add_approval(ApprovalSignature {
-        approver_id: "approver-1".to_string(),
-        timestamp: 1001,
-        signature: vec![1, 2, 3],
-    }).unwrap();
+    policy
+        .add_approval(ApprovalSignature {
+            approver_id: "approver-1".to_string(),
+            timestamp: 1001,
+            signature: vec![1, 2, 3],
+        })
+        .unwrap();
 
     // Cannot activate with insufficient approvals
     assert!(policy.activate(1002).is_err());
 
     // Add second approval
-    policy.add_approval(ApprovalSignature {
-        approver_id: "approver-2".to_string(),
-        timestamp: 1002,
-        signature: vec![4, 5, 6],
-    }).unwrap();
+    policy
+        .add_approval(ApprovalSignature {
+            approver_id: "approver-2".to_string(),
+            timestamp: 1002,
+            signature: vec![4, 5, 6],
+        })
+        .unwrap();
 
     // Now activation should succeed
     assert!(policy.activate(1003).is_ok());
@@ -467,11 +481,13 @@ fn test_policy_bundle_duplicate_approval_rejected() {
     policy.add_threshold("global", ThresholdConfig::default());
     policy.submit_for_approval().unwrap();
 
-    policy.add_approval(ApprovalSignature {
-        approver_id: "approver-1".to_string(),
-        timestamp: 1001,
-        signature: vec![1, 2, 3],
-    }).unwrap();
+    policy
+        .add_approval(ApprovalSignature {
+            approver_id: "approver-1".to_string(),
+            timestamp: 1001,
+            signature: vec![1, 2, 3],
+        })
+        .unwrap();
 
     // Same approver cannot approve twice
     let result = policy.add_approval(ApprovalSignature {
@@ -488,11 +504,13 @@ fn test_policy_bundle_supersession() {
     let mut policy_v1 = PolicyBundle::new("policy-001");
     policy_v1.add_threshold("global", ThresholdConfig::default());
     policy_v1.submit_for_approval().unwrap();
-    policy_v1.add_approval(ApprovalSignature {
-        approver_id: "approver-1".to_string(),
-        timestamp: 1001,
-        signature: vec![1, 2, 3],
-    }).unwrap();
+    policy_v1
+        .add_approval(ApprovalSignature {
+            approver_id: "approver-1".to_string(),
+            timestamp: 1001,
+            signature: vec![1, 2, 3],
+        })
+        .unwrap();
     policy_v1.activate(1002).unwrap();
 
     assert!(policy_v1.is_active());
@@ -508,11 +526,13 @@ fn test_policy_immutability_after_activation() {
     let mut policy = PolicyBundle::new("policy-001");
     policy.add_threshold("global", ThresholdConfig::default());
     policy.submit_for_approval().unwrap();
-    policy.add_approval(ApprovalSignature {
-        approver_id: "approver-1".to_string(),
-        timestamp: 1001,
-        signature: vec![1, 2, 3],
-    }).unwrap();
+    policy
+        .add_approval(ApprovalSignature {
+            approver_id: "approver-1".to_string(),
+            timestamp: 1001,
+            signature: vec![1, 2, 3],
+        })
+        .unwrap();
     policy.activate(1002).unwrap();
 
     // Content hash is locked after activation
@@ -521,7 +541,10 @@ fn test_policy_immutability_after_activation() {
     // Cannot add more thresholds (in a real system this would be prevented)
     // Here we just verify the hash would change if we could modify
     let new_hash = policy.compute_content_hash();
-    assert_eq!(hash_at_activation, new_hash, "Hash should be stable after activation");
+    assert_eq!(
+        hash_at_activation, new_hash,
+        "Hash should be stable after activation"
+    );
 }
 
 // ============================================================================
@@ -821,7 +844,9 @@ fn test_invariant_no_action_without_witness() {
             );
 
             // This is the invariant: every decision creates a witness
-            self.chain.append(witness).expect("Witness must be created for every decision");
+            self.chain
+                .append(witness)
+                .expect("Witness must be created for every decision");
 
             (decision, id)
         }
@@ -885,9 +910,27 @@ fn test_invariant_no_write_without_lineage() {
 
     let mut engine = WriteEngine::new();
 
-    let l1 = engine.write("entity:fact:1", Operation::Create, vec![], "witness-001", "agent-1");
-    let l2 = engine.write("entity:fact:2", Operation::Create, vec![], "witness-002", "agent-1");
-    let l3 = engine.write("entity:derived:1", Operation::Derive, vec![l1, l2], "witness-003", "agent-1");
+    let l1 = engine.write(
+        "entity:fact:1",
+        Operation::Create,
+        vec![],
+        "witness-001",
+        "agent-1",
+    );
+    let l2 = engine.write(
+        "entity:fact:2",
+        Operation::Create,
+        vec![],
+        "witness-002",
+        "agent-1",
+    );
+    let l3 = engine.write(
+        "entity:derived:1",
+        Operation::Derive,
+        vec![l1, l2],
+        "witness-003",
+        "agent-1",
+    );
 
     assert_eq!(engine.lineages.len(), 3);
     assert_eq!(engine.lineages[2].dependencies.len(), 2);

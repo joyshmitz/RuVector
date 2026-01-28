@@ -4,8 +4,10 @@
 //! and deep loop processing.
 
 use ruvllm::{
-    sona::{LearningLoop, SonaConfig, SonaIntegration, SonaStats, Trajectory, RoutingRecommendation},
     error::Result,
+    sona::{
+        LearningLoop, RoutingRecommendation, SonaConfig, SonaIntegration, SonaStats, Trajectory,
+    },
 };
 use std::time::Duration;
 
@@ -269,9 +271,12 @@ fn test_sona_trigger_deep_loop() {
 
     let stats = sona.stats();
     // At least one more deep update after explicit trigger
-    assert!(stats.deep_updates >= deep_updates_before + 1,
+    assert!(
+        stats.deep_updates >= deep_updates_before + 1,
         "Expected at least {} deep updates, got {}",
-        deep_updates_before + 1, stats.deep_updates);
+        deep_updates_before + 1,
+        stats.deep_updates
+    );
 }
 
 #[test]
@@ -318,8 +323,10 @@ fn test_sona_empty_background_loop() {
 
     let stats = sona.stats();
     // With no trajectories meeting quality threshold, background_updates is 0
-    assert_eq!(stats.background_updates, 0,
-        "Background loop with no trajectories should not count as an update");
+    assert_eq!(
+        stats.background_updates, 0,
+        "Background loop with no trajectories should not count as an update"
+    );
 }
 
 #[test]

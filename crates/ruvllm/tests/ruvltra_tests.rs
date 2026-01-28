@@ -24,16 +24,14 @@
 //! ```
 
 use ruvllm::backends::{
-    AneCapabilities, ComputeUnits, GenerateParams, LlmBackend,
-    ModelArchitecture, ModelConfig, Quantization,
+    AneCapabilities, ComputeUnits, GenerateParams, LlmBackend, ModelArchitecture, ModelConfig,
+    Quantization,
 };
 use ruvllm::error::{Result, RuvLLMError};
-use ruvllm::gguf::quantization::{
-    dequantize_tensor, GgufQuantType, QuantizedTensor,
-};
+use ruvllm::gguf::quantization::{dequantize_tensor, GgufQuantType, QuantizedTensor};
 use ruvllm::kernels::ane_ops::{
-    get_ane_recommendation, is_ane_available, should_use_ane,
-    should_use_ane_activation, should_use_ane_matmul, AneRecommendation,
+    get_ane_recommendation, is_ane_available, should_use_ane, should_use_ane_activation,
+    should_use_ane_matmul, AneRecommendation,
 };
 
 use std::sync::Arc;
@@ -169,8 +167,11 @@ mod model_loading {
 
             // Verify name format
             let quant_name = format!("{:?}", quant);
-            assert!(quant_name.contains(name) || !quant_name.is_empty(),
-                "Quantization {:?} should have recognizable name", quant);
+            assert!(
+                quant_name.contains(name) || !quant_name.is_empty(),
+                "Quantization {:?} should have recognizable name",
+                quant
+            );
         }
     }
 
@@ -196,13 +197,19 @@ mod model_loading {
         let invalid_extensions = [".bin", ".safetensors", ".pt", ".pth"];
 
         for ext in valid_extensions {
-            assert!(ext.to_lowercase().ends_with("gguf"),
-                "Extension {} should be valid GGUF", ext);
+            assert!(
+                ext.to_lowercase().ends_with("gguf"),
+                "Extension {} should be valid GGUF",
+                ext
+            );
         }
 
         for ext in invalid_extensions {
-            assert!(!ext.to_lowercase().ends_with("gguf"),
-                "Extension {} should not be GGUF", ext);
+            assert!(
+                !ext.to_lowercase().ends_with("gguf"),
+                "Extension {} should not be GGUF",
+                ext
+            );
         }
     }
 
@@ -264,7 +271,7 @@ mod quantization_accuracy {
         // Pack values: (8 - offset) gives 0, (9 - offset) gives 1, etc.
         // Q4_0 uses offset of 8
         for i in 0..16 {
-            let low = 8u8;  // Will become 0 after offset
+            let low = 8u8; // Will become 0 after offset
             let high = 9u8; // Will become 1 after offset
             block[2 + i] = low | (high << 4);
         }
@@ -285,11 +292,19 @@ mod quantization_accuracy {
         // Verify pattern: alternating 0.0, 0.5
         for i in 0..32 {
             if i % 2 == 0 {
-                assert!(output[i].abs() < QUANTIZATION_EPSILON,
-                    "Even index {} should be ~0.0, got {}", i, output[i]);
+                assert!(
+                    output[i].abs() < QUANTIZATION_EPSILON,
+                    "Even index {} should be ~0.0, got {}",
+                    i,
+                    output[i]
+                );
             } else {
-                assert!((output[i] - 0.5).abs() < QUANTIZATION_EPSILON,
-                    "Odd index {} should be ~0.5, got {}", i, output[i]);
+                assert!(
+                    (output[i] - 0.5).abs() < QUANTIZATION_EPSILON,
+                    "Odd index {} should be ~0.5, got {}",
+                    i,
+                    output[i]
+                );
             }
         }
     }
@@ -317,8 +332,13 @@ mod quantization_accuracy {
         // Verify: values should be 1.0, 2.0, ..., 32.0
         for i in 0..32 {
             let expected = (i + 1) as f32;
-            assert!((output[i] - expected).abs() < EPSILON,
-                "Index {}: expected {}, got {}", i, expected, output[i]);
+            assert!(
+                (output[i] - expected).abs() < EPSILON,
+                "Index {}: expected {}, got {}",
+                i,
+                expected,
+                output[i]
+            );
         }
     }
 
@@ -356,21 +376,34 @@ mod quantization_accuracy {
 
         for dtype in quant_types {
             // Block size must be positive
-            assert!(dtype.block_size() > 0,
-                "{:?} must have positive block size", dtype);
+            assert!(
+                dtype.block_size() > 0,
+                "{:?} must have positive block size",
+                dtype
+            );
 
             // Type size must be positive
-            assert!(dtype.type_size() > 0,
-                "{:?} must have positive type size", dtype);
+            assert!(
+                dtype.type_size() > 0,
+                "{:?} must have positive type size",
+                dtype
+            );
 
             // Bits per weight should be in reasonable range (1-32)
             let bits = dtype.bits_per_weight();
-            assert!(bits >= 1.0 && bits <= 32.0,
-                "{:?} bits/weight {} out of range", dtype, bits);
+            assert!(
+                bits >= 1.0 && bits <= 32.0,
+                "{:?} bits/weight {} out of range",
+                dtype,
+                bits
+            );
 
             // Name should be non-empty
-            assert!(!dtype.name().is_empty(),
-                "{:?} must have non-empty name", dtype);
+            assert!(
+                !dtype.name().is_empty(),
+                "{:?} must have non-empty name",
+                dtype
+            );
         }
     }
 
@@ -431,7 +464,7 @@ mod quantization_accuracy {
         for block in 0..8 {
             let base = block * 18;
             // Set a valid f16 scale: 0x3C00 = 1.0f16, small positive value
-            data[base] = 0x00;     // Low byte of f16 scale
+            data[base] = 0x00; // Low byte of f16 scale
             data[base + 1] = 0x3C; // High byte: 0x3C00 = 1.0
 
             // Fill packed 4-bit values with valid patterns (0-15)
@@ -449,8 +482,12 @@ mod quantization_accuracy {
 
         // All values should be finite
         for (i, val) in output.iter().enumerate() {
-            assert!(val.is_finite(),
-                "Value at index {} should be finite, got {}", i, val);
+            assert!(
+                val.is_finite(),
+                "Value at index {} should be finite, got {}",
+                i,
+                val
+            );
         }
     }
 
@@ -500,14 +537,22 @@ mod sona_integration {
     fn test_sona_config_defaults() {
         let config = SonaTestConfig::default();
 
-        assert!(config.learning_rate > 0.0 && config.learning_rate < 1.0,
-            "Learning rate should be in (0, 1)");
-        assert!(config.momentum >= 0.0 && config.momentum < 1.0,
-            "Momentum should be in [0, 1)");
-        assert!(config.adaptation_threshold > 0.0,
-            "Adaptation threshold must be positive");
-        assert!(config.max_adaptations_per_step > 0,
-            "Max adaptations must be positive");
+        assert!(
+            config.learning_rate > 0.0 && config.learning_rate < 1.0,
+            "Learning rate should be in (0, 1)"
+        );
+        assert!(
+            config.momentum >= 0.0 && config.momentum < 1.0,
+            "Momentum should be in [0, 1)"
+        );
+        assert!(
+            config.adaptation_threshold > 0.0,
+            "Adaptation threshold must be positive"
+        );
+        assert!(
+            config.max_adaptations_per_step > 0,
+            "Max adaptations must be positive"
+        );
     }
 
     #[test]
@@ -527,8 +572,11 @@ mod sona_integration {
         let duration = start.elapsed();
 
         // Should be very fast
-        assert!(duration < Duration::from_millis(1),
-            "SONA adaptation took {:?}, expected <1ms", duration);
+        assert!(
+            duration < Duration::from_millis(1),
+            "SONA adaptation took {:?}, expected <1ms",
+            duration
+        );
     }
 
     #[test]
@@ -560,8 +608,10 @@ mod sona_integration {
 
         // Small dimensions: NEON preferred
         let decision = make_routing_decision(1, 32);
-        assert!(decision.use_neon || decision.use_ane,
-            "Must use some compute backend");
+        assert!(
+            decision.use_neon || decision.use_ane,
+            "Must use some compute backend"
+        );
 
         // Large batch with aligned dims: ANE may be preferred on Apple Silicon
         let decision = make_routing_decision(32, 256);
@@ -625,13 +675,14 @@ mod sona_integration {
         if durations.is_empty() {
             return 0.0;
         }
-        let mean: f64 = durations.iter()
-            .map(|d| d.as_secs_f64())
-            .sum::<f64>() / durations.len() as f64;
+        let mean: f64 =
+            durations.iter().map(|d| d.as_secs_f64()).sum::<f64>() / durations.len() as f64;
 
-        durations.iter()
+        durations
+            .iter()
             .map(|d| (d.as_secs_f64() - mean).powi(2))
-            .sum::<f64>() / durations.len() as f64
+            .sum::<f64>()
+            / durations.len() as f64
     }
 
     #[test]
@@ -640,7 +691,7 @@ mod sona_integration {
         // This prevents catastrophic forgetting in SONA
 
         struct EwcConfig {
-            lambda: f32,      // Importance weight
+            lambda: f32, // Importance weight
             fisher_samples: usize,
         }
 
@@ -682,7 +733,10 @@ mod ane_dispatch {
             // On Apple Silicon, ANE should be available
             assert!(caps.available, "ANE should be available on Apple Silicon");
             assert!(caps.tops > 0.0, "TOPS should be positive");
-            assert!(caps.max_model_size_mb > 0, "Max model size should be positive");
+            assert!(
+                caps.max_model_size_mb > 0,
+                "Max model size should be positive"
+            );
             assert!(!caps.supported_ops.is_empty(), "Should have supported ops");
         }
 
@@ -732,12 +786,18 @@ mod ane_dispatch {
             let recommendation = get_ane_recommendation(m, k, n);
 
             // Recommendation should be consistent
-            assert!(recommendation.confidence >= 0.0 && recommendation.confidence <= 1.0,
-                "Confidence for {} should be in [0, 1]", desc);
+            assert!(
+                recommendation.confidence >= 0.0 && recommendation.confidence <= 1.0,
+                "Confidence for {} should be in [0, 1]",
+                desc
+            );
 
             // Expected speedup should be reasonable
-            assert!(recommendation.expected_speedup > 0.0 && recommendation.expected_speedup < 10.0,
-                "Speedup for {} should be reasonable", desc);
+            assert!(
+                recommendation.expected_speedup > 0.0 && recommendation.expected_speedup < 10.0,
+                "Speedup for {} should be reasonable",
+                desc
+            );
         }
     }
 
@@ -747,7 +807,7 @@ mod ane_dispatch {
             (1, 64),
             (32, 256),
             (64, 4096),
-            (100, 128),  // Above typical ANE batch limit
+            (100, 128),   // Above typical ANE batch limit
             (1, 1000000), // Very large tensor
         ];
 
@@ -818,11 +878,7 @@ mod ane_dispatch {
     #[test]
     fn test_ane_no_dispatch_errors() {
         // Simulate dispatch to verify no errors occur
-        let test_tensors = [
-            (1, 64),
-            (32, 256),
-            (64, 4096),
-        ];
+        let test_tensors = [(1, 64), (32, 256), (64, 4096)];
 
         for (batch, dim) in test_tensors {
             // These should never panic
@@ -883,8 +939,10 @@ mod memory_management {
         let embedding_size_q4k = GgufQuantType::Q4_K.tensor_size(vocab_size * hidden_size);
 
         // Q4_K should be much smaller
-        assert!(embedding_size_q4k < embedding_size_f32 / 4,
-            "Q4_K should be at least 4x smaller than F32");
+        assert!(
+            embedding_size_q4k < embedding_size_f32 / 4,
+            "Q4_K should be at least 4x smaller than F32"
+        );
     }
 
     #[test]
@@ -900,8 +958,12 @@ mod memory_management {
         let kv_per_layer = 2 * max_seq_len * num_kv_heads * head_dim * 2;
         let total_kv_cache = kv_per_layer * num_layers;
 
-        assert!(total_kv_cache < MEMORY_BOUNDS.max_kv_cache_memory as usize,
-            "KV cache {} exceeds bound {}", total_kv_cache, MEMORY_BOUNDS.max_kv_cache_memory);
+        assert!(
+            total_kv_cache < MEMORY_BOUNDS.max_kv_cache_memory as usize,
+            "KV cache {} exceeds bound {}",
+            total_kv_cache,
+            MEMORY_BOUNDS.max_kv_cache_memory
+        );
     }
 
     #[test]
@@ -935,8 +997,12 @@ mod output_validation {
 
         // All logits should be finite
         for (i, logit) in logits.iter().enumerate() {
-            assert!(logit.is_finite(),
-                "Logit at index {} should be finite, got {}", i, logit);
+            assert!(
+                logit.is_finite(),
+                "Logit at index {} should be finite, got {}",
+                i,
+                logit
+            );
         }
     }
 
@@ -958,13 +1024,20 @@ mod output_validation {
 
         // Probabilities should sum to 1.0
         let prob_sum: f32 = probs.iter().sum();
-        assert!((prob_sum - 1.0).abs() < EPSILON,
-            "Probabilities should sum to 1.0, got {}", prob_sum);
+        assert!(
+            (prob_sum - 1.0).abs() < EPSILON,
+            "Probabilities should sum to 1.0, got {}",
+            prob_sum
+        );
 
         // All probabilities should be in [0, 1]
         for (i, p) in probs.iter().enumerate() {
-            assert!(*p >= 0.0 && *p <= 1.0,
-                "Probability at {} should be in [0, 1], got {}", i, p);
+            assert!(
+                *p >= 0.0 && *p <= 1.0,
+                "Probability at {} should be in [0, 1], got {}",
+                i,
+                p
+            );
         }
     }
 
@@ -975,16 +1048,20 @@ mod output_validation {
 
         // All tokens should be valid (within vocab range)
         for token in &sample_tokens {
-            assert!(*token < RUVLTRA_SMALL_CONFIG.vocab_size as u32,
-                "Token {} exceeds vocab size", token);
+            assert!(
+                *token < RUVLTRA_SMALL_CONFIG.vocab_size as u32,
+                "Token {} exceeds vocab size",
+                token
+            );
         }
 
         // No repeated padding tokens at start (unless intentional)
         // This is a basic coherence check
-        let has_varied_tokens = sample_tokens.windows(2)
-            .any(|w| w[0] != w[1]);
-        assert!(has_varied_tokens || sample_tokens.len() <= 1,
-            "Token sequence should have variety");
+        let has_varied_tokens = sample_tokens.windows(2).any(|w| w[0] != w[1]);
+        assert!(
+            has_varied_tokens || sample_tokens.len() <= 1,
+            "Token sequence should have variety"
+        );
     }
 
     #[test]
@@ -1004,8 +1081,12 @@ mod output_validation {
         // Verify row sums are approximately 1.0
         for i in 0..seq_len {
             let row_sum: f32 = attention[i * seq_len..(i + 1) * seq_len].iter().sum();
-            assert!((row_sum - 1.0).abs() < LOOSE_EPSILON,
-                "Attention row {} should sum to 1.0, got {}", i, row_sum);
+            assert!(
+                (row_sum - 1.0).abs() < LOOSE_EPSILON,
+                "Attention row {} should sum to 1.0, got {}",
+                i,
+                row_sum
+            );
         }
     }
 }
@@ -1033,8 +1114,11 @@ mod performance_validation {
         let duration = start.elapsed();
 
         // Basic operations should be very fast
-        assert!(duration < Duration::from_millis(10),
-            "Basic ops took {:?}", duration);
+        assert!(
+            duration < Duration::from_millis(10),
+            "Basic ops took {:?}",
+            duration
+        );
     }
 
     #[test]
@@ -1078,8 +1162,11 @@ mod performance_validation {
         println!("Throughput: {:.2e} ops/sec", ops_per_second);
 
         // Should achieve reasonable throughput
-        assert!(ops_per_second > 1_000_000.0,
-            "Throughput {:.2e} below minimum", ops_per_second);
+        assert!(
+            ops_per_second > 1_000_000.0,
+            "Throughput {:.2e} below minimum",
+            ops_per_second
+        );
     }
 }
 

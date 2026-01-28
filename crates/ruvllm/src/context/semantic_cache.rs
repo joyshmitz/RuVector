@@ -567,7 +567,12 @@ mod tests {
 
         let embedding = test_embedding(128);
         cache
-            .store("read_file", "/path/to/file.rs", "file contents", embedding.clone())
+            .store(
+                "read_file",
+                "/path/to/file.rs",
+                "file contents",
+                embedding.clone(),
+            )
             .unwrap();
 
         // Same embedding should match
@@ -588,12 +593,16 @@ mod tests {
 
         // First call should execute
         let result: std::result::Result<String, &str> =
-            cache.get_or_execute("test_tool", "input", embedding.clone(), || Ok("executed".to_string()));
+            cache.get_or_execute("test_tool", "input", embedding.clone(), || {
+                Ok("executed".to_string())
+            });
         assert_eq!(result.unwrap(), "executed");
 
         // Second call should return cached
         let result: std::result::Result<String, &str> =
-            cache.get_or_execute("test_tool", "input", embedding, || Ok("should not execute".to_string()));
+            cache.get_or_execute("test_tool", "input", embedding, || {
+                Ok("should not execute".to_string())
+            });
         assert_eq!(result.unwrap(), "executed");
     }
 

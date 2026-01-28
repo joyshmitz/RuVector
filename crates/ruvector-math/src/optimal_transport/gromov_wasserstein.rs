@@ -25,9 +25,9 @@
 //! 4. Line search and update
 //! 5. Repeat until convergence
 
+use super::SinkhornSolver;
 use crate::error::{MathError, Result};
 use crate::utils::EPS;
-use super::SinkhornSolver;
 
 /// Gromov-Wasserstein distance calculator
 #[derive(Debug, Clone)]
@@ -94,11 +94,7 @@ impl GromovWasserstein {
     ///      = ⟨h₁(D_X) ⊗ h₂(D_Y), γ ⊗ γ⟩ - 2⟨D_X γ D_Y^T, γ⟩
     ///
     /// where h₁(a) = a², h₂(b) = b², for squared loss
-    fn compute_gw_loss(
-        dist_x: &[Vec<f64>],
-        dist_y: &[Vec<f64>],
-        gamma: &[Vec<f64>],
-    ) -> f64 {
+    fn compute_gw_loss(dist_x: &[Vec<f64>], dist_y: &[Vec<f64>], gamma: &[Vec<f64>]) -> f64 {
         let n = dist_x.len();
         let m = dist_y.len();
 
@@ -144,11 +140,7 @@ impl GromovWasserstein {
 
         let term3: f64 = 2.0
             * (0..n)
-                .map(|i| {
-                    (0..m)
-                        .map(|j| dx_gamma[i][j] * gamma_dy[i][j])
-                        .sum::<f64>()
-                })
+                .map(|i| (0..m).map(|j| dx_gamma[i][j] * gamma_dy[i][j]).sum::<f64>())
                 .sum::<f64>();
 
         term1 + term2 - term3
@@ -225,9 +217,7 @@ impl GromovWasserstein {
         let dist_y = Self::distance_matrix(target);
 
         // Initialize with independent coupling
-        let mut gamma: Vec<Vec<f64>> = (0..n)
-            .map(|_| vec![1.0 / (n * m) as f64; m])
-            .collect();
+        let mut gamma: Vec<Vec<f64>> = (0..n).map(|_| vec![1.0 / (n * m) as f64; m]).collect();
 
         let sinkhorn = SinkhornSolver::new(self.regularization, self.inner_iterations);
         let source_weights = vec![1.0 / n as f64; n];
@@ -272,7 +262,8 @@ impl GromovWasserstein {
             if best_alpha > 0.0 {
                 for i in 0..n {
                     for j in 0..m {
-                        gamma[i][j] = (1.0 - best_alpha) * gamma[i][j] + best_alpha * direction[i][j];
+                        gamma[i][j] =
+                            (1.0 - best_alpha) * gamma[i][j] + best_alpha * direction[i][j];
                     }
                 }
             }
@@ -320,29 +311,28 @@ mod tests {
     fn test_gw_identical() {
         let gw = GromovWasserstein::new(0.1);
 
-        let points = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let points = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]];
 
         let dist = gw.distance(&points, &points).unwrap();
         // GW with entropic regularization won't be exactly 0 for identical structures
-        assert!(dist < 1.0, "Identical structures should have low GW: {}", dist);
+        assert!(
+            dist < 1.0,
+            "Identical structures should have low GW: {}",
+            dist
+        );
     }
 
     #[test]
     fn test_gw_scaled() {
         let gw = GromovWasserstein::new(0.1);
 
-        let source = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let source = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]];
 
         // Scale by 2 - structure is preserved!
-        let target: Vec<Vec<f64>> = source.iter().map(|p| vec![p[0] * 2.0, p[1] * 2.0]).collect();
+        let target: Vec<Vec<f64>> = source
+            .iter()
+            .map(|p| vec![p[0] * 2.0, p[1] * 2.0])
+            .collect();
 
         let dist = gw.distance(&source, &target).unwrap();
 
@@ -356,23 +346,19 @@ mod tests {
         let gw = GromovWasserstein::new(0.1);
 
         // Triangle
-        let triangle = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.5, 0.866],
-        ];
+        let triangle = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.5, 0.866]];
 
         // Line
-        let line = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![2.0, 0.0],
-        ];
+        let line = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]];
 
         let dist = gw.distance(&triangle, &line).unwrap();
 
         // Different structures should have larger GW distance
-        assert!(dist > 0.1, "Different structures should have high GW: {}", dist);
+        assert!(
+            dist > 0.1,
+            "Different structures should have high GW: {}",
+            dist
+        );
     }
 
     #[test]

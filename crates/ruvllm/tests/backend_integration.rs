@@ -5,7 +5,7 @@
 
 use ruvllm::{
     backends::{
-        create_backend, DeviceType, DType, GenerateParams, LlmBackend, ModelArchitecture,
+        create_backend, DType, DeviceType, GenerateParams, LlmBackend, ModelArchitecture,
         ModelConfig, ModelInfo, Quantization, SpecialTokens, TokenStream, Tokenizer,
     },
     error::Result,
@@ -47,9 +47,7 @@ impl LlmBackend for MockBackend {
 
     fn generate(&self, prompt: &str, _params: GenerateParams) -> Result<String> {
         if !self.loaded {
-            return Err(ruvllm::RuvLLMError::Backend(
-                "Model not loaded".to_string(),
-            ));
+            return Err(ruvllm::RuvLLMError::Backend("Model not loaded".to_string()));
         }
         Ok(format!("Response to: {}", prompt))
     }
@@ -58,11 +56,10 @@ impl LlmBackend for MockBackend {
         &self,
         _prompt: &str,
         _params: GenerateParams,
-    ) -> Result<Box<dyn Iterator<Item = Result<ruvllm::backends::GeneratedToken>> + Send + '_>> {
+    ) -> Result<Box<dyn Iterator<Item = Result<ruvllm::backends::GeneratedToken>> + Send + '_>>
+    {
         if !self.loaded {
-            return Err(ruvllm::RuvLLMError::Backend(
-                "Model not loaded".to_string(),
-            ));
+            return Err(ruvllm::RuvLLMError::Backend("Model not loaded".to_string()));
         }
 
         let tokens = vec![
@@ -91,9 +88,7 @@ impl LlmBackend for MockBackend {
 
     fn generate_stream_v2(&self, _prompt: &str, _params: GenerateParams) -> Result<TokenStream> {
         if !self.loaded {
-            return Err(ruvllm::RuvLLMError::Backend(
-                "Model not loaded".to_string(),
-            ));
+            return Err(ruvllm::RuvLLMError::Backend("Model not loaded".to_string()));
         }
         // Return a mock stream using channel
         let (tx, stream) = TokenStream::channel();
@@ -104,9 +99,7 @@ impl LlmBackend for MockBackend {
 
     fn get_embeddings(&self, _text: &str) -> Result<Vec<f32>> {
         if !self.loaded {
-            return Err(ruvllm::RuvLLMError::Backend(
-                "Model not loaded".to_string(),
-            ));
+            return Err(ruvllm::RuvLLMError::Backend("Model not loaded".to_string()));
         }
         // Return a mock embedding
         Ok(vec![0.1; 768])
@@ -149,7 +142,9 @@ fn test_mock_backend_load_model() {
 #[test]
 fn test_backend_generate_basic() {
     let mut backend = MockBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let params = GenerateParams {
         max_tokens: 100,
@@ -183,7 +178,9 @@ fn test_backend_generate_requires_loaded_model() {
 #[test]
 fn test_backend_streaming() {
     let mut backend = MockBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let params = GenerateParams::default();
     let stream = backend.generate_stream("Hello", params).unwrap();
@@ -200,7 +197,9 @@ fn test_backend_streaming() {
 #[test]
 fn test_backend_embeddings() {
     let mut backend = MockBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let embedding = backend.get_embeddings("Test text for embedding").unwrap();
 
@@ -231,7 +230,9 @@ fn test_backend_model_info() {
 #[test]
 fn test_backend_unload() {
     let mut backend = MockBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
     assert!(backend.is_model_loaded());
 
     backend.unload_model();
@@ -413,8 +414,8 @@ mod candle_tests {
 
 mod memory_pool_tests {
     use ruvllm::memory_pool::{
-        InferenceArena, BufferPool, BufferSize, ScratchSpaceManager,
-        MemoryManager, MemoryManagerConfig,
+        BufferPool, BufferSize, InferenceArena, MemoryManager, MemoryManagerConfig,
+        ScratchSpaceManager,
     };
 
     /// Test memory pool integration with streaming generation
@@ -470,7 +471,10 @@ mod memory_pool_tests {
             logits[0] = token_idx as f32 * 0.1;
 
             // Acquire KV cache buffer from pool
-            let kv_buf = manager.pool.acquire(BufferSize::KB16).expect("acquire failed");
+            let kv_buf = manager
+                .pool
+                .acquire(BufferSize::KB16)
+                .expect("acquire failed");
             assert!(kv_buf.capacity() >= 16384);
 
             // Use scratch space for intermediate computations
@@ -582,9 +586,9 @@ mod memory_pool_tests {
     fn test_memory_manager_for_model() {
         // Configure for a small LLM (e.g., Phi-2)
         let config = MemoryManagerConfig::for_model(
-            2560,   // hidden_dim
-            51200,  // vocab_size
-            1,      // batch_size
+            2560,  // hidden_dim
+            51200, // vocab_size
+            1,     // batch_size
         );
 
         let manager = MemoryManager::with_config(config).expect("manager creation failed");

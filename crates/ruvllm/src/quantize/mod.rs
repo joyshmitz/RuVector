@@ -41,21 +41,16 @@
 mod ruvltra_quant;
 
 pub use ruvltra_quant::{
-    // Core quantizer
-    RuvltraQuantizer,
-    QuantConfig,
-    TargetFormat,
-
-    // Quantization functions
-    quantize_ruvltra_q4,
-    quantize_ruvltra_q5,
-    quantize_ruvltra_q8,
     dequantize_for_ane,
 
     // Memory estimation
     estimate_memory_q4,
     estimate_memory_q5,
     estimate_memory_q8,
+    // Quantization functions
+    quantize_ruvltra_q4,
+    quantize_ruvltra_q5,
+    quantize_ruvltra_q8,
     MemoryEstimate,
 
     // Block types
@@ -63,7 +58,11 @@ pub use ruvltra_quant::{
     Q5KMBlock,
     Q8Block,
 
+    QuantConfig,
     // Progress tracking
     QuantProgress,
     QuantStats,
+    // Core quantizer
+    RuvltraQuantizer,
+    TargetFormat,
 };

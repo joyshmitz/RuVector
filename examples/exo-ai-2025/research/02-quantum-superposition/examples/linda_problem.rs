@@ -31,7 +31,7 @@ fn main() {
     let labels = vec![
         "bank_teller".to_string(),
         "feminist".to_string(),
-        "feminist_bank_teller".to_string()
+        "feminist_bank_teller".to_string(),
     ];
     let initial_state = CognitiveState::uniform(3, labels);
 
@@ -45,7 +45,7 @@ fn main() {
             "bank_teller",
             "feminist",
             "feminist_bank_teller",
-            *overlap
+            *overlap,
         );
 
         println!("Semantic Overlap = {:.1}", overlap);

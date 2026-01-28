@@ -110,7 +110,10 @@ impl ReplayBuffer {
 
         for i in 0..batch_size.min(n) {
             // Simple LCG for pseudo-random selection
-            let idx = ((seed.wrapping_mul(6364136223846793005).wrapping_add(i as u64)) % n as u64) as usize;
+            let idx = ((seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(i as u64))
+                % n as u64) as usize;
             let exp = &self.experiences[idx];
             batch.add(
                 exp.source.clone(),
@@ -249,11 +252,7 @@ mod tests {
         let mut buffer = ReplayBuffer::new(100);
 
         for i in 0..50 {
-            buffer.add(
-                vec![i as f32],
-                vec![i as f32 + 1.0],
-                vec![0.1],
-            );
+            buffer.add(vec![i as f32], vec![i as f32 + 1.0], vec![0.1]);
         }
 
         assert_eq!(buffer.len(), 50);

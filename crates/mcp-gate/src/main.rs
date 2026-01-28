@@ -8,8 +8,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     tracing_subscriber::registry()
         .with(fmt::layer().with_writer(std::io::stderr))
@@ -22,10 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create and run server
     let server = McpGateServer::with_thresholds(config.thresholds);
 
-    tracing::info!(
-        "MCP Gate server v{} starting",
-        env!("CARGO_PKG_VERSION")
-    );
+    tracing::info!("MCP Gate server v{} starting", env!("CARGO_PKG_VERSION"));
 
     server.run_stdio().await?;
 

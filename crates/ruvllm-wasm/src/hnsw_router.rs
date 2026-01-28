@@ -43,9 +43,9 @@
 //! const restored = HnswRouterWasm.fromJson(json);
 //! ```
 
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 /// Maximum connections per node in the HNSW graph (M parameter)
 const DEFAULT_M: usize = 16;
@@ -285,11 +285,7 @@ impl HnswGraph {
             let candidates = self.search_layer(embedding, curr, self.ef_construction, l);
 
             // Select M nearest neighbors
-            let neighbors: Vec<usize> = candidates
-                .iter()
-                .take(m)
-                .map(|(id, _)| *id)
-                .collect();
+            let neighbors: Vec<usize> = candidates.iter().take(m).map(|(id, _)| *id).collect();
 
             // Add bidirectional connections
             if let Some(node) = self.layers[l].get_mut(&node_id) {
@@ -371,7 +367,10 @@ impl HnswGraph {
 
             // If worse than worst in best set, stop
             if !best.is_empty() {
-                let worst_best = best.iter().min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+                let worst_best = best
+                    .iter()
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                    .unwrap();
                 if curr_sim < worst_best.1 {
                     break;
                 }
@@ -382,9 +381,17 @@ impl HnswGraph {
                 for &neighbor_id in &node.neighbors {
                     if !visited[neighbor_id] {
                         visited[neighbor_id] = true;
-                        let sim = Self::cosine_similarity(query, &self.patterns[neighbor_id].embedding);
+                        let sim =
+                            Self::cosine_similarity(query, &self.patterns[neighbor_id].embedding);
 
-                        if best.len() < ef || sim > best.iter().min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap().1 {
+                        if best.len() < ef
+                            || sim
+                                > best
+                                    .iter()
+                                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                                    .unwrap()
+                                    .1
+                        {
                             candidates.push((neighbor_id, sim));
                             best.push((neighbor_id, sim));
 

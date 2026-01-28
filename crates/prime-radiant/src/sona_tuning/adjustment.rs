@@ -84,10 +84,7 @@ impl ThresholdAdjustment {
     }
 
     /// Create an adjustment for an energy spike.
-    pub fn for_energy_spike(
-        current: &ThresholdConfig,
-        spike_magnitude: f32,
-    ) -> Self {
+    pub fn for_energy_spike(current: &ThresholdConfig, spike_magnitude: f32) -> Self {
         // Tighten thresholds proportionally to spike
         let factor = 1.0 - (spike_magnitude * 0.5).min(0.4);
         let new = ThresholdConfig {
@@ -100,7 +97,9 @@ impl ThresholdAdjustment {
         Self::new(
             current,
             new,
-            AdjustmentReason::EnergySpike { magnitude: spike_magnitude },
+            AdjustmentReason::EnergySpike {
+                magnitude: spike_magnitude,
+            },
             0.8 + spike_magnitude * 0.1,
         )
     }
@@ -155,10 +154,7 @@ impl ThresholdDelta {
 
     /// Get the total magnitude of change.
     pub fn total_magnitude(&self) -> f32 {
-        (self.reflex_delta.powi(2)
-            + self.retrieval_delta.powi(2)
-            + self.heavy_delta.powi(2))
-        .sqrt()
+        (self.reflex_delta.powi(2) + self.retrieval_delta.powi(2) + self.heavy_delta.powi(2)).sqrt()
     }
 }
 

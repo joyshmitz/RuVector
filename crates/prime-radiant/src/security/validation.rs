@@ -159,11 +159,7 @@ impl InputValidator {
     }
 
     /// Validate matrix dimensions
-    pub fn validate_matrix_dims(
-        &self,
-        rows: usize,
-        cols: usize,
-    ) -> ValidationResult<()> {
+    pub fn validate_matrix_dims(&self, rows: usize, cols: usize) -> ValidationResult<()> {
         let max = self.config.resource_limits.max_matrix_dim;
 
         if rows > max {
@@ -267,9 +263,7 @@ impl PathValidator {
 
         // Check for null bytes
         if component.contains('\0') {
-            return Err(ValidationError::InvalidPathChars(
-                "null byte".to_string(),
-            ));
+            return Err(ValidationError::InvalidPathChars("null byte".to_string()));
         }
 
         Ok(())
@@ -290,9 +284,7 @@ impl PathValidator {
         for component in path.components() {
             match component {
                 Component::ParentDir => {
-                    return Err(ValidationError::PathTraversal(
-                        path.display().to_string(),
-                    ));
+                    return Err(ValidationError::PathTraversal(path.display().to_string()));
                 }
                 Component::Normal(s) => {
                     if let Some(s_str) = s.to_str() {
@@ -300,9 +292,7 @@ impl PathValidator {
                     }
                 }
                 Component::Prefix(_) | Component::RootDir => {
-                    return Err(ValidationError::PathTraversal(
-                        path.display().to_string(),
-                    ));
+                    return Err(ValidationError::PathTraversal(path.display().to_string()));
                 }
                 Component::CurDir => {}
             }
@@ -311,9 +301,7 @@ impl PathValidator {
         // Final check: resolved path should start with base
         if let Ok(resolved) = full_path.canonicalize() {
             if !resolved.starts_with(&base_canonical) {
-                return Err(ValidationError::PathTraversal(
-                    path.display().to_string(),
-                ));
+                return Err(ValidationError::PathTraversal(path.display().to_string()));
             }
         }
 
@@ -377,7 +365,12 @@ impl StateValidator {
     }
 
     /// Validate and clamp state values to a range
-    pub fn validate_and_clamp(&self, state: &[f32], min: f32, max: f32) -> ValidationResult<Vec<f32>> {
+    pub fn validate_and_clamp(
+        &self,
+        state: &[f32],
+        min: f32,
+        max: f32,
+    ) -> ValidationResult<Vec<f32>> {
         if state.is_empty() {
             return Err(ValidationError::EmptyState);
         }
@@ -399,7 +392,11 @@ impl StateValidator {
             }
             // Clamp infinite values to min/max
             let clamped = if val.is_infinite() {
-                if val.is_sign_positive() { max } else { min }
+                if val.is_sign_positive() {
+                    max
+                } else {
+                    min
+                }
             } else {
                 val.clamp(min, max)
             };
@@ -428,9 +425,8 @@ pub fn is_valid_identifier(s: &str) -> bool {
     }
 
     // Rest can be alphanumeric, dash, underscore, or dot
-    s.chars().all(|c| {
-        c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'
-    })
+    s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
 }
 
 /// Check if a state vector is valid (no NaN/Infinity)
@@ -463,7 +459,9 @@ pub fn sanitize_path_component(component: &str) -> Option<String> {
 /// Validate a dimension value
 pub fn validate_dimension(dim: usize, max: usize) -> ValidationResult<()> {
     if dim == 0 {
-        return Err(ValidationError::Custom("Dimension cannot be zero".to_string()));
+        return Err(ValidationError::Custom(
+            "Dimension cannot be zero".to_string(),
+        ));
     }
     if dim > max {
         return Err(ValidationError::MatrixDimensionTooLarge { dim, max });
@@ -544,10 +542,22 @@ mod tests {
 
     #[test]
     fn test_sanitize_path() {
-        assert_eq!(sanitize_path_component("valid_name"), Some("valid_name".to_string()));
-        assert_eq!(sanitize_path_component("file.txt"), Some("file.txt".to_string()));
-        assert_eq!(sanitize_path_component("bad/path"), Some("badpath".to_string()));
-        assert_eq!(sanitize_path_component("bad\\path"), Some("badpath".to_string()));
+        assert_eq!(
+            sanitize_path_component("valid_name"),
+            Some("valid_name".to_string())
+        );
+        assert_eq!(
+            sanitize_path_component("file.txt"),
+            Some("file.txt".to_string())
+        );
+        assert_eq!(
+            sanitize_path_component("bad/path"),
+            Some("badpath".to_string())
+        );
+        assert_eq!(
+            sanitize_path_component("bad\\path"),
+            Some("badpath".to_string())
+        );
 
         assert_eq!(sanitize_path_component(""), None);
         assert_eq!(sanitize_path_component("."), None);

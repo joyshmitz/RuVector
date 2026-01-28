@@ -92,7 +92,11 @@ mod scalar_quantization_tests {
         let quantized = ScalarQuantized::quantize(&vector);
 
         let distance = quantized.distance(&quantized);
-        assert!(distance < 0.001, "Distance to self should be ~0, got {}", distance);
+        assert!(
+            distance < 0.001,
+            "Distance to self should be ~0, got {}",
+            distance
+        );
     }
 
     #[test]
@@ -151,8 +155,7 @@ mod scalar_quantization_tests {
 
             // Verify compression ratio (4x for f32 -> u8)
             let original_size = dim * std::mem::size_of::<f32>();
-            let quantized_size =
-                quantized.data.len() + std::mem::size_of::<f32>() * 2; // data + min + scale
+            let quantized_size = quantized.data.len() + std::mem::size_of::<f32>() * 2; // data + min + scale
             assert!(
                 quantized_size < original_size,
                 "No compression achieved for dim {}",
@@ -230,7 +233,9 @@ mod binary_quantization_tests {
     fn test_binary_quantization_packing() {
         // Test byte packing
         for dim in 1..=32 {
-            let vector: Vec<f32> = (0..dim).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+            let vector: Vec<f32> = (0..dim)
+                .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
             let quantized = BinaryQuantized::quantize(&vector);
 
             let expected_bytes = (dim + 7) / 8;
@@ -283,26 +288,10 @@ mod binary_quantization_tests {
         // Test specific Hamming distance cases
         let cases = vec![
             // (v1, v2, expected_distance)
-            (
-                vec![1.0, 1.0, 1.0, 1.0],
-                vec![1.0, 1.0, 1.0, 1.0],
-                0.0,
-            ), // identical
-            (
-                vec![1.0, 1.0, 1.0, 1.0],
-                vec![-1.0, -1.0, -1.0, -1.0],
-                4.0,
-            ), // opposite
-            (
-                vec![1.0, 1.0, -1.0, -1.0],
-                vec![1.0, -1.0, -1.0, 1.0],
-                2.0,
-            ), // 2 bits differ
-            (
-                vec![1.0, -1.0, 1.0, -1.0],
-                vec![-1.0, 1.0, -1.0, 1.0],
-                4.0,
-            ), // all differ
+            (vec![1.0, 1.0, 1.0, 1.0], vec![1.0, 1.0, 1.0, 1.0], 0.0), // identical
+            (vec![1.0, 1.0, 1.0, 1.0], vec![-1.0, -1.0, -1.0, -1.0], 4.0), // opposite
+            (vec![1.0, 1.0, -1.0, -1.0], vec![1.0, -1.0, -1.0, 1.0], 2.0), // 2 bits differ
+            (vec![1.0, -1.0, 1.0, -1.0], vec![-1.0, 1.0, -1.0, 1.0], 4.0), // all differ
         ];
 
         for (v1, v2, expected) in cases {
@@ -336,7 +325,9 @@ mod binary_quantization_tests {
     #[test]
     fn test_binary_quantization_distance_bounds() {
         for dim in [8, 16, 32, 64, 128, 256] {
-            let v1: Vec<f32> = (0..dim).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+            let v1: Vec<f32> = (0..dim)
+                .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
             let v2: Vec<f32> = (0..dim)
                 .map(|i| if i % 3 == 0 { 1.0 } else { -1.0 })
                 .collect();
@@ -359,7 +350,9 @@ mod binary_quantization_tests {
     #[test]
     fn test_binary_quantization_compression_ratio() {
         for dim in [128, 256, 512, 1024] {
-            let vector: Vec<f32> = (0..dim).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+            let vector: Vec<f32> = (0..dim)
+                .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
             let quantized = BinaryQuantized::quantize(&vector);
 
             // f32 to 1 bit = theoretical 32x compression for data only
@@ -577,12 +570,21 @@ mod comparative_tests {
         let binary_ratio = original_size as f32 / binary_size as f32;
 
         println!("Original: {} bytes", original_size);
-        println!("Scalar: {} bytes ({:.1}x compression)", scalar_size, scalar_ratio);
-        println!("Binary: {} bytes ({:.1}x compression)", binary_size, binary_ratio);
+        println!(
+            "Scalar: {} bytes ({:.1}x compression)",
+            scalar_size, scalar_ratio
+        );
+        println!(
+            "Binary: {} bytes ({:.1}x compression)",
+            binary_size, binary_ratio
+        );
 
         // Verify expected ratios
         assert!(scalar_ratio > 3.5, "Scalar should achieve ~4x compression");
-        assert!(binary_ratio > 25.0, "Binary should achieve ~32x compression");
+        assert!(
+            binary_ratio > 25.0,
+            "Binary should achieve ~32x compression"
+        );
     }
 }
 
@@ -754,14 +756,8 @@ mod performance_tests {
         }
         let binary_duration = start.elapsed();
 
-        println!(
-            "Scalar distance: {:?} for 100k ops",
-            scalar_duration
-        );
-        println!(
-            "Binary distance: {:?} for 100k ops",
-            binary_duration
-        );
+        println!("Scalar distance: {:?} for 100k ops", scalar_duration);
+        println!("Binary distance: {:?} for 100k ops", binary_duration);
 
         // Binary should be faster (just XOR and popcount)
         // But both should be fast

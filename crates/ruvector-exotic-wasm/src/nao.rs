@@ -172,15 +172,16 @@ impl OscillatorySynchronizer {
         }
 
         // Collect current phases
-        let current_phases: Vec<(String, f32)> = self
-            .phases
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
+        let current_phases: Vec<(String, f32)> =
+            self.phases.iter().map(|(k, v)| (k.clone(), *v)).collect();
 
         // Kuramoto update: dθ_i/dt = ω_i + (K/N) * Σ_j sin(θ_j - θ_i)
         for (agent_id, phase) in &current_phases {
-            let omega = self.frequencies.get(agent_id).copied().unwrap_or(self.base_frequency);
+            let omega = self
+                .frequencies
+                .get(agent_id)
+                .copied()
+                .unwrap_or(self.base_frequency);
 
             // Sum of phase differences
             let phase_coupling: f32 = current_phases
@@ -520,8 +521,7 @@ impl WasmNAO {
     /// Get all data as JSON
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<JsValue, JsValue> {
-        serde_wasm_bindgen::to_value(&self.inner)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
+        serde_wasm_bindgen::to_value(&self.inner).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }
 
@@ -623,9 +623,9 @@ mod tests {
         let prop_id = nao.propose("Controversial action");
 
         // Two against, one weak for - should be rejected even with coherence boost
-        nao.vote(&prop_id, "agent_1", 0.3);   // weak support
-        nao.vote(&prop_id, "agent_2", -1.0);  // strong against
-        nao.vote(&prop_id, "agent_3", -1.0);  // strong against
+        nao.vote(&prop_id, "agent_1", 0.3); // weak support
+        nao.vote(&prop_id, "agent_2", -1.0); // strong against
+        nao.vote(&prop_id, "agent_3", -1.0); // strong against
 
         // Should be rejected (more against than for)
         assert!(!nao.execute(&prop_id));
@@ -723,7 +723,7 @@ mod tests {
 
         // Rich votes against, poor votes for
         nao.vote(&prop_id, "rich", -1.0); // -10 effective vote
-        nao.vote(&prop_id, "poor", 1.0);  // +5 effective vote
+        nao.vote(&prop_id, "poor", 1.0); // +5 effective vote
 
         // Rich should win despite being one agent
         assert!(!nao.execute(&prop_id)); // Rejected
@@ -737,7 +737,7 @@ mod tests {
         let mut nao = NeuralAutonomousOrg::new(0.5);
 
         nao.add_member("agent_1", 100); // sqrt(100) = 10
-        nao.add_member("agent_2", 25);  // sqrt(25) = 5
+        nao.add_member("agent_2", 25); // sqrt(25) = 5
 
         let total = nao.total_voting_power();
         assert!((total - 15.0).abs() < 0.01, "Expected ~15, got {}", total);

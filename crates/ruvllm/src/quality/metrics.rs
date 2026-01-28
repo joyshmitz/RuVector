@@ -415,16 +415,22 @@ impl fmt::Display for QualitySummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Quality Summary (Grade: {})", self.overall_grade)?;
         writeln!(f, "  Composite Score: {:.1}%", self.composite_score * 100.0)?;
-        writeln!(f, "  Strongest: {} ({:.1}%)",
+        writeln!(
+            f,
+            "  Strongest: {} ({:.1}%)",
             self.strongest_dimension,
-            self.dimensions.iter()
+            self.dimensions
+                .iter()
                 .find(|(d, _)| *d == self.strongest_dimension)
                 .map(|(_, s)| s * 100.0)
                 .unwrap_or(0.0)
         )?;
-        writeln!(f, "  Weakest: {} ({:.1}%)",
+        writeln!(
+            f,
+            "  Weakest: {} ({:.1}%)",
             self.weakest_dimension,
-            self.dimensions.iter()
+            self.dimensions
+                .iter()
                 .find(|(d, _)| *d == self.weakest_dimension)
                 .map(|(_, s)| s * 100.0)
                 .unwrap_or(0.0)
@@ -434,8 +440,14 @@ impl fmt::Display for QualitySummary {
             let bar_len = (score * 20.0) as usize;
             let bar: String = (0..bar_len).map(|_| '#').collect();
             let empty: String = (0..(20 - bar_len)).map(|_| '-').collect();
-            writeln!(f, "    {:<18} [{}{:<20}] {:.1}%",
-                dim.to_string(), bar, empty, score * 100.0)?;
+            writeln!(
+                f,
+                "    {:<18} [{}{:<20}] {:.1}%",
+                dim.to_string(),
+                bar,
+                empty,
+                score * 100.0
+            )?;
         }
         Ok(())
     }
@@ -513,7 +525,10 @@ mod tests {
         let summary = metrics.to_summary();
 
         assert_eq!(summary.overall_grade, 'B');
-        assert_eq!(summary.strongest_dimension, QualityDimension::SchemaCompliance);
+        assert_eq!(
+            summary.strongest_dimension,
+            QualityDimension::SchemaCompliance
+        );
         assert_eq!(summary.weakest_dimension, QualityDimension::Uniqueness);
     }
 

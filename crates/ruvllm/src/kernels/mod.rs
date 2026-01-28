@@ -93,51 +93,54 @@ pub mod ane_ops;
 
 // Re-exports for convenience
 pub use attention::{
-    flash_attention_neon, flash_attention_v2, flash_attention_auto,
-    grouped_query_attention_neon, multi_query_attention_neon,
-    paged_attention_neon, PagedKvCache,
-    select_block_size, BLOCK_SIZE_SMALL, BLOCK_SIZE_MEDIUM, BLOCK_SIZE_LARGE,
+    flash_attention_auto,
     // TD-009: Zero-allocation attention functions and scratch buffers
-    flash_attention_into, flash_attention_with_scratch, AttentionScratch,
+    flash_attention_into,
+    flash_attention_neon,
+    flash_attention_v2,
+    flash_attention_with_scratch,
+    grouped_query_attention_neon,
+    multi_query_attention_neon,
+    paged_attention_neon,
+    select_block_size,
+    AttentionScratch,
+    PagedKvCache,
+    BLOCK_SIZE_LARGE,
+    BLOCK_SIZE_MEDIUM,
+    BLOCK_SIZE_SMALL,
 };
 // Thread-local scratch buffer for zero-allocation attention (non-WASM only)
 #[cfg(not(target_arch = "wasm32"))]
 pub use attention::THREAD_LOCAL_SCRATCH;
 #[cfg(all(feature = "parallel", not(target_arch = "wasm32")))]
 pub use attention::{
-    multi_query_attention_parallel, grouped_query_attention_parallel,
-    multi_head_attention_parallel,
+    grouped_query_attention_parallel, multi_head_attention_parallel, multi_query_attention_parallel,
 };
 pub use matmul::{batched_gemm_neon, gemm_neon, gemv_neon};
 #[cfg(all(feature = "parallel", not(target_arch = "wasm32")))]
 pub use matmul::{
-    gemm_parallel, gemv_parallel, batched_gemm_parallel,
-    configure_thread_pool, get_physical_cores,
+    batched_gemm_parallel, configure_thread_pool, gemm_parallel, gemv_parallel, get_physical_cores,
 };
 pub use norm::{layer_norm_neon, rms_norm_neon};
 pub use quantized::{
-    int4_gemv_neon, int8_gemv_neon, q4k_gemv_neon,
-    quantize_to_int4, quantize_to_int8, quantize_to_q4k,
-    dequantize_int4, dequantize_int8,
-    BlockQ4K, QuantizedInt4, QuantizedInt8,
+    dequantize_int4, dequantize_int8, int4_gemv_neon, int8_gemv_neon, q4k_gemv_neon,
+    quantize_to_int4, quantize_to_int8, quantize_to_q4k, BlockQ4K, QuantizedInt4, QuantizedInt8,
     INT4_BLOCK_SIZE, Q4K_SUPER_BLOCK_SIZE,
 };
 pub use rope::{apply_rope_neon, precompute_rope_tables, RopeConfig};
 
 // Activation function exports
 pub use activations::{
-    silu, silu_vec, gelu, gelu_vec, gelu_exact,
-    relu, relu_vec, leaky_relu,
-    softmax, softmax_vec, softmax_temperature,
-    batch_silu, batch_gelu, batch_softmax,
+    batch_gelu, batch_silu, batch_softmax, gelu, gelu_exact, gelu_vec, leaky_relu, relu, relu_vec,
+    silu, silu_vec, softmax, softmax_temperature, softmax_vec,
 };
 
 // Accelerate framework exports (macOS only)
 #[cfg(all(target_os = "macos", feature = "accelerate"))]
 pub use accelerate::{
-    gemv_accelerate, gemv_transpose_accelerate, gemv_scaled_accelerate,
-    gemm_accelerate, dot_accelerate, scal_accelerate, axpy_accelerate,
-    is_accelerate_available, should_use_accelerate, MatrixLayout,
+    axpy_accelerate, dot_accelerate, gemm_accelerate, gemv_accelerate, gemv_scaled_accelerate,
+    gemv_transpose_accelerate, is_accelerate_available, scal_accelerate, should_use_accelerate,
+    MatrixLayout,
 };
 
 // Re-export availability check for all platforms
@@ -147,18 +150,29 @@ pub use accelerate::is_accelerate_available;
 // ANE (Apple Neural Engine) ops exports (macOS only with coreml feature)
 #[cfg(all(target_os = "macos", feature = "coreml"))]
 pub use ane_ops::{
-    // Direct ANE operations
-    matmul_ane, batched_matmul_ane,
-    gelu_ane, silu_ane, softmax_ane,
-    layer_norm_ane, rms_norm_ane,
-    // Auto-dispatch functions
-    matmul_auto, gelu_auto, silu_auto, softmax_auto,
-    layer_norm_auto, rms_norm_auto,
-    // Availability checks
-    is_ane_available, should_use_ane, should_use_ane_matmul,
-    should_use_ane_activation,
+    batched_matmul_ane,
+    gelu_ane,
+    gelu_auto,
     // Strategy recommendations (M4 Pro optimized)
-    get_ane_recommendation, AneRecommendation,
+    get_ane_recommendation,
+    // Availability checks
+    is_ane_available,
+    layer_norm_ane,
+    layer_norm_auto,
+    // Direct ANE operations
+    matmul_ane,
+    // Auto-dispatch functions
+    matmul_auto,
+    rms_norm_ane,
+    rms_norm_auto,
+    should_use_ane,
+    should_use_ane_activation,
+    should_use_ane_matmul,
+    silu_ane,
+    silu_auto,
+    softmax_ane,
+    softmax_auto,
+    AneRecommendation,
 };
 
 // Re-export ANE availability check for macOS without coreml feature

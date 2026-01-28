@@ -440,7 +440,8 @@ impl SonaInstantWasm {
 
         // Update quality EMA
         let prev_quality = self.quality_ema;
-        self.quality_ema = self.config.ema_decay * self.quality_ema + (1.0 - self.config.ema_decay) * quality;
+        self.quality_ema =
+            self.config.ema_decay * self.quality_ema + (1.0 - self.config.ema_decay) * quality;
 
         // Adaptive rank adjustment (simple heuristic)
         // Increase rank if quality improving, decrease if degrading
@@ -454,7 +455,8 @@ impl SonaInstantWasm {
         // EWC-lite: Track important features (top 10% by quality contribution)
         // Simplified: just mark indices that correlate with high quality
         if quality > 0.7 && self.important_weights.len() < 100 {
-            let weight_idx = (quality * self.config.hidden_dim as f32) as usize % self.config.hidden_dim;
+            let weight_idx =
+                (quality * self.config.hidden_dim as f32) as usize % self.config.hidden_dim;
             if !self.important_weights.contains(&weight_idx) {
                 self.important_weights.push(weight_idx);
             }
@@ -480,7 +482,11 @@ impl SonaInstantWasm {
         let pattern = Pattern {
             embedding: embedding.to_vec(),
             success,
-            quality: if success { self.quality_ema } else { 1.0 - self.quality_ema },
+            quality: if success {
+                self.quality_ema
+            } else {
+                1.0 - self.quality_ema
+            },
             timestamp: self.timestamp,
         };
 
@@ -589,7 +595,8 @@ impl SonaInstantWasm {
             current_rank: usize,
         }
 
-        let import: Import = serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let import: Import =
+            serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(Self {
             config: import.config.clone(),

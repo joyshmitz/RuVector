@@ -108,7 +108,12 @@ impl GgmlType {
             GgmlType::Q4_0 | GgmlType::Q4_1 => 32,
             GgmlType::Q5_0 | GgmlType::Q5_1 => 32,
             GgmlType::Q8_0 | GgmlType::Q8_1 => 32,
-            GgmlType::Q2K | GgmlType::Q3K | GgmlType::Q4K | GgmlType::Q5K | GgmlType::Q6K | GgmlType::Q8K => 256,
+            GgmlType::Q2K
+            | GgmlType::Q3K
+            | GgmlType::Q4K
+            | GgmlType::Q5K
+            | GgmlType::Q6K
+            | GgmlType::Q8K => 256,
             _ => 32, // Default for newer types
         }
     }
@@ -123,14 +128,14 @@ impl GgmlType {
             GgmlType::I16 => 2,
             GgmlType::I32 => 4,
             GgmlType::I64 => 8,
-            GgmlType::Q4_0 => 18,  // 32 * 4/8 + 2 (scale)
-            GgmlType::Q4_1 => 20,  // 32 * 4/8 + 2 (scale) + 2 (min)
-            GgmlType::Q5_0 => 22,  // 32 * 5/8 + 2 (scale) (approx)
+            GgmlType::Q4_0 => 18, // 32 * 4/8 + 2 (scale)
+            GgmlType::Q4_1 => 20, // 32 * 4/8 + 2 (scale) + 2 (min)
+            GgmlType::Q5_0 => 22, // 32 * 5/8 + 2 (scale) (approx)
             GgmlType::Q5_1 => 24,
-            GgmlType::Q8_0 => 34,  // 32 * 1 + 2 (scale)
+            GgmlType::Q8_0 => 34, // 32 * 1 + 2 (scale)
             GgmlType::Q8_1 => 36,
-            GgmlType::Q4K => 144,  // Complex super-block format
-            _ => 32, // Approximation
+            GgmlType::Q4K => 144, // Complex super-block format
+            _ => 32,              // Approximation
         }
     }
 }
@@ -335,23 +340,31 @@ impl GgufFile {
     fn read_header<R: Read>(reader: &mut R) -> Result<GgufHeader, GgufError> {
         let mut buf = [0u8; 4];
 
-        reader.read_exact(&mut buf).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let magic = u32::from_le_bytes(buf);
         if magic != GGUF_MAGIC {
             return Err(GgufError::InvalidMagic(magic));
         }
 
-        reader.read_exact(&mut buf).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let version = u32::from_le_bytes(buf);
         if version > GGUF_VERSION {
             return Err(GgufError::UnsupportedVersion(version));
         }
 
         let mut buf8 = [0u8; 8];
-        reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf8)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let tensor_count = u64::from_le_bytes(buf8);
 
-        reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf8)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let metadata_kv_count = u64::from_le_bytes(buf8);
 
         Ok(GgufHeader {
@@ -364,11 +377,15 @@ impl GgufFile {
 
     fn read_string<R: Read>(reader: &mut R) -> Result<String, GgufError> {
         let mut buf8 = [0u8; 8];
-        reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf8)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let len = u64::from_le_bytes(buf8) as usize;
 
         let mut str_buf = vec![0u8; len];
-        reader.read_exact(&mut str_buf).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut str_buf)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
 
         String::from_utf8(str_buf).map_err(|e| GgufError::InvalidData(e.to_string()))
     }
@@ -377,7 +394,9 @@ impl GgufFile {
         let key = Self::read_string(reader)?;
 
         let mut buf4 = [0u8; 4];
-        reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf4)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let value_type = GgufMetadataType::try_from(u32::from_le_bytes(buf4))?;
 
         let value = Self::read_metadata_value(reader, value_type)?;
@@ -385,7 +404,10 @@ impl GgufFile {
         Ok((key, value))
     }
 
-    fn read_metadata_value<R: Read>(reader: &mut R, value_type: GgufMetadataType) -> Result<GgufValue, GgufError> {
+    fn read_metadata_value<R: Read>(
+        reader: &mut R,
+        value_type: GgufMetadataType,
+    ) -> Result<GgufValue, GgufError> {
         let mut buf1 = [0u8; 1];
         let mut buf2 = [0u8; 2];
         let mut buf4 = [0u8; 4];
@@ -393,35 +415,51 @@ impl GgufFile {
 
         match value_type {
             GgufMetadataType::Uint8 => {
-                reader.read_exact(&mut buf1).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf1)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Uint8(buf1[0]))
             }
             GgufMetadataType::Int8 => {
-                reader.read_exact(&mut buf1).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf1)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Int8(buf1[0] as i8))
             }
             GgufMetadataType::Uint16 => {
-                reader.read_exact(&mut buf2).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf2)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Uint16(u16::from_le_bytes(buf2)))
             }
             GgufMetadataType::Int16 => {
-                reader.read_exact(&mut buf2).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf2)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Int16(i16::from_le_bytes(buf2)))
             }
             GgufMetadataType::Uint32 => {
-                reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf4)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Uint32(u32::from_le_bytes(buf4)))
             }
             GgufMetadataType::Int32 => {
-                reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf4)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Int32(i32::from_le_bytes(buf4)))
             }
             GgufMetadataType::Float32 => {
-                reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf4)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Float32(f32::from_le_bytes(buf4)))
             }
             GgufMetadataType::Bool => {
-                reader.read_exact(&mut buf1).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf1)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Bool(buf1[0] != 0))
             }
             GgufMetadataType::String => {
@@ -430,10 +468,14 @@ impl GgufFile {
             }
             GgufMetadataType::Array => {
                 // Read array type and length
-                reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf4)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 let elem_type = GgufMetadataType::try_from(u32::from_le_bytes(buf4))?;
 
-                reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf8)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 let len = u64::from_le_bytes(buf8) as usize;
 
                 let mut arr = Vec::with_capacity(len);
@@ -443,15 +485,21 @@ impl GgufFile {
                 Ok(GgufValue::Array(arr))
             }
             GgufMetadataType::Uint64 => {
-                reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf8)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Uint64(u64::from_le_bytes(buf8)))
             }
             GgufMetadataType::Int64 => {
-                reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf8)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Int64(i64::from_le_bytes(buf8)))
             }
             GgufMetadataType::Float64 => {
-                reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+                reader
+                    .read_exact(&mut buf8)
+                    .map_err(|e| GgufError::IoError(e.to_string()))?;
                 Ok(GgufValue::Float64(f64::from_le_bytes(buf8)))
             }
         }
@@ -462,23 +510,31 @@ impl GgufFile {
 
         // Read number of dimensions
         let mut buf4 = [0u8; 4];
-        reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf4)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let n_dims = u32::from_le_bytes(buf4) as usize;
 
         // Read dimensions
         let mut dimensions = Vec::with_capacity(n_dims);
         let mut buf8 = [0u8; 8];
         for _ in 0..n_dims {
-            reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+            reader
+                .read_exact(&mut buf8)
+                .map_err(|e| GgufError::IoError(e.to_string()))?;
             dimensions.push(u64::from_le_bytes(buf8));
         }
 
         // Read type
-        reader.read_exact(&mut buf4).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf4)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let dtype = GgmlType::try_from(u32::from_le_bytes(buf4))?;
 
         // Read offset
-        reader.read_exact(&mut buf8).map_err(|e| GgufError::IoError(e.to_string()))?;
+        reader
+            .read_exact(&mut buf8)
+            .map_err(|e| GgufError::IoError(e.to_string()))?;
         let offset = u64::from_le_bytes(buf8);
 
         Ok(GgufTensorInfo {
@@ -605,7 +661,7 @@ fn create_test_gguf_with_metadata() -> Vec<u8> {
 /// Q4_0 block structure (32 elements)
 #[repr(C, packed)]
 pub struct BlockQ4_0 {
-    pub d: u16,      // Scale as f16
+    pub d: u16,       // Scale as f16
     pub qs: [u8; 16], // Packed 4-bit values
 }
 
@@ -840,7 +896,9 @@ fn test_quantization_roundtrip_accuracy() {
     dequantize_q4_0(&quantized, &mut restored);
 
     // Check accuracy (Q4_0 should be within ~6-7% of original for most values)
-    let max_error = original.iter().zip(restored.iter())
+    let max_error = original
+        .iter()
+        .zip(restored.iter())
         .map(|(a, b)| (a - b).abs())
         .fold(0.0f32, f32::max);
 
@@ -859,7 +917,12 @@ fn test_quantization_extreme_values() {
     // Values should be recoverable within quantization error
     for (orig, restored) in large.iter().zip(d_large.iter()) {
         let rel_error = (orig - restored).abs() / orig.abs().max(1e-6);
-        assert!(rel_error < 0.2, "Large value error: {} vs {}", orig, restored);
+        assert!(
+            rel_error < 0.2,
+            "Large value error: {} vs {}",
+            orig,
+            restored
+        );
     }
 
     // Test with small values
@@ -897,7 +960,10 @@ fn test_f16_conversion() {
         assert!(
             error < 0.01 || (v - back).abs() < 1e-3,
             "F16 roundtrip error for {}: {} -> {} -> {}",
-            v, v, h, back
+            v,
+            v,
+            h,
+            back
         );
     }
 }

@@ -2,8 +2,8 @@
 //!
 //! Uses topological coherence as a permission signal for attention behavior.
 
-use super::{AttentionCoherenceConfig, AttentionError, Result};
 use super::config::AttentionMode;
+use super::{AttentionCoherenceConfig, AttentionError, Result};
 
 /// Score from attention computation
 #[derive(Debug, Clone)]
@@ -171,7 +171,8 @@ impl TopologyGate {
                 .map(|(j, &s)| (j, s))
                 .collect();
 
-            neighbor_sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            neighbor_sims
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             let neighbors: Vec<usize> = neighbor_sims.iter().take(k).map(|(j, _)| *j).collect();
 
             // Boundary mass: edges to non-neighbors
@@ -187,7 +188,12 @@ impl TopologyGate {
         let all_sims: Vec<f32> = similarities
             .iter()
             .enumerate()
-            .flat_map(|(i, row)| row.iter().enumerate().filter(move |(j, _)| *j > i).map(|(_, &s)| s))
+            .flat_map(|(i, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter(move |(j, _)| *j > i)
+                    .map(|(_, &s)| s)
+            })
             .collect();
 
         let mean_sim: f32 = all_sims.iter().sum::<f32>() / all_sims.len().max(1) as f32;
@@ -204,8 +210,9 @@ impl TopologyGate {
         // Combine metrics
         // High mean similarity and low variance = high coherence
         // High boundary mass = low coherence
-        let coherence_score = (mean_sim * 0.5 + (1.0 - variance.sqrt()) * 0.3 + (1.0 - boundary_ratio) * 0.2)
-            .clamp(0.0, 1.0);
+        let coherence_score =
+            (mean_sim * 0.5 + (1.0 - variance.sqrt()) * 0.3 + (1.0 - boundary_ratio) * 0.2)
+                .clamp(0.0, 1.0);
 
         CoherenceMetrics {
             coherence_score,

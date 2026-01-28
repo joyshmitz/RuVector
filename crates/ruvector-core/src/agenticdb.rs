@@ -889,11 +889,26 @@ impl<'a> PolicyMemoryStore<'a> {
         let mut entries = Vec::new();
         for result in results {
             if let Some(metadata) = result.metadata {
-                let policy_id = metadata.get("policy_id").and_then(|v| v.as_str()).unwrap_or("");
-                let state_id = metadata.get("state_id").and_then(|v| v.as_str()).unwrap_or("");
-                let action = metadata.get("action").and_then(|v| v.as_str()).unwrap_or("");
-                let reward = metadata.get("reward").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let q_value = metadata.get("q_value").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let policy_id = metadata
+                    .get("policy_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let state_id = metadata
+                    .get("state_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let action = metadata
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let reward = metadata
+                    .get("reward")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let q_value = metadata
+                    .get("q_value")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
 
                 entries.push(PolicyEntry {
                     id: policy_id.to_string(),
@@ -990,7 +1005,10 @@ impl<'a> SessionStateIndex<'a> {
             metadata: Some({
                 let mut meta = HashMap::new();
                 meta.insert("type".to_string(), serde_json::json!("session_turn"));
-                meta.insert("session_id".to_string(), serde_json::json!(self.session_id.clone()));
+                meta.insert(
+                    "session_id".to_string(),
+                    serde_json::json!(self.session_id.clone()),
+                );
                 meta.insert("turn_id".to_string(), serde_json::json!(id.clone()));
                 meta.insert("turn_number".to_string(), serde_json::json!(turn_number));
                 meta.insert("role".to_string(), serde_json::json!(role));
@@ -1015,7 +1033,10 @@ impl<'a> SessionStateIndex<'a> {
             filter: Some({
                 let mut filter = HashMap::new();
                 filter.insert("type".to_string(), serde_json::json!("session_turn"));
-                filter.insert("session_id".to_string(), serde_json::json!(self.session_id.clone()));
+                filter.insert(
+                    "session_id".to_string(),
+                    serde_json::json!(self.session_id.clone()),
+                );
                 filter
             }),
             ef_search: None,
@@ -1024,7 +1045,10 @@ impl<'a> SessionStateIndex<'a> {
         let mut turns = Vec::new();
         for result in results {
             if let Some(metadata) = result.metadata {
-                let expires_at = metadata.get("expires_at").and_then(|v| v.as_i64()).unwrap_or(0);
+                let expires_at = metadata
+                    .get("expires_at")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
 
                 // Skip expired turns
                 if expires_at < current_time {
@@ -1032,13 +1056,31 @@ impl<'a> SessionStateIndex<'a> {
                 }
 
                 turns.push(SessionTurn {
-                    id: metadata.get("turn_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    id: metadata
+                        .get("turn_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     session_id: self.session_id.clone(),
-                    turn_number: metadata.get("turn_number").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
-                    role: metadata.get("role").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    content: metadata.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    turn_number: metadata
+                        .get("turn_number")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize,
+                    role: metadata
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    content: metadata
+                        .get("content")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     embedding: result.vector.unwrap_or_default(),
-                    timestamp: metadata.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+                    timestamp: metadata
+                        .get("timestamp")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0),
                     expires_at,
                 });
 
@@ -1066,7 +1108,10 @@ impl<'a> SessionStateIndex<'a> {
 
         for turn in all_turns {
             if turn.expires_at < current_time {
-                let _ = self.db.vector_db.delete(&format!("session_{}_{}", self.session_id, turn.id));
+                let _ = self
+                    .db
+                    .vector_db
+                    .delete(&format!("session_{}_{}", self.session_id, turn.id));
                 deleted += 1;
             }
         }
@@ -1116,7 +1161,13 @@ impl<'a> WitnessLog<'a> {
     }
 
     /// Compute SHA256 hash of entry data
-    fn compute_hash(prev_hash: &Option<String>, agent_id: &str, action_type: &str, details: &str, timestamp: i64) -> String {
+    fn compute_hash(
+        prev_hash: &Option<String>,
+        agent_id: &str,
+        action_type: &str,
+        details: &str,
+        timestamp: i64,
+    ) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
@@ -1132,12 +1183,7 @@ impl<'a> WitnessLog<'a> {
     }
 
     /// Append an entry to the witness log (immutable, hash-linked)
-    pub fn append(
-        &self,
-        agent_id: &str,
-        action_type: &str,
-        details: &str,
-    ) -> Result<String> {
+    pub fn append(&self, agent_id: &str, action_type: &str, details: &str) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         let timestamp = chrono::Utc::now().timestamp();
 
@@ -1148,7 +1194,9 @@ impl<'a> WitnessLog<'a> {
         let hash = Self::compute_hash(&prev_hash, agent_id, action_type, details, timestamp);
 
         // Generate embedding for semantic search
-        let embedding = self.db.generate_text_embedding(&format!("{} {} {}", agent_id, action_type, details))?;
+        let embedding = self
+            .db
+            .generate_text_embedding(&format!("{} {} {}", agent_id, action_type, details))?;
 
         // Store in vector DB (append-only)
         self.db.vector_db.insert(VectorEntry {
@@ -1195,14 +1243,40 @@ impl<'a> WitnessLog<'a> {
         for result in results {
             if let Some(metadata) = result.metadata {
                 entries.push(WitnessEntry {
-                    id: metadata.get("witness_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    prev_hash: metadata.get("prev_hash").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                    hash: metadata.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    agent_id: metadata.get("agent_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    action_type: metadata.get("action_type").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    details: metadata.get("details").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    id: metadata
+                        .get("witness_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    prev_hash: metadata
+                        .get("prev_hash")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    hash: metadata
+                        .get("hash")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    agent_id: metadata
+                        .get("agent_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    action_type: metadata
+                        .get("action_type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    details: metadata
+                        .get("details")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     embedding: result.vector.unwrap_or_default(),
-                    timestamp: metadata.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+                    timestamp: metadata
+                        .get("timestamp")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0),
                     metadata: None,
                 });
             }

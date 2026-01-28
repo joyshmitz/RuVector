@@ -7,8 +7,8 @@
 //! - No string operations in critical paths
 //! - Optional wee_alloc for smaller binary
 
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 // Use wee_alloc for smaller WASM binary (~10KB reduction)
 #[cfg(feature = "wee_alloc")]
@@ -147,7 +147,8 @@ impl WasmDag {
         }
 
         // Find node with maximum cost
-        let (max_idx, (max_cost, _)) = dist.iter()
+        let (max_idx, (max_cost, _)) = dist
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap())
             .unwrap();
@@ -164,7 +165,8 @@ impl WasmDag {
         path.reverse();
 
         // Convert to JSON manually to avoid serde_json dependency
-        let path_str = path.iter()
+        let path_str = path
+            .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");

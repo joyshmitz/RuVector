@@ -50,11 +50,13 @@ impl ThrottledGate {
             self.allowed_count += 1;
             Decision::Allow
         } else if energy < self.amber_threshold {
-            let throttle_factor = (energy - self.green_threshold)
-                / (self.amber_threshold - self.green_threshold);
+            let throttle_factor =
+                (energy - self.green_threshold) / (self.amber_threshold - self.green_threshold);
             self.current_throttle = (self.current_throttle + throttle_factor * 0.1).min(1.0);
             self.throttled_count += 1;
-            Decision::Throttle { factor: throttle_factor }
+            Decision::Throttle {
+                factor: throttle_factor,
+            }
         } else {
             self.current_throttle = 1.0;
             self.blocked_count += 1;
@@ -141,7 +143,8 @@ impl ChaosState {
         for ((src, tgt), weight) in &self.edges {
             if let (Some(s), Some(t)) = (self.nodes.get(src), self.nodes.get(tgt)) {
                 let dim = s.len().min(t.len());
-                let residual: f32 = s.iter()
+                let residual: f32 = s
+                    .iter()
                     .take(dim)
                     .zip(t.iter().take(dim))
                     .map(|(a, b)| (a - b).powi(2))
@@ -193,7 +196,10 @@ fn test_random_energy_spikes() {
     // With 10% spike rate and spikes going up to 2.0 (well above amber threshold),
     // we expect a mix of decisions
     assert!(stats.blocked > 0, "Should have blocked some spikes");
-    assert!(stats.allowed > 0, "Should have allowed low-energy operations");
+    assert!(
+        stats.allowed > 0,
+        "Should have allowed low-energy operations"
+    );
     // Allow rate depends on threshold settings - with spikes going to amber/red zone,
     // we expect at least some operations to be allowed (the 90% non-spike operations)
     assert!(
@@ -214,7 +220,10 @@ fn test_sustained_spike_triggers_persistent_block() {
         gate.decide(energy);
     }
 
-    assert!(gate.current_throttle < 0.1, "Should have low throttle initially");
+    assert!(
+        gate.current_throttle < 0.1,
+        "Should have low throttle initially"
+    );
 
     // Sustained high energy
     for _ in 0..20 {
@@ -548,7 +557,10 @@ fn test_recovery_from_blocked_state() {
         recovery_steps < 200,
         "Should recover within reasonable time"
     );
-    assert!(gate.current_throttle < 0.2, "Should have low throttle after recovery");
+    assert!(
+        gate.current_throttle < 0.2,
+        "Should have low throttle after recovery"
+    );
 }
 
 #[test]
@@ -570,8 +582,14 @@ fn test_oscillation_dampening() {
     }
 
     // Throttle should not oscillate wildly
-    let max = throttle_variance.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let min = throttle_variance.iter().cloned().fold(f32::INFINITY, f32::min);
+    let max = throttle_variance
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
+    let min = throttle_variance
+        .iter()
+        .cloned()
+        .fold(f32::INFINITY, f32::min);
 
     // Should settle to some stable-ish range
     // (This is a soft check - exact behavior depends on parameters)
@@ -667,7 +685,11 @@ fn test_memory_stability() {
 
         // Energy check
         let energy = state.compute_energy();
-        assert!(energy.is_finite(), "Energy should be finite at cycle {}", cycle);
+        assert!(
+            energy.is_finite(),
+            "Energy should be finite at cycle {}",
+            cycle
+        );
     }
 
     assert!(state.nodes.len() > 0);
@@ -722,11 +744,21 @@ fn test_seeded_chaos_reproducible() {
     assert!(
         (result1.0 - result2.0).abs() < 0.01,
         "Same seed should produce same energy: {} vs {}",
-        result1.0, result2.0
+        result1.0,
+        result2.0
     );
-    assert_eq!(result1.1, result2.1, "Same seed should produce same allowed count");
-    assert_eq!(result1.2, result2.2, "Same seed should produce same throttled count");
-    assert_eq!(result1.3, result2.3, "Same seed should produce same blocked count");
+    assert_eq!(
+        result1.1, result2.1,
+        "Same seed should produce same allowed count"
+    );
+    assert_eq!(
+        result1.2, result2.2,
+        "Same seed should produce same throttled count"
+    );
+    assert_eq!(
+        result1.3, result2.3,
+        "Same seed should produce same blocked count"
+    );
 
     // Use very different seeds to ensure different random sequences
     let result3 = run_chaos(99999);
@@ -734,6 +766,7 @@ fn test_seeded_chaos_reproducible() {
     assert!(
         (result1.0 - result3.0).abs() > 0.001 || result1.1 != result3.1 || result1.2 != result3.2,
         "Different seeds should produce different results: seed1={:?}, seed2={:?}",
-        result1, result3
+        result1,
+        result3
     );
 }

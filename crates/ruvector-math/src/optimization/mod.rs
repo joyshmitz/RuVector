@@ -22,15 +22,15 @@
 //!
 //! The SOS condition can be written as a semidefinite program (SDP).
 
-mod polynomial;
-mod sos;
-mod sdp;
 mod certificates;
+mod polynomial;
+mod sdp;
+mod sos;
 
-pub use polynomial::{Polynomial, Monomial, Term};
-pub use sos::{SOSDecomposition, SOSConfig, SOSResult};
-pub use sdp::{SDPProblem, SDPSolver, SDPSolution};
-pub use certificates::{NonnegativityCertificate, BoundsCertificate};
+pub use certificates::{BoundsCertificate, NonnegativityCertificate};
+pub use polynomial::{Monomial, Polynomial, Term};
+pub use sdp::{SDPProblem, SDPSolution, SDPSolver};
+pub use sos::{SOSConfig, SOSDecomposition, SOSResult};
 
 /// Degree of a multivariate monomial
 pub type Degree = usize;

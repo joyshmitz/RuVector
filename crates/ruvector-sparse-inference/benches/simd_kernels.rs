@@ -1,7 +1,7 @@
 //! Benchmarks for SIMD kernel performance
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use ruvector_sparse_inference::backend::{Backend, cpu::CpuBackend};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use ruvector_sparse_inference::backend::{cpu::CpuBackend, Backend};
 use ruvector_sparse_inference::sparse::ActivationType;
 
 fn bench_dot_product(c: &mut Criterion) {
@@ -13,9 +13,7 @@ fn bench_dot_product(c: &mut Criterion) {
         let b: Vec<f32> = (0..*size).map(|i| (i * 2) as f32).collect();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |bench, _| {
-            bench.iter(|| {
-                black_box(backend.dot_product(black_box(&a), black_box(&b)))
-            });
+            bench.iter(|| black_box(backend.dot_product(black_box(&a), black_box(&b))));
         });
     }
     group.finish();

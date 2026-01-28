@@ -141,7 +141,9 @@ impl Verdict {
             Verdict::Success { reason } => reason,
             Verdict::Failure { reason, .. } => reason,
             Verdict::Partial { reason, .. } => reason,
-            Verdict::RecoveredViaReflection { recovery_strategy, .. } => recovery_strategy,
+            Verdict::RecoveredViaReflection {
+                recovery_strategy, ..
+            } => recovery_strategy,
         }
     }
 
@@ -612,8 +614,7 @@ impl ReasoningBankIntegration {
             }
             // Update running average quality
             let n = stats.total_trajectories as f32;
-            stats.avg_quality =
-                stats.avg_quality * (n - 1.0) / n + trajectory.quality_score / n;
+            stats.avg_quality = stats.avg_quality * (n - 1.0) / n + trajectory.quality_score / n;
         }
 
         // Add to buffer
@@ -658,7 +659,10 @@ impl ReasoningBankIntegration {
         }
 
         // Check for auto-distillation
-        let count = self.trajectories_since_distill.fetch_add(1, Ordering::SeqCst) + 1;
+        let count = self
+            .trajectories_since_distill
+            .fetch_add(1, Ordering::SeqCst)
+            + 1;
         if self.config.auto_distill && count >= self.config.distill_interval as u64 {
             self.distill_patterns()?;
             self.trajectories_since_distill.store(0, Ordering::SeqCst);
@@ -865,10 +869,7 @@ impl ReasoningBankIntegration {
         }
 
         // Filter out small clusters
-        clusters
-            .into_iter()
-            .filter(|c| c.len() >= 2)
-            .collect()
+        clusters.into_iter().filter(|c| c.len() >= 2).collect()
     }
 
     /// Cosine similarity between two vectors
@@ -1044,7 +1045,10 @@ impl ReasoningBankIntegration {
             let to_remove: Vec<u64> = patterns
                 .iter()
                 .filter(|(_, p)| {
-                    p.should_prune(self.config.min_pattern_quality, self.config.max_pattern_age_secs)
+                    p.should_prune(
+                        self.config.min_pattern_quality,
+                        self.config.max_pattern_age_secs,
+                    )
                 })
                 .map(|(id, _)| *id)
                 .collect();
@@ -1198,8 +1202,7 @@ impl ReasoningBankIntegration {
         let mut pattern_map = self.patterns.write();
         for pattern in patterns {
             let id = pattern.id.max(self.next_pattern_id.load(Ordering::SeqCst));
-            self.next_pattern_id
-                .fetch_max(id + 1, Ordering::SeqCst);
+            self.next_pattern_id.fetch_max(id + 1, Ordering::SeqCst);
             pattern_map.insert(pattern.id, pattern);
         }
 

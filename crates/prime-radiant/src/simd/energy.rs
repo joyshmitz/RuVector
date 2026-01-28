@@ -300,11 +300,7 @@ pub fn weighted_energy_sum_simd(residual_norms: &[f32], weights: &[f32]) -> f32 
 /// // lanes = [0, 1, 2, 3] (Reflex, Retrieval, Heavy, Human)
 /// ```
 #[inline]
-pub fn batch_lane_assignment_simd(
-    energies: &[f32],
-    thresholds: [f32; 4],
-    lanes: &mut [u8],
-) {
+pub fn batch_lane_assignment_simd(energies: &[f32], thresholds: [f32; 4], lanes: &mut [u8]) {
     debug_assert_eq!(energies.len(), lanes.len());
 
     let len = energies.len();
@@ -357,9 +353,7 @@ pub fn batch_lane_assignment_simd(
 
     // Handle remainder
     for (i, &e) in remainder_e.iter().enumerate() {
-        let lane = (e >= t_reflex) as u8
-            + (e >= t_retrieval) as u8
-            + (e >= t_heavy) as u8;
+        let lane = (e >= t_reflex) as u8 + (e >= t_retrieval) as u8 + (e >= t_heavy) as u8;
         lanes[offset + i] = lane.min(3);
     }
 }
@@ -505,9 +499,7 @@ fn batch_lane_assignment_scalar(energies: &[f32], thresholds: [f32; 4], lanes: &
     let t_heavy = thresholds[2];
 
     for (e, l) in energies.iter().zip(lanes.iter_mut()) {
-        let lane = (*e >= t_reflex) as u8
-            + (*e >= t_retrieval) as u8
-            + (*e >= t_heavy) as u8;
+        let lane = (*e >= t_reflex) as u8 + (*e >= t_retrieval) as u8 + (*e >= t_heavy) as u8;
         *l = lane.min(3);
     }
 }
@@ -572,7 +564,11 @@ mod tests {
         batch_residuals_simd(&sources, &targets, &mut residuals_simd, 64, 16);
         batch_residuals_scalar(&sources, &targets, &mut residuals_scalar);
 
-        for (i, (&s, &sc)) in residuals_simd.iter().zip(residuals_scalar.iter()).enumerate() {
+        for (i, (&s, &sc)) in residuals_simd
+            .iter()
+            .zip(residuals_scalar.iter())
+            .enumerate()
+        {
             assert!(approx_eq(s, sc), "at {} got {} expected {}", i, s, sc);
         }
     }
@@ -610,7 +606,12 @@ mod tests {
 
         let result = weighted_energy_sum_simd(&norms, &weights);
         let expected = weighted_energy_sum_scalar(&norms, &weights);
-        assert!(approx_eq(result, expected), "got {} expected {}", result, expected);
+        assert!(
+            approx_eq(result, expected),
+            "got {} expected {}",
+            result,
+            expected
+        );
     }
 
     #[test]
@@ -692,7 +693,11 @@ mod tests {
         let simd_result = compute_residual_norm_sq_simd(&source, &target);
         let scalar_result = compute_residual_norm_sq_scalar(&source, &target);
 
-        assert!(approx_eq(simd_result, scalar_result),
-            "simd={} scalar={}", simd_result, scalar_result);
+        assert!(
+            approx_eq(simd_result, scalar_result),
+            "simd={} scalar={}",
+            simd_result,
+            scalar_result
+        );
     }
 }

@@ -114,8 +114,7 @@ impl SheafStructure {
         let restricted = self.compute_restriction(&section.data, subdomain);
 
         // Cache the result
-        self.restriction_maps
-            .insert(cache_key, restricted.clone());
+        self.restriction_maps.insert(cache_key, restricted.clone());
 
         restricted
     }

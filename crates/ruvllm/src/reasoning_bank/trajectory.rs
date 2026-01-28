@@ -248,7 +248,9 @@ impl Trajectory {
             query_embedding,
             response_embedding: None,
             steps: Vec::new(),
-            verdict: Verdict::Partial { completion_ratio: 0.0 },
+            verdict: Verdict::Partial {
+                completion_ratio: 0.0,
+            },
             quality: 0.0,
             total_latency_ms: 0,
             started_at: now,
@@ -401,17 +403,13 @@ impl TrajectoryRecorder {
         outcome: StepOutcome,
         confidence: f32,
     ) {
-        let latency_ms = self.step_start
+        let latency_ms = self
+            .step_start
             .map(|start| start.elapsed().as_millis() as u64)
             .unwrap_or(0);
 
-        let step = TrajectoryStep::new(
-            self.current_step,
-            action,
-            rationale,
-            outcome,
-            confidence,
-        ).with_latency(latency_ms);
+        let step = TrajectoryStep::new(self.current_step, action, rationale, outcome, confidence)
+            .with_latency(latency_ms);
 
         self.trajectory.add_step(step);
         self.current_step += 1;
@@ -506,7 +504,13 @@ mod tests {
     #[test]
     fn test_step_outcome_quality() {
         assert_eq!(StepOutcome::Success.quality_score(), 1.0);
-        assert_eq!(StepOutcome::Failure { error: "test".into() }.quality_score(), 0.0);
+        assert_eq!(
+            StepOutcome::Failure {
+                error: "test".into()
+            }
+            .quality_score(),
+            0.0
+        );
     }
 
     #[test]
@@ -574,11 +578,15 @@ mod tests {
             1,
             "step2".to_string(),
             "rationale2".to_string(),
-            StepOutcome::Failure { error: "test".to_string() },
+            StepOutcome::Failure {
+                error: "test".to_string(),
+            },
             0.5,
         ));
 
-        trajectory.complete(Verdict::Partial { completion_ratio: 0.5 });
+        trajectory.complete(Verdict::Partial {
+            completion_ratio: 0.5,
+        });
 
         // Quality should reflect the mix of success/failure
         assert!(trajectory.quality < 1.0);
@@ -604,11 +612,15 @@ mod tests {
         recorder.add_step(
             "step3".to_string(),
             "r3".to_string(),
-            StepOutcome::Failure { error: "e".to_string() },
+            StepOutcome::Failure {
+                error: "e".to_string(),
+            },
             0.7,
         );
 
-        let trajectory = recorder.complete(Verdict::Partial { completion_ratio: 0.67 });
+        let trajectory = recorder.complete(Verdict::Partial {
+            completion_ratio: 0.67,
+        });
 
         assert_eq!(trajectory.step_count(), 3);
         assert!((trajectory.step_success_rate() - 0.666).abs() < 0.01);

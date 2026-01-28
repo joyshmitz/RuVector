@@ -36,7 +36,7 @@
 //! - `HF_TOKEN`: HuggingFace token for gated models (optional for most models)
 //! - `RUVLLM_MODELS_DIR`: Default output directory for models
 
-use ruvllm::hub::{RuvLtraRegistry, ModelDownloader, DownloadConfig, default_cache_dir};
+use ruvllm::hub::{default_cache_dir, DownloadConfig, ModelDownloader, RuvLtraRegistry};
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
@@ -204,7 +204,10 @@ fn main() {
             let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
             let expected_mb = model.size_mb as f64;
             if (size_mb - expected_mb).abs() / expected_mb > 0.1 {
-                println!("Warning: File size ({:.1} MB) differs from expected ({} MB)", size_mb, model.size_mb);
+                println!(
+                    "Warning: File size ({:.1} MB) differs from expected ({} MB)",
+                    size_mb, model.size_mb
+                );
                 println!("Consider re-downloading with --force");
             } else {
                 println!("File size verified: {:.1} MB", size_mb);
@@ -222,7 +225,10 @@ fn main() {
 
     // Estimate download time
     let estimated_time = estimate_download_time(model.size_mb);
-    println!("Estimated download time: {}", format_duration(estimated_time));
+    println!(
+        "Estimated download time: {}",
+        format_duration(estimated_time)
+    );
     println!();
 
     // Download the model
@@ -232,8 +238,10 @@ fn main() {
             println!("Model saved to: {}", output_path.display());
             println!();
             println!("To run tests with this model:");
-            println!("  TEST_MODEL_PATH={} cargo test -p ruvllm --test real_model_test -- --ignored",
-                     output_path.display());
+            println!(
+                "  TEST_MODEL_PATH={} cargo test -p ruvllm --test real_model_test -- --ignored",
+                output_path.display()
+            );
         }
         Err(e) => {
             eprintln!("\nDownload failed: {}", e);
@@ -280,9 +288,7 @@ fn list_models() {
     for model in MODELS {
         println!(
             "{:<15} {:>6}MB  {}",
-            model.name,
-            model.size_mb,
-            model.description
+            model.name, model.size_mb, model.description
         );
     }
 
@@ -335,10 +341,11 @@ fn download_with_curl(url: &str, output_path: &Path, _expected_size_mb: usize) -
 
     let status = std::process::Command::new("curl")
         .args([
-            "-L",                    // Follow redirects
-            "-#",                    // Progress bar
-            "--fail",                // Fail on HTTP errors
-            "-o", output_path.to_str().unwrap(),
+            "-L",     // Follow redirects
+            "-#",     // Progress bar
+            "--fail", // Fail on HTTP errors
+            "-o",
+            output_path.to_str().unwrap(),
             url,
         ])
         .status()?;
@@ -358,9 +365,10 @@ fn download_with_wget(url: &str, output_path: &Path) -> io::Result<()> {
 
     let status = std::process::Command::new("wget")
         .args([
-            "-q",                    // Quiet
-            "--show-progress",       // But show progress
-            "-O", output_path.to_str().unwrap(),
+            "-q",              // Quiet
+            "--show-progress", // But show progress
+            "-O",
+            output_path.to_str().unwrap(),
             url,
         ])
         .status()?;
@@ -383,9 +391,9 @@ fn download_with_rust(url: &str, output_path: &Path, _expected_size_mb: usize) -
     // This is a basic implementation - production code should use reqwest or similar
 
     let url_parts: Vec<&str> = url.split('/').collect();
-    let _host = url_parts.get(2).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "Invalid URL")
-    })?;
+    let _host = url_parts
+        .get(2)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid URL"))?;
 
     let _path = format!("/{}", url_parts[3..].join("/"));
 
@@ -466,7 +474,10 @@ fn download_ruvltra_model(
             println!();
             println!("Hardware requirements:");
             println!("  - Minimum RAM: {:.1} GB", model_info.hardware.min_ram_gb);
-            println!("  - Recommended RAM: {:.1} GB", model_info.hardware.recommended_ram_gb);
+            println!(
+                "  - Recommended RAM: {:.1} GB",
+                model_info.hardware.recommended_ram_gb
+            );
             if model_info.hardware.supports_ane {
                 println!("  - Apple Neural Engine: ✓ Supported");
             }
@@ -495,7 +506,10 @@ fn list_ruvltra_models() {
     let registry = RuvLtraRegistry::new();
 
     println!("\nRuvLTRA models (recommended):\n");
-    println!("{:<20} {:>8}  {:>6}  {:<50}", "NAME", "SIZE", "PARAMS", "DESCRIPTION");
+    println!(
+        "{:<20} {:>8}  {:>6}  {:<50}",
+        "NAME", "SIZE", "PARAMS", "DESCRIPTION"
+    );
     println!("{}", "-".repeat(90));
 
     for model in registry.list_all() {

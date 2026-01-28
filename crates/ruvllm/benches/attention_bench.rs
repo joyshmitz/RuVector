@@ -72,7 +72,11 @@ impl PagedKvCache {
         for (block_idx, block) in self.key_blocks.iter().enumerate() {
             let tokens_in_block = if block_idx == self.key_blocks.len() - 1 {
                 let rem = self.num_tokens % self.block_size;
-                if rem == 0 { self.block_size } else { rem }
+                if rem == 0 {
+                    self.block_size
+                } else {
+                    rem
+                }
             } else {
                 self.block_size
             };
@@ -87,7 +91,11 @@ impl PagedKvCache {
         for (block_idx, block) in self.value_blocks.iter().enumerate() {
             let tokens_in_block = if block_idx == self.value_blocks.len() - 1 {
                 let rem = self.num_tokens % self.block_size;
-                if rem == 0 { self.block_size } else { rem }
+                if rem == 0 {
+                    self.block_size
+                } else {
+                    rem
+                }
             } else {
                 self.block_size
             };
@@ -449,11 +457,15 @@ fn bench_flash_attention(c: &mut Criterion) {
             );
 
             group.throughput(Throughput::Elements((seq_len * head_dim) as u64));
-            group.bench_with_input(id, &(query.clone(), key.clone(), value.clone()), |b, (q, k, v)| {
-                b.iter(|| {
-                    flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
-                })
-            });
+            group.bench_with_input(
+                id,
+                &(query.clone(), key.clone(), value.clone()),
+                |b, (q, k, v)| {
+                    b.iter(|| {
+                        flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
+                    })
+                },
+            );
         }
     }
 
@@ -476,20 +488,32 @@ fn bench_flash_attention_batched(c: &mut Criterion) {
 
         let id = BenchmarkId::new(format!("heads_{}_seq_{}", num_heads, seq_len), seq_len);
 
-        group.throughput(Throughput::Elements((num_heads * seq_len * head_dim) as u64));
-        group.bench_with_input(id, &(queries.clone(), key.clone(), value.clone()), |b, (q, k, v)| {
-            b.iter(|| {
-                // Process all heads
-                let mut outputs = Vec::with_capacity(num_heads * head_dim);
-                for h in 0..num_heads {
-                    let q_offset = h * head_dim;
-                    let q_slice = &q[q_offset..q_offset + head_dim];
-                    let out = flash_attention_neon(black_box(q_slice), black_box(k), black_box(v), scale, true);
-                    outputs.extend(out);
-                }
-                outputs
-            })
-        });
+        group.throughput(Throughput::Elements(
+            (num_heads * seq_len * head_dim) as u64,
+        ));
+        group.bench_with_input(
+            id,
+            &(queries.clone(), key.clone(), value.clone()),
+            |b, (q, k, v)| {
+                b.iter(|| {
+                    // Process all heads
+                    let mut outputs = Vec::with_capacity(num_heads * head_dim);
+                    for h in 0..num_heads {
+                        let q_offset = h * head_dim;
+                        let q_slice = &q[q_offset..q_offset + head_dim];
+                        let out = flash_attention_neon(
+                            black_box(q_slice),
+                            black_box(k),
+                            black_box(v),
+                            scale,
+                            true,
+                        );
+                        outputs.extend(out);
+                    }
+                    outputs
+                })
+            },
+        );
     }
 
     group.finish();
@@ -525,9 +549,7 @@ fn bench_paged_attention(c: &mut Criterion) {
 
             group.throughput(Throughput::Elements((num_tokens * head_dim) as u64));
             group.bench_with_input(id, &(query.clone(), kv_cache.clone()), |b, (q, cache)| {
-                b.iter(|| {
-                    paged_attention_neon(black_box(q), black_box(cache), &[], scale)
-                })
+                b.iter(|| paged_attention_neon(black_box(q), black_box(cache), &[], scale))
             });
         }
     }
@@ -557,7 +579,9 @@ fn bench_mqa(c: &mut Criterion) {
 
             let id = BenchmarkId::new(format!("heads_{}_seq_{}", num_heads, seq_len), seq_len);
 
-            group.throughput(Throughput::Elements((num_heads * seq_len * head_dim) as u64));
+            group.throughput(Throughput::Elements(
+                (num_heads * seq_len * head_dim) as u64,
+            ));
             group.bench_with_input(
                 id,
                 &(queries.clone(), key.clone(), value.clone(), config),
@@ -595,12 +619,11 @@ fn bench_gqa(c: &mut Criterion) {
             let values = random_tensor(seq_len * num_kv_heads * head_dim);
 
             let ratio = num_heads / num_kv_heads;
-            let id = BenchmarkId::new(
-                format!("ratio_{}_seq_{}", ratio, seq_len),
-                seq_len,
-            );
+            let id = BenchmarkId::new(format!("ratio_{}_seq_{}", ratio, seq_len), seq_len);
 
-            group.throughput(Throughput::Elements((num_heads * seq_len * head_dim) as u64));
+            group.throughput(Throughput::Elements(
+                (num_heads * seq_len * head_dim) as u64,
+            ));
             group.bench_with_input(
                 id,
                 &(queries.clone(), keys.clone(), values.clone(), config),
@@ -632,14 +655,21 @@ fn bench_attention_memory_efficiency(c: &mut Criterion) {
         // Memory for Q, K, V in bytes
         let memory_bytes = (1 + seq_len * 2) * head_dim * 4; // f32 = 4 bytes
 
-        let id = BenchmarkId::new(format!("seq_{}_mem_{}KB", seq_len, memory_bytes / 1024), seq_len);
+        let id = BenchmarkId::new(
+            format!("seq_{}_mem_{}KB", seq_len, memory_bytes / 1024),
+            seq_len,
+        );
 
         group.throughput(Throughput::Bytes(memory_bytes as u64));
-        group.bench_with_input(id, &(query.clone(), key.clone(), value.clone()), |b, (q, k, v)| {
-            b.iter(|| {
-                flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
-            })
-        });
+        group.bench_with_input(
+            id,
+            &(query.clone(), key.clone(), value.clone()),
+            |b, (q, k, v)| {
+                b.iter(|| {
+                    flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
+                })
+            },
+        );
     }
 
     group.finish();
@@ -667,11 +697,15 @@ fn bench_attention_scaling(c: &mut Criterion) {
         let flops = 4 * seq_len * head_dim;
         group.throughput(Throughput::Elements(flops as u64));
 
-        group.bench_with_input(id, &(query.clone(), key.clone(), value.clone()), |b, (q, k, v)| {
-            b.iter(|| {
-                flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
-            })
-        });
+        group.bench_with_input(
+            id,
+            &(query.clone(), key.clone(), value.clone()),
+            |b, (q, k, v)| {
+                b.iter(|| {
+                    flash_attention_neon(black_box(q), black_box(k), black_box(v), scale, true)
+                })
+            },
+        );
     }
 
     group.finish();

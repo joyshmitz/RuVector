@@ -1,7 +1,7 @@
 //! Witness hashing for integrity verification
 
-use sha2::{Digest, Sha256};
 use crate::types::WitnessLog;
+use sha2::{Digest, Sha256};
 
 /// Compute a hash of the witness log for integrity verification
 pub fn compute_witness_hash(witness: &WitnessLog) -> [u8; 32] {
@@ -75,7 +75,7 @@ impl WitnessProof {
     /// Create a proof with signature
     #[cfg(feature = "sign")]
     pub fn signed(witness: &WitnessLog, secret_key: &[u8; 32]) -> Self {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
 
         let hash = compute_witness_hash(witness);
         let timestamp_ns = std::time::SystemTime::now()
@@ -186,14 +186,16 @@ mod tests {
     #[test]
     fn test_chain_hash() {
         let witnesses: Vec<WitnessLog> = (0..5)
-            .map(|i| WitnessLog::new(
-                [i as u8; 32],
-                [0u8; 32],
-                BackendKind::NativeSim,
-                i * 100,
-                i * 1000,
-                GateDecision::RanFull,
-            ))
+            .map(|i| {
+                WitnessLog::new(
+                    [i as u8; 32],
+                    [0u8; 32],
+                    BackendKind::NativeSim,
+                    i * 100,
+                    i * 1000,
+                    GateDecision::RanFull,
+                )
+            })
             .collect();
 
         let chain_hash1 = compute_chain_hash(&witnesses);

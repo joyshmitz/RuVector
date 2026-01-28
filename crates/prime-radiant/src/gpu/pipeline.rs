@@ -3,8 +3,8 @@
 //! This module handles shader compilation, pipeline creation, and bind group
 //! management for GPU compute operations.
 
-use std::sync::Arc;
 use dashmap::DashMap;
+use std::sync::Arc;
 use tracing::{debug, info};
 use wgpu::{Device, ShaderModule};
 
@@ -332,10 +332,12 @@ impl PipelineCache {
 
         info!("Creating and caching pipeline: {}", name);
 
-        let pipeline = ComputePipeline::from_shader(&self.device, shader_source, entry_point, bindings)?;
+        let pipeline =
+            ComputePipeline::from_shader(&self.device, shader_source, entry_point, bindings)?;
         let pipeline = Arc::new(pipeline);
 
-        self.pipelines.insert(name.to_string(), Arc::clone(&pipeline));
+        self.pipelines
+            .insert(name.to_string(), Arc::clone(&pipeline));
 
         Ok(pipeline)
     }

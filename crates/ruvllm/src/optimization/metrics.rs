@@ -86,9 +86,8 @@ impl MovingAverage {
         }
 
         let mean = self.average();
-        let variance: f32 = values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f32>() / (values.len() - 1) as f32;
+        let variance: f32 =
+            values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / (values.len() - 1) as f32;
 
         variance.sqrt()
     }
@@ -175,7 +174,9 @@ impl LatencyHistogram {
     /// Record a latency value in milliseconds
     pub fn record(&self, latency_ms: f32) {
         // Find the appropriate bucket
-        let bucket_idx = self.buckets.iter()
+        let bucket_idx = self
+            .buckets
+            .iter()
             .position(|&b| latency_ms <= b)
             .unwrap_or(self.buckets.len() - 1);
 
@@ -228,7 +229,8 @@ impl LatencyHistogram {
 
     /// Get bucket counts for visualization
     pub fn bucket_counts(&self) -> Vec<(f32, u64)> {
-        self.buckets.iter()
+        self.buckets
+            .iter()
             .zip(self.counts.iter())
             .map(|(b, c)| (*b, c.load(Ordering::Relaxed)))
             .collect()
@@ -257,7 +259,9 @@ impl Default for LatencyHistogram {
 
 impl Clone for LatencyHistogram {
     fn clone(&self) -> Self {
-        let counts: Vec<AtomicU64> = self.counts.iter()
+        let counts: Vec<AtomicU64> = self
+            .counts
+            .iter()
             .map(|c| AtomicU64::new(c.load(Ordering::Relaxed)))
             .collect();
         let sum = *self.sum.read();
@@ -340,7 +344,8 @@ impl InferenceMetrics {
             let tps = tokens as f32 / duration.as_secs_f32();
             self.tps.add(tps);
         }
-        self.total_tokens.fetch_add(tokens as u64, Ordering::Relaxed);
+        self.total_tokens
+            .fetch_add(tokens as u64, Ordering::Relaxed);
         *self.last_update.write() = Instant::now();
     }
 
@@ -473,7 +478,10 @@ impl InferenceMetrics {
         self.tps.clear();
         self.kv_cache_hits.store(0, Ordering::Relaxed);
         self.kv_cache_misses.store(0, Ordering::Relaxed);
-        self.peak_memory_bytes.store(self.memory_usage_bytes.load(Ordering::Relaxed), Ordering::Relaxed);
+        self.peak_memory_bytes.store(
+            self.memory_usage_bytes.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
         self.total_requests.store(0, Ordering::Relaxed);
         self.total_tokens.store(0, Ordering::Relaxed);
         self.latency_histogram.reset();
@@ -618,7 +626,8 @@ impl MetricsCollector {
     /// Get recent snapshots
     pub fn get_history(&self, count: usize) -> Vec<MetricsSnapshot> {
         let history = self.history.read();
-        history.iter()
+        history
+            .iter()
             .rev()
             .take(count)
             .map(|(_, s)| s.clone())
@@ -632,7 +641,8 @@ impl MetricsCollector {
             return 0.0;
         }
 
-        let recent: Vec<f32> = history.iter()
+        let recent: Vec<f32> = history
+            .iter()
             .rev()
             .take(10)
             .map(|(_, s)| s.ttft_avg_ms)
@@ -662,7 +672,8 @@ impl MetricsCollector {
             return 0.0;
         }
 
-        let recent: Vec<f32> = history.iter()
+        let recent: Vec<f32> = history
+            .iter()
             .rev()
             .take(10)
             .map(|(_, s)| s.tps_avg)

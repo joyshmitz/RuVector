@@ -9,12 +9,10 @@
 //! - Parallel Branch Attention
 //! - Temporal BTSP Attention
 
-use ruvector_dag::{
-    QueryDag, OperatorNode,
-};
+use ruvector_dag::{OperatorNode, QueryDag};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
 use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 // ============================================================================
 // Minimal DAG for WASM
@@ -91,7 +89,8 @@ impl WasmQueryDag {
         serde_json::to_string(&DagSummary {
             node_count: self.inner.node_count(),
             edge_count: self.inner.edge_count(),
-        }).unwrap_or_default()
+        })
+        .unwrap_or_default()
     }
 }
 
@@ -113,7 +112,9 @@ struct DagSummary {
 // ============================================================================
 
 fn hashmap_to_vec(scores: &HashMap<usize, f32>, n: usize) -> Vec<f32> {
-    (0..n).map(|i| scores.get(&i).copied().unwrap_or(0.0)).collect()
+    (0..n)
+        .map(|i| scores.get(&i).copied().unwrap_or(0.0))
+        .collect()
 }
 
 // ============================================================================
@@ -309,7 +310,9 @@ impl WasmCriticalPathAttention {
         longest_path
             .into_iter()
             .max_by(|a, b| {
-                a.1.0.partial_cmp(&b.1.0).unwrap_or(std::cmp::Ordering::Equal)
+                a.1 .0
+                    .partial_cmp(&b.1 .0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(_, (_, path))| path)
             .unwrap_or_default()
@@ -448,7 +451,10 @@ impl WasmHierarchicalLorentzAttention {
     /// * `temperature` - Temperature for softmax
     #[wasm_bindgen(constructor)]
     pub fn new(curvature: f32, temperature: f32) -> WasmHierarchicalLorentzAttention {
-        WasmHierarchicalLorentzAttention { curvature, temperature }
+        WasmHierarchicalLorentzAttention {
+            curvature,
+            temperature,
+        }
     }
 
     /// Compute attention scores for the DAG
@@ -472,10 +478,17 @@ impl WasmHierarchicalLorentzAttention {
         }
 
         // Convert to attention scores using softmax
-        let max_neg_dist = distances.iter().map(|&d| -d / self.temperature).fold(f32::NEG_INFINITY, f32::max);
-        let exp_sum: f32 = distances.iter().map(|&d| ((-d / self.temperature) - max_neg_dist).exp()).sum();
+        let max_neg_dist = distances
+            .iter()
+            .map(|&d| -d / self.temperature)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let exp_sum: f32 = distances
+            .iter()
+            .map(|&d| ((-d / self.temperature) - max_neg_dist).exp())
+            .sum();
 
-        let scores: Vec<f32> = distances.iter()
+        let scores: Vec<f32> = distances
+            .iter()
             .map(|&d| ((-d / self.temperature) - max_neg_dist).exp() / exp_sum.max(1e-10))
             .collect();
 
@@ -665,7 +678,9 @@ impl DagAttentionFactory {
             "causal_cone" => "Lightcone-based attention respecting causal dependencies".to_string(),
             "critical_path" => "Attention weighted by critical execution path distance".to_string(),
             "mincut_gated" => "Flow-based gating through bottleneck nodes".to_string(),
-            "hierarchical_lorentz" => "Multi-scale hyperbolic attention for DAG hierarchies".to_string(),
+            "hierarchical_lorentz" => {
+                "Multi-scale hyperbolic attention for DAG hierarchies".to_string()
+            }
             "parallel_branch" => "Branch-aware attention for parallel DAG structures".to_string(),
             "temporal_btsp" => "Time-series pattern attention for temporal DAGs".to_string(),
             _ => "Unknown attention type".to_string(),

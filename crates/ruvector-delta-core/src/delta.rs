@@ -216,9 +216,7 @@ impl VectorDelta {
     pub fn l2_norm(&self) -> f32 {
         match &self.value {
             DeltaValue::Identity => 0.0,
-            DeltaValue::Sparse(ops) => {
-                ops.iter().map(|op| op.value * op.value).sum::<f32>().sqrt()
-            }
+            DeltaValue::Sparse(ops) => ops.iter().map(|op| op.value * op.value).sum::<f32>().sqrt(),
             DeltaValue::Dense(values) | DeltaValue::Replace(values) => {
                 values.iter().map(|v| v * v).sum::<f32>().sqrt()
             }
@@ -294,20 +292,12 @@ impl Delta for VectorDelta {
     type Error = DeltaError;
 
     fn compute(old: &Vec<f32>, new: &Vec<f32>) -> Self {
-        assert_eq!(
-            old.len(),
-            new.len(),
-            "Vectors must have same dimensions"
-        );
+        assert_eq!(old.len(), new.len(), "Vectors must have same dimensions");
 
         let dimensions = old.len();
 
         // Compute differences
-        let diffs: Vec<f32> = old
-            .iter()
-            .zip(new.iter())
-            .map(|(o, n)| n - o)
-            .collect();
+        let diffs: Vec<f32> = old.iter().zip(new.iter()).map(|(o, n)| n - o).collect();
 
         // Count non-zero differences (with epsilon)
         let epsilon = 1e-7;
@@ -388,9 +378,7 @@ impl Delta for VectorDelta {
             (DeltaValue::Identity, _) => other.value.clone(),
             (_, DeltaValue::Identity) => self.value.clone(),
 
-            (DeltaValue::Replace(_), DeltaValue::Replace(new)) => {
-                DeltaValue::Replace(new.clone())
-            }
+            (DeltaValue::Replace(_), DeltaValue::Replace(new)) => DeltaValue::Replace(new.clone()),
 
             (DeltaValue::Sparse(ops1), DeltaValue::Sparse(ops2)) => {
                 // Merge sparse operations
@@ -418,8 +406,7 @@ impl Delta for VectorDelta {
             }
 
             (DeltaValue::Dense(d1), DeltaValue::Dense(d2)) => {
-                let combined: Vec<f32> =
-                    d1.iter().zip(d2.iter()).map(|(a, b)| a + b).collect();
+                let combined: Vec<f32> = d1.iter().zip(d2.iter()).map(|(a, b)| a + b).collect();
 
                 // Check if result is identity
                 if combined.iter().all(|v| v.abs() < 1e-7) {
@@ -435,8 +422,7 @@ impl Delta for VectorDelta {
                 let d2 = other.value.to_dense(other.dimensions);
 
                 if let (DeltaValue::Dense(v1), DeltaValue::Dense(v2)) = (d1, d2) {
-                    let combined: Vec<f32> =
-                        v1.iter().zip(v2.iter()).map(|(a, b)| a + b).collect();
+                    let combined: Vec<f32> = v1.iter().zip(v2.iter()).map(|(a, b)| a + b).collect();
                     DeltaValue::Dense(combined)
                 } else {
                     DeltaValue::Identity
@@ -461,9 +447,7 @@ impl Delta for VectorDelta {
                     .collect();
                 DeltaValue::Sparse(inverted)
             }
-            DeltaValue::Dense(values) => {
-                DeltaValue::Dense(values.iter().map(|v| -v).collect())
-            }
+            DeltaValue::Dense(values) => DeltaValue::Dense(values.iter().map(|v| -v).collect()),
             DeltaValue::Replace(_) => {
                 // Cannot invert a replace without knowing original
                 panic!("Cannot invert Replace delta without original value");
@@ -621,8 +605,7 @@ impl Delta for SparseDelta {
     }
 
     fn byte_size(&self) -> usize {
-        core::mem::size_of::<Self>()
-            + self.entries.len() * core::mem::size_of::<(u32, f32, f32)>()
+        core::mem::size_of::<Self>() + self.entries.len() * core::mem::size_of::<(u32, f32, f32)>()
     }
 }
 

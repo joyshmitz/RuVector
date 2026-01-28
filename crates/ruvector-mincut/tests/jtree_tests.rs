@@ -188,9 +188,8 @@ impl BmsspJTreeLevel {
     /// Invalidate cache for affected vertices
     pub fn invalidate_cache(&mut self, affected: &[u64]) {
         let affected_set: HashSet<_> = affected.iter().copied().collect();
-        self.path_cache.retain(|(u, v), _| {
-            !affected_set.contains(u) && !affected_set.contains(v)
-        });
+        self.path_cache
+            .retain(|(u, v), _| !affected_set.contains(u) && !affected_set.contains(v));
     }
 
     /// Clear entire cache
@@ -210,7 +209,11 @@ impl BmsspJTreeLevel {
     fn compute_min_cut(&self, _s: u64, _t: u64) -> f64 {
         // Simplified: return sum of minimum edge weight on any path
         // In real implementation, this would use BMSSP shortest path
-        self.edges.values().copied().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(f64::INFINITY)
+        self.edges
+            .values()
+            .copied()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(f64::INFINITY)
     }
 }
 
@@ -303,7 +306,9 @@ impl LazyJTreeHierarchy {
             return None;
         }
         self.ensure_materialized(level);
-        self.levels[level].as_materialized().map(|d| d.min_cut_value)
+        self.levels[level]
+            .as_materialized()
+            .map(|d| d.min_cut_value)
     }
 
     /// Ensure level is materialized (demand-paging)
@@ -1066,9 +1071,7 @@ mod property_tests {
 
         for iteration in 0..20 {
             // Materialize random levels
-            let levels_to_materialize: Vec<usize> = (0..5)
-                .filter(|_| iteration % 2 == 0)
-                .collect();
+            let levels_to_materialize: Vec<usize> = (0..5).filter(|_| iteration % 2 == 0).collect();
 
             for level in &levels_to_materialize {
                 let _ = hierarchy.approximate_min_cut_at_level(*level);
@@ -1125,7 +1128,10 @@ mod property_tests {
         let _ = level.min_cut(5, 7);
         let (hits_after, _) = level.cache_stats();
 
-        assert!(hits_after > hits_before, "Unaffected region should still be cached");
+        assert!(
+            hits_after > hits_before,
+            "Unaffected region should still be cached"
+        );
     }
 }
 
@@ -1290,7 +1296,12 @@ mod stress_tests {
         assert!(misses > 0, "Should have cache misses from first pass");
         assert!(hits > 0, "Should have cache hits from second pass");
         // Second pass should have produced hits
-        assert!(hits >= first_misses, "Second pass should hit cache: hits={}, first_misses={}", hits, first_misses);
+        assert!(
+            hits >= first_misses,
+            "Second pass should hit cache: hits={}, first_misses={}",
+            hits,
+            first_misses
+        );
     }
 
     #[test]

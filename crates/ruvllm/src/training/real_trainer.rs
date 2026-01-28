@@ -239,14 +239,21 @@ impl RealContrastiveTrainer {
             return Err("No triplets loaded".to_string());
         }
 
-        println!("═══════════════════════════════════════════════════════════════════════════════════");
+        println!(
+            "═══════════════════════════════════════════════════════════════════════════════════"
+        );
         println!("                    REAL CONTRASTIVE TRAINING                     ");
-        println!("═══════════════════════════════════════════════════════════════════════════════════\n");
+        println!(
+            "═══════════════════════════════════════════════════════════════════════════════════\n"
+        );
 
         println!("Configuration:");
         println!("  Model:          {}", self.config.model_path.display());
         println!("  Triplets:       {}", self.triplets.len());
-        println!("  Hard Negatives: {:.1}%", self.hard_negative_ratio() * 100.0);
+        println!(
+            "  Hard Negatives: {:.1}%",
+            self.hard_negative_ratio() * 100.0
+        );
         println!("  Epochs:         {}", self.config.epochs);
         println!("  Batch Size:     {}", self.config.batch_size);
         println!("  Learning Rate:  {}", self.config.learning_rate);
@@ -261,20 +268,23 @@ impl RealContrastiveTrainer {
             self.config.embedding_dim,
             self.config.embedding_dim,
             vb.pp("embed_projection"),
-        ).map_err(|e| format!("Failed to create projection: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create projection: {}", e))?;
 
         // Additional MLP for better representation
         let mlp_hidden = linear(
             self.config.embedding_dim,
             self.config.embedding_dim * 2,
             vb.pp("mlp_hidden"),
-        ).map_err(|e| format!("Failed to create MLP hidden: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create MLP hidden: {}", e))?;
 
         let mlp_output = linear(
             self.config.embedding_dim * 2,
             self.config.embedding_dim,
             vb.pp("mlp_output"),
-        ).map_err(|e| format!("Failed to create MLP output: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create MLP output: {}", e))?;
 
         // Setup optimizer with weight decay
         let params = self.var_map.all_vars();
@@ -287,7 +297,8 @@ impl RealContrastiveTrainer {
                 beta2: 0.999,
                 eps: 1e-8,
             },
-        ).map_err(|e| format!("Failed to create optimizer: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create optimizer: {}", e))?;
 
         let mut history = Vec::new();
         let mut checkpoints = Vec::new();
@@ -338,31 +349,42 @@ impl RealContrastiveTrainer {
                     .map_err(|e| format!("Anchor tensor failed: {}", e))?;
 
                 let positive_data = self.agent_to_embedding_batch(
-                    &batch.iter().map(|t| t.positive.as_str()).collect::<Vec<_>>(),
+                    &batch
+                        .iter()
+                        .map(|t| t.positive.as_str())
+                        .collect::<Vec<_>>(),
                 );
                 let positive = Tensor::from_slice(&positive_data, (batch_size, dim), &self.device)
                     .map_err(|e| format!("Positive tensor failed: {}", e))?;
 
                 let negative_data = self.agent_to_embedding_batch(
-                    &batch.iter().map(|t| t.negative.as_str()).collect::<Vec<_>>(),
+                    &batch
+                        .iter()
+                        .map(|t| t.negative.as_str())
+                        .collect::<Vec<_>>(),
                 );
                 let negative = Tensor::from_slice(&negative_data, (batch_size, dim), &self.device)
                     .map_err(|e| format!("Negative tensor failed: {}", e))?;
 
                 // Forward pass through trainable layers
-                let anchor_proj = self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &anchor)?;
-                let positive_proj = self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &positive)?;
-                let negative_proj = self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &negative)?;
+                let anchor_proj =
+                    self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &anchor)?;
+                let positive_proj =
+                    self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &positive)?;
+                let negative_proj =
+                    self.forward_mlp(&projection, &mlp_hidden, &mlp_output, &negative)?;
 
                 // Compute losses
-                let triplet_loss = self.triplet_loss(&anchor_proj, &positive_proj, &negative_proj)?;
-                let infonce_loss = self.infonce_loss(&anchor_proj, &positive_proj, &[negative_proj.clone()])?;
+                let triplet_loss =
+                    self.triplet_loss(&anchor_proj, &positive_proj, &negative_proj)?;
+                let infonce_loss =
+                    self.infonce_loss(&anchor_proj, &positive_proj, &[negative_proj.clone()])?;
 
                 // Apply GRPO reward scaling if enabled
                 let grpo_scale = if self.config.enable_grpo && !self.grpo_feedback.is_empty() {
                     let avg_reward: f64 = self.grpo_feedback.iter().map(|f| f.reward).sum::<f64>()
                         / self.grpo_feedback.len() as f64;
-                    1.0 + avg_reward * 0.1  // Scale loss by reward
+                    1.0 + avg_reward * 0.1 // Scale loss by reward
                 } else {
                     1.0
                 };
@@ -370,17 +392,20 @@ impl RealContrastiveTrainer {
                 // Combined loss with GRPO scaling
                 let combined = (&triplet_loss + &infonce_loss)
                     .map_err(|e| format!("Loss combination failed: {}", e))?;
-                let total_loss = (combined * grpo_scale)
-                    .map_err(|e| format!("GRPO scaling failed: {}", e))?;
+                let total_loss =
+                    (combined * grpo_scale).map_err(|e| format!("GRPO scaling failed: {}", e))?;
 
                 // Backward pass with gradient clipping
-                optimizer.backward_step(&total_loss)
+                optimizer
+                    .backward_step(&total_loss)
                     .map_err(|e| format!("Backward step failed: {}", e))?;
 
                 // Track statistics
-                let triplet_val: f32 = triplet_loss.to_vec0()
+                let triplet_val: f32 = triplet_loss
+                    .to_vec0()
                     .map_err(|e| format!("Loss extraction failed: {}", e))?;
-                let infonce_val: f32 = infonce_loss.to_vec0()
+                let infonce_val: f32 = infonce_loss
+                    .to_vec0()
                     .map_err(|e| format!("Loss extraction failed: {}", e))?;
 
                 total_triplet_loss += triplet_val as f64;
@@ -444,12 +469,15 @@ impl RealContrastiveTrainer {
 
             // Save checkpoint
             if (epoch + 1) % self.config.checkpoint_every == 0 {
-                let checkpoint_path = self.config.output_path
-                    .with_file_name(format!(
-                        "{}-checkpoint-{}.gguf",
-                        self.config.output_path.file_stem().unwrap().to_string_lossy(),
-                        epoch + 1
-                    ));
+                let checkpoint_path = self.config.output_path.with_file_name(format!(
+                    "{}-checkpoint-{}.gguf",
+                    self.config
+                        .output_path
+                        .file_stem()
+                        .unwrap()
+                        .to_string_lossy(),
+                    epoch + 1
+                ));
                 // In real implementation, save model weights here
                 checkpoints.push(checkpoint_path);
             }
@@ -489,30 +517,33 @@ impl RealContrastiveTrainer {
         input: &Tensor,
     ) -> Result<Tensor, String> {
         // Projection
-        let x = projection.forward(input)
+        let x = projection
+            .forward(input)
             .map_err(|e| format!("Projection forward failed: {}", e))?;
 
         // MLP with GELU activation
-        let hidden = mlp_hidden.forward(&x)
+        let hidden = mlp_hidden
+            .forward(&x)
             .map_err(|e| format!("MLP hidden forward failed: {}", e))?;
-        let activated = hidden.gelu()
-            .map_err(|e| format!("GELU failed: {}", e))?;
-        let output = mlp_output.forward(&activated)
+        let activated = hidden.gelu().map_err(|e| format!("GELU failed: {}", e))?;
+        let output = mlp_output
+            .forward(&activated)
             .map_err(|e| format!("MLP output forward failed: {}", e))?;
 
         // Residual connection + layer norm (simplified)
-        let result = (&x + &output)
-            .map_err(|e| format!("Residual connection failed: {}", e))?;
+        let result = (&x + &output).map_err(|e| format!("Residual connection failed: {}", e))?;
 
         // L2 normalize for cosine similarity
-        let norm = result.sqr()
+        let norm = result
+            .sqr()
             .map_err(|e| format!("Sqr failed: {}", e))?
             .sum_keepdim(D::Minus1)
             .map_err(|e| format!("Sum failed: {}", e))?
             .sqrt()
             .map_err(|e| format!("Sqrt failed: {}", e))?;
 
-        result.broadcast_div(&norm)
+        result
+            .broadcast_div(&norm)
             .map_err(|e| format!("Normalize failed: {}", e))
     }
 
@@ -539,17 +570,20 @@ impl RealContrastiveTrainer {
 
         let margin = Tensor::new(&[self.config.margin as f32], &self.device)
             .map_err(|e| format!("Margin tensor failed: {}", e))?;
-        let zero = Tensor::zeros_like(&pos_dist)
-            .map_err(|e| format!("Zero tensor failed: {}", e))?;
+        let zero =
+            Tensor::zeros_like(&pos_dist).map_err(|e| format!("Zero tensor failed: {}", e))?;
 
         let pos_dist_shape = pos_dist.shape().clone();
-        let loss = (pos_dist - neg_dist + margin.broadcast_as(&pos_dist_shape)
-            .map_err(|e| format!("Margin broadcast failed: {}", e))?)
-            .map_err(|e| format!("Loss calc failed: {}", e))?
-            .maximum(&zero)
-            .map_err(|e| format!("Maximum failed: {}", e))?;
+        let loss = (pos_dist - neg_dist
+            + margin
+                .broadcast_as(&pos_dist_shape)
+                .map_err(|e| format!("Margin broadcast failed: {}", e))?)
+        .map_err(|e| format!("Loss calc failed: {}", e))?
+        .maximum(&zero)
+        .map_err(|e| format!("Maximum failed: {}", e))?;
 
-        loss.mean(D::Minus1).map_err(|e| format!("Mean failed: {}", e))
+        loss.mean(D::Minus1)
+            .map_err(|e| format!("Mean failed: {}", e))
     }
 
     /// Compute InfoNCE loss
@@ -580,13 +614,13 @@ impl RealContrastiveTrainer {
             all_sims.push(neg_sim);
         }
 
-        let stacked = Tensor::stack(&all_sims, 0)
-            .map_err(|e| format!("Stack failed: {}", e))?;
-        let log_softmax = ops::log_softmax(&stacked, 0)
-            .map_err(|e| format!("Log softmax failed: {}", e))?;
+        let stacked = Tensor::stack(&all_sims, 0).map_err(|e| format!("Stack failed: {}", e))?;
+        let log_softmax =
+            ops::log_softmax(&stacked, 0).map_err(|e| format!("Log softmax failed: {}", e))?;
 
         // Get first element (positive similarity) from log_softmax
-        let pos_log_prob = log_softmax.get(0)
+        let pos_log_prob = log_softmax
+            .get(0)
             .map_err(|e| format!("Index failed: {}", e))?;
 
         pos_log_prob
@@ -604,7 +638,8 @@ impl RealContrastiveTrainer {
             .sum(D::Minus1)
             .map_err(|e| format!("Distance sum failed: {}", e))?;
         let dist = (1.0 - sim).map_err(|e| format!("Distance sub failed: {}", e))?;
-        dist.to_vec1().map_err(|e| format!("Distance vec failed: {}", e))
+        dist.to_vec1()
+            .map_err(|e| format!("Distance vec failed: {}", e))
     }
 
     /// Convert text to embedding using deterministic hash
@@ -615,8 +650,9 @@ impl RealContrastiveTrainer {
         for text in texts {
             let hash = self.hash_text(text);
             for i in 0..dim {
-                let val = ((hash.wrapping_add(i as u64) as f64 / u64::MAX as f64) * 2.0 - 1.0) as f32;
-                embeddings.push(val * 0.1);  // Scale down
+                let val =
+                    ((hash.wrapping_add(i as u64) as f64 / u64::MAX as f64) * 2.0 - 1.0) as f32;
+                embeddings.push(val * 0.1); // Scale down
             }
         }
 
@@ -631,7 +667,8 @@ impl RealContrastiveTrainer {
         for agent in agents {
             let base_hash = self.hash_text(agent);
             for i in 0..dim {
-                let val = ((base_hash.wrapping_mul(i as u64 + 1) as f64 / u64::MAX as f64) * 2.0 - 1.0) as f32;
+                let val = ((base_hash.wrapping_mul(i as u64 + 1) as f64 / u64::MAX as f64) * 2.0
+                    - 1.0) as f32;
                 embeddings.push(val * 0.1);
             }
         }
@@ -657,9 +694,13 @@ impl RealContrastiveTrainer {
     pub fn export_gguf<P: AsRef<Path>>(&self, path: P) -> Result<GgufExportResult, String> {
         let path = path.as_ref();
 
-        println!("\n═══════════════════════════════════════════════════════════════════════════════════");
+        println!(
+            "\n═══════════════════════════════════════════════════════════════════════════════════"
+        );
         println!("                          GGUF EXPORT");
-        println!("═══════════════════════════════════════════════════════════════════════════════════\n");
+        println!(
+            "═══════════════════════════════════════════════════════════════════════════════════\n"
+        );
 
         println!("Exporting trained model to: {}", path.display());
 
@@ -694,16 +735,20 @@ impl RealContrastiveTrainer {
         for (name, size, weights) in &layer_info {
             // Write layer header
             let name_bytes = name.as_bytes();
-            weights_file.write_all(&(name_bytes.len() as u32).to_le_bytes())
+            weights_file
+                .write_all(&(name_bytes.len() as u32).to_le_bytes())
                 .map_err(|e| format!("Write failed: {}", e))?;
-            weights_file.write_all(name_bytes)
+            weights_file
+                .write_all(name_bytes)
                 .map_err(|e| format!("Write failed: {}", e))?;
-            weights_file.write_all(&(*size as u64).to_le_bytes())
+            weights_file
+                .write_all(&(*size as u64).to_le_bytes())
                 .map_err(|e| format!("Write failed: {}", e))?;
 
             // Write weights as f32 little-endian
             for w in weights {
-                weights_file.write_all(&w.to_le_bytes())
+                weights_file
+                    .write_all(&w.to_le_bytes())
                     .map_err(|e| format!("Write failed: {}", e))?;
             }
         }
@@ -717,11 +762,14 @@ impl RealContrastiveTrainer {
             total_weights,
             embedding_dim: self.config.embedding_dim,
             architecture: "projection_mlp".to_string(),
-            layers: layer_info.iter().map(|(n, s, _)| LayerMetadata {
-                name: n.clone(),
-                size: *s,
-                dtype: "f32".to_string(),
-            }).collect(),
+            layers: layer_info
+                .iter()
+                .map(|(n, s, _)| LayerMetadata {
+                    name: n.clone(),
+                    size: *s,
+                    dtype: "f32".to_string(),
+                })
+                .collect(),
             training_config: TrainingConfigMeta {
                 epochs: self.config.epochs,
                 learning_rate: self.config.learning_rate,
@@ -737,12 +785,14 @@ impl RealContrastiveTrainer {
         let metadata_path = weights_dir.join("metadata.json");
         let mut metadata_file = File::create(&metadata_path)
             .map_err(|e| format!("Failed to create metadata file: {}", e))?;
-        metadata_file.write_all(serde_json::to_string_pretty(&metadata).unwrap().as_bytes())
+        metadata_file
+            .write_all(serde_json::to_string_pretty(&metadata).unwrap().as_bytes())
             .map_err(|e| format!("Failed to write metadata: {}", e))?;
         println!("  Metadata saved to: {}", metadata_path.display());
 
         // Create merge script for llama.cpp
-        let merge_script = format!(r#"#!/bin/bash
+        let merge_script = format!(
+            r#"#!/bin/bash
 # Merge trained adapter with base GGUF model
 # Requires: llama.cpp build with gguf-py
 
@@ -770,9 +820,10 @@ echo "      Install: pip install gguf"
         );
 
         let script_path = weights_dir.join("merge_adapter.sh");
-        let mut script_file = File::create(&script_path)
-            .map_err(|e| format!("Failed to create script: {}", e))?;
-        script_file.write_all(merge_script.as_bytes())
+        let mut script_file =
+            File::create(&script_path).map_err(|e| format!("Failed to create script: {}", e))?;
+        script_file
+            .write_all(merge_script.as_bytes())
             .map_err(|e| format!("Failed to write script: {}", e))?;
         println!("  Merge script saved to: {}", script_path.display());
 
@@ -812,7 +863,9 @@ pub async fn run_training_pipeline(
 ) -> Result<RealTrainingResult, String> {
     println!("═══════════════════════════════════════════════════════════════════════════════════");
     println!("          COMPLETE TRAINING PIPELINE WITH GRPO FEEDBACK");
-    println!("═══════════════════════════════════════════════════════════════════════════════════\n");
+    println!(
+        "═══════════════════════════════════════════════════════════════════════════════════\n"
+    );
 
     // Phase 1: Load config and triplets
     let config = RealTrainingConfig {
@@ -824,8 +877,11 @@ pub async fn run_training_pipeline(
 
     let mut trainer = RealContrastiveTrainer::new(config)?;
     let triplet_count = trainer.load_triplets(triplets_path)?;
-    println!("Phase 1: Loaded {} triplets ({:.1}% hard negatives)\n",
-        triplet_count, trainer.hard_negative_ratio() * 100.0);
+    println!(
+        "Phase 1: Loaded {} triplets ({:.1}% hard negatives)\n",
+        triplet_count,
+        trainer.hard_negative_ratio() * 100.0
+    );
 
     // Phase 2: Initial training
     println!("Phase 2: Initial contrastive training...\n");
@@ -836,7 +892,8 @@ pub async fn run_training_pipeline(
         println!("\nPhase 3: GRPO feedback loop...\n");
 
         // Collect predictions for evaluation
-        let predictions: Vec<(String, String, String)> = trainer.triplets
+        let predictions: Vec<(String, String, String)> = trainer
+            .triplets
             .iter()
             .take(20) // Sample 20 for GRPO
             .map(|t| (t.anchor.clone(), t.positive.clone(), t.positive.clone()))
@@ -888,7 +945,10 @@ impl GrpoEvaluator {
     }
 
     /// Evaluate predictions and generate feedback
-    pub async fn evaluate(&self, predictions: &[(String, String, String)]) -> Result<Vec<GrpoFeedback>, String> {
+    pub async fn evaluate(
+        &self,
+        predictions: &[(String, String, String)],
+    ) -> Result<Vec<GrpoFeedback>, String> {
         // In real implementation, this would call Claude API
         // For now, return simulated feedback
 

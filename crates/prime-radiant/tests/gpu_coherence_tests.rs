@@ -13,12 +13,11 @@
 #![cfg(feature = "gpu")]
 
 use prime_radiant::gpu::{
-    GpuCoherenceEngine, GpuConfig, GpuBuffer, GpuParams, GpuEdge, GpuRestrictionMap,
-    BufferUsage, GpuBufferManager, GpuResult, GpuError,
+    BufferUsage, GpuBuffer, GpuBufferManager, GpuCoherenceEngine, GpuConfig, GpuEdge, GpuError,
+    GpuParams, GpuRestrictionMap, GpuResult,
 };
 use prime_radiant::substrate::{
-    SheafGraph, SheafNode, SheafEdge, SheafNodeBuilder, SheafEdgeBuilder,
-    NodeId, EdgeId,
+    EdgeId, NodeId, SheafEdge, SheafEdgeBuilder, SheafGraph, SheafNode, SheafNodeBuilder,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -79,12 +78,8 @@ fn create_coherent_graph() -> SheafGraph {
     // All nodes have the same state
     let state = [1.0, 1.0, 1.0];
 
-    let node1 = SheafNodeBuilder::new()
-        .state_from_slice(&state)
-        .build();
-    let node2 = SheafNodeBuilder::new()
-        .state_from_slice(&state)
-        .build();
+    let node1 = SheafNodeBuilder::new().state_from_slice(&state).build();
+    let node2 = SheafNodeBuilder::new().state_from_slice(&state).build();
 
     let id1 = graph.add_node(node1);
     let id2 = graph.add_node(node2);
@@ -110,9 +105,7 @@ fn create_large_graph(num_nodes: usize, edges_per_node: usize) -> SheafGraph {
             .map(|j| ((i * state_dim + j) as f32 * 0.01).sin())
             .collect();
 
-        let node = SheafNodeBuilder::new()
-            .state_from_slice(&state)
-            .build();
+        let node = SheafNodeBuilder::new().state_from_slice(&state).build();
 
         node_ids.push(graph.add_node(node));
     }
@@ -480,13 +473,17 @@ async fn test_gpu_performance_1k_nodes() {
         let cpu_energy = graph.compute_energy();
         let cpu_time = start.elapsed();
 
+        println!("Performance test ({} edges):", edge_count);
         println!(
-            "Performance test ({} edges):",
-            edge_count
+            "  GPU: {}us ({} edges/ms)",
+            energy.compute_time_us,
+            edge_count as u64 * 1000 / energy.compute_time_us.max(1)
         );
-        println!("  GPU: {}us ({} edges/ms)", energy.compute_time_us, edge_count as u64 * 1000 / energy.compute_time_us.max(1));
         println!("  CPU: {}us", cpu_time.as_micros());
-        println!("  Speedup: {:.2}x", cpu_time.as_micros() as f64 / gpu_time.as_micros() as f64);
+        println!(
+            "  Speedup: {:.2}x",
+            cpu_time.as_micros() as f64 / gpu_time.as_micros() as f64
+        );
 
         // Verify correctness
         let diff = (cpu_energy.total_energy - energy.total_energy).abs();

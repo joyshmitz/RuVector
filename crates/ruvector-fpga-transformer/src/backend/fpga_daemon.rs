@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 
 use crate::artifact::ModelArtifact;
 use crate::backend::{
-    commands, compute_topk, crc32, protocol, read_lock, validate_tokens, write_lock,
-    BackendStats, RequestFrame, ResponseFrame, TransformerBackend,
+    commands, compute_topk, crc32, protocol, read_lock, validate_tokens, write_lock, BackendStats,
+    RequestFrame, ResponseFrame, TransformerBackend,
 };
 use crate::error::{Error, Result};
 use crate::types::{
@@ -250,10 +250,7 @@ impl FpgaDaemonBackend {
                 });
             }
             _ => {
-                return Err(Error::backend(format!(
-                    "Daemon error: status {}",
-                    status
-                )));
+                return Err(Error::backend(format!("Daemon error: status {}", status)));
             }
         }
 
@@ -283,7 +280,11 @@ impl FpgaDaemonBackend {
     }
 
     /// Send load model command to daemon
-    fn send_load_command(&self, stream: &mut dyn ReadWrite, artifact: &ModelArtifact) -> Result<()> {
+    fn send_load_command(
+        &self,
+        stream: &mut dyn ReadWrite,
+        artifact: &ModelArtifact,
+    ) -> Result<()> {
         // Pack artifact
         let artifact_bytes = crate::artifact::pack::pack_artifact(artifact)?;
 
@@ -437,10 +438,9 @@ impl TransformerBackend for FpgaDaemonBackend {
 
         // Check model is loaded locally and validate tokens
         let model_metadata = read_lock(&self.models, |models| {
-            models
-                .get(&req.model)
-                .map(|m| m.artifact.clone())
-        })?.ok_or_else(|| Error::ModelNotFound(req.model))?;
+            models.get(&req.model).map(|m| m.artifact.clone())
+        })?
+        .ok_or_else(|| Error::ModelNotFound(req.model))?;
 
         // Validate tokens against vocabulary
         validate_tokens(req.tokens, model_metadata.manifest.shape.vocab)?;

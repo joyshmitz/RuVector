@@ -22,7 +22,7 @@ mod config;
 mod manifold;
 mod operations;
 
-pub use config::{ProductManifoldConfig, CurvatureType};
+pub use config::{CurvatureType, ProductManifoldConfig};
 pub use manifold::ProductManifold;
 
 // Re-export batch operations (used internally by ProductManifold impl)

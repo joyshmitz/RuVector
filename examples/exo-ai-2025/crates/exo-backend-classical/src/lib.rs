@@ -10,8 +10,8 @@ pub mod graph;
 pub mod vector;
 
 use exo_core::{
-    Error as ExoError, Filter, ManifoldDelta, Pattern, Result as ExoResult,
-    SearchResult, SubstrateBackend,
+    Error as ExoError, Filter, ManifoldDelta, Pattern, Result as ExoResult, SearchResult,
+    SubstrateBackend,
 };
 use parking_lot::RwLock;
 use std::sync::Arc;

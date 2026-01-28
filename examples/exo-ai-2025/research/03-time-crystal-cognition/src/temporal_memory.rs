@@ -86,18 +86,16 @@ impl TemporalMemory {
         let hc_neurons = Array1::zeros(config.hc_neurons);
 
         // Asymmetric weights for PFC (enable limit cycles)
-        let pfc_weights = Self::generate_limit_cycle_weights(
-            config.pfc_neurons, 0.3, 1.0
-        );
+        let pfc_weights = Self::generate_limit_cycle_weights(config.pfc_neurons, 0.3, 1.0);
 
         // Symmetric weights for HC (content storage)
-        let hc_weights = Self::generate_symmetric_weights(
-            config.hc_neurons, 0.2, 0.8
-        );
+        let hc_weights = Self::generate_symmetric_weights(config.hc_neurons, 0.2, 0.8);
 
         // Coupling weights
         let pfc_to_hc = Self::generate_coupling_weights(
-            config.pfc_neurons, config.hc_neurons, config.pfc_hc_coupling
+            config.pfc_neurons,
+            config.hc_neurons,
+            config.pfc_hc_coupling,
         );
         let hc_to_pfc = pfc_to_hc.t().to_owned();
 
@@ -141,7 +139,7 @@ impl TemporalMemory {
 
         use rand::Rng;
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 if rng.gen::<f64>() < sparsity {
                     let w = rng.gen_range(0.0..strength);
                     weights[[i, j]] = w;
@@ -161,7 +159,8 @@ impl TemporalMemory {
         use rand::Rng;
         for i in 0..n_to {
             for j in 0..n_from {
-                if rng.gen::<f64>() < 0.1 { // Sparse coupling
+                if rng.gen::<f64>() < 0.1 {
+                    // Sparse coupling
                     weights[[i, j]] = rng.gen_range(-strength..strength);
                 }
             }
@@ -245,7 +244,8 @@ impl TemporalMemory {
 
         // Update energy (metabolic supply - dissipation)
         let energy_cost = self.compute_energy_cost();
-        self.energy += (self.config.energy_rate - energy_cost - self.config.dissipation) * self.config.dt;
+        self.energy +=
+            (self.config.energy_rate - energy_cost - self.config.dissipation) * self.config.dt;
         self.energy = self.energy.clamp(0.0, 2.0);
 
         // If energy too low, time crystal collapses
@@ -372,7 +372,10 @@ impl TemporalMemory {
         if self.memory_items.is_empty() {
             0.0
         } else {
-            self.memory_items.iter().map(|item| item.strength).sum::<f64>()
+            self.memory_items
+                .iter()
+                .map(|item| item.strength)
+                .sum::<f64>()
                 / self.memory_items.len() as f64
         }
     }
@@ -384,7 +387,9 @@ impl TemporalMemory {
         }
 
         // Average recent order parameter
-        let recent: Vec<f64> = self.order_parameter_history.iter()
+        let recent: Vec<f64> = self
+            .order_parameter_history
+            .iter()
             .rev()
             .take(100)
             .cloned()
@@ -466,11 +471,7 @@ impl WorkingMemoryTask {
 
         // Generate random items
         let items: Vec<Array1<f64>> = (0..n_items)
-            .map(|_| {
-                Array1::from_vec(
-                    (0..memory_dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
-                )
-            })
+            .map(|_| Array1::from_vec((0..memory_dim).map(|_| rng.gen_range(-1.0..1.0)).collect()))
             .collect();
 
         // Queries are same as items (exact recall)

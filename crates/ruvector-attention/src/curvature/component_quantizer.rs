@@ -102,20 +102,14 @@ impl ComponentQuantizer {
         h_range: std::ops::Range<usize>,
         s_range: std::ops::Range<usize>,
     ) -> QuantizedVector {
-        let (euclidean, euclidean_scale) = self.quantize_component(
-            &vector[e_range],
-            self.euclidean_levels,
-        );
+        let (euclidean, euclidean_scale) =
+            self.quantize_component(&vector[e_range], self.euclidean_levels);
 
-        let (hyperbolic, hyperbolic_scale) = self.quantize_component(
-            &vector[h_range],
-            self.hyperbolic_levels,
-        );
+        let (hyperbolic, hyperbolic_scale) =
+            self.quantize_component(&vector[h_range], self.hyperbolic_levels);
 
-        let (spherical, spherical_scale) = self.quantize_component(
-            &vector[s_range],
-            self.spherical_levels,
-        );
+        let (spherical, spherical_scale) =
+            self.quantize_component(&vector[s_range], self.spherical_levels);
 
         QuantizedVector {
             euclidean,
@@ -177,11 +171,7 @@ impl ComponentQuantizer {
     }
 
     /// Dequantize to full vector
-    pub fn dequantize(
-        &self,
-        quant: &QuantizedVector,
-        total_dim: usize,
-    ) -> Vec<f32> {
+    pub fn dequantize(&self, quant: &QuantizedVector, total_dim: usize) -> Vec<f32> {
         let mut result = vec![0.0f32; total_dim];
 
         let e_vec = self.dequantize_component(&quant.euclidean, quant.euclidean_scale);
@@ -223,7 +213,8 @@ mod tests {
         let h_range = 32..48;
         let s_range = 48..64;
 
-        let quantized = quantizer.quantize(&vector, e_range.clone(), h_range.clone(), s_range.clone());
+        let quantized =
+            quantizer.quantize(&vector, e_range.clone(), h_range.clone(), s_range.clone());
 
         assert_eq!(quantized.euclidean.len(), 32);
         assert_eq!(quantized.hyperbolic.len(), 16);

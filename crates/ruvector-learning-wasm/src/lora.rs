@@ -537,7 +537,10 @@ mod tests {
         for i in 0..256 {
             diff += (output[i] - input[i]).abs();
         }
-        assert!(diff > 0.0, "Output should differ from input after adaptation");
+        assert!(
+            diff > 0.0,
+            "Output should differ from input after adaptation"
+        );
     }
 
     #[test]

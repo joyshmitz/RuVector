@@ -237,7 +237,9 @@ impl PersistenceLandscape {
         if pairs.is_empty() {
             return Self {
                 landscapes: vec![vec![0.0; resolution]; num_landscapes],
-                grid: (0..resolution).map(|i| i as f64 / resolution as f64).collect(),
+                grid: (0..resolution)
+                    .map(|i| i as f64 / resolution as f64)
+                    .collect(),
                 num_landscapes,
             };
         }
@@ -311,7 +313,10 @@ impl PersistenceLandscape {
 
     /// Get feature vector (flattened landscape)
     pub fn to_vector(&self) -> Vec<f64> {
-        self.landscapes.iter().flat_map(|l| l.iter().copied()).collect()
+        self.landscapes
+            .iter()
+            .flat_map(|l| l.iter().copied())
+            .collect()
     }
 }
 

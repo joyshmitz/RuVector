@@ -399,7 +399,11 @@ mod serialization {
 
     #[test]
     fn test_decision_serialization() {
-        let decisions = [GateDecision::Permit, GateDecision::Defer, GateDecision::Deny];
+        let decisions = [
+            GateDecision::Permit,
+            GateDecision::Defer,
+            GateDecision::Deny,
+        ];
 
         for decision in &decisions {
             let json = serde_json::to_string(decision).unwrap();

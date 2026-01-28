@@ -199,7 +199,10 @@ impl MambaSSMAttention {
         if input.len() != seq_len * dim {
             return Err(JsError::new(&format!(
                 "Input size mismatch: expected {} ({}x{}), got {}",
-                seq_len * dim, seq_len, dim, input.len()
+                seq_len * dim,
+                seq_len,
+                dim,
+                input.len()
             )));
         }
 
@@ -218,7 +221,8 @@ impl MambaSSMAttention {
         let ssm_output = self.selective_scan(&projected, &ssm_params);
 
         // Step 4: Apply D skip connection
-        let with_skip: Vec<Vec<f32>> = ssm_output.iter()
+        let with_skip: Vec<Vec<f32>> = ssm_output
+            .iter()
             .zip(projected.iter())
             .map(|(y, x)| {
                 y.iter()
@@ -252,13 +256,18 @@ impl MambaSSMAttention {
     ///
     /// Returns pseudo-attention scores showing which positions influence output
     #[wasm_bindgen(js_name = getAttentionScores)]
-    pub fn get_attention_scores(&self, input: Vec<f32>, seq_len: usize) -> Result<Vec<f32>, JsError> {
+    pub fn get_attention_scores(
+        &self,
+        input: Vec<f32>,
+        seq_len: usize,
+    ) -> Result<Vec<f32>, JsError> {
         let dim = self.config.dim;
 
         if input.len() != seq_len * dim {
             return Err(JsError::new(&format!(
                 "Input size mismatch: expected {}, got {}",
-                seq_len * dim, input.len()
+                seq_len * dim,
+                input.len()
             )));
         }
 
@@ -270,9 +279,12 @@ impl MambaSSMAttention {
             for s in 0..=t {
                 // Exponential decay based on distance and A parameters
                 let distance = (t - s) as f32;
-                let decay: f32 = self.a_log.iter()
+                let decay: f32 = self
+                    .a_log
+                    .iter()
                     .map(|&a| (a * distance).exp())
-                    .sum::<f32>() / self.config.state_dim as f32;
+                    .sum::<f32>()
+                    / self.config.state_dim as f32;
 
                 scores[t * seq_len + s] = decay;
             }
@@ -286,9 +298,11 @@ impl MambaSSMAttention {
 impl MambaSSMAttention {
     /// Project input from dim to inner_dim
     fn project_in(&self, input: &[Vec<f32>]) -> Vec<Vec<f32>> {
-        input.iter()
+        input
+            .iter()
             .map(|x| {
-                self.in_proj.iter()
+                self.in_proj
+                    .iter()
                     .map(|row| row.iter().zip(x.iter()).map(|(w, xi)| w * xi).sum())
                     .collect()
             })
@@ -297,9 +311,11 @@ impl MambaSSMAttention {
 
     /// Project from inner_dim back to dim
     fn project_out(&self, input: &[Vec<f32>]) -> Vec<Vec<f32>> {
-        input.iter()
+        input
+            .iter()
             .map(|x| {
-                self.out_proj.iter()
+                self.out_proj
+                    .iter()
                     .map(|row| row.iter().zip(x.iter()).map(|(w, xi)| w * xi).sum())
                     .collect()
             })
@@ -321,7 +337,8 @@ impl MambaSSMAttention {
 
         for (t, x) in input.iter().enumerate() {
             // Compute delta from input (softplus of projection)
-            let dt: Vec<f32> = x.iter()
+            let dt: Vec<f32> = x
+                .iter()
                 .map(|&xi| {
                     let raw = xi * 0.1; // Simple scaling
                     let dt_val = (1.0 + raw.exp()).ln(); // Softplus
@@ -349,7 +366,12 @@ impl MambaSSMAttention {
             }
         }
 
-        SelectiveSSMParams { a_bar, b_bar, c, delta }
+        SelectiveSSMParams {
+            a_bar,
+            b_bar,
+            c,
+            delta,
+        }
     }
 
     /// Run selective scan (parallel associative scan in practice)
@@ -367,12 +389,13 @@ impl MambaSSMAttention {
 
                 // Update hidden state: h_t = A_bar * h_{t-1} + B_bar * x_t
                 for n in 0..state_dim {
-                    hidden[d][n] = params.a_bar[t][d][n] * hidden[d][n]
-                        + params.b_bar[t][d][n] * x_d;
+                    hidden[d][n] =
+                        params.a_bar[t][d][n] * hidden[d][n] + params.b_bar[t][d][n] * x_d;
                 }
 
                 // Compute output: y_t = C * h_t
-                output[t][d] = hidden[d].iter()
+                output[t][d] = hidden[d]
+                    .iter()
                     .zip(params.c[t][d].iter())
                     .map(|(h, c)| h * c)
                     .sum();

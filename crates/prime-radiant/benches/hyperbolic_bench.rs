@@ -374,7 +374,9 @@ fn bench_knn_hyperbolic(c: &mut Criterion) {
     let dim = 64;
     let curvature = -1.0;
 
-    let points: Vec<Vec<f32>> = (0..1000).map(|i| generate_point(dim, i as u64, 0.9)).collect();
+    let points: Vec<Vec<f32>> = (0..1000)
+        .map(|i| generate_point(dim, i as u64, 0.9))
+        .collect();
     let query = generate_point(dim, 999, 0.9);
 
     for k in [1, 5, 10, 50] {
@@ -389,7 +391,10 @@ fn bench_knn_hyperbolic(c: &mut Criterion) {
 
                 // Partial sort for k-nearest
                 distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-                let result = distances[..k].iter().map(|(i, d)| (*i, *d)).collect::<Vec<_>>();
+                let result = distances[..k]
+                    .iter()
+                    .map(|(i, d)| (*i, *d))
+                    .collect::<Vec<_>>();
                 black_box(result)
             })
         });
@@ -460,9 +465,7 @@ fn bench_curvature_impact(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("curvature", format!("{:.1}", curvature)),
             &curvature,
-            |b, &c| {
-                b.iter(|| poincare_distance(black_box(&x), black_box(&y), black_box(c)))
-            },
+            |b, &c| b.iter(|| poincare_distance(black_box(&x), black_box(&y), black_box(c))),
         );
     }
 

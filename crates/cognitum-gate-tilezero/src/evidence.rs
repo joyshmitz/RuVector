@@ -193,10 +193,7 @@ pub fn aggregate_tiles_simd(tile_e_values: &[f64]) -> f64 {
 ///
 /// # Returns
 /// Weighted geometric mean of e-values
-pub fn mixture_evalue_adaptive(
-    log_e_values: &[f64],
-    weights: Option<&[f64]>,
-) -> f64 {
+pub fn mixture_evalue_adaptive(log_e_values: &[f64], weights: Option<&[f64]>) -> f64 {
     if log_e_values.is_empty() {
         return 1.0;
     }

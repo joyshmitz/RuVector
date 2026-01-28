@@ -392,9 +392,7 @@ fn bench_ewc_penalty(c: &mut Criterion) {
 
     for param_count in [1000, 10000, 100000] {
         let ewc = EwcPlusPlus::new(param_count, 0.4);
-        let weights: Vec<f32> = (0..param_count)
-            .map(|i| (i as f32 * 0.001).sin())
-            .collect();
+        let weights: Vec<f32> = (0..param_count).map(|i| (i as f32 * 0.001).sin()).collect();
 
         group.bench_with_input(
             BenchmarkId::new("params", param_count),
@@ -412,9 +410,7 @@ fn bench_ewc_consolidate(c: &mut Criterion) {
 
     for param_count in [1000, 10000, 100000] {
         let mut ewc = EwcPlusPlus::new(param_count, 0.4);
-        let weights: Vec<f32> = (0..param_count)
-            .map(|i| (i as f32 * 0.001).sin())
-            .collect();
+        let weights: Vec<f32> = (0..param_count).map(|i| (i as f32 * 0.001).sin()).collect();
         let new_fisher: Vec<f32> = (0..param_count)
             .map(|i| (i as f32 * 0.002).cos().abs())
             .collect();
@@ -422,9 +418,7 @@ fn bench_ewc_consolidate(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("params", param_count),
             &param_count,
-            |b, _| {
-                b.iter(|| ewc.consolidate(black_box(&weights), black_box(&new_fisher)))
-            },
+            |b, _| b.iter(|| ewc.consolidate(black_box(&weights), black_box(&new_fisher))),
         );
     }
 

@@ -3,10 +3,10 @@
 //! Tests for async write batching, flush on shutdown, backpressure handling,
 //! and the overall witness logging system.
 
-use crate::witness_log::{
-    WitnessEntry, WitnessLog, LatencyBreakdown, RoutingDecision, AsyncWriteConfig,
-};
 use crate::types::ModelSize;
+use crate::witness_log::{
+    AsyncWriteConfig, LatencyBreakdown, RoutingDecision, WitnessEntry, WitnessLog,
+};
 use std::time::Instant;
 
 // ============================================================================
@@ -178,7 +178,8 @@ fn test_witness_entry_with_quality() {
         "session-456".to_string(),
         vec![0.5; 768],
         RoutingDecision::default(),
-    ).with_quality(0.85);
+    )
+    .with_quality(0.85);
 
     assert!((entry.quality_score - 0.85).abs() < 0.01);
     assert!(entry.meets_quality_threshold(0.8));
@@ -200,7 +201,8 @@ fn test_witness_entry_with_latency() {
         "session-789".to_string(),
         vec![0.0; 768],
         RoutingDecision::default(),
-    ).with_latency(latency);
+    )
+    .with_latency(latency);
 
     assert_eq!(entry.latency.total_ms, 96.0);
     assert_eq!(entry.latency.generation_ms, 50.0);
@@ -221,7 +223,8 @@ fn test_witness_entry_with_error() {
         "session-error".to_string(),
         vec![0.0; 768],
         RoutingDecision::default(),
-    ).with_error(error);
+    )
+    .with_error(error);
 
     assert!(!entry.is_success());
     assert!(entry.error.is_some());
@@ -234,7 +237,8 @@ fn test_witness_entry_quality_threshold_edge_cases() {
         "session".to_string(),
         vec![0.0; 768],
         RoutingDecision::default(),
-    ).with_quality(0.0);
+    )
+    .with_quality(0.0);
 
     assert!(entry_zero.meets_quality_threshold(0.0));
     assert!(!entry_zero.meets_quality_threshold(0.1));
@@ -243,7 +247,8 @@ fn test_witness_entry_quality_threshold_edge_cases() {
         "session".to_string(),
         vec![0.0; 768],
         RoutingDecision::default(),
-    ).with_quality(1.0);
+    )
+    .with_quality(1.0);
 
     assert!(entry_one.meets_quality_threshold(1.0));
     assert!(entry_one.meets_quality_threshold(0.99));
@@ -352,8 +357,8 @@ fn test_backpressure_behavior() {
 
 #[test]
 fn test_time_based_flush_simulation() {
-    use std::time::Duration;
     use std::thread::sleep;
+    use std::time::Duration;
 
     let max_wait = Duration::from_millis(100);
     let start = Instant::now();
@@ -432,8 +437,8 @@ fn test_witness_log_stats_serialization() {
 
 #[test]
 fn test_concurrent_entry_creation() {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
     use std::thread;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -550,21 +555,24 @@ fn test_witness_entry_tags() {
 
 #[test]
 fn test_witness_entry_filter_by_tag() {
-    let entries: Vec<WitnessEntry> = (0..10).map(|i| {
-        let mut entry = WitnessEntry::new(
-            format!("session-{}", i),
-            vec![0.0; 768],
-            RoutingDecision::default(),
-        );
-        if i % 2 == 0 {
-            entry.tags.push("even".to_string());
-        } else {
-            entry.tags.push("odd".to_string());
-        }
-        entry
-    }).collect();
+    let entries: Vec<WitnessEntry> = (0..10)
+        .map(|i| {
+            let mut entry = WitnessEntry::new(
+                format!("session-{}", i),
+                vec![0.0; 768],
+                RoutingDecision::default(),
+            );
+            if i % 2 == 0 {
+                entry.tags.push("even".to_string());
+            } else {
+                entry.tags.push("odd".to_string());
+            }
+            entry
+        })
+        .collect();
 
-    let even_entries: Vec<_> = entries.iter()
+    let even_entries: Vec<_> = entries
+        .iter()
         .filter(|e| e.tags.contains(&"even".to_string()))
         .collect();
 
@@ -590,7 +598,11 @@ fn test_entry_creation_performance() {
     let duration = start.elapsed();
 
     let avg_us = duration.as_micros() as f64 / iterations as f64;
-    assert!(avg_us < 100.0, "Entry creation should be fast: {}us", avg_us);
+    assert!(
+        avg_us < 100.0,
+        "Entry creation should be fast: {}us",
+        avg_us
+    );
 }
 
 #[test]
@@ -613,7 +625,11 @@ fn test_latency_breakdown_performance() {
     let duration = start.elapsed();
 
     let avg_ns = duration.as_nanos() as f64 / iterations as f64;
-    assert!(avg_ns < 1000.0, "Latency operations should be fast: {}ns", avg_ns);
+    assert!(
+        avg_ns < 1000.0,
+        "Latency operations should be fast: {}ns",
+        avg_ns
+    );
 }
 
 // ============================================================================
@@ -646,11 +662,7 @@ fn test_large_embedding() {
 
 #[test]
 fn test_empty_session_id() {
-    let entry = WitnessEntry::new(
-        "".to_string(),
-        vec![0.0; 768],
-        RoutingDecision::default(),
-    );
+    let entry = WitnessEntry::new("".to_string(), vec![0.0; 768], RoutingDecision::default());
 
     assert!(entry.session_id.is_empty());
 }
@@ -659,11 +671,7 @@ fn test_empty_session_id() {
 fn test_long_session_id() {
     let long_id = "x".repeat(1000);
 
-    let entry = WitnessEntry::new(
-        long_id.clone(),
-        vec![0.0; 768],
-        RoutingDecision::default(),
-    );
+    let entry = WitnessEntry::new(long_id.clone(), vec![0.0; 768], RoutingDecision::default());
 
     assert_eq!(entry.session_id.len(), 1000);
 }

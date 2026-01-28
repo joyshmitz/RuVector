@@ -268,7 +268,10 @@ impl CompactGraph {
                 weight: 0,
                 flags: 0,
             }; MAX_SHARD_EDGES],
-            adjacency: [[AdjEntry { neighbor: 0, edge_id: 0 }; MAX_DEGREE]; MAX_SHARD_VERTICES],
+            adjacency: [[AdjEntry {
+                neighbor: 0,
+                edge_id: 0,
+            }; MAX_DEGREE]; MAX_SHARD_VERTICES],
         }
     }
 
@@ -470,7 +473,11 @@ impl CompactGraph {
     ///
     /// SAFETY: Caller must ensure source < MAX_SHARD_VERTICES and vertex is active
     #[inline(always)]
-    pub unsafe fn find_edge_unchecked(&self, source: TileVertexId, target: TileVertexId) -> Option<TileEdgeId> {
+    pub unsafe fn find_edge_unchecked(
+        &self,
+        source: TileVertexId,
+        target: TileVertexId,
+    ) -> Option<TileEdgeId> {
         unsafe {
             let entry = self.vertices.get_unchecked(source as usize);
             let degree = entry.degree as usize;
@@ -682,7 +689,12 @@ impl CompactGraph {
     }
 
     /// Remove from adjacency list using swap-remove
-    fn remove_from_adjacency(&mut self, v: TileVertexId, neighbor: TileVertexId, edge_id: TileEdgeId) {
+    fn remove_from_adjacency(
+        &mut self,
+        v: TileVertexId,
+        neighbor: TileVertexId,
+        edge_id: TileEdgeId,
+    ) {
         if v as usize >= MAX_SHARD_VERTICES {
             return;
         }
@@ -808,7 +820,10 @@ impl CompactGraph {
     /// Iterator of weights from active edges
     #[inline]
     pub fn active_edge_weights(&self) -> impl Iterator<Item = FixedWeight> + '_ {
-        self.edges.iter().filter(|e| e.is_active()).map(|e| e.weight)
+        self.edges
+            .iter()
+            .filter(|e| e.is_active())
+            .map(|e| e.weight)
     }
 
     /// Compute total edge weight using SIMD-friendly accumulation

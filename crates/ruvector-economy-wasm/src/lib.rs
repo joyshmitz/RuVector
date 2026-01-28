@@ -58,15 +58,15 @@
 
 use wasm_bindgen::prelude::*;
 
-pub mod ledger;
 pub mod curve;
+pub mod ledger;
 pub mod reputation;
 pub mod stake;
 
+pub use curve::{contribution_multiplier, ContributionCurve};
 pub use ledger::CreditLedger;
-pub use curve::{ContributionCurve, contribution_multiplier};
 pub use reputation::ReputationScore;
-pub use stake::{StakeManager, SlashReason};
+pub use stake::{SlashReason, StakeManager};
 
 /// Initialize panic hook for better error messages in console
 #[wasm_bindgen(start)]

@@ -30,24 +30,24 @@
 use ruvllm::{
     // Backends
     backends::{
-        GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture, ModelConfig,
-        Quantization, SpecialTokens, StreamEvent, TokenStream, Tokenizer,
+        GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture, ModelConfig, Quantization,
+        SpecialTokens, StreamEvent, TokenStream, Tokenizer,
     },
+    // Error handling
+    error::{Result, RuvLLMError},
     // KV Cache
     kv_cache::{KvCacheConfig, TwoTierKvCache},
+    // Serving
+    serving::{
+        InferenceRequest, KvCachePoolConfig, Priority, ServingEngine, ServingEngineConfig,
+        TokenOutput,
+    },
     // Speculative decoding
     speculative::{
         log_softmax, sample_from_probs, softmax, top_k_filter, top_p_filter,
         AtomicSpeculativeStats, SpeculationTree, SpeculativeConfig, SpeculativeDecoder,
         SpeculativeStats, TreeNode,
     },
-    // Serving
-    serving::{
-        InferenceRequest, KvCachePoolConfig, Priority, ServingEngine, ServingEngineConfig,
-        TokenOutput,
-    },
-    // Error handling
-    error::{Result, RuvLLMError},
 };
 
 use std::collections::HashMap;
@@ -214,7 +214,10 @@ impl MockTokenizer {
             reverse_vocab.insert(id, text.to_string());
         }
 
-        Self { vocab, reverse_vocab }
+        Self {
+            vocab,
+            reverse_vocab,
+        }
     }
 }
 
@@ -227,7 +230,9 @@ impl Tokenizer for MockTokenizer {
                 tokens.push(id);
             } else {
                 // Unknown word - hash it to a pseudo-ID
-                let hash = word.bytes().fold(200u32, |acc, b| acc.wrapping_add(b as u32));
+                let hash = word
+                    .bytes()
+                    .fold(200u32, |acc, b| acc.wrapping_add(b as u32));
                 tokens.push(hash % 1000 + 200);
             }
         }
@@ -238,7 +243,10 @@ impl Tokenizer for MockTokenizer {
         let words: Vec<String> = tokens
             .iter()
             .filter_map(|&id| {
-                self.reverse_vocab.get(&id).cloned().or_else(|| Some(format!("[{}]", id)))
+                self.reverse_vocab
+                    .get(&id)
+                    .cloned()
+                    .or_else(|| Some(format!("[{}]", id)))
             })
             .collect();
         Ok(words.join(" "))
@@ -275,9 +283,9 @@ impl MockLlmBackend {
     }
 
     fn deterministic_token(&self, context: &[u32], seed_offset: usize) -> u32 {
-        let hash = context
-            .iter()
-            .fold(seed_offset as u32, |acc, &t| acc.wrapping_add(t).wrapping_mul(31));
+        let hash = context.iter().fold(seed_offset as u32, |acc, &t| {
+            acc.wrapping_add(t).wrapping_mul(31)
+        });
         // Generate tokens in reasonable vocabulary range
         (hash % 30000) + 100
     }
@@ -460,7 +468,9 @@ impl<'a> Iterator for MockStreamIterator<'a> {
             return None;
         }
 
-        let token = self.backend.deterministic_token(&self.context, self.seed_offset);
+        let token = self
+            .backend
+            .deterministic_token(&self.context, self.seed_offset);
         self.seed_offset += 1;
         self.remaining -= 1;
 
@@ -522,7 +532,9 @@ fn test_gguf_load_and_generate_basic() {
 
     // Create mock backend and generate
     let mut backend = MockLlmBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let params = GenerateParams::default().with_max_tokens(10);
     let output = backend.generate("Hello world", params).unwrap();
@@ -543,8 +555,7 @@ fn test_gguf_load_with_metadata() {
     assert_eq!(magic, GGUF_MAGIC);
 
     // Count metadata (at offset 16)
-    let metadata_count =
-        u64::from_le_bytes(gguf_data[16..24].try_into().unwrap());
+    let metadata_count = u64::from_le_bytes(gguf_data[16..24].try_into().unwrap());
     assert_eq!(metadata_count, 3, "Should have 3 metadata entries");
 }
 
@@ -557,8 +568,7 @@ fn test_gguf_load_with_quantization() {
     let magic = u32::from_le_bytes([gguf_data[0], gguf_data[1], gguf_data[2], gguf_data[3]]);
     assert_eq!(magic, GGUF_MAGIC);
 
-    let tensor_count =
-        u64::from_le_bytes(gguf_data[8..16].try_into().unwrap());
+    let tensor_count = u64::from_le_bytes(gguf_data[8..16].try_into().unwrap());
     assert_eq!(tensor_count, 1, "Should have 1 quantized tensor");
 
     // Test quantization type bytes_per_weight
@@ -579,7 +589,9 @@ fn test_gguf_load_with_quantization() {
 fn test_streaming_generation() {
     // Test: Streaming callback generation works correctly
     let mut backend = MockLlmBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let params = GenerateParams::default()
         .with_max_tokens(20)
@@ -595,10 +607,7 @@ fn test_streaming_generation() {
     }
 
     assert!(!tokens_received.is_empty(), "Should receive tokens");
-    assert!(
-        tokens_received.len() <= 20,
-        "Should respect max_tokens"
-    );
+    assert!(tokens_received.len() <= 20, "Should respect max_tokens");
 
     // Verify each token has valid fields
     for token in &tokens_received {
@@ -610,7 +619,9 @@ fn test_streaming_generation() {
 fn test_streaming_generation_v2() {
     // Test: New TokenStream interface
     let mut backend = MockLlmBackend::new();
-    backend.load_model("test-model", ModelConfig::default()).unwrap();
+    backend
+        .load_model("test-model", ModelConfig::default())
+        .unwrap();
 
     let params = GenerateParams::default()
         .with_max_tokens(10)
@@ -692,7 +703,10 @@ fn test_speculative_decoding_config() {
     assert!(config.lookahead >= 2, "Lookahead should be at least 2");
     assert!(config.lookahead <= 16, "Lookahead should be reasonable");
     assert!(config.acceptance_threshold > 0.0 && config.acceptance_threshold <= 1.0);
-    assert!(config.adaptive_lookahead, "Adaptive lookahead should be on by default");
+    assert!(
+        config.adaptive_lookahead,
+        "Adaptive lookahead should be on by default"
+    );
 }
 
 #[test]
@@ -771,7 +785,10 @@ fn test_speculation_tree() {
 
     // Best path should be the one with higher probability
     let best = tree.best_path();
-    assert!(best.is_empty() || best[0] == 100, "Best path should start with high-prob token");
+    assert!(
+        best.is_empty() || best[0] == 100,
+        "Best path should start with high-prob token"
+    );
 }
 
 #[test]
@@ -1004,9 +1021,7 @@ fn test_batch_generation() {
 
     // Should have processed requests
     assert!(
-        stats.running_requests > 0
-            || stats.completed_requests > 0
-            || stats.pending_requests > 0,
+        stats.running_requests > 0 || stats.completed_requests > 0 || stats.pending_requests > 0,
         "Should have processed some requests"
     );
 }
@@ -1146,7 +1161,10 @@ fn test_log_softmax() {
     let probs = softmax(&logits);
 
     for (a, b) in probs_from_log.iter().zip(probs.iter()) {
-        assert!((a - b).abs() < 0.001, "exp(log_softmax) should equal softmax");
+        assert!(
+            (a - b).abs() < 0.001,
+            "exp(log_softmax) should equal softmax"
+        );
     }
 }
 
@@ -1176,10 +1194,7 @@ fn test_top_p_filtering() {
     // Most probability mass should be preserved
     let finite_count = logits.iter().filter(|x| x.is_finite()).count();
     assert!(finite_count >= 1, "Top-p should keep at least one value");
-    assert!(
-        finite_count < 5,
-        "Top-p with 0.9 should filter some values"
-    );
+    assert!(finite_count < 5, "Top-p with 0.9 should filter some values");
 }
 
 #[test]
@@ -1217,9 +1232,7 @@ fn test_deterministic_generation_with_seed() {
     backend1.load_model("test", ModelConfig::default()).unwrap();
     backend2.load_model("test", ModelConfig::default()).unwrap();
 
-    let params = GenerateParams::default()
-        .with_max_tokens(10)
-        .with_seed(42);
+    let params = GenerateParams::default().with_max_tokens(10).with_seed(42);
 
     let output1 = backend1.generate("Hello", params.clone()).unwrap();
     let output2 = backend2.generate("Hello", params).unwrap();
@@ -1236,8 +1249,8 @@ fn test_deterministic_generation_with_seed() {
 #[ignore = "Requires GGUF model file at TEST_MODEL_PATH environment variable"]
 fn test_real_model_generation() {
     // Test: Load actual GGUF model and generate
-    let model_path = env::var("TEST_MODEL_PATH")
-        .expect("TEST_MODEL_PATH environment variable must be set");
+    let model_path =
+        env::var("TEST_MODEL_PATH").expect("TEST_MODEL_PATH environment variable must be set");
 
     let path = Path::new(&model_path);
     assert!(path.exists(), "Model file should exist: {}", model_path);
@@ -1265,8 +1278,8 @@ fn test_real_model_generation() {
 #[ignore = "Requires GGUF model file at TEST_MODEL_PATH environment variable"]
 fn test_real_model_streaming() {
     // Test: Stream generation from real model
-    let model_path = env::var("TEST_MODEL_PATH")
-        .expect("TEST_MODEL_PATH environment variable must be set");
+    let model_path =
+        env::var("TEST_MODEL_PATH").expect("TEST_MODEL_PATH environment variable must be set");
 
     // Would need real model loading here
     // For now, verify environment is set correctly
@@ -1280,8 +1293,8 @@ fn test_real_model_streaming() {
 #[ignore = "Requires GGUF model file at TEST_MODEL_PATH environment variable"]
 fn test_real_model_quantization() {
     // Test: Load quantized model and verify inference
-    let _model_path = env::var("TEST_MODEL_PATH")
-        .expect("TEST_MODEL_PATH environment variable must be set");
+    let _model_path =
+        env::var("TEST_MODEL_PATH").expect("TEST_MODEL_PATH environment variable must be set");
 
     // Verify quantization types
     assert!(Quantization::Q4K.is_gguf());
@@ -1336,9 +1349,7 @@ fn test_full_pipeline_mock() {
     // Should have made progress
     let stats = engine.stats();
     assert!(
-        stats.running_requests > 0
-            || stats.completed_requests > 0
-            || stats.pending_requests > 0
+        stats.running_requests > 0 || stats.completed_requests > 0 || stats.pending_requests > 0
     );
 }
 
@@ -1370,10 +1381,17 @@ fn test_engine_metrics() {
     let metrics = engine.metrics();
     // Requests may have completed by now, so check all states
     assert!(
-        metrics.pending_requests > 0 || metrics.running_requests > 0 || metrics.completed_requests > 0
+        metrics.pending_requests > 0
+            || metrics.running_requests > 0
+            || metrics.completed_requests > 0
             || metrics.total_requests_processed > 0,
         "Should have requests processed, pending, running, or completed: {:?}",
-        (metrics.pending_requests, metrics.running_requests, metrics.completed_requests, metrics.total_requests_processed)
+        (
+            metrics.pending_requests,
+            metrics.running_requests,
+            metrics.completed_requests,
+            metrics.total_requests_processed
+        )
     );
 }
 
@@ -1497,5 +1515,8 @@ fn test_embeddings_generation() {
         .map(|(a, b)| (a - b).abs())
         .sum();
 
-    assert!(diff > 0.1, "Different texts should have different embeddings");
+    assert!(
+        diff > 0.1,
+        "Different texts should have different embeddings"
+    );
 }

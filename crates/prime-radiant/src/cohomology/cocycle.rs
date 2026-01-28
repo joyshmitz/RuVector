@@ -3,8 +3,8 @@
 //! Cocycles are the building blocks of cohomology. A cocycle is a cochain
 //! that is in the kernel of the coboundary operator.
 
-use super::simplex::{Cochain, SimplexId, SimplicialComplex};
 use super::sheaf::{Sheaf, SheafSection};
+use super::simplex::{Cochain, SimplexId, SimplicialComplex};
 use crate::substrate::NodeId;
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};

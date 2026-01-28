@@ -168,7 +168,8 @@ impl EnergyBasedNetwork {
             let mut max_change: f64 = 0.0;
 
             // Update states: ds/dt = -∂E/∂s / τ
-            for layer in 1..self.n_layers { // Don't update input layer
+            for layer in 1..self.n_layers {
+                // Don't update input layer
                 for i in 0..self.layer_sizes[layer] {
                     let ds_dt = -gradient[layer][i] / self.tau;
                     let old_state = self.states[layer][i];
@@ -189,7 +190,13 @@ impl EnergyBasedNetwork {
     }
 
     /// Nudged phase: relax with gentle push toward target
-    pub fn relax_nudged(&mut self, target: &[f64], beta: f64, max_iters: usize, tolerance: f64) -> usize {
+    pub fn relax_nudged(
+        &mut self,
+        target: &[f64],
+        beta: f64,
+        max_iters: usize,
+        tolerance: f64,
+    ) -> usize {
         assert_eq!(target.len(), self.layer_sizes[self.n_layers - 1]);
 
         let dt = 0.1;
@@ -366,12 +373,22 @@ pub struct ContrastiveDivergence {
 
 impl ContrastiveDivergence {
     pub fn new(k_steps: usize, temperature: f64) -> Self {
-        Self { k_steps, temperature }
+        Self {
+            k_steps,
+            temperature,
+        }
     }
 
     /// Compute gradient: ⟨s_i s_j⟩_data - ⟨s_i s_j⟩_model
-    pub fn gradient(&self, network: &EnergyBasedNetwork, data_states: &[Vec<f64>]) -> Vec<Vec<Vec<f64>>> {
-        let mut gradient = vec![vec![vec![0.0; network.layer_sizes[0]]; network.layer_sizes[1]]; network.n_layers - 1];
+    pub fn gradient(
+        &self,
+        network: &EnergyBasedNetwork,
+        data_states: &[Vec<f64>],
+    ) -> Vec<Vec<Vec<f64>>> {
+        let mut gradient = vec![
+            vec![vec![0.0; network.layer_sizes[0]]; network.layer_sizes[1]];
+            network.n_layers - 1
+        ];
 
         // Positive phase: data statistics
         for layer in 0..network.n_layers - 1 {
@@ -387,7 +404,8 @@ impl ContrastiveDivergence {
         for layer in 0..network.n_layers - 1 {
             for i in 0..network.layer_sizes[layer + 1] {
                 for j in 0..network.layer_sizes[layer] {
-                    gradient[layer][i][j] -= network.states[layer + 1][i] * network.states[layer][j];
+                    gradient[layer][i][j] -=
+                        network.states[layer + 1][i] * network.states[layer][j];
                 }
             }
         }
@@ -444,7 +462,8 @@ mod tests {
 
         // Energy gradient should be small at equilibrium
         let grad = network.energy_gradient();
-        for layer_grad in &grad[1..] { // Skip input layer
+        for layer_grad in &grad[1..] {
+            // Skip input layer
             for &g in layer_grad {
                 assert!(g.abs() < 0.1); // Approximate equilibrium
             }
@@ -459,9 +478,7 @@ mod tests {
         let target = vec![1.0];
 
         // One learning step
-        let (e_free, e_nudged) = network.equilibrium_propagation_step(
-            &input, &target, 0.5, 0.01
-        );
+        let (e_free, e_nudged) = network.equilibrium_propagation_step(&input, &target, 0.5, 0.01);
 
         // Energies should be different
         assert!((e_free - e_nudged).abs() > 0.0);
@@ -502,12 +519,7 @@ pub fn example_xor_learning() {
         vec![1.0, 0.0],
         vec![1.0, 1.0],
     ];
-    let targets = vec![
-        vec![0.0],
-        vec![1.0],
-        vec![1.0],
-        vec![0.0],
-    ];
+    let targets = vec![vec![0.0], vec![1.0], vec![1.0], vec![0.0]];
 
     let beta = 0.5;
     let learning_rate = 0.01;
@@ -531,7 +543,9 @@ pub fn example_xor_learning() {
     println!("\nFinal predictions:");
     for (input, target) in inputs.iter().zip(targets.iter()) {
         let pred = network.predict(input);
-        println!("Input: {:?} -> Prediction: {:.4}, Target: {:.4}",
-            input, pred[0], target[0]);
+        println!(
+            "Input: {:?} -> Prediction: {:.4}, Target: {:.4}",
+            input, pred[0], target[0]
+        );
     }
 }

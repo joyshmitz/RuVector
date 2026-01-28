@@ -85,8 +85,16 @@ impl MetalPipelines {
             fused_attention: Self::try_create_pipeline(device, library, "fused_attention"),
             fused_attention_f16: Self::try_create_pipeline(device, library, "fused_attention_f16"),
             paged_attention: Self::try_create_pipeline(device, library, "paged_attention"),
-            fused_layernorm_residual: Self::try_create_pipeline(device, library, "fused_layernorm_residual"),
-            fused_rmsnorm_residual: Self::try_create_pipeline(device, library, "fused_rmsnorm_residual"),
+            fused_layernorm_residual: Self::try_create_pipeline(
+                device,
+                library,
+                "fused_layernorm_residual",
+            ),
+            fused_rmsnorm_residual: Self::try_create_pipeline(
+                device,
+                library,
+                "fused_rmsnorm_residual",
+            ),
             fused_swiglu: Self::try_create_pipeline(device, library, "fused_swiglu"),
             int4_gemv: Self::try_create_pipeline(device, library, "int4_gemv"),
             int4_gemv_simd: Self::try_create_pipeline(device, library, "int4_gemv_simd"),
@@ -94,7 +102,11 @@ impl MetalPipelines {
             int8_gemv: Self::try_create_pipeline(device, library, "int8_gemv"),
             rope_then_attention: Self::try_create_pipeline(device, library, "rope_then_attention"),
             yarn_attention: Self::try_create_pipeline(device, library, "yarn_attention"),
-            apply_rope_qk_inplace: Self::try_create_pipeline(device, library, "apply_rope_qk_inplace"),
+            apply_rope_qk_inplace: Self::try_create_pipeline(
+                device,
+                library,
+                "apply_rope_qk_inplace",
+            ),
         })
     }
 
@@ -106,20 +118,48 @@ impl MetalPipelines {
     /// Get list of available optimized pipelines
     pub fn available_optimizations(&self) -> Vec<&'static str> {
         let mut available = Vec::new();
-        if self.gemm_optimized.is_some() { available.push("gemm_optimized"); }
-        if self.fused_attention.is_some() { available.push("fused_attention"); }
-        if self.fused_attention_f16.is_some() { available.push("fused_attention_f16"); }
-        if self.paged_attention.is_some() { available.push("paged_attention"); }
-        if self.fused_layernorm_residual.is_some() { available.push("fused_layernorm_residual"); }
-        if self.fused_rmsnorm_residual.is_some() { available.push("fused_rmsnorm_residual"); }
-        if self.fused_swiglu.is_some() { available.push("fused_swiglu"); }
-        if self.int4_gemv.is_some() { available.push("int4_gemv"); }
-        if self.int4_gemv_simd.is_some() { available.push("int4_gemv_simd"); }
-        if self.int4_gemm.is_some() { available.push("int4_gemm"); }
-        if self.int8_gemv.is_some() { available.push("int8_gemv"); }
-        if self.rope_then_attention.is_some() { available.push("rope_then_attention"); }
-        if self.yarn_attention.is_some() { available.push("yarn_attention"); }
-        if self.apply_rope_qk_inplace.is_some() { available.push("apply_rope_qk_inplace"); }
+        if self.gemm_optimized.is_some() {
+            available.push("gemm_optimized");
+        }
+        if self.fused_attention.is_some() {
+            available.push("fused_attention");
+        }
+        if self.fused_attention_f16.is_some() {
+            available.push("fused_attention_f16");
+        }
+        if self.paged_attention.is_some() {
+            available.push("paged_attention");
+        }
+        if self.fused_layernorm_residual.is_some() {
+            available.push("fused_layernorm_residual");
+        }
+        if self.fused_rmsnorm_residual.is_some() {
+            available.push("fused_rmsnorm_residual");
+        }
+        if self.fused_swiglu.is_some() {
+            available.push("fused_swiglu");
+        }
+        if self.int4_gemv.is_some() {
+            available.push("int4_gemv");
+        }
+        if self.int4_gemv_simd.is_some() {
+            available.push("int4_gemv_simd");
+        }
+        if self.int4_gemm.is_some() {
+            available.push("int4_gemm");
+        }
+        if self.int8_gemv.is_some() {
+            available.push("int8_gemv");
+        }
+        if self.rope_then_attention.is_some() {
+            available.push("rope_then_attention");
+        }
+        if self.yarn_attention.is_some() {
+            available.push("yarn_attention");
+        }
+        if self.apply_rope_qk_inplace.is_some() {
+            available.push("apply_rope_qk_inplace");
+        }
         available
     }
 
@@ -138,14 +178,9 @@ impl MetalPipelines {
         library: &Library,
         function_name: &str,
     ) -> Result<ComputePipelineState> {
-        let function = library
-            .get_function(function_name, None)
-            .map_err(|e| {
-                RuvLLMError::Backend(format!(
-                    "Failed to get function '{}': {}",
-                    function_name, e
-                ))
-            })?;
+        let function = library.get_function(function_name, None).map_err(|e| {
+            RuvLLMError::Backend(format!("Failed to get function '{}': {}", function_name, e))
+        })?;
 
         device
             .new_compute_pipeline_state_with_function(&function)

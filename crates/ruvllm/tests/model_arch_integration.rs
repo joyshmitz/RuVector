@@ -8,7 +8,6 @@
 //! - Grouped Query Attention (GQA)
 //! - RoPE (Rotary Position Embedding) configurations
 
-
 // =============================================================================
 // Model Configuration Types
 // =============================================================================
@@ -906,10 +905,7 @@ mod tests {
     #[test]
     fn test_gemma_chat_template_uses_model_role() {
         let template = GemmaChatTemplate;
-        let messages = vec![
-            ChatMessage::user("Hello"),
-            ChatMessage::assistant("Hi!"),
-        ];
+        let messages = vec![ChatMessage::user("Hello"), ChatMessage::assistant("Hi!")];
 
         let result = template.format(&messages, false);
 
@@ -1166,7 +1162,11 @@ mod tests {
     fn test_phi3_full_pipeline_setup() {
         let config = Phi3Config::phi3_mini();
         let template = Phi3ChatTemplate;
-        let rope = RoPE::new(config.head_dim(), config.rope_theta, config.max_position_embeddings);
+        let rope = RoPE::new(
+            config.head_dim(),
+            config.rope_theta,
+            config.max_position_embeddings,
+        );
 
         // Validate config
         assert!(config.validate().is_ok());
@@ -1200,7 +1200,10 @@ mod tests {
         assert!(!prompt.is_empty());
 
         // Sliding window is ready
-        assert_eq!(sliding_window.effective_context(10000), config.sliding_window);
+        assert_eq!(
+            sliding_window.effective_context(10000),
+            config.sliding_window
+        );
 
         // Soft caps are ready
         assert!(attn_cap.apply(100.0) < config.attn_logit_softcapping);

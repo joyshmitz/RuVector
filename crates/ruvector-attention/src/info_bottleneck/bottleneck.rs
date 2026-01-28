@@ -2,7 +2,7 @@
 //!
 //! Apply information bottleneck principle to attention.
 
-use super::kl_divergence::{KLDivergence, DiagonalGaussian};
+use super::kl_divergence::{DiagonalGaussian, KLDivergence};
 use serde::{Deserialize, Serialize};
 
 /// Information Bottleneck configuration
@@ -58,12 +58,7 @@ impl InformationBottleneck {
     }
 
     /// Sample from bottleneck distribution (for forward pass)
-    pub fn sample(
-        &self,
-        mean: &[f32],
-        log_var: &[f32],
-        epsilon: &[f32],
-    ) -> Vec<f32> {
+    pub fn sample(&self, mean: &[f32], log_var: &[f32], epsilon: &[f32]) -> Vec<f32> {
         let n = mean.len().min(log_var.len()).min(epsilon.len());
         let mut z = vec![0.0f32; n];
 
@@ -98,11 +93,7 @@ impl InformationBottleneck {
 
     /// Apply bottleneck to attention weights
     /// Returns: (compressed_weights, kl_loss)
-    pub fn compress_attention_weights(
-        &self,
-        weights: &[f32],
-        temperature: f32,
-    ) -> (Vec<f32>, f32) {
+    pub fn compress_attention_weights(&self, weights: &[f32], temperature: f32) -> (Vec<f32>, f32) {
         let n = weights.len();
 
         // Compute entropy-based compression

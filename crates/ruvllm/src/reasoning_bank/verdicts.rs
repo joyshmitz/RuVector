@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::{Trajectory, StepOutcome, PatternCategory};
+use super::{PatternCategory, StepOutcome, Trajectory};
 
 /// Verdict for a trajectory execution
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,7 +33,9 @@ pub enum Verdict {
 
 impl Default for Verdict {
     fn default() -> Self {
-        Self::Partial { completion_ratio: 0.0 }
+        Self::Partial {
+            completion_ratio: 0.0,
+        }
     }
 }
 
@@ -93,9 +95,19 @@ impl Verdict {
         match self {
             Self::Success => "Success".to_string(),
             Self::Failure(cause) => format!("Failure: {}", cause),
-            Self::Partial { completion_ratio } => format!("Partial: {:.0}% complete", completion_ratio * 100.0),
-            Self::RecoveredViaReflection { reflection_attempts, final_quality, .. } => {
-                format!("Recovered after {} attempts, quality {:.0}%", reflection_attempts, final_quality * 100.0)
+            Self::Partial { completion_ratio } => {
+                format!("Partial: {:.0}% complete", completion_ratio * 100.0)
+            }
+            Self::RecoveredViaReflection {
+                reflection_attempts,
+                final_quality,
+                ..
+            } => {
+                format!(
+                    "Recovered after {} attempts, quality {:.0}%",
+                    reflection_attempts,
+                    final_quality * 100.0
+                )
             }
         }
     }
@@ -162,7 +174,10 @@ impl std::fmt::Display for RootCause {
             }
             Self::InvalidInput { details } => write!(f, "Invalid input: {}", details),
             Self::ToolFailure { tool, error } => write!(f, "Tool '{}' failed: {}", tool, error),
-            Self::ReasoningError { error_type, description } => {
+            Self::ReasoningError {
+                error_type,
+                description,
+            } => {
                 write!(f, "Reasoning error ({}): {}", error_type, description)
             }
             Self::ResourceConstraint { resource, limit } => {
@@ -389,7 +404,10 @@ impl VerdictAnalyzer {
             RecoveryStrategy {
                 name: "Clarification Loop".to_string(),
                 description: "Ask clarifying questions to gather missing context".to_string(),
-                applicable_causes: vec!["InsufficientContext".to_string(), "InvalidInput".to_string()],
+                applicable_causes: vec![
+                    "InsufficientContext".to_string(),
+                    "InvalidInput".to_string(),
+                ],
                 success_rate: 0.75,
                 actions: vec![
                     "Identify what information is missing".to_string(),
@@ -402,7 +420,10 @@ impl VerdictAnalyzer {
             RecoveryStrategy {
                 name: "Decomposition".to_string(),
                 description: "Break the problem into smaller, manageable parts".to_string(),
-                applicable_causes: vec!["ReasoningError".to_string(), "CapabilityLimit".to_string()],
+                applicable_causes: vec![
+                    "ReasoningError".to_string(),
+                    "CapabilityLimit".to_string(),
+                ],
                 success_rate: 0.70,
                 actions: vec![
                     "Identify sub-problems".to_string(),
@@ -448,7 +469,11 @@ impl VerdictAnalyzer {
         // Extract root cause from verdict
         if let Verdict::Failure(ref cause) = trajectory.verdict {
             analysis.root_cause = Some(cause.clone());
-        } else if let Verdict::RecoveredViaReflection { ref original_failure, .. } = trajectory.verdict {
+        } else if let Verdict::RecoveredViaReflection {
+            ref original_failure,
+            ..
+        } = trajectory.verdict
+        {
             analysis.root_cause = Some((**original_failure).clone());
         }
 
@@ -483,7 +508,8 @@ impl VerdictAnalyzer {
         let mut factors = Vec::new();
 
         // Check step outcomes
-        let failure_count = trajectory.steps
+        let failure_count = trajectory
+            .steps
             .iter()
             .filter(|s| s.outcome.is_failure())
             .count();
@@ -493,7 +519,8 @@ impl VerdictAnalyzer {
         }
 
         // Check confidence levels
-        let low_confidence = trajectory.steps
+        let low_confidence = trajectory
+            .steps
             .iter()
             .filter(|s| s.confidence < 0.5)
             .count();
@@ -525,7 +552,11 @@ impl VerdictAnalyzer {
             if step.outcome.is_failure() {
                 // Check each known pattern
                 for (_, pattern) in &self.known_patterns {
-                    if pattern.associated_actions.iter().any(|a| step.action.contains(a)) {
+                    if pattern
+                        .associated_actions
+                        .iter()
+                        .any(|a| step.action.contains(a))
+                    {
                         matched.push(pattern.clone());
                     }
                 }
@@ -570,7 +601,8 @@ impl VerdictAnalyzer {
         // Add automatic lessons based on analysis
         if trajectory.is_success() {
             // Learn from success
-            let successful_actions: Vec<_> = trajectory.steps
+            let successful_actions: Vec<_> = trajectory
+                .steps
                 .iter()
                 .filter(|s| s.outcome.is_success())
                 .map(|s| &s.action)
@@ -579,7 +611,12 @@ impl VerdictAnalyzer {
             if !successful_actions.is_empty() {
                 lessons.push(format!(
                     "Successful pattern: {}",
-                    successful_actions.iter().take(3).map(|s| s.as_str()).collect::<Vec<_>>().join(" -> ")
+                    successful_actions
+                        .iter()
+                        .take(3)
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" -> ")
                 ));
             }
         } else {
@@ -592,7 +629,11 @@ impl VerdictAnalyzer {
         }
 
         // Add recovery lessons
-        if let Verdict::RecoveredViaReflection { reflection_attempts, .. } = &trajectory.verdict {
+        if let Verdict::RecoveredViaReflection {
+            reflection_attempts,
+            ..
+        } = &trajectory.verdict
+        {
             lessons.push(format!(
                 "Recovery possible with {} reflection attempts",
                 reflection_attempts
@@ -614,13 +655,22 @@ impl VerdictAnalyzer {
         // Check actions
         let actions: Vec<_> = trajectory.steps.iter().map(|s| s.action.as_str()).collect();
 
-        if actions.iter().any(|a| a.contains("code") || a.contains("implement")) {
+        if actions
+            .iter()
+            .any(|a| a.contains("code") || a.contains("implement"))
+        {
             return PatternCategory::CodeGeneration;
         }
-        if actions.iter().any(|a| a.contains("search") || a.contains("research")) {
+        if actions
+            .iter()
+            .any(|a| a.contains("search") || a.contains("research"))
+        {
             return PatternCategory::Research;
         }
-        if actions.iter().any(|a| a.contains("tool") || a.contains("execute")) {
+        if actions
+            .iter()
+            .any(|a| a.contains("tool") || a.contains("execute"))
+        {
             return PatternCategory::ToolUse;
         }
 
@@ -645,11 +695,16 @@ impl VerdictAnalyzer {
     }
 
     /// Suggest improvements
-    fn suggest_improvements(&self, trajectory: &Trajectory, _analysis: &VerdictAnalysis) -> Vec<String> {
+    fn suggest_improvements(
+        &self,
+        trajectory: &Trajectory,
+        _analysis: &VerdictAnalysis,
+    ) -> Vec<String> {
         let mut improvements = Vec::new();
 
         // Check for low confidence steps
-        let low_confidence_steps: Vec<_> = trajectory.steps
+        let low_confidence_steps: Vec<_> = trajectory
+            .steps
             .iter()
             .filter(|s| s.confidence < 0.6)
             .collect();
@@ -658,12 +713,18 @@ impl VerdictAnalyzer {
             improvements.push(format!(
                 "Improve confidence in {} steps: {}",
                 low_confidence_steps.len(),
-                low_confidence_steps.iter().take(3).map(|s| s.action.as_str()).collect::<Vec<_>>().join(", ")
+                low_confidence_steps
+                    .iter()
+                    .take(3)
+                    .map(|s| s.action.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
 
         // Check for missing verification
-        let has_verification = trajectory.steps
+        let has_verification = trajectory
+            .steps
             .iter()
             .any(|s| s.action.contains("verify") || s.action.contains("check"));
 
@@ -672,12 +733,14 @@ impl VerdictAnalyzer {
         }
 
         // Check for error handling
-        let has_error_handling = trajectory.steps
+        let has_error_handling = trajectory
+            .steps
             .iter()
             .any(|s| matches!(s.outcome, StepOutcome::NeedsRetry { .. }));
 
         if !has_error_handling && trajectory.is_failure() {
-            improvements.push("Consider implementing retry logic for recoverable errors".to_string());
+            improvements
+                .push("Consider implementing retry logic for recoverable errors".to_string());
         }
 
         improvements
@@ -722,20 +785,26 @@ pub struct VerdictAnalyzerStats {
 
 #[cfg(test)]
 mod tests {
+    use super::super::trajectory::{StepOutcome, TrajectoryRecorder};
     use super::*;
-    use super::super::trajectory::{TrajectoryRecorder, StepOutcome};
 
     #[test]
     fn test_verdict_creation() {
         assert!(Verdict::success().is_success());
-        assert!(Verdict::failure(RootCause::Unknown { details: "test".into() }).is_failure());
+        assert!(Verdict::failure(RootCause::Unknown {
+            details: "test".into()
+        })
+        .is_failure());
         assert!(!Verdict::partial(0.5).is_success());
     }
 
     #[test]
     fn test_verdict_quality_score() {
         assert_eq!(Verdict::success().quality_score(), 1.0);
-        assert_eq!(Verdict::failure(RootCause::Unknown { details: "".into() }).quality_score(), 0.0);
+        assert_eq!(
+            Verdict::failure(RootCause::Unknown { details: "".into() }).quality_score(),
+            0.0
+        );
         assert!(Verdict::partial(0.5).quality_score() > 0.0);
     }
 
@@ -771,7 +840,9 @@ mod tests {
         recorder.add_step(
             "execute".to_string(),
             "executing".to_string(),
-            StepOutcome::Failure { error: "permission denied".to_string() },
+            StepOutcome::Failure {
+                error: "permission denied".to_string(),
+            },
             0.6,
         );
 

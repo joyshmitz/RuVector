@@ -63,11 +63,9 @@
 //! ```
 
 use crate::error::{Result, RuvLLMError};
-use crate::kernels::{
-    apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig,
-};
 use crate::kernels::rope::{precompute_rope_tables_with_config, RopeConfig, RopeTables};
-use crate::paged_attention::{PagedAttentionConfig, PagedAttention, PageTable};
+use crate::kernels::{apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig};
+use crate::paged_attention::{PageTable, PagedAttention, PagedAttentionConfig};
 use crate::sona::{SonaConfig, SonaIntegration, Trajectory};
 
 /// Type alias for PagedAttention used as KV cache
@@ -77,9 +75,9 @@ use crate::speculative::SpeculativeConfig;
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 // =============================================================================
 // Model Variants
@@ -116,8 +114,8 @@ impl RuvLtraMediumVariant {
     pub fn temperature(&self) -> f32 {
         match self {
             Self::Base => 0.7,
-            Self::Coder => 0.2,  // Lower for deterministic code
-            Self::Agent => 0.3,  // Slightly higher for creativity
+            Self::Coder => 0.2, // Lower for deterministic code
+            Self::Agent => 0.3, // Slightly higher for creativity
         }
     }
 
@@ -160,11 +158,11 @@ impl RuvLtraMediumQuant {
     /// Get bytes per parameter
     pub fn bytes_per_param(&self) -> f32 {
         match self {
-            Self::None => 2.0,      // FP16
-            Self::Q4KM => 0.5625,   // ~4.5 bits
-            Self::Q5KM => 0.6875,   // ~5.5 bits
-            Self::Q80 => 1.0625,    // ~8.5 bits
-            Self::Mixed => 1.0,     // Average
+            Self::None => 2.0,    // FP16
+            Self::Q4KM => 0.5625, // ~4.5 bits
+            Self::Q5KM => 0.6875, // ~5.5 bits
+            Self::Q80 => 1.0625,  // ~8.5 bits
+            Self::Mixed => 1.0,   // Average
         }
     }
 
@@ -310,12 +308,12 @@ impl RuvLtraMediumConfig {
             intermediate_size: 11008,
             num_hidden_layers: 32,
             num_attention_heads: 16,
-            num_kv_heads: 2,           // GQA ratio 8:1
+            num_kv_heads: 2, // GQA ratio 8:1
             vocab_size: 151936,
             max_position_embeddings: 32768,
-            rope_theta: 1000000.0,     // Qwen uses 1M base
+            rope_theta: 1000000.0, // Qwen uses 1M base
             rms_norm_eps: 1e-6,
-            head_dim: 128,             // 2048 / 16 = 128
+            head_dim: 128, // 2048 / 16 = 128
             use_flash_attention: true,
             sliding_window: None,
             bos_token_id: 151643,
@@ -329,7 +327,7 @@ impl RuvLtraMediumConfig {
             // Memory optimization
             use_paged_attention: true,
             paged_config: PagedAttentionConfig {
-                page_size: 64,         // 64-token blocks
+                page_size: 64, // 64-token blocks
                 max_pages_per_sequence: 512,
                 page_table_capacity: 8192,
                 num_heads: 16,
@@ -352,12 +350,12 @@ impl RuvLtraMediumConfig {
             sona_enabled: true,
             sona_config: SonaConfig {
                 hidden_dim: 2048,
-                embedding_dim: 1024,   // Half of hidden_size
+                embedding_dim: 1024, // Half of hidden_size
                 micro_lora_rank: 4,
                 base_lora_rank: 8,
                 instant_learning_rate: 0.01,
                 background_learning_rate: 0.001,
-                ewc_lambda: 1000.0,    // Higher for larger model
+                ewc_lambda: 1000.0, // Higher for larger model
                 pattern_capacity: 50000,
                 background_interval_secs: 3600,
                 deep_interval_secs: 604800,
@@ -376,12 +374,12 @@ impl RuvLtraMediumConfig {
         Self {
             variant: RuvLtraMediumVariant::Coder,
             sona_config: SonaConfig {
-                pattern_capacity: 100000,  // More patterns for code
-                quality_threshold: 0.7,    // Higher quality bar
+                pattern_capacity: 100000, // More patterns for code
+                quality_threshold: 0.7,   // Higher quality bar
                 ..Self::base().sona_config
             },
             sona_hooks: SonaHookConfig {
-                hook_layers: vec![8, 16, 24, 28],  // Extra late-layer hook
+                hook_layers: vec![8, 16, 24, 28], // Extra late-layer hook
                 ..Default::default()
             },
             ..Self::base()
@@ -393,15 +391,15 @@ impl RuvLtraMediumConfig {
         Self {
             variant: RuvLtraMediumVariant::Agent,
             use_paged_attention: true,
-            use_flash_attn_2: true,     // Maximize speed
+            use_flash_attn_2: true, // Maximize speed
             sona_config: SonaConfig {
-                micro_lora_rank: 2,     // Lower latency
-                instant_learning_rate: 0.02,  // Faster adaptation
+                micro_lora_rank: 2,          // Lower latency
+                instant_learning_rate: 0.02, // Faster adaptation
                 ..Self::base().sona_config
             },
             sona_hooks: SonaHookConfig {
                 use_hnsw: true,
-                hnsw_m: 32,             // More connections for routing
+                hnsw_m: 32, // More connections for routing
                 hnsw_ef_construction: 400,
                 ..Default::default()
             },
@@ -443,20 +441,22 @@ impl RuvLtraMediumConfig {
     /// Estimate total parameters
     pub fn estimate_params(&self) -> usize {
         let embed_params = self.vocab_size * self.hidden_size;
-        let attn_params = self.num_hidden_layers * (
-            // Q projection
-            self.hidden_size * self.hidden_size +
+        let attn_params = self.num_hidden_layers
+            * (
+                // Q projection
+                self.hidden_size * self.hidden_size +
             // K, V projections (smaller due to GQA)
             2 * self.hidden_size * (self.num_kv_heads * self.head_dim) +
             // O projection
             self.hidden_size * self.hidden_size
-        );
-        let mlp_params = self.num_hidden_layers * (
-            // gate_proj, up_proj
-            2 * self.hidden_size * self.intermediate_size +
+            );
+        let mlp_params = self.num_hidden_layers
+            * (
+                // gate_proj, up_proj
+                2 * self.hidden_size * self.intermediate_size +
             // down_proj
             self.intermediate_size * self.hidden_size
-        );
+            );
         let norm_params = (self.num_hidden_layers * 2 + 1) * self.hidden_size;
 
         embed_params + attn_params + mlp_params + norm_params
@@ -533,8 +533,18 @@ impl RuvLtraMediumAttention {
 
         // Project to Q, K, V
         let mut query = self.matmul(hidden_states, &self.q_proj, hidden_size, hidden_size);
-        let mut key = self.matmul(hidden_states, &self.k_proj, hidden_size, num_kv_heads * head_dim);
-        let value = self.matmul(hidden_states, &self.v_proj, hidden_size, num_kv_heads * head_dim);
+        let mut key = self.matmul(
+            hidden_states,
+            &self.k_proj,
+            hidden_size,
+            num_kv_heads * head_dim,
+        );
+        let value = self.matmul(
+            hidden_states,
+            &self.v_proj,
+            hidden_size,
+            num_kv_heads * head_dim,
+        );
 
         // Apply RoPE
         self.apply_rope(&mut query, positions, num_heads);
@@ -552,7 +562,13 @@ impl RuvLtraMediumAttention {
     }
 
     /// Flash Attention 2 implementation
-    fn flash_attention(&self, query: &[f32], key: &[f32], value: &[f32], seq_len: usize) -> Result<Vec<f32>> {
+    fn flash_attention(
+        &self,
+        query: &[f32],
+        key: &[f32],
+        value: &[f32],
+        seq_len: usize,
+    ) -> Result<Vec<f32>> {
         let num_heads = self.config.num_attention_heads;
         let num_kv_heads = self.config.num_kv_heads;
         let head_dim = self.config.head_dim;
@@ -589,7 +605,13 @@ impl RuvLtraMediumAttention {
     }
 
     /// Standard attention (fallback)
-    fn standard_attention(&self, query: &[f32], key: &[f32], value: &[f32], seq_len: usize) -> Result<Vec<f32>> {
+    fn standard_attention(
+        &self,
+        query: &[f32],
+        key: &[f32],
+        value: &[f32],
+        seq_len: usize,
+    ) -> Result<Vec<f32>> {
         // Similar to flash_attention but without kernel optimization
         self.flash_attention(query, key, value, seq_len)
     }
@@ -603,7 +625,12 @@ impl RuvLtraMediumAttention {
             for t in 0..seq_len {
                 let offset = (t * num_heads + h) * head_dim;
                 let mut head_vec = x[offset..offset + head_dim].to_vec();
-                apply_rope_neon(&mut head_vec, &[positions[t]], head_dim, self.config.rope_theta);
+                apply_rope_neon(
+                    &mut head_vec,
+                    &[positions[t]],
+                    head_dim,
+                    self.config.rope_theta,
+                );
                 x[offset..offset + head_dim].copy_from_slice(&head_vec);
             }
         }
@@ -636,8 +663,15 @@ impl RuvLtraMediumAttention {
     }
 
     #[cfg(target_arch = "aarch64")]
-    unsafe fn matmul_neon(&self, input: &[f32], weights: &[f32], output: &mut [f32],
-                          batch: usize, in_dim: usize, out_dim: usize) {
+    unsafe fn matmul_neon(
+        &self,
+        input: &[f32],
+        weights: &[f32],
+        output: &mut [f32],
+        batch: usize,
+        in_dim: usize,
+        out_dim: usize,
+    ) {
         for b in 0..batch {
             for o in 0..out_dim {
                 let mut acc = vdupq_n_f32(0.0);
@@ -697,7 +731,8 @@ impl RuvLtraMediumMLP {
     }
 
     fn linear(&self, input: &[f32], weights: &[f32]) -> Vec<f32> {
-        let in_dim = if weights.len() == self.gate_proj.len() || weights.len() == self.up_proj.len() {
+        let in_dim = if weights.len() == self.gate_proj.len() || weights.len() == self.up_proj.len()
+        {
             self.hidden_size
         } else {
             self.intermediate_size
@@ -768,8 +803,11 @@ impl RuvLtraMediumDecoderLayer {
         let mut normed = hidden_states.to_vec();
         for t in 0..seq_len {
             let offset = t * self.hidden_size;
-            rms_norm_neon(&mut normed[offset..offset + self.hidden_size],
-                         &self.input_layernorm, self.rms_norm_eps);
+            rms_norm_neon(
+                &mut normed[offset..offset + self.hidden_size],
+                &self.input_layernorm,
+                self.rms_norm_eps,
+            );
         }
 
         // Attention
@@ -787,15 +825,21 @@ impl RuvLtraMediumDecoderLayer {
         };
 
         // Residual
-        let mut hidden: Vec<f32> = hidden_states.iter().zip(attn_out.iter())
-            .map(|(h, a)| h + a).collect();
+        let mut hidden: Vec<f32> = hidden_states
+            .iter()
+            .zip(attn_out.iter())
+            .map(|(h, a)| h + a)
+            .collect();
 
         // Pre-norm for MLP
         let mut normed = hidden.clone();
         for t in 0..seq_len {
             let offset = t * self.hidden_size;
-            rms_norm_neon(&mut normed[offset..offset + self.hidden_size],
-                         &self.post_attention_layernorm, self.rms_norm_eps);
+            rms_norm_neon(
+                &mut normed[offset..offset + self.hidden_size],
+                &self.post_attention_layernorm,
+                self.rms_norm_eps,
+            );
         }
 
         // MLP
@@ -809,7 +853,11 @@ impl RuvLtraMediumDecoderLayer {
         Ok(hidden)
     }
 
-    fn apply_sona_hook(&self, hidden_states: &[f32], sona: &Arc<RwLock<SonaIntegration>>) -> Result<Vec<f32>> {
+    fn apply_sona_hook(
+        &self,
+        hidden_states: &[f32],
+        sona: &Arc<RwLock<SonaIntegration>>,
+    ) -> Result<Vec<f32>> {
         // Extract embeddings for trajectory recording
         // This is a simplified version - real implementation would be more sophisticated
         Ok(hidden_states.to_vec())
@@ -841,7 +889,9 @@ impl RuvLtraMediumModel {
         }
 
         let sona = if config.sona_enabled {
-            Some(Arc::new(RwLock::new(SonaIntegration::new(config.sona_config.clone()))))
+            Some(Arc::new(RwLock::new(SonaIntegration::new(
+                config.sona_config.clone(),
+            ))))
         } else {
             None
         };
@@ -867,9 +917,9 @@ impl RuvLtraMediumModel {
     /// Enable SONA with custom hook layers
     pub fn enable_sona_with_hooks(&mut self, hook_layers: &[usize]) -> Result<()> {
         if self.sona.is_none() {
-            self.sona = Some(Arc::new(RwLock::new(
-                SonaIntegration::new(self.config.sona_config.clone())
-            )));
+            self.sona = Some(Arc::new(RwLock::new(SonaIntegration::new(
+                self.config.sona_config.clone(),
+            ))));
         }
 
         // Update layer hooks
@@ -881,18 +931,15 @@ impl RuvLtraMediumModel {
     }
 
     /// Forward pass
-    pub fn forward(
-        &mut self,
-        input_ids: &[u32],
-        positions: &[usize],
-    ) -> Result<Vec<f32>> {
+    pub fn forward(&mut self, input_ids: &[u32], positions: &[usize]) -> Result<Vec<f32>> {
         let seq_len = positions.len();
 
         // Embeddings
         let mut hidden_states = Vec::with_capacity(seq_len * self.config.hidden_size);
         for &token_id in input_ids {
             let offset = (token_id as usize) * self.config.hidden_size;
-            hidden_states.extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
+            hidden_states
+                .extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
         }
 
         // Decoder layers
@@ -908,15 +955,20 @@ impl RuvLtraMediumModel {
         // Final norm
         for t in 0..seq_len {
             let offset = t * self.config.hidden_size;
-            rms_norm_neon(&mut hidden_states[offset..offset + self.config.hidden_size],
-                         &self.norm, self.config.rms_norm_eps);
+            rms_norm_neon(
+                &mut hidden_states[offset..offset + self.config.hidden_size],
+                &self.norm,
+                self.config.rms_norm_eps,
+            );
         }
 
         // LM head
         let lm_weights = if self.tie_word_embeddings {
             &self.embed_tokens
         } else {
-            self.lm_head.as_ref().ok_or_else(|| RuvLLMError::InvalidOperation("No LM head".into()))?
+            self.lm_head
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No LM head".into()))?
         };
 
         let mut logits = vec![0.0; seq_len * self.config.vocab_size];

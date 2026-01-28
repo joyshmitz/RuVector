@@ -9,11 +9,11 @@ use anyhow::Result;
 use clap::Parser;
 use ruvector_benchmarks::{
     intelligence_metrics::{
-        DifficultyStats, EpisodeMetrics, IntelligenceCalculator, RawMetrics,
-        print_intelligence_report,
+        print_intelligence_report, DifficultyStats, EpisodeMetrics, IntelligenceCalculator,
+        RawMetrics,
     },
     swarm_regret::SwarmController,
-    temporal::{TemporalSolver, AdaptiveSolver},
+    temporal::{AdaptiveSolver, TemporalSolver},
     timepuzzles::{PuzzleGenerator, PuzzleGeneratorConfig},
 };
 
@@ -157,7 +157,13 @@ fn main() -> Result<()> {
         }
 
         // Record episode for swarm controller
-        controller.complete_episode(solved, correct, total_steps, total_tool_calls, total_latency);
+        controller.complete_episode(
+            solved,
+            correct,
+            total_steps,
+            total_tool_calls,
+            total_latency,
+        );
 
         // Record episode metrics
         let episode_accuracy = if args.tasks_per_episode > 0 {
@@ -296,7 +302,10 @@ fn main() -> Result<()> {
         let progress = solver.learning_progress();
         println!("🧠 ReasoningBank Statistics:");
         println!("   Total trajectories: {}", progress.total_trajectories);
-        println!("   Success rate:       {:.1}%", progress.success_rate * 100.0);
+        println!(
+            "   Success rate:       {:.1}%",
+            progress.success_rate * 100.0
+        );
         println!("   Improvement rate:   {:.4}", progress.improvement_rate);
         println!("   Patterns learned:   {}", progress.patterns_learned);
         println!("   Strategies tried:   {}", progress.strategies_tried);

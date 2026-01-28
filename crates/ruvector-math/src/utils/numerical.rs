@@ -156,7 +156,11 @@ pub fn symmetric_kl(p: &[f64], q: &[f64]) -> f64 {
 
 /// Jensen-Shannon divergence
 pub fn jensen_shannon(p: &[f64], q: &[f64]) -> f64 {
-    let m: Vec<f64> = p.iter().zip(q.iter()).map(|(&pi, &qi)| (pi + qi) / 2.0).collect();
+    let m: Vec<f64> = p
+        .iter()
+        .zip(q.iter())
+        .map(|(&pi, &qi)| (pi + qi) / 2.0)
+        .collect();
     (kl_divergence(p, &m) + kl_divergence(q, &m)) / 2.0
 }
 

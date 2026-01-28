@@ -9,8 +9,8 @@
 //! - Small eigenvalues indicate near-obstructions
 
 use super::sheaf::{Sheaf, SheafSection};
-use crate::substrate::SheafGraph;
 use crate::substrate::NodeId;
+use crate::substrate::SheafGraph;
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -211,25 +211,25 @@ impl SheafLaplacian {
             let source_offset = self.vertex_to_offset.get(&source).copied().unwrap_or(0);
             let target_offset = self.vertex_to_offset.get(&target).copied().unwrap_or(0);
 
-            if let Some(edge) = graph
-                .edge_ids()
-                .into_iter()
-                .find_map(|eid| {
-                    let e = graph.get_edge(eid)?;
-                    if e.source == source && e.target == target {
-                        Some(e)
-                    } else if e.source == target && e.target == source {
-                        Some(e)
-                    } else {
-                        None
-                    }
-                })
-            {
-                let source_dim = self.vertices.iter()
+            if let Some(edge) = graph.edge_ids().into_iter().find_map(|eid| {
+                let e = graph.get_edge(eid)?;
+                if e.source == source && e.target == target {
+                    Some(e)
+                } else if e.source == target && e.target == source {
+                    Some(e)
+                } else {
+                    None
+                }
+            }) {
+                let source_dim = self
+                    .vertices
+                    .iter()
                     .find(|(v, _)| *v == source)
                     .map(|(_, d)| *d)
                     .unwrap_or(0);
-                let target_dim = self.vertices.iter()
+                let target_dim = self
+                    .vertices
+                    .iter()
                     .find(|(v, _)| *v == target)
                     .map(|(_, d)| *d)
                     .unwrap_or(0);
@@ -417,9 +417,7 @@ impl SheafLaplacian {
 
                     for (vertex, dim) in &self.vertices {
                         let offset = self.vertex_to_offset.get(vertex).copied().unwrap_or(0);
-                        let values = Array1::from_iter(
-                            (0..*dim).map(|j| evec[offset + j])
-                        );
+                        let values = Array1::from_iter((0..*dim).map(|j| evec[offset + j]));
                         cochain.insert(*vertex, values);
                     }
 
@@ -482,12 +480,8 @@ mod tests {
     fn test_laplacian_energy() {
         let graph = SheafGraph::new();
 
-        let node1 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
-        let node2 = SheafNodeBuilder::new()
-            .state_from_slice(&[2.0])
-            .build();
+        let node1 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
+        let node2 = SheafNodeBuilder::new().state_from_slice(&[2.0]).build();
 
         let id1 = graph.add_node(node1);
         let id2 = graph.add_node(node2);
@@ -515,15 +509,9 @@ mod tests {
     fn test_connected_graph_has_one_zero_eigenvalue() {
         let graph = SheafGraph::new();
 
-        let node1 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
-        let node2 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
-        let node3 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
+        let node1 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
+        let node2 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
+        let node3 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
 
         let id1 = graph.add_node(node1);
         let id2 = graph.add_node(node2);

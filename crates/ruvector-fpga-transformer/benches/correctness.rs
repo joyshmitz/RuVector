@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 
 use ruvector_fpga_transformer::{
-    artifact::{ModelArtifact, Manifest},
+    artifact::{Manifest, ModelArtifact},
     backend::native_sim::NativeSimBackend,
     backend::TransformerBackend,
     gating::DefaultCoherenceGate,
@@ -37,7 +37,9 @@ fn bench_determinism(c: &mut Criterion) {
     let model_id = backend.load(&artifact).unwrap();
     let shape = FixedShape::micro();
 
-    let tokens: Vec<u16> = (0..shape.seq_len).map(|i| (i * 7) % shape.vocab as u16).collect();
+    let tokens: Vec<u16> = (0..shape.seq_len)
+        .map(|i| (i * 7) % shape.vocab as u16)
+        .collect();
     let mask = vec![1u8; shape.seq_len as usize];
 
     c.bench_function("determinism_check_1000", |b| {
@@ -55,9 +57,10 @@ fn bench_determinism(c: &mut Criterion) {
                 let result = backend.infer(req).unwrap();
 
                 // Hash the logits
-                let hash = result.logits_q.iter().fold(0u64, |acc, &v| {
-                    acc.wrapping_mul(31).wrapping_add(v as u64)
-                });
+                let hash = result
+                    .logits_q
+                    .iter()
+                    .fold(0u64, |acc, &v| acc.wrapping_mul(31).wrapping_add(v as u64));
 
                 match first_hash {
                     None => first_hash = Some(hash),
@@ -91,13 +94,7 @@ fn bench_golden_vectors(c: &mut Criterion) {
     let expected: Vec<Vec<i16>> = test_inputs
         .iter()
         .map(|tokens| {
-            let req = InferenceRequest::new(
-                model_id,
-                shape,
-                tokens,
-                &mask,
-                GateHint::allow_all(),
-            );
+            let req = InferenceRequest::new(model_id, shape, tokens, &mask, GateHint::allow_all());
             backend.infer(req).unwrap().logits_q
         })
         .collect();

@@ -588,7 +588,9 @@ mod tests {
         let parsed: WorkerMessage = serde_json::from_str(&json).unwrap();
 
         match parsed {
-            WorkerMessage::ComputeMatmul { task_id, m, n, k, .. } => {
+            WorkerMessage::ComputeMatmul {
+                task_id, m, n, k, ..
+            } => {
                 assert_eq!(task_id, 1);
                 assert_eq!(m, 10);
                 assert_eq!(n, 20);

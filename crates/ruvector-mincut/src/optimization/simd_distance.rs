@@ -156,10 +156,22 @@ impl SimdDistanceOps {
             let c = data[base + 2];
             let d = data[base + 3];
 
-            if a < min_val { min_val = a; min_idx = base; }
-            if b < min_val { min_val = b; min_idx = base + 1; }
-            if c < min_val { min_val = c; min_idx = base + 2; }
-            if d < min_val { min_val = d; min_idx = base + 3; }
+            if a < min_val {
+                min_val = a;
+                min_idx = base;
+            }
+            if b < min_val {
+                min_val = b;
+                min_idx = base + 1;
+            }
+            if c < min_val {
+                min_val = c;
+                min_idx = base + 2;
+            }
+            if d < min_val {
+                min_val = d;
+                min_idx = base + 3;
+            }
         }
 
         // Handle remainder
@@ -317,8 +329,12 @@ impl SimdDistanceOps {
                 // Extract comparison results
                 let mask = i8x16_bitmask(cmp);
                 // Each f64 lane uses 8 bits in bitmask
-                if mask & 0xFF != 0 { count += 1; }
-                if mask & 0xFF00 != 0 { count += 1; }
+                if mask & 0xFF != 0 {
+                    count += 1;
+                }
+                if mask & 0xFF00 != 0 {
+                    count += 1;
+                }
             }
         }
 
@@ -335,7 +351,11 @@ impl SimdDistanceOps {
     /// Count vertices with distance less than threshold (scalar fallback)
     #[cfg(not(target_arch = "wasm32"))]
     pub fn count_below_threshold(distances: &DistanceArray, threshold: f64) -> usize {
-        distances.as_slice().iter().filter(|&&d| d < threshold).count()
+        distances
+            .as_slice()
+            .iter()
+            .filter(|&&d| d < threshold)
+            .count()
     }
 
     /// Compute sum of distances (for average)
@@ -469,12 +489,7 @@ mod tests {
         let mut arr = DistanceArray::new(10);
         arr.set(0, 0.0); // Source
 
-        let neighbors = vec![
-            (1, 1.0),
-            (2, 2.0),
-            (3, 3.0),
-            (4, 4.0),
-        ];
+        let neighbors = vec![(1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0)];
 
         let updated = SimdDistanceOps::relax_batch(&mut arr, 0.0, &neighbors);
 

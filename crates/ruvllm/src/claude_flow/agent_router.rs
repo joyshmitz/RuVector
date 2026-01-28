@@ -3,10 +3,10 @@
 //! Routes tasks to optimal agent types using RuvLTRA embeddings and SONA learning.
 
 use super::{ClaudeFlowAgent, ClaudeFlowTask};
-use crate::sona::{SonaIntegration, SonaConfig, Trajectory, RoutingRecommendation};
+use crate::sona::{RoutingRecommendation, SonaConfig, SonaIntegration, Trajectory};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 use serde::{Deserialize, Serialize};
 
@@ -163,8 +163,10 @@ impl AgentRouter {
             confidence,
             alternatives,
             task_type,
-            reasoning: format!("Keyword match: {} keywords matched for {:?}",
-                             primary_score as usize, primary_agent),
+            reasoning: format!(
+                "Keyword match: {} keywords matched for {:?}",
+                primary_score as usize, primary_agent
+            ),
             learned_patterns: 0,
         }
     }
@@ -186,8 +188,10 @@ impl AgentRouter {
             confidence: rec.confidence,
             alternatives: vec![],
             task_type,
-            reasoning: format!("SONA pattern match: {} patterns, avg quality {:.2}",
-                             rec.based_on_patterns, rec.average_quality),
+            reasoning: format!(
+                "SONA pattern match: {} patterns, avg quality {:.2}",
+                rec.based_on_patterns, rec.average_quality
+            ),
             learned_patterns: rec.based_on_patterns,
         }
     }
@@ -198,11 +202,17 @@ impl AgentRouter {
             ClaudeFlowTask::Testing
         } else if lower.contains("review") || lower.contains("audit") {
             ClaudeFlowTask::CodeReview
-        } else if lower.contains("research") || lower.contains("analyze") || lower.contains("investigate") {
+        } else if lower.contains("research")
+            || lower.contains("analyze")
+            || lower.contains("investigate")
+        {
             ClaudeFlowTask::Research
         } else if lower.contains("security") || lower.contains("vulnerability") {
             ClaudeFlowTask::Security
-        } else if lower.contains("performance") || lower.contains("optimize") || lower.contains("benchmark") {
+        } else if lower.contains("performance")
+            || lower.contains("optimize")
+            || lower.contains("benchmark")
+        {
             ClaudeFlowTask::Performance
         } else if lower.contains("architecture") || lower.contains("design") {
             ClaudeFlowTask::Architecture
@@ -218,7 +228,13 @@ impl AgentRouter {
     }
 
     /// Record feedback for learning
-    pub fn record_feedback(&mut self, task: &str, embedding: &[f32], agent_used: AgentType, success: bool) {
+    pub fn record_feedback(
+        &mut self,
+        task: &str,
+        embedding: &[f32],
+        agent_used: AgentType,
+        success: bool,
+    ) {
         if success {
             self.successful_routings += 1;
         }
@@ -282,7 +298,13 @@ mod tests {
         let router = AgentRouter::new(config);
 
         assert_eq!(router.classify_task("write tests"), ClaudeFlowTask::Testing);
-        assert_eq!(router.classify_task("review code"), ClaudeFlowTask::CodeReview);
-        assert_eq!(router.classify_task("optimize performance"), ClaudeFlowTask::Performance);
+        assert_eq!(
+            router.classify_task("review code"),
+            ClaudeFlowTask::CodeReview
+        );
+        assert_eq!(
+            router.classify_task("optimize performance"),
+            ClaudeFlowTask::Performance
+        );
     }
 }

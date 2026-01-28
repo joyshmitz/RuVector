@@ -2,7 +2,7 @@
 //!
 //! Provides convenient wrappers around Metal compute operations.
 
-use super::{MetalContext, MetalConfig, AttentionParams, GemmParams, NormParams, RopeParams};
+use super::{AttentionParams, GemmParams, MetalConfig, MetalContext, NormParams, RopeParams};
 use crate::error::{Result, RuvLLMError};
 use crate::kernels::AttentionConfig;
 
@@ -35,7 +35,7 @@ impl GemvParams {
         Self {
             m: m as u32,
             n: n as u32,
-            lda: n as u32,  // Row-major
+            lda: n as u32, // Row-major
             alpha: 1.0,
             beta: 0.0,
         }
@@ -203,7 +203,13 @@ pub fn fused_mlp_metal(
         .collect();
 
     // Down projection: hidden @ down_weight^T
-    ctx.gemm_f32(&hidden, down_weight, batch_size, hidden_size, intermediate_size)
+    ctx.gemm_f32(
+        &hidden,
+        down_weight,
+        batch_size,
+        hidden_size,
+        intermediate_size,
+    )
 }
 
 /// Convert FP32 to FP16
@@ -397,13 +403,16 @@ pub fn gemv_metal_with_params(
     if a.len() != m * n {
         return Err(RuvLLMError::InvalidOperation(format!(
             "GEMV matrix size mismatch: A[{}] != {}x{}",
-            a.len(), m, n
+            a.len(),
+            m,
+            n
         )));
     }
     if x.len() != n {
         return Err(RuvLLMError::InvalidOperation(format!(
             "GEMV vector size mismatch: x[{}] != {}",
-            x.len(), n
+            x.len(),
+            n
         )));
     }
 
@@ -440,7 +449,11 @@ pub fn gemv_metal_with_params(
         .map_err(|e| RuvLLMError::Backend(format!("Failed to compile GEMV shader: {}", e)))?;
 
     // Try optimized kernel first, fall back to simple
-    let function_name = if m >= 4 { "gemv_optimized_f32" } else { "gemv_simple_f32" };
+    let function_name = if m >= 4 {
+        "gemv_optimized_f32"
+    } else {
+        "gemv_simple_f32"
+    };
     let function = library
         .get_function(function_name, None)
         .map_err(|e| RuvLLMError::Backend(format!("Failed to get GEMV function: {}", e)))?;
@@ -520,13 +533,16 @@ pub fn gemv_metal_f16(
     if a.len() != m * n {
         return Err(RuvLLMError::InvalidOperation(format!(
             "GEMV matrix size mismatch: A[{}] != {}x{}",
-            a.len(), m, n
+            a.len(),
+            m,
+            n
         )));
     }
     if x.len() != n {
         return Err(RuvLLMError::InvalidOperation(format!(
             "GEMV vector size mismatch: x[{}] != {}",
-            x.len(), n
+            x.len(),
+            n
         )));
     }
 
@@ -676,7 +692,9 @@ pub fn gemv_batched_metal(
 
     let pipeline = device
         .new_compute_pipeline_state_with_function(&function)
-        .map_err(|e| RuvLLMError::Backend(format!("Failed to create batched GEMV pipeline: {}", e)))?;
+        .map_err(|e| {
+            RuvLLMError::Backend(format!("Failed to create batched GEMV pipeline: {}", e))
+        })?;
 
     let command_buffer = queue.new_command_buffer();
     let encoder = command_buffer.new_compute_command_encoder();
@@ -752,12 +770,8 @@ mod tests {
         target_logits[vocab_size + 3] = 10.0;
         target_logits[2 * vocab_size + 2] = 10.0;
 
-        let (num_accepted, tokens) = verify_speculative_tokens(
-            &draft_logits,
-            &target_logits,
-            vocab_size,
-            num_tokens,
-        );
+        let (num_accepted, tokens) =
+            verify_speculative_tokens(&draft_logits, &target_logits, vocab_size, num_tokens);
 
         assert_eq!(num_accepted, 3); // 2 accepted + 1 target correction
         assert_eq!(tokens, vec![5, 3, 2]);
@@ -814,7 +828,9 @@ mod tests {
             assert!(
                 (y[i] - x[i]).abs() < 1e-5,
                 "Mismatch at {}: {} vs {}",
-                i, y[i], x[i]
+                i,
+                y[i],
+                x[i]
             );
         }
     }
@@ -850,7 +866,9 @@ mod tests {
             assert!(
                 (y[i] - expected).abs() < 1e-3,
                 "Mismatch at {}: {} vs {}",
-                i, y[i], expected
+                i,
+                y[i],
+                expected
             );
         }
     }

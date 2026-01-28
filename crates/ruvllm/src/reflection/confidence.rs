@@ -334,9 +334,7 @@ impl ConfidenceChecker {
 
         // Check for incomplete markers
         let incomplete_markers = ["TODO", "FIXME", "...", "to be continued", "incomplete"];
-        let has_incomplete = incomplete_markers
-            .iter()
-            .any(|m| output.contains(m));
+        let has_incomplete = incomplete_markers.iter().any(|m| output.contains(m));
         if has_incomplete {
             score -= 0.2;
         }
@@ -373,7 +371,8 @@ impl ConfidenceChecker {
         }
 
         // Check for lists
-        let has_lists = output.contains("\n- ") || output.contains("\n* ") || output.contains("\n1.");
+        let has_lists =
+            output.contains("\n- ") || output.contains("\n* ") || output.contains("\n1.");
         if has_lists {
             score += 0.1;
         }
@@ -440,8 +439,11 @@ impl ConfidenceChecker {
     /// Assess code validity (basic heuristics)
     fn assess_code_validity(&self, output: &str) -> f32 {
         // Check if output contains code
-        let has_code = output.contains("```") || output.contains("fn ") || output.contains("def ")
-            || output.contains("function ") || output.contains("class ");
+        let has_code = output.contains("```")
+            || output.contains("fn ")
+            || output.contains("def ")
+            || output.contains("function ")
+            || output.contains("class ");
 
         if !has_code {
             return 0.8; // Not code-related, give neutral score
@@ -498,7 +500,10 @@ impl ConfidenceChecker {
                         0.6,
                         WeaknessType::Uncertainty,
                     )
-                    .with_suggestion(format!("Remove or clarify the uncertain statement at '{}'", pattern)),
+                    .with_suggestion(format!(
+                        "Remove or clarify the uncertain statement at '{}'",
+                        pattern
+                    )),
                 );
             }
         }
@@ -573,16 +578,14 @@ impl ConfidenceChecker {
     }
 
     /// Generate a targeted revision based on weak points
-    pub fn generate_targeted_revision(
-        &self,
-        output: &str,
-        weak_points: &[WeakPoint],
-    ) -> String {
+    pub fn generate_targeted_revision(&self, output: &str, weak_points: &[WeakPoint]) -> String {
         if weak_points.is_empty() {
             return output.to_string();
         }
 
-        let mut revision_prompt = String::from("Please revise the following output to address these specific issues:\n\n");
+        let mut revision_prompt = String::from(
+            "Please revise the following output to address these specific issues:\n\n",
+        );
 
         for (i, wp) in weak_points.iter().enumerate() {
             revision_prompt.push_str(&format!(
@@ -602,17 +605,30 @@ impl ConfidenceChecker {
     }
 
     /// Record a confidence check for learning
-    pub fn record_check(&mut self, output: &str, context: &ExecutionContext) -> ConfidenceCheckRecord {
+    pub fn record_check(
+        &mut self,
+        output: &str,
+        context: &ExecutionContext,
+    ) -> ConfidenceCheckRecord {
         let score = self.compute_confidence(output, context);
         let level = ConfidenceLevel::from_score(score);
         let weak_points = self.identify_weak_points(output, context);
 
         let mut factors = HashMap::new();
-        factors.insert("completeness".to_string(), self.assess_completeness(output, context));
+        factors.insert(
+            "completeness".to_string(),
+            self.assess_completeness(output, context),
+        );
         factors.insert("structure".to_string(), self.assess_structure(output));
         factors.insert("certainty".to_string(), self.assess_certainty(output));
-        factors.insert("relevance".to_string(), self.assess_relevance(output, context));
-        factors.insert("code_validity".to_string(), self.assess_code_validity(output));
+        factors.insert(
+            "relevance".to_string(),
+            self.assess_relevance(output, context),
+        );
+        factors.insert(
+            "code_validity".to_string(),
+            self.assess_code_validity(output),
+        );
 
         let record = ConfidenceCheckRecord {
             score,
@@ -632,7 +648,8 @@ impl ConfidenceChecker {
 
     /// Learn from a pattern that indicated low quality
     pub fn learn_pattern(&mut self, pattern: String, weight: f32) {
-        self.learned_patterns.insert(pattern, weight.clamp(0.0, 1.0));
+        self.learned_patterns
+            .insert(pattern, weight.clamp(0.0, 1.0));
     }
 
     /// Get check history
@@ -710,7 +727,9 @@ mod tests {
 
         let weak_points = checker.identify_weak_points(output, &context);
         assert!(!weak_points.is_empty());
-        assert!(weak_points.iter().any(|wp| matches!(wp.weakness_type, WeaknessType::Incomplete)));
+        assert!(weak_points
+            .iter()
+            .any(|wp| matches!(wp.weakness_type, WeaknessType::Incomplete)));
     }
 
     #[test]
@@ -729,22 +748,29 @@ mod tests {
 
         // After exceeding budget, should not revise
         for _ in 0..3 {
-            context.previous_attempts.push(crate::reflection::reflective_agent::PreviousAttempt {
-                attempt_number: 1,
-                output: String::new(),
-                error: None,
-                quality_score: None,
-                duration_ms: 0,
-                reflection: None,
-            });
+            context
+                .previous_attempts
+                .push(crate::reflection::reflective_agent::PreviousAttempt {
+                    attempt_number: 1,
+                    output: String::new(),
+                    error: None,
+                    quality_score: None,
+                    duration_ms: 0,
+                    reflection: None,
+                });
         }
         assert!(!checker.should_revise(low_conf_output, &context));
     }
 
     #[test]
     fn test_weak_point_builder() {
-        let wp = WeakPoint::new("line 5", "Missing error handling", 0.7, WeaknessType::MissingErrorHandling)
-            .with_suggestion("Add Result return type");
+        let wp = WeakPoint::new(
+            "line 5",
+            "Missing error handling",
+            0.7,
+            WeaknessType::MissingErrorHandling,
+        )
+        .with_suggestion("Add Result return type");
 
         assert_eq!(wp.location, "line 5");
         assert!(!wp.suggestion.is_empty());

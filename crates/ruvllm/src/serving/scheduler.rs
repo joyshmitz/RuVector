@@ -306,17 +306,9 @@ impl ContinuousBatchScheduler {
                 }
 
                 // Get last generated token (or first prompt token if no generations yet)
-                let input_token = running
-                    .generated_tokens
-                    .last()
-                    .copied()
-                    .unwrap_or_else(|| {
-                        running
-                            .request
-                            .prompt_tokens
-                            .last()
-                            .copied()
-                            .unwrap_or(0)
+                let input_token =
+                    running.generated_tokens.last().copied().unwrap_or_else(|| {
+                        running.request.prompt_tokens.last().copied().unwrap_or(0)
                     });
 
                 plan.decode_tasks.push(DecodeTask {
@@ -383,7 +375,9 @@ impl ContinuousBatchScheduler {
                 .unwrap_or_default();
 
             // Determine tokens to prefill
-            let tokens = if self.config.chunked_prefill && request.prompt_len() > self.config.prefill_chunk_size {
+            let tokens = if self.config.chunked_prefill
+                && request.prompt_len() > self.config.prefill_chunk_size
+            {
                 request.prompt_tokens[..self.config.prefill_chunk_size].to_vec()
             } else {
                 request.prompt_tokens.clone()
@@ -402,7 +396,9 @@ impl ContinuousBatchScheduler {
             running.block_table = block_table;
 
             // If chunked, mark partial prefill
-            if self.config.chunked_prefill && running.request.prompt_len() > self.config.prefill_chunk_size {
+            if self.config.chunked_prefill
+                && running.request.prompt_len() > self.config.prefill_chunk_size
+            {
                 running.prefill_tokens_processed = self.config.prefill_chunk_size;
             } else {
                 running.complete_prefill();
@@ -431,11 +427,7 @@ impl ContinuousBatchScheduler {
                     // Resume as decode
                     if budget.try_allocate_decode() {
                         if let Some(running) = queue.running.get(&request_id) {
-                            let input_token = running
-                                .generated_tokens
-                                .last()
-                                .copied()
-                                .unwrap_or(0);
+                            let input_token = running.generated_tokens.last().copied().unwrap_or(0);
 
                             plan.decode_tasks.push(DecodeTask {
                                 request_id,
@@ -465,7 +457,8 @@ impl ContinuousBatchScheduler {
                         break;
                     }
 
-                    let tokens_needed = data.request.prompt_tokens.len() + data.generated_tokens.len();
+                    let tokens_needed =
+                        data.request.prompt_tokens.len() + data.generated_tokens.len();
 
                     if !budget.try_allocate_prefill(tokens_needed) {
                         // Put back
@@ -503,7 +496,8 @@ impl ContinuousBatchScheduler {
                     running.decode_steps = data.decode_steps;
                     running.block_table = block_table;
                     running.complete_prefill();
-                    running.context_len = running.request.prompt_tokens.len() + running.generated_tokens.len();
+                    running.context_len =
+                        running.request.prompt_tokens.len() + running.generated_tokens.len();
                     running.current_seq_len = running.context_len;
 
                     queue.add_running(running);
@@ -527,7 +521,10 @@ impl ContinuousBatchScheduler {
         // Preempt if we have high-priority pending requests
         if let Some(pending) = queue.pending.front() {
             if pending.priority == Priority::Critical {
-                return queue.running.values().any(|r| r.request.priority < Priority::Critical);
+                return queue
+                    .running
+                    .values()
+                    .any(|r| r.request.priority < Priority::Critical);
             }
         }
 

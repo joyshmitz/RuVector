@@ -109,7 +109,9 @@ pub struct EnergyHistory {
 impl EnergyHistory {
     pub fn new(max_scopes: usize, window_size: usize) -> Self {
         Self {
-            history: (0..max_scopes).map(|_| VecDeque::with_capacity(window_size)).collect(),
+            history: (0..max_scopes)
+                .map(|_| VecDeque::with_capacity(window_size))
+                .collect(),
             max_scopes,
             window_size,
         }
@@ -140,10 +142,7 @@ impl EnergyHistory {
         let cutoff = current_time_ms.saturating_sub(window_ms);
 
         // Check if all samples in window are above threshold
-        let samples_in_window: Vec<_> = queue
-            .iter()
-            .filter(|(ts, _)| *ts >= cutoff)
-            .collect();
+        let samples_in_window: Vec<_> = queue.iter().filter(|(ts, _)| *ts >= cutoff).collect();
 
         if samples_in_window.is_empty() {
             return false;
@@ -160,10 +159,7 @@ impl EnergyHistory {
         let queue = &self.history[scope_id as usize];
         let cutoff = current_time_ms.saturating_sub(window_ms);
 
-        let samples: Vec<_> = queue
-            .iter()
-            .filter(|(ts, _)| *ts >= cutoff)
-            .collect();
+        let samples: Vec<_> = queue.iter().filter(|(ts, _)| *ts >= cutoff).collect();
 
         if samples.len() < 2 {
             return None;
@@ -257,7 +253,8 @@ impl CoherenceGate {
         let current_energy = energy.scope_energy(action.scope_id);
 
         // Record in history
-        self.history.record(action.scope_id, self.current_time_ms, current_energy);
+        self.history
+            .record(action.scope_id, self.current_time_ms, current_energy);
 
         // Determine lane based on energy
         let lane = if current_energy < self.config.reflex {
@@ -279,8 +276,13 @@ impl CoherenceGate {
         );
 
         // Check for growing incoherence (trend)
-        let growing = self.history
-            .trend(action.scope_id, self.config.persistence_window_ms, self.current_time_ms)
+        let growing = self
+            .history
+            .trend(
+                action.scope_id,
+                self.config.persistence_window_ms,
+                self.current_time_ms,
+            )
             .map(|t| t > 0.01)
             .unwrap_or(false);
 
@@ -404,9 +406,7 @@ fn bench_gate_fast_path(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("evaluate_fast", format!("{:.2}", energy)),
             &energy,
-            |b, &e| {
-                b.iter(|| black_box(gate.evaluate_fast(black_box(e))))
-            },
+            |b, &e| b.iter(|| black_box(gate.evaluate_fast(black_box(e)))),
         );
     }
 
@@ -466,20 +466,13 @@ fn bench_history_operations(c: &mut Criterion) {
     // Check threshold
     group.bench_function("check_threshold", |b| {
         b.iter(|| {
-            history.is_above_threshold(
-                black_box(5),
-                black_box(0.3),
-                black_box(100),
-                black_box(500),
-            )
+            history.is_above_threshold(black_box(5), black_box(0.3), black_box(100), black_box(500))
         })
     });
 
     // Compute trend
     group.bench_function("compute_trend", |b| {
-        b.iter(|| {
-            history.trend(black_box(5), black_box(100), black_box(500))
-        })
+        b.iter(|| history.trend(black_box(5), black_box(100), black_box(500)))
     });
 
     group.finish();

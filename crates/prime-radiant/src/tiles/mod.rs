@@ -40,6 +40,6 @@ mod error;
 mod fabric;
 
 pub use adapter::{TileAdapter, TileAdapterConfig};
-pub use coordinator::{TileCoordinator, CoordinatorConfig, ShardMap, AggregatedWitness};
+pub use coordinator::{AggregatedWitness, CoordinatorConfig, ShardMap, TileCoordinator};
 pub use error::{TilesError, TilesResult};
 pub use fabric::{CoherenceFabric, FabricConfig, FabricReport, FabricState};

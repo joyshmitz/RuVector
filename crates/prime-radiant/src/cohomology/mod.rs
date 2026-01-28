@@ -47,22 +47,14 @@ mod obstruction;
 mod sheaf;
 mod simplex;
 
-pub use cocycle::{Cocycle, CocycleBuilder, Coboundary};
-pub use cohomology_group::{
-    CohomologyGroup, CohomologyComputer, CohomologyConfig, BettiNumbers,
-};
-pub use diffusion::{
-    SheafDiffusion, SheafDiffusionConfig, DiffusionResult, ObstructionIndicator,
-};
-pub use laplacian::{
-    SheafLaplacian, LaplacianConfig, LaplacianSpectrum, HarmonicRepresentative,
-};
+pub use cocycle::{Coboundary, Cocycle, CocycleBuilder};
+pub use cohomology_group::{BettiNumbers, CohomologyComputer, CohomologyConfig, CohomologyGroup};
+pub use diffusion::{DiffusionResult, ObstructionIndicator, SheafDiffusion, SheafDiffusionConfig};
+pub use laplacian::{HarmonicRepresentative, LaplacianConfig, LaplacianSpectrum, SheafLaplacian};
 pub use neural::{
-    SheafNeuralLayer, SheafNeuralConfig, SheafConvolution, CohomologyPooling,
-    Activation, PoolingMethod,
+    Activation, CohomologyPooling, PoolingMethod, SheafConvolution, SheafNeuralConfig,
+    SheafNeuralLayer,
 };
-pub use obstruction::{
-    ObstructionDetector, Obstruction, ObstructionSeverity, ObstructionReport,
-};
-pub use sheaf::{Sheaf, SheafBuilder, Stalk, SheafSection, LocalSection};
-pub use simplex::{Simplex, SimplexId, SimplicialComplex, Chain, Cochain};
+pub use obstruction::{Obstruction, ObstructionDetector, ObstructionReport, ObstructionSeverity};
+pub use sheaf::{LocalSection, Sheaf, SheafBuilder, SheafSection, Stalk};
+pub use simplex::{Chain, Cochain, Simplex, SimplexId, SimplicialComplex};

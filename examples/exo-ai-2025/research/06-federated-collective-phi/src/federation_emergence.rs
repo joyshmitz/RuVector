@@ -2,10 +2,10 @@
 // Emergence Detection and Phase Transition Analysis
 // Monitors when collective consciousness emerges from federation
 
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use super::distributed_phi::{AgentId, DistributedPhiCoordinator};
 use super::consciousness_crdt::{ConsciousnessState, Quale};
+use super::distributed_phi::{AgentId, DistributedPhiCoordinator};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Network topology metrics
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -121,7 +121,10 @@ impl TopologyMetrics {
     }
 
     /// BFS to compute distances from start node
-    fn bfs_distances(adjacency: &HashMap<AgentId, Vec<AgentId>>, start: AgentId) -> HashMap<AgentId, usize> {
+    fn bfs_distances(
+        adjacency: &HashMap<AgentId, Vec<AgentId>>,
+        start: AgentId,
+    ) -> HashMap<AgentId, usize> {
         use std::collections::VecDeque;
 
         let mut distances = HashMap::new();
@@ -333,10 +336,8 @@ impl EmergenceDetector {
     /// Compute consensus coherence
     fn compute_consensus_coherence(states: &HashMap<AgentId, ConsciousnessState>) -> f64 {
         // Simplified: measure how similar attention focus is across agents
-        let focuses: Vec<Option<&Quale>> = states
-            .values()
-            .map(|s| s.attention_focus.get())
-            .collect();
+        let focuses: Vec<Option<&Quale>> =
+            states.values().map(|s| s.attention_focus.get()).collect();
 
         if focuses.is_empty() {
             return 0.0;
@@ -569,8 +570,14 @@ mod tests {
         println!("Small-world index: {}", swi);
 
         // Should have positive clustering and reasonable path length
-        assert!(metrics.clustering_coefficient >= 0.0, "Clustering should be non-negative");
-        assert!(metrics.average_path_length >= 0.0, "Path length should be non-negative");
+        assert!(
+            metrics.clustering_coefficient >= 0.0,
+            "Clustering should be non-negative"
+        );
+        assert!(
+            metrics.average_path_length >= 0.0,
+            "Path length should be non-negative"
+        );
 
         // For a connected network, either we have a positive path length or positive clustering
         assert!(swi >= 0.0, "Small world index should be non-negative");
@@ -578,7 +585,10 @@ mod tests {
         // This topology should actually have some structure
         // Relaxed assertion - just check that we computed something reasonable
         if metrics.average_path_length > 0.0 && metrics.clustering_coefficient > 0.0 {
-            assert!(swi > 0.0, "Connected network with clustering should have positive SWI");
+            assert!(
+                swi > 0.0,
+                "Connected network with clustering should have positive SWI"
+            );
         } else {
             // If no clustering, SWI could be 0
             println!("Network has no clustering, SWI is {}", swi);
@@ -632,7 +642,8 @@ mod tests {
 
         let consciousness_states = HashMap::new();
 
-        let indicators = detector.analyze(&phi_coordinator, &consciousness_states, &topology_metrics);
+        let indicators =
+            detector.analyze(&phi_coordinator, &consciousness_states, &topology_metrics);
 
         println!("Phase: {:?}", detector.current_phase());
         println!("Indicators: {:?}", indicators);

@@ -4,8 +4,8 @@
 // cognition. Decisions emerge from constructive/destructive interference of
 // amplitude paths rather than classical utility maximization.
 
+use crate::quantum_cognitive_state::{Amplitude, CognitiveState, SuperpositionBuilder};
 use num_complex::Complex64;
-use crate::quantum_cognitive_state::{CognitiveState, Amplitude, SuperpositionBuilder};
 use std::f64::consts::PI;
 
 /// Decision maker using quantum amplitude interference
@@ -105,10 +105,7 @@ impl InterferenceDecisionMaker {
 
         // Calculate interference contributions
         let classical_prob = 1.0 / n as f64;
-        let interference_effects: Vec<f64> = probs
-            .iter()
-            .map(|&p| p - classical_prob)
-            .collect();
+        let interference_effects: Vec<f64> = probs.iter().map(|&p| p - classical_prob).collect();
 
         // Perform measurement
         let (choice_idx, collapsed, prob) = state.measure();
@@ -187,7 +184,8 @@ impl InterferenceDecisionMaker {
         }
 
         // Answer Q2 with modified state
-        let (ans2, prob2, _) = self.multi_alternative_choice(question2_options.clone(), modified_q2_phases);
+        let (ans2, prob2, _) =
+            self.multi_alternative_choice(question2_options.clone(), modified_q2_phases);
 
         // Order effect magnitude
         let order_effect = coupling_strength * prob1;
@@ -200,7 +198,7 @@ impl InterferenceDecisionMaker {
     /// Non-separable joint state enables cooperation
     pub fn quantum_prisoners_dilemma(
         &mut self,
-        player2_strategy: &str, // "cooperate" or "defect"
+        player2_strategy: &str,     // "cooperate" or "defect"
         entanglement_strength: f64, // Degree of non-separability
     ) -> (String, f64, f64) {
         // Classical strategies
@@ -248,7 +246,8 @@ impl InterferenceDecisionMaker {
     ///
     /// Confidence = |α_chosen|² (Born rule interpretation)
     pub fn confidence(&self) -> f64 {
-        self.state.probabilities()
+        self.state
+            .probabilities()
             .iter()
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .copied()
@@ -330,7 +329,8 @@ mod tests {
 
     #[test]
     fn test_conjunction_fallacy() {
-        let initial = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "AB".to_string()]);
+        let initial =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "AB".to_string()]);
         let mut dm = InterferenceDecisionMaker::new(initial);
 
         // High overlap → conjunction can exceed individual
@@ -338,12 +338,15 @@ mod tests {
             "bank_teller",
             "feminist",
             "feminist_bank_teller",
-            0.8 // High semantic overlap with "feminist"
+            0.8, // High semantic overlap with "feminist"
         );
 
         // P(feminist ∧ bank_teller) can be > P(bank_teller) with high overlap
         // This reproduces the empirical "fallacy"
-        println!("P(bank): {}, P(fem): {}, P(both): {}", probs[0], probs[1], probs[2]);
+        println!(
+            "P(bank): {}, P(fem): {}, P(both): {}",
+            probs[0], probs[1], probs[2]
+        );
     }
 
     #[test]
@@ -352,8 +355,14 @@ mod tests {
         let pattern = interference_pattern(phases);
 
         // Should oscillate between 0 and 1
-        let max = pattern.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let min = pattern.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max = pattern
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let min = pattern
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
 
         assert!(*max <= 1.0);
         assert!(*min >= 0.0);
@@ -362,18 +371,24 @@ mod tests {
 
     #[test]
     fn test_prisoners_dilemma() {
-        let initial = CognitiveState::uniform(4, vec![
-            "CC".to_string(),
-            "DD".to_string(),
-            "CD".to_string(),
-            "DC".to_string(),
-        ]);
+        let initial = CognitiveState::uniform(
+            4,
+            vec![
+                "CC".to_string(),
+                "DD".to_string(),
+                "CD".to_string(),
+                "DC".to_string(),
+            ],
+        );
         let mut dm = InterferenceDecisionMaker::new(initial);
 
         // High entanglement → more cooperation
         let (decision, p_coop, payoff) = dm.quantum_prisoners_dilemma("cooperate", 0.9);
 
-        println!("Decision: {}, P(cooperate): {}, Payoff: {}", decision, p_coop, payoff);
+        println!(
+            "Decision: {}, P(cooperate): {}, Payoff: {}",
+            decision, p_coop, payoff
+        );
 
         // Should have higher cooperation than classical (0.5)
         assert!(p_coop > 0.5);
@@ -387,6 +402,6 @@ mod tests {
         let phase = semantic_phase(&v1, &v2);
 
         // Orthogonal vectors → π/2 phase
-        assert!((phase - PI/2.0).abs() < 1e-6);
+        assert!((phase - PI / 2.0).abs() < 1e-6);
     }
 }

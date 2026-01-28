@@ -68,12 +68,18 @@ pub async fn run(
             info.num_parameters as f64 / 1e9
         );
     } else {
-        println!("{} Model loaded (mock mode)", style("Ready!").yellow().bold());
+        println!(
+            "{} Model loaded (mock mode)",
+            style("Ready!").yellow().bold()
+        );
     }
 
     // Load draft model for speculative decoding if provided
     let (draft_backend, speculative_config) = if let Some(draft_id) = draft_model {
-        println!("{}", "Loading draft model for speculative decoding...".yellow());
+        println!(
+            "{}",
+            "Loading draft model for speculative decoding...".yellow()
+        );
         let draft = load_model(&resolve_model_id(draft_id), quant, cache_dir)?;
 
         if let Some(info) = draft.model_info() {
@@ -122,7 +128,10 @@ pub async fn run(
     }
 
     println!();
-    println!("{}", "Type your message and press Enter. Special commands:".dimmed());
+    println!(
+        "{}",
+        "Type your message and press Enter. Special commands:".dimmed()
+    );
     println!("{}", "  /clear  - Clear conversation history".dimmed());
     println!("{}", "  /system - Set system prompt".dimmed());
     println!("{}", "  /save   - Save conversation to file".dimmed());
@@ -272,11 +281,15 @@ fn generate_response(session: &mut ChatSession, user_input: &str) -> Result<Stri
 
     let response = if session.backend.is_model_loaded() {
         // Try streaming first
-        generate_with_streaming(session.backend.as_ref(), &prompt, params.clone())
-            .unwrap_or_else(|_| {
+        generate_with_streaming(session.backend.as_ref(), &prompt, params.clone()).unwrap_or_else(
+            |_| {
                 // Fall back to non-streaming
-                session.backend.generate(&prompt, params).unwrap_or_else(|_| mock_response(user_input))
-            })
+                session
+                    .backend
+                    .generate(&prompt, params)
+                    .unwrap_or_else(|_| mock_response(user_input))
+            },
+        )
     } else {
         // Use streaming mock response
         generate_streaming_mock(user_input)?
@@ -563,28 +576,13 @@ fn print_help() {
     println!("{}", "=".repeat(40).dimmed());
     println!();
     println!("  {} - Clear conversation history", "/clear, /c".cyan());
-    println!(
-        "  {} - Set/show system prompt",
-        "/system [prompt]".cyan()
-    );
-    println!(
-        "  {} - Save conversation to file",
-        "/save [file]".cyan()
-    );
-    println!(
-        "  {} - Load conversation from file",
-        "/load [file]".cyan()
-    );
+    println!("  {} - Set/show system prompt", "/system [prompt]".cyan());
+    println!("  {} - Save conversation to file", "/save [file]".cyan());
+    println!("  {} - Load conversation from file", "/load [file]".cyan());
     println!("  {} - Show conversation history", "/history".cyan());
     println!("  {} - Show token count", "/tokens".cyan());
-    println!(
-        "  {} - Set/show temperature (0-2)",
-        "/temp [value]".cyan()
-    );
-    println!(
-        "  {} - Set/show max tokens",
-        "/max [value]".cyan()
-    );
+    println!("  {} - Set/show temperature (0-2)", "/temp [value]".cyan());
+    println!("  {} - Set/show max tokens", "/max [value]".cyan());
     println!("  {} - Show this help", "/help, /h".cyan());
     println!("  {} - Exit chat", "/quit, /q".cyan());
     println!();

@@ -22,8 +22,8 @@
 //! - p = Prior/generative model
 //! - o = Observations
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// Minimizes free energy through predictive processing
@@ -174,11 +174,15 @@ impl FreeEnergyMinimizer {
 
         for i in 0..len {
             let e = observation.get(i).copied().unwrap_or(0.0)
-                  - prediction.get(i).copied().unwrap_or(0.0);
+                - prediction.get(i).copied().unwrap_or(0.0);
             error[i] = e;
 
             let channel = format!("channel_{}", i);
-            let precision = self.precisions.get(&channel).copied().unwrap_or(default_precision);
+            let precision = self
+                .precisions
+                .get(&channel)
+                .copied()
+                .unwrap_or(default_precision);
             weighted_error[i] = e * precision;
             by_channel.insert(channel, e.abs());
         }
@@ -246,12 +250,14 @@ impl FreeEnergyMinimizer {
 
     /// Add an action to the repertoire
     pub fn add_action(&mut self, name: &str, expected_outcome: Vec<f64>, cost: f64) {
-        self.active_inference.add_action(name, expected_outcome, cost);
+        self.active_inference
+            .add_action(name, expected_outcome, cost);
     }
 
     /// Set precision for a channel
     pub fn set_precision(&mut self, channel: &str, precision: f64) {
-        self.precisions.insert(channel.to_string(), precision.max(0.01));
+        self.precisions
+            .insert(channel.to_string(), precision.max(0.01));
     }
 
     /// Get average free energy over time
@@ -273,10 +279,10 @@ impl FreeEnergyMinimizer {
             return 0.0;
         }
 
-        let first_half: f64 = recent[..recent.len()/2].iter().sum::<f64>()
-            / (recent.len()/2) as f64;
-        let second_half: f64 = recent[recent.len()/2..].iter().sum::<f64>()
-            / (recent.len() - recent.len()/2) as f64;
+        let first_half: f64 =
+            recent[..recent.len() / 2].iter().sum::<f64>() / (recent.len() / 2) as f64;
+        let second_half: f64 = recent[recent.len() / 2..].iter().sum::<f64>()
+            / (recent.len() - recent.len() / 2) as f64;
 
         second_half - first_half
     }
@@ -303,7 +309,11 @@ impl PredictiveModel {
         for i in 0..hidden_dims {
             for j in 0..obs_dims {
                 // Simple diagonal-ish initialization
-                likelihood[i][j] = if i % obs_dims == j { 0.7 } else { 0.3 / (obs_dims - 1) as f64 };
+                likelihood[i][j] = if i % obs_dims == j {
+                    0.7
+                } else {
+                    0.3 / (obs_dims - 1) as f64
+                };
             }
         }
 
@@ -349,7 +359,9 @@ impl PredictiveModel {
 
     /// Entropy of the posterior
     pub fn posterior_entropy(&self) -> f64 {
-        -self.posterior.iter()
+        -self
+            .posterior
+            .iter()
             .filter(|&&p| p > 1e-10)
             .map(|&p| p * p.ln())
             .sum::<f64>()
@@ -409,7 +421,9 @@ impl ActiveInference {
             return None;
         }
 
-        let min_idx = self.expected_fe.iter()
+        let min_idx = self
+            .expected_fe
+            .iter()
             .enumerate()
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)?;
@@ -436,7 +450,8 @@ mod tests {
     #[test]
     fn test_free_energy_minimizer_creation() {
         let fem = FreeEnergyMinimizer::new(0.1);
-        assert!(fem.compute_free_energy() >= 0.0 || fem.compute_free_energy() < 0.0); // Always defined
+        assert!(fem.compute_free_energy() >= 0.0 || fem.compute_free_energy() < 0.0);
+        // Always defined
     }
 
     #[test]
@@ -495,14 +510,16 @@ mod tests {
         let mut fem = FreeEnergyMinimizer::with_dims(0.1, 4, 4);
 
         fem.set_precision("channel_0", 10.0); // High precision
-        fem.set_precision("channel_1", 0.1);  // Low precision
+        fem.set_precision("channel_1", 0.1); // Low precision
 
         let observation = vec![1.0, 1.0, 0.5, 0.5];
         let error = fem.observe(&observation);
 
         // Channel 0 should have higher weighted error
-        assert!(error.weighted_error[0].abs() > error.weighted_error[1].abs()
-            || error.error[0].abs() * 10.0 > error.error[1].abs() * 0.1);
+        assert!(
+            error.weighted_error[0].abs() > error.weighted_error[1].abs()
+                || error.error[0].abs() * 10.0 > error.error[1].abs() * 0.1
+        );
     }
 
     #[test]

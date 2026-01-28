@@ -17,11 +17,11 @@
 //! - Monitoring attention health
 //! - Debugging attention patterns
 
-mod report;
 mod metrics;
+mod report;
 
-pub use report::{AttentionRecommendation, GeometryReport, ReportBuilder, ReportConfig};
 pub use metrics::{MetricType, MetricValue};
+pub use report::{AttentionRecommendation, GeometryReport, ReportBuilder, ReportConfig};
 
 #[cfg(test)]
 mod tests {

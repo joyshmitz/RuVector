@@ -1,9 +1,9 @@
-use wasm_bindgen::prelude::*;
 use ruvector_sparse_inference::{
-    SparseModel, InferenceConfig, SparsityConfig,
+    model::{GenerationConfig, GgufParser, KVCache, ModelMetadata, ModelRunner},
     predictor::LowRankPredictor,
-    model::{GgufParser, ModelRunner, ModelMetadata, GenerationConfig, KVCache},
+    InferenceConfig, SparseModel, SparsityConfig,
 };
+use wasm_bindgen::prelude::*;
 
 /// Initialize panic hook for better error messages
 #[wasm_bindgen(start)]
@@ -33,12 +33,19 @@ impl SparseInferenceEngine {
 
         let predictors = Self::init_predictors(&model, &config);
 
-        Ok(Self { model, config, predictors })
+        Ok(Self {
+            model,
+            config,
+            predictors,
+        })
     }
 
     /// Load model with streaming (for large models)
     #[wasm_bindgen]
-    pub async fn load_streaming(url: &str, config_json: &str) -> Result<SparseInferenceEngine, JsError> {
+    pub async fn load_streaming(
+        url: &str,
+        config_json: &str,
+    ) -> Result<SparseInferenceEngine, JsError> {
         // Fetch model in chunks
         let bytes = fetch_model_bytes(url).await?;
         Self::new(&bytes, config_json)
@@ -47,7 +54,8 @@ impl SparseInferenceEngine {
     /// Run inference on input
     #[wasm_bindgen]
     pub fn infer(&self, input: &[f32]) -> Result<Vec<f32>, JsError> {
-        self.model.forward_embedding(input, &self.config)
+        self.model
+            .forward_embedding(input, &self.config)
             .map_err(|e| JsError::new(&format!("Inference failed: {}", e)))
     }
 
@@ -61,7 +69,8 @@ impl SparseInferenceEngine {
             ..Default::default()
         };
 
-        self.model.generate(input_ids, &config)
+        self.model
+            .generate(input_ids, &config)
             .map_err(|e| JsError::new(&format!("Generation failed: {}", e)))
     }
 
@@ -90,12 +99,10 @@ impl SparseInferenceEngine {
     /// Calibrate predictors with sample inputs
     #[wasm_bindgen]
     pub fn calibrate(&mut self, samples: &[f32], sample_dim: usize) -> Result<(), JsError> {
-        let samples: Vec<Vec<f32>> = samples
-            .chunks(sample_dim)
-            .map(|c| c.to_vec())
-            .collect();
+        let samples: Vec<Vec<f32>> = samples.chunks(sample_dim).map(|c| c.to_vec()).collect();
 
-        self.model.calibrate(&samples)
+        self.model
+            .calibrate(&samples)
             .map_err(|e| JsError::new(&format!("Calibration failed: {}", e)))
     }
 
@@ -120,7 +127,8 @@ pub struct EmbeddingModel {
 impl EmbeddingModel {
     #[wasm_bindgen(constructor)]
     pub fn new(model_bytes: &[u8]) -> Result<EmbeddingModel, JsError> {
-        let config = r#"{"sparsity": {"enabled": true, "threshold": 0.1}, "temperature": 1.0, "top_k": 50}"#;
+        let config =
+            r#"{"sparsity": {"enabled": true, "threshold": 0.1}, "temperature": 1.0, "top_k": 50}"#;
         let engine = SparseInferenceEngine::new(model_bytes, config)?;
         Ok(Self { engine })
     }
@@ -128,7 +136,9 @@ impl EmbeddingModel {
     /// Encode text to embedding (requires tokenizer)
     #[wasm_bindgen]
     pub fn encode(&self, input_ids: &[u32]) -> Result<Vec<f32>, JsError> {
-        self.engine.model.encode(input_ids)
+        self.engine
+            .model
+            .encode(input_ids)
             .map_err(|e| JsError::new(&format!("Encoding failed: {}", e)))
     }
 
@@ -144,7 +154,10 @@ impl EmbeddingModel {
                 return Err(JsError::new("Invalid lengths: exceeds input_ids size"));
             }
             let ids = &input_ids[offset..offset + len];
-            let embedding = self.engine.model.encode(ids)
+            let embedding = self
+                .engine
+                .model
+                .encode(ids)
                 .map_err(|e| JsError::new(&format!("Encoding failed: {}", e)))?;
             results.extend(embedding);
             offset += len;
@@ -180,7 +193,9 @@ impl LLMModel {
     /// Generate next token
     #[wasm_bindgen]
     pub fn next_token(&mut self, input_ids: &[u32]) -> Result<u32, JsError> {
-        self.engine.model.next_token(input_ids, &mut self.kv_cache)
+        self.engine
+            .model
+            .next_token(input_ids, &mut self.kv_cache)
             .map_err(|e| JsError::new(&format!("Generation failed: {}", e)))
     }
 
@@ -205,7 +220,11 @@ impl LLMModel {
 
 /// Performance measurement utilities
 #[wasm_bindgen]
-pub fn measure_inference_time(engine: &SparseInferenceEngine, input: &[f32], iterations: u32) -> f64 {
+pub fn measure_inference_time(
+    engine: &SparseInferenceEngine,
+    input: &[f32],
+    iterations: u32,
+) -> f64 {
     let performance = web_sys::window()
         .and_then(|w| w.performance())
         .expect("Performance API not available");
@@ -231,10 +250,15 @@ async fn fetch_model_bytes(url: &str) -> Result<Vec<u8>, JsError> {
 
     let window = web_sys::window().ok_or_else(|| JsError::new("No window"))?;
     let response = JsFuture::from(window.fetch_with_str(url)).await?;
-    let response: web_sys::Response = response.dyn_into()
+    let response: web_sys::Response = response
+        .dyn_into()
         .map_err(|_| JsError::new("Failed to cast to Response"))?;
-    let buffer = JsFuture::from(response.array_buffer()
-        .map_err(|_| JsError::new("Failed to get array buffer"))?).await?;
+    let buffer = JsFuture::from(
+        response
+            .array_buffer()
+            .map_err(|_| JsError::new("Failed to get array buffer"))?,
+    )
+    .await?;
     let array = js_sys::Uint8Array::new(&buffer);
     Ok(array.to_vec())
 }

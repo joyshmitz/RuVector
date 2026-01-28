@@ -63,11 +63,7 @@ pub struct GraphWavelet {
 
 impl GraphWavelet {
     /// Compute wavelet centered at vertex
-    pub fn at_vertex(
-        laplacian: &ScaledLaplacian,
-        scale: &WaveletScale,
-        center: usize,
-    ) -> Self {
+    pub fn at_vertex(laplacian: &ScaledLaplacian, scale: &WaveletScale, center: usize) -> Self {
         let n = laplacian.n;
 
         // Delta function at center
@@ -211,7 +207,11 @@ impl SpectralWaveletTransform {
 }
 
 /// Apply Chebyshev filter to signal using recurrence
-fn apply_filter(laplacian: &ScaledLaplacian, filter: &ChebyshevExpansion, signal: &[f64]) -> Vec<f64> {
+fn apply_filter(
+    laplacian: &ScaledLaplacian,
+    filter: &ChebyshevExpansion,
+    signal: &[f64],
+) -> Vec<f64> {
     let n = laplacian.n;
     let coeffs = &filter.coefficients;
 

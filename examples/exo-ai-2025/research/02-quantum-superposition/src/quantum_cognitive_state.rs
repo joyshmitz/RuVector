@@ -40,7 +40,11 @@ impl CognitiveState {
     /// );
     /// ```
     pub fn new(amplitudes: Vec<Amplitude>, labels: Vec<String>) -> Self {
-        assert_eq!(amplitudes.len(), labels.len(), "Amplitude and label count mismatch");
+        assert_eq!(
+            amplitudes.len(),
+            labels.len(),
+            "Amplitude and label count mismatch"
+        );
 
         let mut state = CognitiveState {
             amplitudes,
@@ -88,10 +92,7 @@ impl CognitiveState {
     ///
     /// Returns vector where P[i] = |α_i|²
     pub fn probabilities(&self) -> Vec<f64> {
-        self.amplitudes
-            .iter()
-            .map(|a| a.norm_sqr())
-            .collect()
+        self.amplitudes.iter().map(|a| a.norm_sqr()).collect()
     }
 
     /// Inner product ⟨φ|ψ⟩ with another state
@@ -132,18 +133,19 @@ impl CognitiveState {
             cumulative += p;
             if r < cumulative {
                 // Collapse to state i
-                let collapsed = CognitiveState::definite(
-                    i,
-                    self.amplitudes.len(),
-                    self.labels.clone()
-                );
+                let collapsed =
+                    CognitiveState::definite(i, self.amplitudes.len(), self.labels.clone());
                 return (i, collapsed, p);
             }
         }
 
         // Fallback (should never reach due to normalization)
         let last = probs.len() - 1;
-        (last, CognitiveState::definite(last, self.amplitudes.len(), self.labels.clone()), probs[last])
+        (
+            last,
+            CognitiveState::definite(last, self.amplitudes.len(), self.labels.clone()),
+            probs[last],
+        )
     }
 
     /// Weak measurement with strength parameter
@@ -154,7 +156,8 @@ impl CognitiveState {
         use rand_distr::{Distribution, Normal};
 
         // Calculate expectation value
-        let expectation: f64 = self.amplitudes
+        let expectation: f64 = self
+            .amplitudes
             .iter()
             .zip(observable)
             .map(|(a, &o)| a.norm_sqr() * o)
@@ -196,10 +199,7 @@ impl CognitiveState {
     ///
     /// Measures effective number of states in superposition (1 = pure, N = uniform)
     pub fn participation_ratio(&self) -> f64 {
-        let sum_p4: f64 = self.probabilities()
-            .iter()
-            .map(|&p| p * p)
-            .sum();
+        let sum_p4: f64 = self.probabilities().iter().map(|&p| p * p).sum();
 
         if sum_p4 > 1e-10 {
             1.0 / sum_p4
@@ -256,7 +256,8 @@ impl SuperpositionBuilder {
 
     /// Add a basis state with magnitude and phase
     pub fn add_polar(mut self, magnitude: f64, phase: f64, label: String) -> Self {
-        self.amplitudes.push(Complex64::from_polar(magnitude, phase));
+        self.amplitudes
+            .push(Complex64::from_polar(magnitude, phase));
         self.labels.push(label);
         self
     }
@@ -313,7 +314,7 @@ mod tests {
     fn test_normalization() {
         let psi = CognitiveState::new(
             vec![Complex64::new(3.0, 0.0), Complex64::new(0.0, 4.0)],
-            vec!["A".to_string(), "B".to_string()]
+            vec!["A".to_string(), "B".to_string()],
         );
 
         assert!((psi.norm() - 1.0).abs() < 1e-10);
@@ -323,7 +324,7 @@ mod tests {
     fn test_born_rule() {
         let psi = CognitiveState::new(
             vec![Complex64::new(0.6, 0.0), Complex64::new(0.0, 0.8)],
-            vec!["A".to_string(), "B".to_string()]
+            vec!["A".to_string(), "B".to_string()],
         );
 
         let probs = psi.probabilities();
@@ -349,11 +350,16 @@ mod tests {
     #[test]
     fn test_entropy() {
         // Pure state: S = 0
-        let pure = CognitiveState::definite(0, 3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let pure = CognitiveState::definite(
+            0,
+            3,
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+        );
         assert!(pure.von_neumann_entropy() < 1e-10);
 
         // Maximally mixed: S = log(N)
-        let mixed = CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
+        let mixed =
+            CognitiveState::uniform(3, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
         assert!((mixed.von_neumann_entropy() - (3.0_f64).ln()).abs() < 1e-6);
     }
 
@@ -361,7 +367,7 @@ mod tests {
     fn test_superposition_builder() {
         let psi = SuperpositionBuilder::new()
             .add_real(0.6, "happy".to_string())
-            .add_polar(0.8, PI/2.0, "sad".to_string())
+            .add_polar(0.8, PI / 2.0, "sad".to_string())
             .build();
 
         assert_eq!(psi.dimension(), 2);

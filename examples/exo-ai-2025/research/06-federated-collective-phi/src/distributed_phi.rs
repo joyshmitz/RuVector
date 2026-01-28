@@ -2,8 +2,8 @@
 // Distributed Φ (Integrated Information) Measurement Algorithm
 // Based on IIT 4.0 framework with approximations for tractability
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Agent identifier
 pub type AgentId = u64;
@@ -203,7 +203,11 @@ impl DistributedPhiCalculator {
 
         // Try all bipartitions (skip empty partitions)
         // For efficiency, only try a subset of partitions for large n
-        let max_partitions = if n > 10 { 100 } else { 2_usize.pow(n as u32) - 2 }; // -2 to skip all-in-one and empty
+        let max_partitions = if n > 10 {
+            100
+        } else {
+            2_usize.pow(n as u32) - 2
+        }; // -2 to skip all-in-one and empty
 
         for p in 1..=max_partitions {
             let partition = self.generate_partition(n, p);
@@ -366,7 +370,11 @@ impl DistributedPhiCoordinator {
         }
 
         // Count edges
-        let n_edges: usize = self.network_topology.values().map(|neighbors| neighbors.len()).sum();
+        let n_edges: usize = self
+            .network_topology
+            .values()
+            .map(|neighbors| neighbors.len())
+            .sum();
 
         // Maximum possible edges (fully connected)
         let max_edges = (n_agents * (n_agents - 1.0)) as usize;
@@ -493,10 +501,7 @@ mod tests {
         let mut assignments = HashMap::new();
         assignments.insert(1, vec![0, 1]);
 
-        let matrix = vec![
-            vec![0.5, 0.5],
-            vec![0.3, 0.7],
-        ];
+        let matrix = vec![vec![0.5, 0.5], vec![0.3, 0.7]];
 
         let calc = DistributedPhiCalculator::new(2, matrix, assignments);
         let phi = calc.compute_local_phi(1);
@@ -533,11 +538,17 @@ mod tests {
 
         // With proper connectivity, collective should exceed sum of parts
         assert!(collective > 0.0, "Collective Φ should be positive");
-        assert!(collective > phi1, "Collective should exceed individual agent Φ");
+        assert!(
+            collective > phi1,
+            "Collective should exceed individual agent Φ"
+        );
 
         // Relax the superlinearity requirement since the algorithm is approximate
         // Just ensure we have positive integration in the collective system
-        assert!(delta > -1.0, "Emergence delta should not be extremely negative");
+        assert!(
+            delta > -1.0,
+            "Emergence delta should not be extremely negative"
+        );
     }
 
     #[test]

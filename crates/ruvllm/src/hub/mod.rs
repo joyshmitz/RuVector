@@ -30,32 +30,25 @@
 //! ```
 
 pub mod download;
-pub mod upload;
-pub mod registry;
 pub mod model_card;
 pub mod progress;
+pub mod registry;
+pub mod upload;
 
 // Re-exports
 pub use download::{
-    ModelDownloader, DownloadConfig, DownloadProgress,
-    DownloadError, ChecksumVerifier,
-};
-pub use upload::{
-    ModelUploader, UploadConfig, UploadProgress,
-    UploadError, ModelMetadata,
-};
-pub use registry::{
-    RuvLtraRegistry, ModelInfo, ModelSize, QuantizationLevel,
-    HardwareRequirements, get_model_info,
+    ChecksumVerifier, DownloadConfig, DownloadError, DownloadProgress, ModelDownloader,
 };
 pub use model_card::{
-    ModelCard, ModelCardBuilder, TaskType, Framework,
-    License, DatasetInfo, MetricResult,
+    DatasetInfo, Framework, License, MetricResult, ModelCard, ModelCardBuilder, TaskType,
 };
 pub use progress::{
-    ProgressBar, ProgressIndicator, ProgressStyle,
-    ProgressCallback, MultiProgress,
+    MultiProgress, ProgressBar, ProgressCallback, ProgressIndicator, ProgressStyle,
 };
+pub use registry::{
+    get_model_info, HardwareRequirements, ModelInfo, ModelSize, QuantizationLevel, RuvLtraRegistry,
+};
+pub use upload::{ModelMetadata, ModelUploader, UploadConfig, UploadError, UploadProgress};
 
 use std::path::PathBuf;
 
@@ -84,10 +77,7 @@ pub enum HubError {
 
     /// Checksum mismatch
     #[error("Checksum verification failed: expected {expected}, got {actual}")]
-    ChecksumMismatch {
-        expected: String,
-        actual: String,
-    },
+    ChecksumMismatch { expected: String, actual: String },
 
     /// Invalid model format
     #[error("Invalid model format: {0}")]

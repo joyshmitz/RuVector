@@ -206,11 +206,7 @@ pub struct CompareResult {
 
 /// Compare two tensors element-wise with configurable tolerance
 pub fn compare_tensors(expected: &[f32], actual: &[f32], config: &CompareConfig) -> CompareResult {
-    assert_eq!(
-        expected.len(),
-        actual.len(),
-        "Tensor sizes must match"
-    );
+    assert_eq!(expected.len(), actual.len(), "Tensor sizes must match");
 
     let mut max_abs_diff = 0.0f32;
     let mut max_rel_diff = 0.0f32;
@@ -240,17 +236,22 @@ pub fn compare_tensors(expected: &[f32], actual: &[f32], config: &CompareConfig)
         }
     }
 
-    let equal = max_abs_diff <= config.atol
-        || max_rel_diff <= config.rtol
-        || differences.is_empty();
+    let equal =
+        max_abs_diff <= config.atol || max_rel_diff <= config.rtol || differences.is_empty();
 
     if config.verbose && !equal {
         eprintln!("Tensor comparison failed:");
-        eprintln!("  Max abs diff: {} at index {}", max_abs_diff, max_abs_diff_idx);
+        eprintln!(
+            "  Max abs diff: {} at index {}",
+            max_abs_diff, max_abs_diff_idx
+        );
         eprintln!("  Max rel diff: {}", max_rel_diff);
         eprintln!("  Differences ({}/{}):", differences.len(), expected.len());
         for (idx, exp, act, diff) in &differences {
-            eprintln!("    [{}]: expected={}, actual={}, diff={}", idx, exp, act, diff);
+            eprintln!(
+                "    [{}]: expected={}, actual={}, diff={}",
+                idx, exp, act, diff
+            );
         }
     }
 
@@ -371,12 +372,7 @@ impl TestWeights {
     pub fn linear(&mut self, in_features: usize, out_features: usize) -> Vec<f32> {
         // Xavier initialization scale
         let scale = (2.0 / (in_features + out_features) as f32).sqrt();
-        let weights = random_tensor_uniform(
-            in_features * out_features,
-            -scale,
-            scale,
-            self.seed,
-        );
+        let weights = random_tensor_uniform(in_features * out_features, -scale, scale, self.seed);
         self.seed += 1;
         weights
     }
@@ -401,12 +397,7 @@ impl TestWeights {
     /// Generate embedding table
     pub fn embedding(&mut self, vocab_size: usize, hidden_dim: usize) -> Vec<f32> {
         let scale = 0.02;
-        let weights = random_tensor_normal(
-            vocab_size * hidden_dim,
-            0.0,
-            scale,
-            self.seed,
-        );
+        let weights = random_tensor_normal(vocab_size * hidden_dim, 0.0, scale, self.seed);
         self.seed += 1;
         weights
     }
@@ -498,9 +489,7 @@ pub struct ActivationTestData {
 
 impl Default for ActivationTestData {
     fn default() -> Self {
-        let inputs: Vec<f32> = vec![
-            -3.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 3.0,
-        ];
+        let inputs: Vec<f32> = vec![-3.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 3.0];
 
         // Pre-computed expected values (approximate)
         let expected_gelu: Vec<f32> = vec![
@@ -596,11 +585,7 @@ mod tests {
     #[test]
     fn test_identity_matrix() {
         let identity = identity_matrix(3);
-        assert_eq!(identity, vec![
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0,
-        ]);
+        assert_eq!(identity, vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,]);
     }
 
     #[test]

@@ -153,11 +153,20 @@ impl GradientAccumulator {
     }
 
     /// Initialize for a module with dimensions
-    pub fn init_module(&mut self, module: TargetModule, in_features: usize, rank: usize, out_features: usize) {
-        self.gradients.insert(module, ModuleGradients {
-            grad_a: Array2::zeros((in_features, rank)),
-            grad_b: Array2::zeros((rank, out_features)),
-        });
+    pub fn init_module(
+        &mut self,
+        module: TargetModule,
+        in_features: usize,
+        rank: usize,
+        out_features: usize,
+    ) {
+        self.gradients.insert(
+            module,
+            ModuleGradients {
+                grad_a: Array2::zeros((in_features, rank)),
+                grad_b: Array2::zeros((rank, out_features)),
+            },
+        );
     }
 
     /// Accumulate gradients
@@ -183,11 +192,14 @@ impl GradientAccumulator {
         }
 
         let scale = 1.0 / self.sample_count as f32;
-        self.gradients.iter().map(|(module, grads)| {
-            let avg_a = grads.grad_a.mapv(|v| v * scale);
-            let avg_b = grads.grad_b.mapv(|v| v * scale);
-            (*module, (avg_a, avg_b))
-        }).collect()
+        self.gradients
+            .iter()
+            .map(|(module, grads)| {
+                let avg_a = grads.grad_a.mapv(|v| v * scale);
+                let avg_b = grads.grad_b.mapv(|v| v * scale);
+                (*module, (avg_a, avg_b))
+            })
+            .collect()
     }
 
     /// Clear accumulated gradients
@@ -251,7 +263,11 @@ impl EwcRegularizer {
     }
 
     /// Initialize state for a module from adapter
-    pub fn init_module(&mut self, module: TargetModule, adapter: &crate::lora::micro_lora::LoraAdapter) {
+    pub fn init_module(
+        &mut self,
+        module: TargetModule,
+        adapter: &crate::lora::micro_lora::LoraAdapter,
+    ) {
         self.states.insert(module, EwcState::from_adapter(adapter));
     }
 
@@ -279,7 +295,9 @@ impl EwcRegularizer {
             let mut penalty = 0.0f32;
 
             // Penalty for A: sum(F_a * (w_a - w*_a)^2)
-            for ((f, w), w_opt) in state.fisher_a.iter()
+            for ((f, w), w_opt) in state
+                .fisher_a
+                .iter()
                 .zip(current_a.iter())
                 .zip(state.optimal_a.iter())
             {
@@ -288,7 +306,9 @@ impl EwcRegularizer {
             }
 
             // Penalty for B: sum(F_b * (w_b - w*_b)^2)
-            for ((f, w), w_opt) in state.fisher_b.iter()
+            for ((f, w), w_opt) in state
+                .fisher_b
+                .iter()
                 .zip(current_b.iter())
                 .zip(state.optimal_b.iter())
             {
@@ -324,7 +344,10 @@ impl EwcRegularizer {
     }
 
     /// Start a new task (consolidate current knowledge)
-    pub fn start_new_task(&mut self, adapters: &HashMap<TargetModule, Arc<RwLock<crate::lora::micro_lora::LoraAdapter>>>) {
+    pub fn start_new_task(
+        &mut self,
+        adapters: &HashMap<TargetModule, Arc<RwLock<crate::lora::micro_lora::LoraAdapter>>>,
+    ) {
         // Update optimal weights to current
         for (module, adapter) in adapters {
             if let Some(state) = self.states.get_mut(module) {
@@ -363,16 +386,22 @@ impl EwcRegularizer {
 
     /// Export states for serialization
     pub fn export_states(&self) -> HashMap<TargetModule, EwcStateExport> {
-        self.states.iter().map(|(module, state)| {
-            (*module, EwcStateExport {
-                fisher_a: state.fisher_a.iter().copied().collect(),
-                fisher_b: state.fisher_b.iter().copied().collect(),
-                optimal_a: state.optimal_a.iter().copied().collect(),
-                optimal_b: state.optimal_b.iter().copied().collect(),
-                shape_a: (state.fisher_a.nrows(), state.fisher_a.ncols()),
-                shape_b: (state.fisher_b.nrows(), state.fisher_b.ncols()),
+        self.states
+            .iter()
+            .map(|(module, state)| {
+                (
+                    *module,
+                    EwcStateExport {
+                        fisher_a: state.fisher_a.iter().copied().collect(),
+                        fisher_b: state.fisher_b.iter().copied().collect(),
+                        optimal_a: state.optimal_a.iter().copied().collect(),
+                        optimal_b: state.optimal_b.iter().copied().collect(),
+                        shape_a: (state.fisher_a.nrows(), state.fisher_a.ncols()),
+                        shape_b: (state.fisher_b.nrows(), state.fisher_b.ncols()),
+                    },
+                )
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -499,7 +528,10 @@ impl TrainingPipeline {
         let lr = self.compute_lr(step);
 
         // Apply gradients with EWC
-        let ewc_states: HashMap<TargetModule, EwcState> = self.ewc.states.iter()
+        let ewc_states: HashMap<TargetModule, EwcState> = self
+            .ewc
+            .states
+            .iter()
             .map(|(k, v)| (*k, v.clone()))
             .collect();
 
@@ -542,7 +574,8 @@ impl TrainingPipeline {
 
             LearningRateSchedule::Cosine => {
                 let decay_steps = 10000.0;
-                let factor = 0.5 * (1.0 + (std::f32::consts::PI * adjusted_step / decay_steps).cos());
+                let factor =
+                    0.5 * (1.0 + (std::f32::consts::PI * adjusted_step / decay_steps).cos());
                 min_lr + (base_lr - min_lr) * factor
             }
 
@@ -618,7 +651,10 @@ impl TrainingPipeline {
 
     /// Start a new task (for EWC)
     pub fn start_new_task(&mut self, lora: &MicroLoRA) {
-        let adapters: HashMap<_, _> = lora.config().target_modules.iter()
+        let adapters: HashMap<_, _> = lora
+            .config()
+            .target_modules
+            .iter()
             .filter_map(|m| lora.get_adapter(m).map(|a| (*m, a)))
             .collect();
         self.ewc.start_new_task(&adapters);

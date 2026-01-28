@@ -277,9 +277,9 @@ impl EvaluationHarness {
 
         // Determine if accepted
         let accepted = correctness.succeeded()
-            && diff_quality
-                .as_ref()
-                .map_or(false, |dq| dq.combined_score >= self.config.quality_threshold);
+            && diff_quality.as_ref().map_or(false, |dq| {
+                dq.combined_score >= self.config.quality_threshold
+            });
 
         Ok(EvalRun {
             task_id: task.id.clone(),
@@ -364,8 +364,14 @@ impl EvaluationHarness {
                 }
 
                 // Add latency samples
-                economics.latency.routing.add_secs(run.latency.routing_ms / 1000.0);
-                economics.latency.end_to_end.add_secs(run.latency.total_ms / 1000.0);
+                economics
+                    .latency
+                    .routing
+                    .add_secs(run.latency.routing_ms / 1000.0);
+                economics
+                    .latency
+                    .end_to_end
+                    .add_secs(run.latency.total_ms / 1000.0);
             }
 
             economics.recalculate();
@@ -426,9 +432,15 @@ impl EvalReport {
     /// Generate leaderboard-style output
     pub fn to_leaderboard(&self) -> String {
         let mut output = String::new();
-        output.push_str("╔════════════════════════════════════════════════════════════════════════════╗\n");
-        output.push_str("║                        RuvLLM Evaluation Report                            ║\n");
-        output.push_str("╠════════════════════════════════════════════════════════════════════════════╣\n");
+        output.push_str(
+            "╔════════════════════════════════════════════════════════════════════════════╗\n",
+        );
+        output.push_str(
+            "║                        RuvLLM Evaluation Report                            ║\n",
+        );
+        output.push_str(
+            "╠════════════════════════════════════════════════════════════════════════════╣\n",
+        );
         output.push_str(&format!(
             "║ Tasks: {} × {} seeds × {} modes = {} runs                                 ║\n",
             self.config.task_count,
@@ -441,9 +453,15 @@ impl EvalReport {
             self.total_duration.as_secs_f64(),
             self.config.quality_threshold * 100.0
         ));
-        output.push_str("╠════════════════════════════════════════════════════════════════════════════╣\n");
-        output.push_str("║ Mode               │ Success% │ Verified% │ Quality │ $/patch │ p95 lat  ║\n");
-        output.push_str("╠════════════════════════════════════════════════════════════════════════════╣\n");
+        output.push_str(
+            "╠════════════════════════════════════════════════════════════════════════════╣\n",
+        );
+        output.push_str(
+            "║ Mode               │ Success% │ Verified% │ Quality │ $/patch │ p95 lat  ║\n",
+        );
+        output.push_str(
+            "╠════════════════════════════════════════════════════════════════════════════╣\n",
+        );
 
         // Sort modes by success rate
         let mut modes: Vec<_> = self.mode_metrics.values().collect();
@@ -466,7 +484,9 @@ impl EvalReport {
             ));
         }
 
-        output.push_str("╚════════════════════════════════════════════════════════════════════════════╝\n");
+        output.push_str(
+            "╚════════════════════════════════════════════════════════════════════════════╝\n",
+        );
         output
     }
 
@@ -493,9 +513,7 @@ impl EvalReport {
             return None;
         }
 
-        Some(
-            (target.correctness.task_success_rate() - baseline_rate) / baseline_rate * 100.0,
-        )
+        Some((target.correctness.task_success_rate() - baseline_rate) / baseline_rate * 100.0)
     }
 }
 

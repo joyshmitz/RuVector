@@ -84,8 +84,8 @@ impl Default for SonaConfig {
             background_learning_rate: 0.001,
             ewc_lambda: 0.1,
             pattern_capacity: 10000,
-            background_interval_secs: 3600,  // 1 hour
-            deep_interval_secs: 604800,      // 1 week
+            background_interval_secs: 3600, // 1 hour
+            deep_interval_secs: 604800,     // 1 week
             quality_threshold: 0.5,
         }
     }
@@ -322,9 +322,9 @@ impl SonaIntegration {
         {
             let mut rb = self.reasoning_bank.write();
             rb.prune_patterns(
-                0.3,     // min_quality
-                5,       // min_accesses
-                604800,  // max_age_secs (1 week)
+                0.3,    // min_quality
+                5,      // min_accesses
+                604800, // max_age_secs (1 week)
             );
         }
 
@@ -351,10 +351,7 @@ impl SonaIntegration {
     /// Search for similar patterns in ReasoningBank
     pub fn search_patterns(&self, query: &[f32], limit: usize) -> Vec<LearnedPattern> {
         let rb = self.reasoning_bank.read();
-        rb.find_similar(query, limit)
-            .into_iter()
-            .cloned()
-            .collect()
+        rb.find_similar(query, limit).into_iter().cloned().collect()
     }
 
     /// Apply learned transformations to input

@@ -36,7 +36,11 @@ impl TropicalNeuralAnalysis {
         weights: Vec<Vec<Vec<f64>>>,
         biases: Vec<Vec<f64>>,
     ) -> Self {
-        Self { architecture, weights, biases }
+        Self {
+            architecture,
+            weights,
+            biases,
+        }
     }
 
     /// Create a random network for testing
@@ -74,7 +78,11 @@ impl TropicalNeuralAnalysis {
             biases.push(layer_biases);
         }
 
-        Self { architecture, weights, biases }
+        Self {
+            architecture,
+            weights,
+            biases,
+        }
     }
 
     /// Forward pass of the ReLU network
@@ -84,8 +92,13 @@ impl TropicalNeuralAnalysis {
         for layer in 0..self.weights.len() {
             let mut y = Vec::with_capacity(self.weights[layer].len());
 
-            for (neuron_weights, &bias) in self.weights[layer].iter().zip(self.biases[layer].iter()) {
-                let linear: f64 = neuron_weights.iter().zip(x.iter()).map(|(w, xi)| w * xi).sum();
+            for (neuron_weights, &bias) in self.weights[layer].iter().zip(self.biases[layer].iter())
+            {
+                let linear: f64 = neuron_weights
+                    .iter()
+                    .zip(x.iter())
+                    .map(|(w, xi)| w * xi)
+                    .sum();
                 let z = linear + bias;
                 // ReLU = max(0, z) = tropical addition
                 y.push(z.max(0.0));
@@ -163,8 +176,13 @@ impl TropicalNeuralAnalysis {
         for layer in 0..self.weights.len() {
             let mut y = Vec::with_capacity(self.weights[layer].len());
 
-            for (neuron_weights, &bias) in self.weights[layer].iter().zip(self.biases[layer].iter()) {
-                let linear: f64 = neuron_weights.iter().zip(x.iter()).map(|(w, xi)| w * xi).sum();
+            for (neuron_weights, &bias) in self.weights[layer].iter().zip(self.biases[layer].iter())
+            {
+                let linear: f64 = neuron_weights
+                    .iter()
+                    .zip(x.iter())
+                    .map(|(w, xi)| w * xi)
+                    .sum();
                 let z = linear + bias;
                 pattern.push(z > 0.0);
                 y.push(z.max(0.0));
@@ -199,7 +217,10 @@ impl TropicalNeuralAnalysis {
         }
 
         Some(TropicalPolynomial::from_monomials(
-            terms.into_iter().map(|(c, e)| super::polynomial::TropicalMonomial::new(c, e)).collect()
+            terms
+                .into_iter()
+                .map(|(c, e)| super::polynomial::TropicalMonomial::new(c, e))
+                .collect(),
         ))
     }
 
@@ -353,10 +374,7 @@ mod tests {
                 vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 1.0]],
                 vec![vec![1.0, 1.0, 1.0]],
             ],
-            vec![
-                vec![0.0, 0.0, -1.0],
-                vec![0.0],
-            ],
+            vec![vec![0.0, 0.0, -1.0], vec![0.0]],
         );
 
         let output = analysis.forward(&[1.0, 1.0]);

@@ -58,10 +58,10 @@ pub struct AccessEntry {
 /// Storage tier levels
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageTier {
-    L1Dram,      // ~80 ns
-    L2Cxl,       // ~350 ns
-    L3Ssd,       // ~80 μs
-    L4Hdd,       // ~10 ms
+    L1Dram, // ~80 ns
+    L2Cxl,  // ~350 ns
+    L3Ssd,  // ~80 μs
+    L4Hdd,  // ~10 ms
 }
 
 impl StorageTier {
@@ -169,11 +169,11 @@ impl MmapNeuralField {
 
         // Initialize multi-resolution hash tables
         let hash_tables = vec![
-            HashTable::new(1 << 16),  // 64K entries
-            HashTable::new(1 << 18),  // 256K entries
-            HashTable::new(1 << 20),  // 1M entries
-            HashTable::new(1 << 22),  // 4M entries
-            HashTable::new(1 << 24),  // 16M entries
+            HashTable::new(1 << 16), // 64K entries
+            HashTable::new(1 << 18), // 256K entries
+            HashTable::new(1 << 20), // 1M entries
+            HashTable::new(1 << 22), // 4M entries
+            HashTable::new(1 << 24), // 16M entries
         ];
 
         Ok(Self {
@@ -234,19 +234,19 @@ impl MmapNeuralField {
         let byte_slice = &mmap[byte_start..byte_end];
 
         // Reinterpret as f32 slice
-        let f32_slice = unsafe {
-            std::slice::from_raw_parts(
-                byte_slice.as_ptr() as *const f32,
-                len,
-            )
-        };
+        let f32_slice =
+            unsafe { std::slice::from_raw_parts(byte_slice.as_ptr() as *const f32, len) };
 
         // Copy to Vec (required for safe return)
         let result = f32_slice.to_vec();
 
         // Update access tracking
         let page_id = addr / self.page_size as u64;
-        self.record_access(page_id, StorageTier::L3Ssd, start.elapsed().as_micros() as u64);
+        self.record_access(
+            page_id,
+            StorageTier::L3Ssd,
+            start.elapsed().as_micros() as u64,
+        );
 
         Ok(result)
     }
@@ -274,10 +274,7 @@ impl MmapNeuralField {
 
         // Reinterpret as f32 slice
         let f32_slice = unsafe {
-            std::slice::from_raw_parts_mut(
-                byte_slice.as_mut_ptr() as *mut f32,
-                data.len(),
-            )
+            std::slice::from_raw_parts_mut(byte_slice.as_mut_ptr() as *mut f32, data.len())
         };
 
         // Copy data
@@ -307,7 +304,8 @@ impl MmapNeuralField {
         // Update page metadata
         {
             let mut pages = self.pages.write().unwrap();
-            let page = pages.entry(page_id)
+            let page = pages
+                .entry(page_id)
                 .or_insert_with(|| PageMetadata::new(page_id, self.page_size));
             page.touch();
         }
@@ -382,9 +380,10 @@ mod tests {
         let temp = NamedTempFile::new().unwrap();
         let field = MmapNeuralField::new(
             temp.path(),
-            1024 * 1024 * 1024, // 1 GB
+            1024 * 1024 * 1024,    // 1 GB
             Some(4 * 1024 * 1024), // 4 MB pages
-        ).unwrap();
+        )
+        .unwrap();
 
         let concept = vec![0.1f32, 0.2, 0.3, 0.4];
         let addr = field.hash_address(&concept);
@@ -403,8 +402,9 @@ mod tests {
         let field = MmapNeuralField::new(
             temp.path(),
             1024 * 1024, // 1 MB
-            Some(4096),   // 4 KB pages
-        ).unwrap();
+            Some(4096),  // 4 KB pages
+        )
+        .unwrap();
 
         // Write data
         let data = vec![1.0f32, 2.0, 3.0, 4.0];
@@ -422,7 +422,8 @@ mod tests {
             temp.path(),
             1024 * 1024 * 1024, // 1 GB virtual
             Some(4 * 1024 * 1024),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Reading uninitialized memory should return zeros
         let data = field.read(0, 100).unwrap();
@@ -440,11 +441,7 @@ mod tests {
     #[test]
     fn test_access_tracking() {
         let temp = NamedTempFile::new().unwrap();
-        let field = MmapNeuralField::new(
-            temp.path(),
-            1024 * 1024,
-            Some(4096),
-        ).unwrap();
+        let field = MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap();
 
         // Perform some reads
         for _ in 0..10 {

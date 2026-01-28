@@ -241,8 +241,8 @@ impl AttentionCoherence {
 
         // Aggregate
         let total_energy: f32 = weighted.iter().map(|w| w.weighted_energy).sum();
-        let avg_attention: f32 = weighted.iter().map(|w| w.attention_weight).sum::<f32>()
-            / weighted.len().max(1) as f32;
+        let avg_attention: f32 =
+            weighted.iter().map(|w| w.attention_weight).sum::<f32>() / weighted.len().max(1) as f32;
 
         Ok(AttentionEnergyAnalysis {
             weighted_residuals: weighted,
@@ -331,9 +331,7 @@ mod tests {
     use super::*;
 
     fn make_states(n: usize, dim: usize) -> Vec<Vec<f32>> {
-        (0..n)
-            .map(|i| vec![0.1 * (i + 1) as f32; dim])
-            .collect()
+        (0..n).map(|i| vec![0.1 * (i + 1) as f32; dim]).collect()
     }
 
     #[test]
@@ -372,7 +370,9 @@ mod tests {
             (2, 3, vec![0.3f32; 8]),
         ];
 
-        let weighted = coherence.weighted_residuals(&state_refs, &residuals).unwrap();
+        let weighted = coherence
+            .weighted_residuals(&state_refs, &residuals)
+            .unwrap();
 
         assert_eq!(weighted.len(), 3);
         for w in &weighted {

@@ -209,10 +209,7 @@ impl ConflictResolver<VectorDelta> for SparsityResolver {
         }
 
         // Take the sparsest delta
-        let sparsest = deltas
-            .iter()
-            .min_by_key(|d| d.value.nnz())
-            .unwrap();
+        let sparsest = deltas.iter().min_by_key(|d| d.value.nnz()).unwrap();
 
         Ok((*sparsest).clone())
     }

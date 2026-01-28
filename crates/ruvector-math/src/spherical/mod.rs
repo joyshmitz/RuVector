@@ -17,7 +17,7 @@
 //! - Fréchet mean: Spherical centroid
 
 use crate::error::{MathError, Result};
-use crate::utils::{dot, normalize, norm, EPS};
+use crate::utils::{dot, norm, normalize, EPS};
 
 /// Configuration for spherical operations
 #[derive(Debug, Clone)]
@@ -212,8 +212,7 @@ impl SphericalSpace {
         let result: Vec<f64> = (0..self.dim)
             .map(|i| {
                 let v_perp = v[i] - v_u * u[i] - dot(v, x) * x[i];
-                v_perp
-                    + v_u * (-theta.sin() * x[i] + theta.cos() * u[i])
+                v_perp + v_u * (-theta.sin() * x[i] + theta.cos() * u[i])
                     - dot(v, x) * (theta.cos() * x[i] + theta.sin() * u[i])
             })
             .collect();
@@ -308,9 +307,7 @@ impl SphericalSpace {
     pub fn sample_uniform(&self, rng: &mut impl rand::Rng) -> Vec<f64> {
         use rand_distr::{Distribution, StandardNormal};
 
-        let point: Vec<f64> = (0..self.dim)
-            .map(|_| StandardNormal.sample(rng))
-            .collect();
+        let point: Vec<f64> = (0..self.dim).map(|_| StandardNormal.sample(rng)).collect();
 
         normalize(&point)
     }

@@ -32,8 +32,8 @@
 //! 3. **Reentrant**: Feedback loops present
 //! 4. **Selective**: Not fully connected
 
-use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 /// Represents a substrate region for Φ analysis
 #[derive(Debug, Clone)]
@@ -362,7 +362,12 @@ impl ConsciousnessCalculator {
         let n = nodes.len();
 
         if n <= 1 {
-            return (Partition { parts: vec![nodes.iter().cloned().collect()] }, 0.0);
+            return (
+                Partition {
+                    parts: vec![nodes.iter().cloned().collect()],
+                },
+                0.0,
+            );
         }
 
         let mut min_ei = f64::INFINITY;
@@ -476,10 +481,13 @@ impl ConsciousnessCalculator {
     /// Perturb a state vector
     fn perturb_state(&self, state: &[f64]) -> Vec<f64> {
         // Add Gaussian noise
-        state.iter().map(|&x| {
-            let noise = (rand_simple() - 0.5) * 0.1;
-            (x + noise).clamp(0.0, 1.0)
-        }).collect()
+        state
+            .iter()
+            .map(|&x| {
+                let noise = (rand_simple() - 0.5) * 0.1;
+                (x + noise).clamp(0.0, 1.0)
+            })
+            .collect()
     }
 
     /// Evolve state through one time step - optimized with precomputed indices
@@ -487,34 +495,36 @@ impl ConsciousnessCalculator {
     /// Uses O(1) HashMap lookups instead of O(n) linear search for neighbor indices.
     fn evolve_state(&self, region: &SubstrateRegion, nodes: &[NodeId], state: &[f64]) -> Vec<f64> {
         // Precompute node -> index mapping for O(1) lookup
-        let node_index: HashMap<NodeId, usize> = nodes.iter()
-            .enumerate()
-            .map(|(i, &n)| (n, i))
-            .collect();
+        let node_index: HashMap<NodeId, usize> =
+            nodes.iter().enumerate().map(|(i, &n)| (n, i)).collect();
 
         // Leaky integration constant
         const ALPHA: f64 = 0.1;
         const ONE_MINUS_ALPHA: f64 = 1.0 - ALPHA;
 
         // Evolve each node
-        nodes.iter().enumerate().map(|(i, &node)| {
-            let current = state.get(i).cloned().unwrap_or(0.0);
+        nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| {
+                let current = state.get(i).cloned().unwrap_or(0.0);
 
-            // Sum inputs from connected nodes using precomputed index map
-            let input: f64 = region.connections
-                .get(&node)
-                .map(|neighbors| {
-                    neighbors.iter()
-                        .filter_map(|n| {
-                            node_index.get(n).and_then(|&j| state.get(j))
-                        })
-                        .sum()
-                })
-                .unwrap_or(0.0);
+                // Sum inputs from connected nodes using precomputed index map
+                let input: f64 = region
+                    .connections
+                    .get(&node)
+                    .map(|neighbors| {
+                        neighbors
+                            .iter()
+                            .filter_map(|n| node_index.get(n).and_then(|&j| state.get(j)))
+                            .sum()
+                    })
+                    .unwrap_or(0.0);
 
-            // Leaky integration with precomputed constants
-            (current * ONE_MINUS_ALPHA + input * ALPHA).clamp(0.0, 1.0)
-        }).collect()
+                // Leaky integration with precomputed constants
+                (current * ONE_MINUS_ALPHA + input * ALPHA).clamp(0.0, 1.0)
+            })
+            .collect()
     }
 
     /// Batch compute Φ for multiple regions (useful for monitoring)
@@ -569,9 +579,27 @@ mod tests {
         connections.insert(3, vec![1]); // Feedback creates reentrant architecture
 
         let mut states = HashMap::new();
-        states.insert(1, NodeState { activation: 0.5, previous_activation: 0.4 });
-        states.insert(2, NodeState { activation: 0.6, previous_activation: 0.5 });
-        states.insert(3, NodeState { activation: 0.4, previous_activation: 0.3 });
+        states.insert(
+            1,
+            NodeState {
+                activation: 0.5,
+                previous_activation: 0.4,
+            },
+        );
+        states.insert(
+            2,
+            NodeState {
+                activation: 0.6,
+                previous_activation: 0.5,
+            },
+        );
+        states.insert(
+            3,
+            NodeState {
+                activation: 0.4,
+                previous_activation: 0.3,
+            },
+        );
 
         SubstrateRegion {
             id: "test_region".to_string(),
@@ -591,9 +619,27 @@ mod tests {
         // No connection from 3 back to 1 - pure feed-forward
 
         let mut states = HashMap::new();
-        states.insert(1, NodeState { activation: 0.5, previous_activation: 0.4 });
-        states.insert(2, NodeState { activation: 0.6, previous_activation: 0.5 });
-        states.insert(3, NodeState { activation: 0.4, previous_activation: 0.3 });
+        states.insert(
+            1,
+            NodeState {
+                activation: 0.5,
+                previous_activation: 0.4,
+            },
+        );
+        states.insert(
+            2,
+            NodeState {
+                activation: 0.6,
+                previous_activation: 0.5,
+            },
+        );
+        states.insert(
+            3,
+            NodeState {
+                activation: 0.4,
+                previous_activation: 0.3,
+            },
+        );
 
         SubstrateRegion {
             id: "feedforward".to_string(),
@@ -629,9 +675,15 @@ mod tests {
     #[test]
     fn test_consciousness_levels() {
         assert_eq!(ConsciousnessLevel::from_phi(0.0), ConsciousnessLevel::None);
-        assert_eq!(ConsciousnessLevel::from_phi(0.05), ConsciousnessLevel::Minimal);
+        assert_eq!(
+            ConsciousnessLevel::from_phi(0.05),
+            ConsciousnessLevel::Minimal
+        );
         assert_eq!(ConsciousnessLevel::from_phi(0.5), ConsciousnessLevel::Low);
-        assert_eq!(ConsciousnessLevel::from_phi(5.0), ConsciousnessLevel::Moderate);
+        assert_eq!(
+            ConsciousnessLevel::from_phi(5.0),
+            ConsciousnessLevel::Moderate
+        );
         assert_eq!(ConsciousnessLevel::from_phi(15.0), ConsciousnessLevel::High);
     }
 }

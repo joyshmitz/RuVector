@@ -279,20 +279,36 @@ pub use wrapper::MinCutWrapper;
 
 // Optimization re-exports (SOTA j-Tree + BMSSP performance improvements)
 pub use optimization::{
-    // DSpar: 5.9x speedup via degree-based presparse
-    DegreePresparse, PresparseConfig, PresparseResult, PresparseStats,
-    // Cache: 10x for repeated distance queries
-    PathDistanceCache, CacheConfig, CacheStats, PrefetchHint,
-    // SIMD: 2-4x for distance operations
-    SimdDistanceOps, DistanceArray,
-    // Pool: 50-75% memory reduction
-    LevelPool, PoolConfig, LazyLevel, PoolStats,
-    // Parallel: Rayon-based work-stealing
-    ParallelLevelUpdater, ParallelConfig, WorkStealingScheduler,
-    // WASM Batch: 10x FFI overhead reduction
-    WasmBatchOps, BatchConfig, TypedArrayTransfer,
+    BatchConfig,
+    BenchmarkResult,
     // Benchmarking
-    BenchmarkSuite, BenchmarkResult, OptimizationBenchmark,
+    BenchmarkSuite,
+    CacheConfig,
+    CacheStats,
+    // DSpar: 5.9x speedup via degree-based presparse
+    DegreePresparse,
+    DistanceArray,
+    LazyLevel,
+    // Pool: 50-75% memory reduction
+    LevelPool,
+    OptimizationBenchmark,
+    ParallelConfig,
+    // Parallel: Rayon-based work-stealing
+    ParallelLevelUpdater,
+    // Cache: 10x for repeated distance queries
+    PathDistanceCache,
+    PoolConfig,
+    PoolStats,
+    PrefetchHint,
+    PresparseConfig,
+    PresparseResult,
+    PresparseStats,
+    // SIMD: 2-4x for distance operations
+    SimdDistanceOps,
+    TypedArrayTransfer,
+    // WASM Batch: 10x FFI overhead reduction
+    WasmBatchOps,
+    WorkStealingScheduler,
 };
 
 // J-Tree re-exports (feature-gated)

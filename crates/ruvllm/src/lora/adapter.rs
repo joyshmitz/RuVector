@@ -65,7 +65,7 @@ impl AdapterHandle {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
-                    .as_secs()
+                    .as_secs(),
             )),
         }
     }
@@ -210,7 +210,8 @@ impl AdapterRegistry {
 
         self.adapters.insert(id, entry);
         self.name_index.insert(name, id);
-        self.current_memory.fetch_add(memory_needed, Ordering::SeqCst);
+        self.current_memory
+            .fetch_add(memory_needed, Ordering::SeqCst);
 
         Ok(handle)
     }
@@ -239,7 +240,9 @@ impl AdapterRegistry {
 
     /// Set active adapter by name
     pub fn set_active_by_name(&self, name: &str) -> Result<()> {
-        let id = self.name_index.get(name)
+        let id = self
+            .name_index
+            .get(name)
             .map(|r| *r)
             .ok_or_else(|| RuvLLMError::NotFound(format!("Adapter '{}' not found", name)))?;
         self.set_active(id)
@@ -254,7 +257,8 @@ impl AdapterRegistry {
     pub fn unregister(&self, id: &Uuid) -> Result<()> {
         if let Some((_, entry)) = self.adapters.remove(id) {
             self.name_index.remove(&entry.handle.name);
-            self.current_memory.fetch_sub(entry.adapter.memory_bytes(), Ordering::SeqCst);
+            self.current_memory
+                .fetch_sub(entry.adapter.memory_bytes(), Ordering::SeqCst);
 
             // Clear active if this was the active adapter
             let mut active = self.active_id.write();
@@ -267,8 +271,9 @@ impl AdapterRegistry {
 
     /// List all registered adapters
     pub fn list(&self) -> Vec<AdapterInfo> {
-        self.adapters.iter().map(|entry| {
-            AdapterInfo {
+        self.adapters
+            .iter()
+            .map(|entry| AdapterInfo {
                 id: entry.handle.id,
                 name: entry.handle.name.clone(),
                 version: entry.handle.version,
@@ -277,8 +282,8 @@ impl AdapterRegistry {
                 domain: entry.metadata.domain.clone(),
                 quality_score: entry.metadata.quality_score,
                 last_accessed: entry.handle.last_accessed(),
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Get memory statistics
@@ -301,14 +306,20 @@ impl AdapterRegistry {
         }
 
         // Need to evict some adapters
-        let mut entries: Vec<_> = self.adapters.iter()
-            .map(|e| (e.key().clone(), e.handle.last_accessed(), e.handle.ref_count()))
+        let mut entries: Vec<_> = self
+            .adapters
+            .iter()
+            .map(|e| {
+                (
+                    e.key().clone(),
+                    e.handle.last_accessed(),
+                    e.handle.ref_count(),
+                )
+            })
             .collect();
 
         // Sort by last accessed (oldest first), then by ref count (lowest first)
-        entries.sort_by(|a, b| {
-            a.1.cmp(&b.1).then(a.2.cmp(&b.2))
-        });
+        entries.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(&b.2)));
 
         let mut freed = 0;
         for (id, _, ref_count) in entries {
@@ -324,13 +335,14 @@ impl AdapterRegistry {
             if let Some((_, entry)) = self.adapters.remove(&id) {
                 freed += entry.adapter.memory_bytes();
                 self.name_index.remove(&entry.handle.name);
-                self.current_memory.fetch_sub(entry.adapter.memory_bytes(), Ordering::SeqCst);
+                self.current_memory
+                    .fetch_sub(entry.adapter.memory_bytes(), Ordering::SeqCst);
             }
         }
 
         if freed < needed || self.adapters.len() >= self.max_adapters {
             return Err(RuvLLMError::OutOfMemory(
-                "Cannot free enough memory for new adapter".to_string()
+                "Cannot free enough memory for new adapter".to_string(),
             ));
         }
 
@@ -380,9 +392,7 @@ pub struct AdapterPool {
 impl AdapterPool {
     /// Create a new adapter pool
     pub fn new(config: MicroLoraConfig, size: usize) -> Self {
-        let available: Vec<_> = (0..size)
-            .map(|_| MicroLoRA::new(config.clone()))
-            .collect();
+        let available: Vec<_> = (0..size).map(|_| MicroLoRA::new(config.clone())).collect();
 
         Self {
             available: RwLock::new(available),
@@ -569,7 +579,8 @@ impl AdapterComposer {
         let output_b = adapter_b.forward(x, module);
 
         let t = self.interpolation;
-        output_a.iter()
+        output_a
+            .iter()
             .zip(output_b.iter())
             .map(|(a, b)| a * (1.0 - t) + b * t)
             .collect()
@@ -619,11 +630,13 @@ mod tests {
         let config = MicroLoraConfig::for_hidden_dim(64);
         let adapter = MicroLoRA::new(config);
 
-        let handle = registry.register(
-            "test-adapter".to_string(),
-            adapter,
-            AdapterMetadata::default(),
-        ).unwrap();
+        let handle = registry
+            .register(
+                "test-adapter".to_string(),
+                adapter,
+                AdapterMetadata::default(),
+            )
+            .unwrap();
 
         assert_eq!(registry.list().len(), 1);
         assert!(registry.get(&handle.id).is_some());
@@ -636,18 +649,22 @@ mod tests {
         let config = MicroLoraConfig::for_hidden_dim(64);
 
         let adapter1 = MicroLoRA::new(config.clone());
-        let handle1 = registry.register(
-            "adapter-1".to_string(),
-            adapter1,
-            AdapterMetadata::default(),
-        ).unwrap();
+        let handle1 = registry
+            .register(
+                "adapter-1".to_string(),
+                adapter1,
+                AdapterMetadata::default(),
+            )
+            .unwrap();
 
         let adapter2 = MicroLoRA::new(config);
-        let _handle2 = registry.register(
-            "adapter-2".to_string(),
-            adapter2,
-            AdapterMetadata::default(),
-        ).unwrap();
+        let _handle2 = registry
+            .register(
+                "adapter-2".to_string(),
+                adapter2,
+                AdapterMetadata::default(),
+            )
+            .unwrap();
 
         registry.set_active(handle1.id).unwrap();
         assert!(registry.get_active().is_some());

@@ -142,11 +142,12 @@ impl KernelPackVerifier {
     /// Verify manifest with signature from base64 string
     pub fn verify_base64(&self, manifest: &[u8], signature_b64: &str) -> Result<(), VerifyError> {
         use base64::{engine::general_purpose::STANDARD, Engine};
-        let signature = STANDARD
-            .decode(signature_b64)
-            .map_err(|e| VerifyError::InvalidSignature {
-                reason: format!("Invalid base64 signature: {}", e),
-            })?;
+        let signature =
+            STANDARD
+                .decode(signature_b64)
+                .map_err(|e| VerifyError::InvalidSignature {
+                    reason: format!("Invalid base64 signature: {}", e),
+                })?;
         self.verify(manifest, &signature)
     }
 

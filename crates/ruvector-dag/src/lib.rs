@@ -73,7 +73,9 @@ pub use qudag::QuDagClient;
 
 // Re-export crypto security functions for easy access (requires full feature)
 #[cfg(feature = "full")]
-pub use qudag::crypto::{check_crypto_security, is_production_ready, security_status, SecurityStatus};
+pub use qudag::crypto::{
+    check_crypto_security, is_production_ready, security_status, SecurityStatus,
+};
 
 #[cfg(feature = "full")]
 pub use healing::{

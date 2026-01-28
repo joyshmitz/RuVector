@@ -78,7 +78,8 @@ impl TestTensorNameMapper {
         }
 
         if lower.contains("norm") || lower.contains("ln_") || lower.contains("layer_norm") {
-            if lower.contains("final") || lower.contains("model.norm") || !lower.contains("layers") {
+            if lower.contains("final") || lower.contains("model.norm") || !lower.contains("layers")
+            {
                 return "FinalNorm";
             }
             return "LayerNorm";
@@ -93,9 +94,18 @@ fn test_llama_tensor_name_mapping() {
     let mapper = TestTensorNameMapper::new("llama");
 
     // Test layer extraction
-    assert_eq!(mapper.extract_layer_index("model.layers.0.self_attn.q_proj.weight"), Some(0));
-    assert_eq!(mapper.extract_layer_index("model.layers.31.mlp.gate_proj.weight"), Some(31));
-    assert_eq!(mapper.extract_layer_index("model.embed_tokens.weight"), None);
+    assert_eq!(
+        mapper.extract_layer_index("model.layers.0.self_attn.q_proj.weight"),
+        Some(0)
+    );
+    assert_eq!(
+        mapper.extract_layer_index("model.layers.31.mlp.gate_proj.weight"),
+        Some(31)
+    );
+    assert_eq!(
+        mapper.extract_layer_index("model.embed_tokens.weight"),
+        None
+    );
     assert_eq!(mapper.extract_layer_index("lm_head.weight"), None);
 }
 
@@ -104,9 +114,18 @@ fn test_phi_tensor_name_mapping() {
     let mapper = TestTensorNameMapper::new("phi");
 
     // Phi uses transformer.h.N pattern
-    assert_eq!(mapper.extract_layer_index("transformer.h.0.mixer.Wqkv.weight"), Some(0));
-    assert_eq!(mapper.extract_layer_index("transformer.h.15.mlp.fc1.weight"), Some(15));
-    assert_eq!(mapper.extract_layer_index("transformer.embd.wte.weight"), None);
+    assert_eq!(
+        mapper.extract_layer_index("transformer.h.0.mixer.Wqkv.weight"),
+        Some(0)
+    );
+    assert_eq!(
+        mapper.extract_layer_index("transformer.h.15.mlp.fc1.weight"),
+        Some(15)
+    );
+    assert_eq!(
+        mapper.extract_layer_index("transformer.embd.wte.weight"),
+        None
+    );
 }
 
 #[test]
@@ -114,27 +133,54 @@ fn test_qwen_tensor_name_mapping() {
     let mapper = TestTensorNameMapper::new("qwen");
 
     // Qwen uses transformer.h.N pattern like GPT-2
-    assert_eq!(mapper.extract_layer_index("transformer.h.0.attn.c_attn.weight"), Some(0));
-    assert_eq!(mapper.extract_layer_index("transformer.h.23.mlp.w1.weight"), Some(23));
+    assert_eq!(
+        mapper.extract_layer_index("transformer.h.0.attn.c_attn.weight"),
+        Some(0)
+    );
+    assert_eq!(
+        mapper.extract_layer_index("transformer.h.23.mlp.w1.weight"),
+        Some(23)
+    );
 }
 
 #[test]
 fn test_tensor_categorization_attention() {
     let mapper = TestTensorNameMapper::new("llama");
 
-    assert_eq!(mapper.categorize("model.layers.0.self_attn.q_proj.weight"), "AttentionQuery");
-    assert_eq!(mapper.categorize("model.layers.0.self_attn.k_proj.weight"), "AttentionKey");
-    assert_eq!(mapper.categorize("model.layers.0.self_attn.v_proj.weight"), "AttentionValue");
-    assert_eq!(mapper.categorize("model.layers.0.self_attn.o_proj.weight"), "AttentionOutput");
+    assert_eq!(
+        mapper.categorize("model.layers.0.self_attn.q_proj.weight"),
+        "AttentionQuery"
+    );
+    assert_eq!(
+        mapper.categorize("model.layers.0.self_attn.k_proj.weight"),
+        "AttentionKey"
+    );
+    assert_eq!(
+        mapper.categorize("model.layers.0.self_attn.v_proj.weight"),
+        "AttentionValue"
+    );
+    assert_eq!(
+        mapper.categorize("model.layers.0.self_attn.o_proj.weight"),
+        "AttentionOutput"
+    );
 }
 
 #[test]
 fn test_tensor_categorization_mlp() {
     let mapper = TestTensorNameMapper::new("llama");
 
-    assert_eq!(mapper.categorize("model.layers.0.mlp.gate_proj.weight"), "FfnGate");
-    assert_eq!(mapper.categorize("model.layers.0.mlp.up_proj.weight"), "FfnUp");
-    assert_eq!(mapper.categorize("model.layers.0.mlp.down_proj.weight"), "FfnDown");
+    assert_eq!(
+        mapper.categorize("model.layers.0.mlp.gate_proj.weight"),
+        "FfnGate"
+    );
+    assert_eq!(
+        mapper.categorize("model.layers.0.mlp.up_proj.weight"),
+        "FfnUp"
+    );
+    assert_eq!(
+        mapper.categorize("model.layers.0.mlp.down_proj.weight"),
+        "FfnDown"
+    );
 }
 
 #[test]
@@ -362,18 +408,36 @@ impl ArchitectureTensorMap {
 fn test_llama_tensor_patterns() {
     let map = ArchitectureTensorMap::llama();
 
-    assert_eq!(map.layer_tensor(map.q_proj_pattern, 0), "model.layers.0.self_attn.q_proj.weight");
-    assert_eq!(map.layer_tensor(map.gate_proj_pattern, 15), "model.layers.15.mlp.gate_proj.weight");
-    assert_eq!(map.layer_tensor(map.down_proj_pattern, 31), "model.layers.31.mlp.down_proj.weight");
+    assert_eq!(
+        map.layer_tensor(map.q_proj_pattern, 0),
+        "model.layers.0.self_attn.q_proj.weight"
+    );
+    assert_eq!(
+        map.layer_tensor(map.gate_proj_pattern, 15),
+        "model.layers.15.mlp.gate_proj.weight"
+    );
+    assert_eq!(
+        map.layer_tensor(map.down_proj_pattern, 31),
+        "model.layers.31.mlp.down_proj.weight"
+    );
 }
 
 #[test]
 fn test_phi_tensor_patterns() {
     let map = ArchitectureTensorMap::phi();
 
-    assert_eq!(map.layer_tensor(map.q_proj_pattern, 0), "transformer.h.0.mixer.Wqkv.weight");
-    assert_eq!(map.layer_tensor(map.o_proj_pattern, 7), "transformer.h.7.mixer.out_proj.weight");
-    assert_eq!(map.layer_tensor(map.down_proj_pattern, 23), "transformer.h.23.mlp.fc2.weight");
+    assert_eq!(
+        map.layer_tensor(map.q_proj_pattern, 0),
+        "transformer.h.0.mixer.Wqkv.weight"
+    );
+    assert_eq!(
+        map.layer_tensor(map.o_proj_pattern, 7),
+        "transformer.h.7.mixer.out_proj.weight"
+    );
+    assert_eq!(
+        map.layer_tensor(map.down_proj_pattern, 23),
+        "transformer.h.23.mlp.fc2.weight"
+    );
 }
 
 #[test]
@@ -391,7 +455,11 @@ fn test_gemma_tied_embeddings() {
 #[derive(Clone)]
 enum TestWeightTensor {
     F32(Vec<f32>, Vec<usize>),
-    Quantized { data: Vec<u8>, quant_type: u32, shape: Vec<usize> },
+    Quantized {
+        data: Vec<u8>,
+        quant_type: u32,
+        shape: Vec<usize>,
+    },
 }
 
 impl TestWeightTensor {
@@ -599,7 +667,7 @@ fn estimate_model_memory(config: &TestModelConfig, quant_type: &str) -> usize {
         "Q8_0" => 1.0625, // ~8.5 bits per weight
         "Q4_K" => 0.5625, // ~4.5 bits per weight
         "Q4_0" => 0.5625,
-        "Q2_K" => 0.325,  // ~2.6 bits per weight
+        "Q2_K" => 0.325, // ~2.6 bits per weight
         _ => 4.0,
     };
 
@@ -636,8 +704,8 @@ fn test_memory_estimation_llama_7b() {
     // F32 ~7B params * 4 bytes = ~28GB
     // Q4_K ~7B params * 0.5625 bytes = ~4GB
     assert!(f32_size > 20_000_000_000); // > 20GB
-    assert!(q4_size < 6_000_000_000);   // < 6GB
-    assert!(f32_size > q4_size * 5);     // F32 should be ~7x larger
+    assert!(q4_size < 6_000_000_000); // < 6GB
+    assert!(f32_size > q4_size * 5); // F32 should be ~7x larger
 }
 
 #[test]

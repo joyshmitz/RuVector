@@ -111,18 +111,28 @@ impl std::fmt::Debug for ReflectionStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Retry(config) => f.debug_tuple("Retry").field(config).finish(),
-            Self::IfOrElse { threshold, revision_budget, .. } => f
+            Self::IfOrElse {
+                threshold,
+                revision_budget,
+                ..
+            } => f
                 .debug_struct("IfOrElse")
                 .field("threshold", threshold)
                 .field("revision_budget", revision_budget)
                 .field("checker", &"<ConfidenceChecker>")
                 .finish(),
-            Self::MultiPerspective { min_agreement, perspectives } => f
+            Self::MultiPerspective {
+                min_agreement,
+                perspectives,
+            } => f
                 .debug_struct("MultiPerspective")
                 .field("min_agreement", min_agreement)
                 .field("perspectives_count", &perspectives.len())
                 .finish(),
-            Self::TrajectoryReflection { window_size, use_sona } => f
+            Self::TrajectoryReflection {
+                window_size,
+                use_sona,
+            } => f
                 .debug_struct("TrajectoryReflection")
                 .field("window_size", window_size)
                 .field("use_sona", use_sona)
@@ -381,8 +391,9 @@ pub trait BaseAgent: Send + Sync {
         let output_lower = output.to_lowercase();
         let not_error = !output_lower.contains("error") && !output_lower.contains("failed");
 
-        let score =
-            (has_content as u8 as f32 * 0.3) + (has_structure as u8 as f32 * 0.3) + (not_error as u8 as f32 * 0.4);
+        let score = (has_content as u8 as f32 * 0.3)
+            + (has_structure as u8 as f32 * 0.3)
+            + (not_error as u8 as f32 * 0.4);
         score
     }
 }
@@ -440,7 +451,11 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
     }
 
     /// Create with custom configuration
-    pub fn with_config(base_agent: A, strategy: ReflectionStrategy, config: ReflectionConfig) -> Self {
+    pub fn with_config(
+        base_agent: A,
+        strategy: ReflectionStrategy,
+        config: ReflectionConfig,
+    ) -> Self {
         let error_learner = ErrorPatternLearner::new(config.error_learner_config.clone());
         let confidence_checker = ConfidenceChecker::new(config.confidence_config.clone());
 
@@ -455,7 +470,10 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
     }
 
     /// Execute with automatic reflection on failure or low confidence
-    pub fn execute_with_reflection(&mut self, context: &ExecutionContext) -> Result<ExecutionResult> {
+    pub fn execute_with_reflection(
+        &mut self,
+        context: &ExecutionContext,
+    ) -> Result<ExecutionResult> {
         let start = Instant::now();
         let mut attempts = 0u32;
         let mut attempt_history = Vec::new();
@@ -555,12 +573,8 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
                     });
 
                     // Update context with reflection
-                    current_context = self.retry_with_context(
-                        &current_context,
-                        Some(&output),
-                        None,
-                        &reflection,
-                    );
+                    current_context =
+                        self.retry_with_context(&current_context, Some(&output), None, &reflection);
 
                     last_reflection = Some(reflection);
                 }
@@ -627,7 +641,10 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
                 let attempts = context.previous_attempts.len() as u32;
                 confidence < *threshold && attempts < *revision_budget
             }
-            ReflectionStrategy::MultiPerspective { min_agreement, perspectives } => {
+            ReflectionStrategy::MultiPerspective {
+                min_agreement,
+                perspectives,
+            } => {
                 // Check agreement across perspectives
                 if perspectives.is_empty() {
                     return false;
@@ -653,11 +670,7 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
                     .take(*window_size)
                     .filter_map(|a| a.quality_score)
                     .sum::<f32>()
-                    / context
-                        .previous_attempts
-                        .len()
-                        .min(*window_size)
-                        .max(1) as f32;
+                    / context.previous_attempts.len().min(*window_size).max(1) as f32;
 
                 recent_quality < self.config.min_quality_threshold
             }
@@ -678,7 +691,8 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
                 let mut r = Reflection::new("retry", "Retry with accumulated context");
                 if let Some(e) = error {
                     r.insights.push(format!("Error encountered: {}", e));
-                    r.suggestions.push("Review error and adjust approach".to_string());
+                    r.suggestions
+                        .push("Review error and adjust approach".to_string());
                 }
                 if config.include_error_context && !context.previous_attempts.is_empty() {
                     r.insights.push(format!(
@@ -691,7 +705,9 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
 
             ReflectionStrategy::IfOrElse { threshold, .. } => {
                 let confidence = self.base_agent.estimate_confidence(output, context);
-                let weak_points = self.confidence_checker.identify_weak_points(output, context);
+                let weak_points = self
+                    .confidence_checker
+                    .identify_weak_points(output, context);
 
                 let mut r = Reflection::new(
                     "if_or_else",
@@ -784,15 +800,15 @@ impl<A: BaseAgent> ReflectiveAgent<A> {
                         if trend > 0.1 {
                             r.insights.push("Quality improving".to_string());
                         } else if trend < -0.1 {
-                            r.insights.push("Quality declining - consider strategy change".to_string());
+                            r.insights
+                                .push("Quality declining - consider strategy change".to_string());
                             r.suggestions
                                 .push("Try different approach or break task down".to_string());
                         }
                     }
 
                     // Compute trajectory confidence
-                    let avg_quality =
-                        qualities.iter().sum::<f32>() / qualities.len().max(1) as f32;
+                    let avg_quality = qualities.iter().sum::<f32>() / qualities.len().max(1) as f32;
                     r.confidence = avg_quality;
                 }
 
@@ -943,9 +959,15 @@ mod tests {
         fn execute(&self, context: &ExecutionContext) -> Result<String> {
             let count = self.fail_count.fetch_add(1, Ordering::SeqCst);
             if count < self.max_fails {
-                Err(RuvLLMError::InvalidOperation(format!("Simulated failure {}", count + 1)))
+                Err(RuvLLMError::InvalidOperation(format!(
+                    "Simulated failure {}",
+                    count + 1
+                )))
             } else {
-                Ok(format!("Success after {} failures for: {}", count, context.task))
+                Ok(format!(
+                    "Success after {} failures for: {}",
+                    count, context.task
+                ))
             }
         }
 
@@ -957,7 +979,8 @@ mod tests {
     #[test]
     fn test_reflective_agent_retry_success() {
         let base = TestAgent::new(2); // Fail twice then succeed
-        let mut agent = ReflectiveAgent::new(base, ReflectionStrategy::Retry(RetryConfig::default()));
+        let mut agent =
+            ReflectiveAgent::new(base, ReflectionStrategy::Retry(RetryConfig::default()));
 
         let context = ExecutionContext::new("test task", AgentType::Coder, "test input");
         let result = agent.execute_with_reflection(&context).unwrap();
@@ -974,8 +997,11 @@ mod tests {
             max_reflection_attempts: 3,
             ..Default::default()
         };
-        let mut agent =
-            ReflectiveAgent::with_config(base, ReflectionStrategy::Retry(RetryConfig::default()), config);
+        let mut agent = ReflectiveAgent::with_config(
+            base,
+            ReflectionStrategy::Retry(RetryConfig::default()),
+            config,
+        );
 
         let context = ExecutionContext::new("test task", AgentType::Coder, "test input");
         let result = agent.execute_with_reflection(&context).unwrap();
@@ -1021,7 +1047,10 @@ mod tests {
             200,
             Reflection::new("retry", "context"),
         );
-        assert!(matches!(recovered.verdict, Verdict::RecoveredViaReflection { .. }));
+        assert!(matches!(
+            recovered.verdict,
+            Verdict::RecoveredViaReflection { .. }
+        ));
         assert!(recovered.recovered_via_reflection);
 
         let failure = ExecutionResult::failure("error", 3, 300);
@@ -1031,7 +1060,8 @@ mod tests {
     #[test]
     fn test_stats_tracking() {
         let base = TestAgent::new(1);
-        let mut agent = ReflectiveAgent::new(base, ReflectionStrategy::Retry(RetryConfig::default()));
+        let mut agent =
+            ReflectiveAgent::new(base, ReflectionStrategy::Retry(RetryConfig::default()));
 
         let context = ExecutionContext::new("test", AgentType::Coder, "input");
         let _ = agent.execute_with_reflection(&context);

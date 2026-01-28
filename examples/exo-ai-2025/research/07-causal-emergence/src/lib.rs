@@ -46,46 +46,26 @@
 // Feature gate for SIMD (stable in Rust 1.80+)
 #![feature(portable_simd)]
 
-pub mod effective_information;
-pub mod coarse_graining;
 pub mod causal_hierarchy;
+pub mod coarse_graining;
+pub mod effective_information;
 pub mod emergence_detection;
 
 // Re-export key types and functions for convenience
 pub use effective_information::{
-    compute_ei_simd,
-    entropy_simd,
-    compute_ei_multi_scale,
-    detect_causal_emergence,
-    normalized_ei,
+    compute_ei_multi_scale, compute_ei_simd, detect_causal_emergence, entropy_simd, normalized_ei,
 };
 
-pub use coarse_graining::{
-    Partition,
-    ScaleLevel,
-    ScaleHierarchy,
-    coarse_grain_transition_matrix,
-};
+pub use coarse_graining::{coarse_grain_transition_matrix, Partition, ScaleHierarchy, ScaleLevel};
 
 pub use causal_hierarchy::{
-    CausalHierarchy,
-    HierarchyMetrics,
-    ConsciousnessLevel,
-    transfer_entropy,
+    transfer_entropy, CausalHierarchy, ConsciousnessLevel, HierarchyMetrics,
 };
 
 pub use emergence_detection::{
-    EmergenceReport,
-    ConsciousnessReport,
-    detect_emergence,
-    assess_consciousness,
-    compare_consciousness_states,
-    find_optimal_scale,
-    ScaleOptimizationCriterion,
-    ConsciousnessMonitor,
-    consciousness_time_series,
-    detect_consciousness_transitions,
-    ConsciousnessTransition,
+    assess_consciousness, compare_consciousness_states, consciousness_time_series,
+    detect_consciousness_transitions, detect_emergence, find_optimal_scale, ConsciousnessMonitor,
+    ConsciousnessReport, ConsciousnessTransition, EmergenceReport, ScaleOptimizationCriterion,
 };
 
 /// Library version
@@ -110,9 +90,7 @@ mod integration_tests {
         let data: Vec<f32> = (0..500)
             .map(|t| {
                 let t_f = t as f32;
-                0.5 * (t_f * 0.05).sin() +
-                0.3 * (t_f * 0.15).cos() +
-                0.2 * (t_f * 0.5).sin()
+                0.5 * (t_f * 0.05).sin() + 0.3 * (t_f * 0.15).cos() + 0.2 * (t_f * 0.5).sin()
             })
             .collect();
 

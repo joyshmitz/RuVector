@@ -1,8 +1,8 @@
 //! Vector index wrapper for ruvector-core
 
 use exo_core::{
-    Error as ExoError, Filter, Metadata, MetadataValue, Pattern, PatternId,
-    Result as ExoResult, SearchResult, SubstrateTime,
+    Error as ExoError, Filter, Metadata, MetadataValue, Pattern, PatternId, Result as ExoResult,
+    SearchResult, SubstrateTime,
 };
 use ruvector_core::{types::*, VectorDB};
 use std::collections::HashMap;
@@ -17,9 +17,13 @@ pub struct VectorIndexWrapper {
 
 impl VectorIndexWrapper {
     /// Create a new vector index wrapper
-    pub fn new(dimensions: usize, distance_metric: DistanceMetric) -> Result<Self, ruvector_core::RuvectorError> {
+    pub fn new(
+        dimensions: usize,
+        distance_metric: DistanceMetric,
+    ) -> Result<Self, ruvector_core::RuvectorError> {
         // Use a temporary file path for in-memory like behavior
-        let temp_path = std::env::temp_dir().join(format!("exo_vector_{}.db", uuid::Uuid::new_v4()));
+        let temp_path =
+            std::env::temp_dir().join(format!("exo_vector_{}.db", uuid::Uuid::new_v4()));
 
         let options = DbOptions {
             dimensions,
@@ -38,7 +42,7 @@ impl VectorIndexWrapper {
     pub fn insert(&mut self, pattern: &Pattern) -> ExoResult<PatternId> {
         // Convert Pattern to VectorEntry
         let metadata = Self::serialize_metadata(pattern)?;
-        
+
         let entry = VectorEntry {
             id: Some(pattern.id.to_string()),
             vector: pattern.embedding.clone(),
@@ -79,20 +83,19 @@ impl VectorIndexWrapper {
         Ok(results
             .into_iter()
             .filter_map(|r| {
-                Self::deserialize_pattern(&r.metadata?, r.vector.as_ref())
-                    .map(|pattern| SearchResult {
+                Self::deserialize_pattern(&r.metadata?, r.vector.as_ref()).map(|pattern| {
+                    SearchResult {
                         pattern,
                         score: r.score,
                         distance: r.score, // For now, distance == score
-                    })
+                    }
+                })
             })
             .collect())
     }
 
     /// Serialize pattern metadata to JSON
-    fn serialize_metadata(
-        pattern: &Pattern,
-    ) -> ExoResult<HashMap<String, serde_json::Value>> {
+    fn serialize_metadata(pattern: &Pattern) -> ExoResult<HashMap<String, serde_json::Value>> {
         let mut json_metadata = HashMap::new();
 
         // Add pattern metadata fields

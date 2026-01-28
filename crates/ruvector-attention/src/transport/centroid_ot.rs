@@ -83,11 +83,8 @@ impl CentroidCache {
         let mut indices: Vec<usize> = (0..num_keys).collect();
         indices.shuffle(&mut rng);
 
-        let mut centroids: Vec<Vec<f32>> = indices
-            .iter()
-            .take(m)
-            .map(|&i| keys[i].to_vec())
-            .collect();
+        let mut centroids: Vec<Vec<f32>> =
+            indices.iter().take(m).map(|&i| keys[i].to_vec()).collect();
 
         let mut assignments = vec![0usize; num_keys];
 
@@ -135,10 +132,7 @@ impl CentroidCache {
         for &a in &assignments {
             counts[a] += 1;
         }
-        let weights: Vec<f32> = counts
-            .iter()
-            .map(|&c| c as f32 / num_keys as f32)
-            .collect();
+        let weights: Vec<f32> = counts.iter().map(|&c| c as f32 / num_keys as f32).collect();
 
         Self {
             centroids,
@@ -245,7 +239,11 @@ impl CentroidOTAttention {
         let mut key_weights = vec![0.0f32; cache.num_keys];
         for (key_idx, &assignment) in cache.assignments.iter().enumerate() {
             // Key weight = centroid weight / number of keys in cluster
-            let cluster_size = cache.assignments.iter().filter(|&&a| a == assignment).count();
+            let cluster_size = cache
+                .assignments
+                .iter()
+                .filter(|&&a| a == assignment)
+                .count();
             if cluster_size > 0 {
                 key_weights[key_idx] = centroid_weights[assignment] / cluster_size as f32;
             }
@@ -391,9 +389,7 @@ mod tests {
 
     #[test]
     fn test_centroid_cache() {
-        let keys: Vec<Vec<f32>> = (0..50)
-            .map(|i| vec![i as f32 * 0.1; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..50).map(|i| vec![i as f32 * 0.1; 32]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let cache = CentroidCache::build(&keys_refs, 8, 5, 42);
@@ -412,12 +408,8 @@ mod tests {
         let attention = CentroidOTAttention::with_dim(32);
 
         let query = vec![0.5f32; 32];
-        let keys: Vec<Vec<f32>> = (0..30)
-            .map(|i| vec![i as f32 * 0.05; 32])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..30)
-            .map(|i| vec![i as f32; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..30).map(|i| vec![i as f32 * 0.05; 32]).collect();
+        let values: Vec<Vec<f32>> = (0..30).map(|i| vec![i as f32; 32]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -430,12 +422,8 @@ mod tests {
     fn test_cache_reuse() {
         let attention = CentroidOTAttention::with_dim(64);
 
-        let keys: Vec<Vec<f32>> = (0..40)
-            .map(|i| vec![i as f32 * 0.025; 64])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..40)
-            .map(|i| vec![i as f32; 64])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..40).map(|i| vec![i as f32 * 0.025; 64]).collect();
+        let values: Vec<Vec<f32>> = (0..40).map(|i| vec![i as f32; 64]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -446,7 +434,9 @@ mod tests {
         // Reuse for multiple queries
         for q in 0..10 {
             let query = vec![q as f32 * 0.1; 64];
-            let output = attention.compute_with_cache(&query, &cache, &values_refs).unwrap();
+            let output = attention
+                .compute_with_cache(&query, &cache, &values_refs)
+                .unwrap();
             assert_eq!(output.len(), 64);
         }
     }

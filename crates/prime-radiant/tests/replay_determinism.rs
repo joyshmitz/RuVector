@@ -31,10 +31,7 @@ enum DomainEvent {
         timestamp: u64,
     },
     /// Remove a node
-    NodeRemoved {
-        node_id: u64,
-        timestamp: u64,
-    },
+    NodeRemoved { node_id: u64, timestamp: u64 },
     /// Add an edge between nodes
     EdgeAdded {
         source: u64,
@@ -112,24 +109,41 @@ impl CoherenceState {
             DomainEvent::NodeAdded { node_id, state, .. } => {
                 self.nodes.insert(*node_id, state.clone());
             }
-            DomainEvent::NodeUpdated { node_id, new_state, .. } => {
+            DomainEvent::NodeUpdated {
+                node_id, new_state, ..
+            } => {
                 self.nodes.insert(*node_id, new_state.clone());
             }
             DomainEvent::NodeRemoved { node_id, .. } => {
                 self.nodes.remove(node_id);
                 // Remove incident edges
-                self.edges.retain(|(s, t), _| *s != *node_id && *t != *node_id);
+                self.edges
+                    .retain(|(s, t), _| *s != *node_id && *t != *node_id);
             }
-            DomainEvent::EdgeAdded { source, target, weight, .. } => {
+            DomainEvent::EdgeAdded {
+                source,
+                target,
+                weight,
+                ..
+            } => {
                 self.edges.insert((*source, *target), *weight);
             }
-            DomainEvent::EdgeWeightUpdated { source, target, new_weight, .. } => {
+            DomainEvent::EdgeWeightUpdated {
+                source,
+                target,
+                new_weight,
+                ..
+            } => {
                 self.edges.insert((*source, *target), *new_weight);
             }
             DomainEvent::EdgeRemoved { source, target, .. } => {
                 self.edges.remove(&(*source, *target));
             }
-            DomainEvent::ThresholdChanged { scope, new_threshold, .. } => {
+            DomainEvent::ThresholdChanged {
+                scope,
+                new_threshold,
+                ..
+            } => {
                 self.thresholds.insert(scope.clone(), *new_threshold);
             }
         }
@@ -683,7 +697,10 @@ fn test_concurrent_replays() {
     // All concurrent replays should produce the same fingerprint
     let first = fingerprints[0];
     for fp in &fingerprints {
-        assert_eq!(*fp, first, "All replays should produce the same fingerprint");
+        assert_eq!(
+            *fp, first,
+            "All replays should produce the same fingerprint"
+        );
     }
 }
 

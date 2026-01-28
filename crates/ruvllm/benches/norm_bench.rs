@@ -100,15 +100,24 @@ unsafe fn rms_norm_neon_impl(x: &mut [f32], weight: &[f32], eps: f32) {
 
         let x1 = vld1q_f32(x_ptr.add(idx + 4));
         let w1 = vld1q_f32(w_ptr.add(idx + 4));
-        vst1q_f32(x_ptr.add(idx + 4), vmulq_f32(vmulq_f32(x1, inv_rms_vec), w1));
+        vst1q_f32(
+            x_ptr.add(idx + 4),
+            vmulq_f32(vmulq_f32(x1, inv_rms_vec), w1),
+        );
 
         let x2 = vld1q_f32(x_ptr.add(idx + 8));
         let w2 = vld1q_f32(w_ptr.add(idx + 8));
-        vst1q_f32(x_ptr.add(idx + 8), vmulq_f32(vmulq_f32(x2, inv_rms_vec), w2));
+        vst1q_f32(
+            x_ptr.add(idx + 8),
+            vmulq_f32(vmulq_f32(x2, inv_rms_vec), w2),
+        );
 
         let x3 = vld1q_f32(x_ptr.add(idx + 12));
         let w3 = vld1q_f32(w_ptr.add(idx + 12));
-        vst1q_f32(x_ptr.add(idx + 12), vmulq_f32(vmulq_f32(x3, inv_rms_vec), w3));
+        vst1q_f32(
+            x_ptr.add(idx + 12),
+            vmulq_f32(vmulq_f32(x3, inv_rms_vec), w3),
+        );
 
         idx += 16;
     }
@@ -412,7 +421,12 @@ fn bench_layer_norm(c: &mut Criterion) {
         group.bench_function(id, |b| {
             b.iter(|| {
                 let mut x_copy = x.clone();
-                layer_norm_neon(black_box(&mut x_copy), black_box(&weight), black_box(&bias), eps);
+                layer_norm_neon(
+                    black_box(&mut x_copy),
+                    black_box(&weight),
+                    black_box(&bias),
+                    eps,
+                );
                 x_copy
             })
         });
@@ -431,13 +445,22 @@ fn bench_batched_rms_norm(c: &mut Criterion) {
             let weight = random_tensor(dim);
             let eps = 1e-6;
 
-            let id = BenchmarkId::new(format!("batch_{}_dim_{}", batch_size, dim), batch_size * dim);
+            let id = BenchmarkId::new(
+                format!("batch_{}_dim_{}", batch_size, dim),
+                batch_size * dim,
+            );
 
             group.throughput(Throughput::Elements((batch_size * dim) as u64));
             group.bench_function(id, |b| {
                 b.iter(|| {
                     let mut x_copy = x.clone();
-                    batched_rms_norm_neon(black_box(&mut x_copy), black_box(&weight), batch_size, dim, eps);
+                    batched_rms_norm_neon(
+                        black_box(&mut x_copy),
+                        black_box(&weight),
+                        batch_size,
+                        dim,
+                        eps,
+                    );
                     x_copy
                 })
             });
@@ -458,7 +481,10 @@ fn bench_batched_layer_norm(c: &mut Criterion) {
             let bias = random_tensor(dim);
             let eps = 1e-6;
 
-            let id = BenchmarkId::new(format!("batch_{}_dim_{}", batch_size, dim), batch_size * dim);
+            let id = BenchmarkId::new(
+                format!("batch_{}_dim_{}", batch_size, dim),
+                batch_size * dim,
+            );
 
             group.throughput(Throughput::Elements((batch_size * dim) as u64));
             group.bench_function(id, |b| {
@@ -502,7 +528,12 @@ fn bench_rms_vs_layer_norm(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("layer_norm", dim), |b| {
             b.iter(|| {
                 let mut x_copy = x.clone();
-                layer_norm_neon(black_box(&mut x_copy), black_box(&weight), black_box(&bias), eps);
+                layer_norm_neon(
+                    black_box(&mut x_copy),
+                    black_box(&weight),
+                    black_box(&bias),
+                    eps,
+                );
                 x_copy
             })
         });
@@ -521,9 +552,7 @@ fn bench_compute_rms(c: &mut Criterion) {
         let id = BenchmarkId::new(format!("dim_{}", dim), dim);
 
         group.throughput(Throughput::Elements(dim as u64));
-        group.bench_function(id, |b| {
-            b.iter(|| compute_rms(black_box(&x)))
-        });
+        group.bench_function(id, |b| b.iter(|| compute_rms(black_box(&x))));
     }
 
     group.finish();

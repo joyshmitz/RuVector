@@ -6,9 +6,9 @@
 //! - GraphSAGE (Sample and Aggregate)
 
 use ruvector_gnn::{
-    CompressedTensor, CompressionLevel, RuvectorLayer, TensorCompress,
     differentiable_search as core_differentiable_search,
-    hierarchical_forward as core_hierarchical_forward,
+    hierarchical_forward as core_hierarchical_forward, CompressedTensor, CompressionLevel,
+    RuvectorLayer, TensorCompress,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -79,7 +79,9 @@ impl WasmGNNLayer {
             )));
         }
 
-        let result = self.inner.forward(&node_embedding, &neighbors, &edge_weights);
+        let result = self
+            .inner
+            .forward(&node_embedding, &neighbors, &edge_weights);
         Ok(result)
     }
 
@@ -123,7 +125,8 @@ impl WasmTensorCompress {
     ///   - f > 0.01: 4-bit PQ (cold data)
     ///   - f <= 0.01: Binary (archive)
     pub fn compress(&self, embedding: Vec<f32>, access_freq: f32) -> Result<JsValue, JsError> {
-        let compressed = self.inner
+        let compressed = self
+            .inner
             .compress(&embedding, access_freq)
             .map_err(|e| JsError::new(&format!("Compression failed: {}", e)))?;
 
@@ -137,17 +140,33 @@ impl WasmTensorCompress {
     /// * `embedding` - The input embedding vector
     /// * `level` - Compression level: "none", "half", "pq8", "pq4", "binary"
     #[wasm_bindgen(js_name = compressWithLevel)]
-    pub fn compress_with_level(&self, embedding: Vec<f32>, level: &str) -> Result<JsValue, JsError> {
+    pub fn compress_with_level(
+        &self,
+        embedding: Vec<f32>,
+        level: &str,
+    ) -> Result<JsValue, JsError> {
         let compression_level = match level {
             "none" => CompressionLevel::None,
             "half" => CompressionLevel::Half { scale: 1.0 },
-            "pq8" => CompressionLevel::PQ8 { subvectors: 8, centroids: 16 },
-            "pq4" => CompressionLevel::PQ4 { subvectors: 8, outlier_threshold: 3.0 },
+            "pq8" => CompressionLevel::PQ8 {
+                subvectors: 8,
+                centroids: 16,
+            },
+            "pq4" => CompressionLevel::PQ4 {
+                subvectors: 8,
+                outlier_threshold: 3.0,
+            },
             "binary" => CompressionLevel::Binary { threshold: 0.0 },
-            _ => return Err(JsError::new(&format!("Unknown compression level: {}", level))),
+            _ => {
+                return Err(JsError::new(&format!(
+                    "Unknown compression level: {}",
+                    level
+                )))
+            }
         };
 
-        let compressed = self.inner
+        let compressed = self
+            .inner
             .compress_with_level(&embedding, &compression_level)
             .map_err(|e| JsError::new(&format!("Compression failed: {}", e)))?;
 
@@ -168,11 +187,17 @@ impl WasmTensorCompress {
     /// Get compression ratio estimate for a given access frequency
     #[wasm_bindgen(js_name = getCompressionRatio)]
     pub fn get_compression_ratio(&self, access_freq: f32) -> f32 {
-        if access_freq > 0.8 { 1.0 }
-        else if access_freq > 0.4 { 2.0 }
-        else if access_freq > 0.1 { 4.0 }
-        else if access_freq > 0.01 { 8.0 }
-        else { 32.0 }
+        if access_freq > 0.8 {
+            1.0
+        } else if access_freq > 0.4 {
+            2.0
+        } else if access_freq > 0.1 {
+            4.0
+        } else if access_freq > 0.01 {
+            8.0
+        } else {
+            32.0
+        }
     }
 }
 
@@ -220,7 +245,8 @@ pub fn differentiable_search(
     let candidates: Vec<Vec<f32>> = serde_wasm_bindgen::from_value(candidate_embeddings)
         .map_err(|e| JsError::new(&format!("Failed to parse candidate embeddings: {}", e)))?;
 
-    let (indices, weights) = core_differentiable_search(&query, &candidates, config.k, config.temperature);
+    let (indices, weights) =
+        core_differentiable_search(&query, &candidates, config.k, config.temperature);
 
     let result = SearchResult { indices, weights };
     serde_wasm_bindgen::to_value(&result)
@@ -293,7 +319,9 @@ impl GraphAttentionFactory {
     #[wasm_bindgen(js_name = getDescription)]
     pub fn get_description(attention_type: &str) -> String {
         match attention_type {
-            "gat" => "Graph Attention Networks - learns attention weights over neighbors".to_string(),
+            "gat" => {
+                "Graph Attention Networks - learns attention weights over neighbors".to_string()
+            }
             "gcn" => "Graph Convolutional Networks - spectral convolution on graphs".to_string(),
             "graphsage" => "GraphSAGE - sample and aggregate neighbor features".to_string(),
             _ => "Unknown graph attention type".to_string(),

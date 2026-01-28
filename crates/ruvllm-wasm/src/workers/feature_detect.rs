@@ -84,9 +84,7 @@ pub fn cross_origin_isolated() -> bool {
 
     // Also check in worker context
     let global = js_sys::global();
-    if let Ok(isolated) =
-        js_sys::Reflect::get(&global, &JsValue::from_str("crossOriginIsolated"))
-    {
+    if let Ok(isolated) = js_sys::Reflect::get(&global, &JsValue::from_str("crossOriginIsolated")) {
         return isolated.as_bool().unwrap_or(false);
     }
 

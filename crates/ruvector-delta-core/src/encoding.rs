@@ -110,9 +110,7 @@ impl DeltaEncoding for DenseEncoding {
 
         let encoding_type = EncodingType::try_from(bytes[0])?;
         if encoding_type != EncodingType::Dense {
-            return Err(DeltaError::InvalidEncoding(
-                "Not a dense encoding".into(),
-            ));
+            return Err(DeltaError::InvalidEncoding("Not a dense encoding".into()));
         }
 
         let dimensions = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]) as usize;
@@ -212,9 +210,7 @@ impl DeltaEncoding for SparseEncoding {
 
         let encoding_type = EncodingType::try_from(bytes[0])?;
         if encoding_type != EncodingType::Sparse {
-            return Err(DeltaError::InvalidEncoding(
-                "Not a sparse encoding".into(),
-            ));
+            return Err(DeltaError::InvalidEncoding("Not a sparse encoding".into()));
         }
 
         let dimensions = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]) as usize;
@@ -501,9 +497,7 @@ impl DeltaEncoding for HybridEncoding {
 
     fn decode(&self, bytes: &[u8]) -> Result<VectorDelta> {
         if bytes.is_empty() {
-            return Err(DeltaError::InvalidEncoding(
-                "Empty buffer".into(),
-            ));
+            return Err(DeltaError::InvalidEncoding("Empty buffer".into()));
         }
 
         let encoding_type = EncodingType::try_from(bytes[0])?;
@@ -511,19 +505,13 @@ impl DeltaEncoding for HybridEncoding {
         match encoding_type {
             EncodingType::Dense => DenseEncoding.decode(bytes),
             EncodingType::Sparse => SparseEncoding::with_epsilon(self.epsilon).decode(bytes),
-            EncodingType::RunLength => {
-                RunLengthEncoding::with_epsilon(self.epsilon).decode(bytes)
-            }
-            EncodingType::Hybrid => {
-                Err(DeltaError::InvalidEncoding(
-                    "Hybrid type should not appear in encoded data".into(),
-                ))
-            }
-            EncodingType::Varint => {
-                Err(DeltaError::InvalidEncoding(
-                    "Varint encoding not yet implemented".into(),
-                ))
-            }
+            EncodingType::RunLength => RunLengthEncoding::with_epsilon(self.epsilon).decode(bytes),
+            EncodingType::Hybrid => Err(DeltaError::InvalidEncoding(
+                "Hybrid type should not appear in encoded data".into(),
+            )),
+            EncodingType::Varint => Err(DeltaError::InvalidEncoding(
+                "Varint encoding not yet implemented".into(),
+            )),
         }
     }
 

@@ -21,11 +21,11 @@ pub enum MapState {
 /// A simple dense layer.
 #[derive(Debug, Clone)]
 struct DenseLayer {
-    weights: Vec<Vec<f32>>,    // [output_dim][input_dim]
-    biases: Vec<f32>,          // [output_dim]
+    weights: Vec<Vec<f32>>, // [output_dim][input_dim]
+    biases: Vec<f32>,       // [output_dim]
     weight_gradients: Vec<Vec<f32>>,
     bias_gradients: Vec<f32>,
-    input_cache: Vec<f32>,     // For backprop
+    input_cache: Vec<f32>, // For backprop
     pre_activation_cache: Vec<f32>,
     activation: Activation,
 }
@@ -98,7 +98,11 @@ impl DenseLayer {
     }
 
     fn apply_gradients(&mut self, lr: f32, weight_decay: f32) {
-        for (weights_row, grads_row) in self.weights.iter_mut().zip(self.weight_gradients.iter_mut()) {
+        for (weights_row, grads_row) in self
+            .weights
+            .iter_mut()
+            .zip(self.weight_gradients.iter_mut())
+        {
             for (w, g) in weights_row.iter_mut().zip(grads_row.iter_mut()) {
                 *w -= lr * (*g + weight_decay * *w);
                 *g = 0.0; // Reset gradient
@@ -154,7 +158,9 @@ impl EwcState {
         }
 
         let mut loss = 0.0;
-        for ((f, opt), curr) in self.fisher.iter()
+        for ((f, opt), curr) in self
+            .fisher
+            .iter()
             .zip(self.optimal_weights.iter())
             .zip(current_weights.iter())
         {
@@ -189,7 +195,9 @@ pub struct LearnedRestrictionMap {
 impl LearnedRestrictionMap {
     /// Create a new learned restriction map.
     pub fn new(config: RestrictionMapConfig) -> LearnedRhoResult<Self> {
-        config.validate().map_err(LearnedRhoError::InvalidConfiguration)?;
+        config
+            .validate()
+            .map_err(LearnedRhoError::InvalidConfiguration)?;
 
         let mut layers = Vec::with_capacity(config.num_layers + 1);
 
@@ -217,9 +225,10 @@ impl LearnedRestrictionMap {
         ));
 
         // Count total parameters for EWC
-        let num_params: usize = layers.iter().map(|l| {
-            l.weights.iter().map(|r| r.len()).sum::<usize>() + l.biases.len()
-        }).sum();
+        let num_params: usize = layers
+            .iter()
+            .map(|l| l.weights.iter().map(|r| r.len()).sum::<usize>() + l.biases.len())
+            .sum();
 
         let replay = ReplayBuffer::new(config.replay_capacity);
         let ewc = EwcState::new(num_params, config.ewc_lambda);
@@ -258,7 +267,10 @@ impl LearnedRestrictionMap {
     /// Apply the learned restriction map (forward pass).
     pub fn apply(&mut self, input: &[f32]) -> LearnedRhoResult<Vec<f32>> {
         if input.len() != self.config.input_dim {
-            return Err(LearnedRhoError::dim_mismatch(self.config.input_dim, input.len()));
+            return Err(LearnedRhoError::dim_mismatch(
+                self.config.input_dim,
+                input.len(),
+            ));
         }
 
         let mut x = input.to_vec();
@@ -278,10 +290,16 @@ impl LearnedRestrictionMap {
         expected_residual: &[f32],
     ) -> LearnedRhoResult<TrainingMetrics> {
         if source.len() != self.config.input_dim {
-            return Err(LearnedRhoError::dim_mismatch(self.config.input_dim, source.len()));
+            return Err(LearnedRhoError::dim_mismatch(
+                self.config.input_dim,
+                source.len(),
+            ));
         }
         if expected_residual.len() != self.config.output_dim {
-            return Err(LearnedRhoError::dim_mismatch(self.config.output_dim, expected_residual.len()));
+            return Err(LearnedRhoError::dim_mismatch(
+                self.config.output_dim,
+                expected_residual.len(),
+            ));
         }
 
         self.state = MapState::Training;
@@ -307,7 +325,12 @@ impl LearnedRestrictionMap {
         }
 
         // Compute gradient norm
-        let gradient_norm: f32 = self.layers.iter().map(|l| l.gradient_norm()).sum::<f32>().sqrt();
+        let gradient_norm: f32 = self
+            .layers
+            .iter()
+            .map(|l| l.gradient_norm())
+            .sum::<f32>()
+            .sqrt();
 
         // Get current learning rate
         let lr = self.config.scheduler.get_lr(self.training_step);
@@ -415,7 +438,11 @@ impl LearnedRestrictionMap {
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
-        Ok(TrainingResult::from_metrics(&metrics_list, epoch, duration_ms))
+        Ok(TrainingResult::from_metrics(
+            &metrics_list,
+            epoch,
+            duration_ms,
+        ))
     }
 
     /// Get map statistics.
@@ -526,11 +553,7 @@ mod tests {
 
         // Add some experiences
         for _ in 0..20 {
-            map.add_experience(
-                vec![1.0; 32],
-                vec![2.0; 32],
-                vec![0.1; 16],
-            );
+            map.add_experience(vec![1.0; 32], vec![2.0; 32], vec![0.1; 16]);
         }
 
         let metrics = map.train_from_replay().unwrap();

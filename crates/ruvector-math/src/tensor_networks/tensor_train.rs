@@ -50,7 +50,12 @@ impl TTCore {
     /// Create new TT-core
     pub fn new(data: Vec<f64>, rank_left: usize, mode_size: usize, rank_right: usize) -> Self {
         assert_eq!(data.len(), rank_left * mode_size * rank_right);
-        Self { data, rank_left, mode_size, rank_right }
+        Self {
+            data,
+            rank_left,
+            mode_size,
+            rank_right,
+        }
     }
 
     /// Create zeros core
@@ -113,7 +118,11 @@ impl TensorTrain {
             ranks.push(core.rank_right);
         }
 
-        Self { cores, shape, ranks }
+        Self {
+            cores,
+            shape,
+            ranks,
+        }
     }
 
     /// Create rank-1 TT from vectors
@@ -252,8 +261,16 @@ impl TensorTrain {
             let c1 = &self.cores[k];
             let c2 = &other.cores[k];
 
-            let new_rl = if k == 0 { 1 } else { c1.rank_left + c2.rank_left };
-            let new_rr = if k == self.order() - 1 { 1 } else { c1.rank_right + c2.rank_right };
+            let new_rl = if k == 0 {
+                1
+            } else {
+                c1.rank_left + c2.rank_left
+            };
+            let new_rr = if k == self.order() - 1 {
+                1
+            } else {
+                c1.rank_right + c2.rank_right
+            };
             let n = c1.mode_size;
 
             let mut new_data = vec![0.0; new_rl * n * new_rr];
@@ -285,7 +302,12 @@ impl TensorTrain {
                     }
                     for rl2 in 0..c2.rank_left {
                         for rr2 in 0..c2.rank_right {
-                            new_core.set(c1.rank_left + rl2, i, c1.rank_right + rr2, c2.get(rl2, i, rr2));
+                            new_core.set(
+                                c1.rank_left + rl2,
+                                i,
+                                c1.rank_right + rr2,
+                                c2.get(rl2, i, rr2),
+                            );
                         }
                     }
                 }
@@ -359,7 +381,12 @@ impl TensorTrain {
 
 /// Simple truncated SVD using power iteration
 /// Returns (U, S, Vt, rank)
-fn simple_svd(a: &[f64], rows: usize, cols: usize, config: &TensorTrainConfig) -> (Vec<f64>, Vec<f64>, Vec<f64>, usize) {
+fn simple_svd(
+    a: &[f64],
+    rows: usize,
+    cols: usize,
+    config: &TensorTrainConfig,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, usize) {
     let max_rank = if config.max_rank > 0 {
         config.max_rank.min(rows).min(cols)
     } else {
@@ -397,9 +424,16 @@ fn simple_svd(a: &[f64], rows: usize, cols: usize, config: &TensorTrainConfig) -
 }
 
 /// Power iteration for largest singular value
-fn power_iteration(a: &[f64], rows: usize, cols: usize, max_iter: usize) -> (f64, Vec<f64>, Vec<f64>) {
+fn power_iteration(
+    a: &[f64],
+    rows: usize,
+    cols: usize,
+    max_iter: usize,
+) -> (f64, Vec<f64>, Vec<f64>) {
     // Initialize random v
-    let mut v: Vec<f64> = (0..cols).map(|i| ((i * 2654435769) as f64 / 4294967296.0) * 2.0 - 1.0).collect();
+    let mut v: Vec<f64> = (0..cols)
+        .map(|i| ((i * 2654435769) as f64 / 4294967296.0) * 2.0 - 1.0)
+        .collect();
     normalize(&mut v);
 
     let mut u = vec![0.0; rows];
@@ -482,7 +516,10 @@ mod tests {
 
         // Check reconstruction
         let reconstructed = tt.to_dense();
-        let error: f64 = tensor.data.iter().zip(reconstructed.data.iter())
+        let error: f64 = tensor
+            .data
+            .iter()
+            .zip(reconstructed.data.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f64>()
             .sqrt();

@@ -3,11 +3,10 @@
 //! Tests for GGUF header/metadata parsing, tensor loading, quantization
 //! format handling, architecture detection, memory mapping, and error handling.
 
+use crate::gguf::parser::GgufValueType;
 use crate::gguf::{
-    GgufHeader, GgufValue, GgufQuantType, GGUF_MAGIC, GGUF_VERSION,
-    parse_header, parse_metadata,
+    parse_header, parse_metadata, GgufHeader, GgufQuantType, GgufValue, GGUF_MAGIC, GGUF_VERSION,
 };
-use crate::gguf::parser::{GgufValueType};
 use std::io::Cursor;
 
 // ============================================================================
@@ -17,10 +16,10 @@ use std::io::Cursor;
 #[test]
 fn test_parse_valid_header() {
     let mut data = vec![];
-    data.extend_from_slice(&GGUF_MAGIC.to_le_bytes());    // magic
-    data.extend_from_slice(&GGUF_VERSION.to_le_bytes());  // version
-    data.extend_from_slice(&10u64.to_le_bytes());         // tensor_count
-    data.extend_from_slice(&5u64.to_le_bytes());          // metadata_kv_count
+    data.extend_from_slice(&GGUF_MAGIC.to_le_bytes()); // magic
+    data.extend_from_slice(&GGUF_VERSION.to_le_bytes()); // version
+    data.extend_from_slice(&10u64.to_le_bytes()); // tensor_count
+    data.extend_from_slice(&5u64.to_le_bytes()); // metadata_kv_count
 
     let mut cursor = Cursor::new(data);
     let header = parse_header(&mut cursor).unwrap();
@@ -140,11 +139,7 @@ fn test_gguf_value_bool() {
 
 #[test]
 fn test_gguf_value_array() {
-    let arr = vec![
-        GgufValue::U32(1),
-        GgufValue::U32(2),
-        GgufValue::U32(3),
-    ];
+    let arr = vec![GgufValue::U32(1), GgufValue::U32(2), GgufValue::U32(3)];
     let val = GgufValue::Array(arr);
 
     let array = val.as_array().unwrap();
@@ -208,11 +203,11 @@ fn test_value_type_invalid() {
 
 #[test]
 fn test_quant_type_from_u32() {
-    assert!(GgufQuantType::try_from(0u32).is_ok());  // F32
-    assert!(GgufQuantType::try_from(1u32).is_ok());  // F16
-    assert!(GgufQuantType::try_from(2u32).is_ok());  // Q4_0
-    assert!(GgufQuantType::try_from(3u32).is_ok());  // Q4_1
-    assert!(GgufQuantType::try_from(8u32).is_ok());  // Q8_0
+    assert!(GgufQuantType::try_from(0u32).is_ok()); // F32
+    assert!(GgufQuantType::try_from(1u32).is_ok()); // F16
+    assert!(GgufQuantType::try_from(2u32).is_ok()); // Q4_0
+    assert!(GgufQuantType::try_from(3u32).is_ok()); // Q4_1
+    assert!(GgufQuantType::try_from(8u32).is_ok()); // Q8_0
 }
 
 #[test]
@@ -268,8 +263,8 @@ fn test_quant_type_bits_per_weight() {
     assert!((GgufQuantType::Q8_0.bits_per_weight() - 8.5).abs() < 0.1);
 
     // Q4_0: (18 bytes * 8 bits) / 32 elements = 4.5 bits
-    let q4_bits = (GgufQuantType::Q4_0.type_size() * 8) as f32
-                  / GgufQuantType::Q4_0.block_size() as f32;
+    let q4_bits =
+        (GgufQuantType::Q4_0.type_size() * 8) as f32 / GgufQuantType::Q4_0.block_size() as f32;
     assert!((q4_bits - 4.5).abs() < 0.1);
 }
 
@@ -317,7 +312,9 @@ fn test_architecture_detection_patterns() {
         let normalized = input.to_lowercase();
         assert!(
             normalized.starts_with(expected_prefix) || normalized.contains(expected_prefix),
-            "{} should match {} pattern", input, expected_prefix
+            "{} should match {} pattern",
+            input,
+            expected_prefix
         );
     }
 }
@@ -570,8 +567,16 @@ fn test_all_quantization_types_defined() {
     ];
 
     for qt in &types {
-        assert!(qt.block_size() > 0, "{:?} should have positive block size", qt);
-        assert!(qt.type_size() > 0, "{:?} should have positive type size", qt);
+        assert!(
+            qt.block_size() > 0,
+            "{:?} should have positive block size",
+            qt
+        );
+        assert!(
+            qt.type_size() > 0,
+            "{:?} should have positive type size",
+            qt
+        );
     }
 }
 
@@ -673,7 +678,10 @@ fn test_complete_header_metadata_flow() {
 
     // Parse metadata
     let metadata = parse_metadata(&mut cursor, header.metadata_kv_count).unwrap();
-    assert_eq!(metadata.get("general.architecture").unwrap().as_str(), Some("llama"));
+    assert_eq!(
+        metadata.get("general.architecture").unwrap().as_str(),
+        Some("llama")
+    );
 }
 
 // ============================================================================
@@ -718,7 +726,7 @@ fn test_large_tensor_count() {
     data.extend_from_slice(&GGUF_MAGIC.to_le_bytes());
     data.extend_from_slice(&GGUF_VERSION.to_le_bytes());
     data.extend_from_slice(&1000u64.to_le_bytes()); // 1000 tensors
-    data.extend_from_slice(&500u64.to_le_bytes());  // 500 metadata entries
+    data.extend_from_slice(&500u64.to_le_bytes()); // 500 metadata entries
 
     let mut cursor = Cursor::new(data);
     let header = parse_header(&mut cursor).unwrap();

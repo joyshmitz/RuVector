@@ -245,7 +245,9 @@ impl BTSPAssociativeMemory {
     #[wasm_bindgen(constructor)]
     pub fn new(input_size: usize, output_size: usize) -> BTSPAssociativeMemory {
         let tau = 2000.0;
-        let layers = (0..output_size).map(|_| BTSPLayer::new(input_size, tau)).collect();
+        let layers = (0..output_size)
+            .map(|_| BTSPLayer::new(input_size, tau))
+            .collect();
 
         Self {
             layers,

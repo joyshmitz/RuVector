@@ -40,8 +40,8 @@ pub struct SQuatCompressed {
 impl SQuatCompressed {
     /// Get total bytes used
     pub fn bytes(&self) -> usize {
-        self.subspaces.iter().map(|s| s.data.len()).sum::<usize>()
-            + self.subspaces.len() * 8 // scale + zero_point per subspace
+        self.subspaces.iter().map(|s| s.data.len()).sum::<usize>() + self.subspaces.len() * 8
+        // scale + zero_point per subspace
     }
 
     /// Get compression ratio vs FP16
@@ -76,8 +76,16 @@ impl SQuatQuantizer {
     /// * `bits_per_subspace` - Bits per component (typically 2)
     /// * `head_dim` - Head dimension
     /// * `num_layers` - Number of transformer layers
-    pub fn new(num_subspaces: usize, bits_per_subspace: u8, head_dim: usize, num_layers: usize) -> Self {
-        assert!(head_dim % num_subspaces == 0, "head_dim must be divisible by num_subspaces");
+    pub fn new(
+        num_subspaces: usize,
+        bits_per_subspace: u8,
+        head_dim: usize,
+        num_layers: usize,
+    ) -> Self {
+        assert!(
+            head_dim % num_subspaces == 0,
+            "head_dim must be divisible by num_subspaces"
+        );
         assert!(bits_per_subspace <= 4, "bits_per_subspace must be <= 4");
 
         let subspace_dim = head_dim / num_subspaces;
@@ -276,7 +284,8 @@ impl SQuatQuantizer {
             let scale = (max_val - min_val) / self.max_quant as f32;
 
             // Quantize
-            let mut quantized = Vec::with_capacity((self.subspace_dim + values_per_byte - 1) / values_per_byte);
+            let mut quantized =
+                Vec::with_capacity((self.subspace_dim + values_per_byte - 1) / values_per_byte);
             for chunk in subspace.chunks(values_per_byte) {
                 let mut byte = 0u8;
                 for (j, &val) in chunk.iter().enumerate() {
@@ -349,9 +358,9 @@ impl SQuatQuantizer {
     /// Calculate expected compression ratio vs FP16
     pub fn compression_ratio(&self) -> f32 {
         let original_bits = self.head_dim * 32; // FP32 (4 bytes per element)
-        // Compressed: bits_per_subspace for each subspace's indices + 8 bytes (scale + zero_point) per subspace
-        let compressed_bits = self.num_subspaces * self.bits_per_subspace as usize
-            + self.num_subspaces * 64; // scale + zero_point per subspace
+                                                // Compressed: bits_per_subspace for each subspace's indices + 8 bytes (scale + zero_point) per subspace
+        let compressed_bits =
+            self.num_subspaces * self.bits_per_subspace as usize + self.num_subspaces * 64; // scale + zero_point per subspace
         if compressed_bits == 0 {
             return 1.0;
         }

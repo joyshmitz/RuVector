@@ -294,18 +294,12 @@ impl GrpoOptimizer {
         let mean = rewards.iter().sum::<f32>() / rewards.len() as f32;
 
         // Compute group std
-        let variance = rewards
-            .iter()
-            .map(|r| (r - mean).powi(2))
-            .sum::<f32>()
-            / rewards.len() as f32;
+        let variance =
+            rewards.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / rewards.len() as f32;
         let std = variance.sqrt().max(1e-8);
 
         // Compute relative advantages
-        rewards
-            .iter()
-            .map(|r| (r - mean) / std)
-            .collect()
+        rewards.iter().map(|r| (r - mean) / std).collect()
     }
 
     /// Compute generalized advantage estimation (GAE)
@@ -390,7 +384,8 @@ impl GrpoOptimizer {
         let mut clip_count = 0;
         for (ratio, adv) in ratios.iter().zip(normalized_advantages.iter()) {
             let surr1 = ratio * adv;
-            let surr2 = ratio.clamp(1.0 - self.config.clip_range, 1.0 + self.config.clip_range) * adv;
+            let surr2 =
+                ratio.clamp(1.0 - self.config.clip_range, 1.0 + self.config.clip_range) * adv;
 
             policy_loss -= surr1.min(surr2);
 
@@ -468,17 +463,11 @@ impl GrpoOptimizer {
         }
 
         let mean = advantages.iter().sum::<f32>() / advantages.len() as f32;
-        let variance = advantages
-            .iter()
-            .map(|a| (a - mean).powi(2))
-            .sum::<f32>()
-            / advantages.len() as f32;
+        let variance =
+            advantages.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / advantages.len() as f32;
         let std = variance.sqrt().max(1e-8);
 
-        advantages
-            .iter()
-            .map(|a| (a - mean) / std)
-            .collect()
+        advantages.iter().map(|a| (a - mean) / std).collect()
     }
 
     /// Add experience sample to buffer
@@ -620,9 +609,7 @@ impl GrpoBatch {
         // Placeholder advantages and returns (would be computed)
         let advantages = Array1::zeros(n);
         let returns = Array1::zeros(n);
-        let values = Array1::from_vec(
-            samples.iter().map(|s| s.value.unwrap_or(0.0)).collect()
-        );
+        let values = Array1::from_vec(samples.iter().map(|s| s.value.unwrap_or(0.0)).collect());
 
         Some(Self {
             states,
@@ -707,12 +694,14 @@ mod tests {
         assert!(mean.abs() < 1e-5);
 
         // Highest reward should have highest advantage
-        let max_reward_idx = rewards.iter()
+        let max_reward_idx = rewards
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(i, _)| i)
             .unwrap();
-        let max_advantage_idx = advantages.iter()
+        let max_advantage_idx = advantages
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(i, _)| i)
@@ -728,7 +717,9 @@ mod tests {
         let advantages = vec![0.5, 0.2, -0.3, 0.1];
         let ref_log_probs = vec![-0.5, -0.3, -0.7, -0.4]; // Same as current
 
-        let result = optimizer.grpo_update(&log_probs, &advantages, &ref_log_probs).unwrap();
+        let result = optimizer
+            .grpo_update(&log_probs, &advantages, &ref_log_probs)
+            .unwrap();
 
         assert_eq!(result.num_samples, 4);
         assert!(result.kl_divergence.abs() < 1e-5); // No KL when same policy

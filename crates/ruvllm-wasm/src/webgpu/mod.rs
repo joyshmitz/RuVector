@@ -243,8 +243,16 @@ pub async fn get_gpu_info() -> Result<JsValue, JsValue> {
             js_sys::Reflect::set(&js_obj, &"architecture".into(), &info.architecture.into())?;
             js_sys::Reflect::set(&js_obj, &"deviceType".into(), &info.device_type.into())?;
             js_sys::Reflect::set(&js_obj, &"backend".into(), &info.backend.into())?;
-            js_sys::Reflect::set(&js_obj, &"maxBufferSize".into(), &JsValue::from_f64(info.max_buffer_size as f64))?;
-            js_sys::Reflect::set(&js_obj, &"maxWorkgroupSize".into(), &JsValue::from_f64(info.max_workgroup_size as f64))?;
+            js_sys::Reflect::set(
+                &js_obj,
+                &"maxBufferSize".into(),
+                &JsValue::from_f64(info.max_buffer_size as f64),
+            )?;
+            js_sys::Reflect::set(
+                &js_obj,
+                &"maxWorkgroupSize".into(),
+                &JsValue::from_f64(info.max_workgroup_size as f64),
+            )?;
             Ok(js_obj.into())
         }
         None => Ok(JsValue::NULL),
@@ -278,12 +286,23 @@ impl std::fmt::Display for WebGpuError {
             Self::NotAvailable => write!(f, "WebGPU is not available in this browser"),
             Self::AdapterNotFound => write!(f, "No suitable GPU adapter found"),
             Self::DeviceCreationFailed(msg) => write!(f, "Failed to create GPU device: {}", msg),
-            Self::BufferAllocationFailed { requested, available } => {
-                write!(f, "Buffer allocation failed: requested {} bytes, {} available", requested, available)
+            Self::BufferAllocationFailed {
+                requested,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Buffer allocation failed: requested {} bytes, {} available",
+                    requested, available
+                )
             }
             Self::ShaderCompilationFailed(msg) => write!(f, "Shader compilation failed: {}", msg),
             Self::DimensionMismatch { expected, actual } => {
-                write!(f, "Dimension mismatch: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "Dimension mismatch: expected {}, got {}",
+                    expected, actual
+                )
             }
             Self::Timeout => write!(f, "GPU operation timed out"),
             Self::GpuError(msg) => write!(f, "GPU error: {}", msg),

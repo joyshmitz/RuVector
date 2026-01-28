@@ -149,11 +149,12 @@ fn conditional_entropy_simd(matrix: &[f32], n: usize) -> f32 {
 /// Vector of EI values, one per scale
 pub fn compute_ei_multi_scale(
     transition_matrices: &[Vec<f32>],
-    state_counts: &[usize]
+    state_counts: &[usize],
 ) -> Vec<f32> {
     assert_eq!(transition_matrices.len(), state_counts.len());
 
-    transition_matrices.iter()
+    transition_matrices
+        .iter()
         .zip(state_counts.iter())
         .map(|(matrix, &n)| compute_ei_simd(matrix, n))
         .collect()
@@ -170,7 +171,8 @@ pub fn detect_causal_emergence(ei_per_scale: &[f32]) -> Option<(usize, f32)> {
         return None;
     }
 
-    let (max_scale, &max_ei) = ei_per_scale.iter()
+    let (max_scale, &max_ei) = ei_per_scale
+        .iter()
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))?;
 
@@ -209,9 +211,12 @@ mod tests {
         let ei = compute_ei_simd(&matrix, n);
         let expected = (n as f32).log2(); // Should be maximal
 
-        assert!((ei - expected).abs() < 0.1,
+        assert!(
+            (ei - expected).abs() < 0.1,
             "Deterministic system should have EI ≈ log₂(n), got {}, expected {}",
-            ei, expected);
+            ei,
+            expected
+        );
     }
 
     #[test]
@@ -222,8 +227,7 @@ mod tests {
 
         let ei = compute_ei_simd(&matrix, n);
 
-        assert!(ei < 0.1,
-            "Random system should have EI ≈ 0, got {}", ei);
+        assert!(ei < 0.1, "Random system should have EI ≈ 0, got {}", ei);
     }
 
     #[test]
@@ -238,16 +242,22 @@ mod tests {
         let ei = compute_ei_simd(&matrix, n);
         let expected = (n as f32).log2();
 
-        assert!((ei - expected).abs() < 0.1,
+        assert!(
+            (ei - expected).abs() < 0.1,
             "Identity should have maximal EI, got {}, expected {}",
-            ei, expected);
+            ei,
+            expected
+        );
     }
 
     #[test]
     fn test_entropy_uniform() {
         let probs = vec![0.25, 0.25, 0.25, 0.25];
         let h = entropy_simd(&probs);
-        assert!((h - 2.0).abs() < 0.01, "Uniform 4-state should have H=2 bits");
+        assert!(
+            (h - 2.0).abs() < 0.01,
+            "Uniform 4-state should have H=2 bits"
+        );
     }
 
     #[test]
@@ -265,7 +275,10 @@ mod tests {
         let (emergent_scale, gain) = detect_causal_emergence(&ei_scales).unwrap();
 
         assert_eq!(emergent_scale, 2, "Should detect scale 2 as emergent");
-        assert!((gain - 2.2).abs() < 0.01, "EI gain should be 4.2 - 2.0 = 2.2");
+        assert!(
+            (gain - 2.2).abs() < 0.01,
+            "EI gain should be 4.2 - 2.0 = 2.2"
+        );
     }
 
     #[test]
@@ -335,8 +348,12 @@ pub mod bench {
         for n in [16, 64, 256, 1024] {
             let time = benchmark_ei(n, 100);
             let states_per_sec = (n * n) as f64 / time;
-            println!("n={:4}: {:.3}ms ({:.0} states/sec)",
-                n, time * 1000.0, states_per_sec);
+            println!(
+                "n={:4}: {:.3}ms ({:.0} states/sec)",
+                n,
+                time * 1000.0,
+                states_per_sec
+            );
         }
     }
 }

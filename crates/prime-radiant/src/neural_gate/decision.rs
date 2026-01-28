@@ -75,10 +75,9 @@ impl DecisionConfidence {
         supporting_evidence: usize,
     ) -> Self {
         // Combine confidences with weighted average
-        let overall = (energy_confidence * 0.4
-            + dendritic_confidence * 0.3
-            + oscillator_confidence * 0.3)
-            .clamp(0.0, 1.0);
+        let overall =
+            (energy_confidence * 0.4 + dendritic_confidence * 0.3 + oscillator_confidence * 0.3)
+                .clamp(0.0, 1.0);
 
         Self {
             overall,

@@ -127,11 +127,7 @@ pub fn quantize_to_int8(data: &[f32]) -> (Vec<i8>, f32) {
     let max_abs = data.iter().fold(0.0f32, |acc, &x| acc.max(x.abs()));
 
     // Compute scale to map [-max_abs, max_abs] -> [-127, 127]
-    let scale = if max_abs > 0.0 {
-        max_abs / 127.0
-    } else {
-        1.0
-    };
+    let scale = if max_abs > 0.0 { max_abs / 127.0 } else { 1.0 };
 
     let inv_scale = 1.0 / scale;
 
@@ -186,9 +182,9 @@ pub fn quantize_to_int4(data: &[f32], block_size: usize) -> (Vec<u8>, Vec<f32>, 
         let block = &data[start..end];
 
         // Find min and max in block
-        let (min_val, max_val) = block
-            .iter()
-            .fold((f32::MAX, f32::MIN), |(min, max), &x| (min.min(x), max.max(x)));
+        let (min_val, max_val) = block.iter().fold((f32::MAX, f32::MIN), |(min, max), &x| {
+            (min.min(x), max.max(x))
+        });
 
         // Compute scale and min for asymmetric quantization: q = (x - min) / scale
         // Maps [min, max] -> [0, 15]
@@ -256,11 +252,7 @@ pub fn dequantize_int4(
         for i in 0..elements_in_block {
             let byte_idx = start_byte + i / 2;
             let byte = packed[byte_idx];
-            let q = if i % 2 == 0 {
-                byte & 0x0F
-            } else {
-                byte >> 4
-            };
+            let q = if i % 2 == 0 { byte & 0x0F } else { byte >> 4 };
             output.push((q as f32) * scale + min);
         }
     }
@@ -279,9 +271,9 @@ pub fn quantize_to_q4k(data: &[f32]) -> BlockQ4K {
     debug_assert_eq!(data.len(), Q4K_SUPER_BLOCK_SIZE);
 
     // Find global min and max
-    let (global_min, global_max) = data
-        .iter()
-        .fold((f32::MAX, f32::MIN), |(min, max), &x| (min.min(x), max.max(x)));
+    let (global_min, global_max) = data.iter().fold((f32::MAX, f32::MIN), |(min, max), &x| {
+        (min.min(x), max.max(x))
+    });
 
     // Convert to f16 representation (simplified - using upper 16 bits of f32)
     let d = f32_to_f16(global_max - global_min);
@@ -299,11 +291,15 @@ pub fn quantize_to_q4k(data: &[f32]) -> BlockQ4K {
 
         let (sb_min, sb_max) = sub_block
             .iter()
-            .fold((f32::MAX, f32::MIN), |(min, max), &x| (min.min(x), max.max(x)));
+            .fold((f32::MAX, f32::MIN), |(min, max), &x| {
+                (min.min(x), max.max(x))
+            });
 
         // Scale relative to global range (6-bit precision: 0-63)
         let rel_scale = if global_scale > 1e-10 {
-            ((sb_max - sb_min) / global_scale * 63.0).round().clamp(0.0, 63.0) as u8
+            ((sb_max - sb_min) / global_scale * 63.0)
+                .round()
+                .clamp(0.0, 63.0) as u8
         } else {
             0
         };
@@ -871,11 +867,7 @@ fn q4k_gemv_scalar(
             for i in 0..Q4K_SUPER_BLOCK_SIZE {
                 let byte_idx = i / 2;
                 let byte = block.qs[byte_idx];
-                let q = if i % 2 == 0 {
-                    byte & 0x0F
-                } else {
-                    byte >> 4
-                };
+                let q = if i % 2 == 0 { byte & 0x0F } else { byte >> 4 };
                 let val = (q as f32) * scale + dmin;
                 sum += val * x[x_offset + i];
             }
@@ -967,7 +959,12 @@ mod tests {
 
         for (orig, deq) in data.iter().zip(dequantized.iter()) {
             let error = (orig - deq).abs() / orig.abs().max(0.01);
-            assert!(error < 0.02, "INT8 quantization error too high: {} vs {}", orig, deq);
+            assert!(
+                error < 0.02,
+                "INT8 quantization error too high: {} vs {}",
+                orig,
+                deq
+            );
         }
     }
 
@@ -979,7 +976,12 @@ mod tests {
 
         for (orig, deq) in data.iter().zip(dequantized.iter()) {
             let error = (orig - deq).abs();
-            assert!(error < 0.1, "INT4 quantization error too high: {} vs {}", orig, deq);
+            assert!(
+                error < 0.1,
+                "INT4 quantization error too high: {} vs {}",
+                orig,
+                deq
+            );
         }
     }
 
@@ -1014,7 +1016,11 @@ mod tests {
             assert!(
                 rel_error < 0.03 || abs_error < 0.01,
                 "INT8 GEMV error at row {}: {} vs {} (rel: {:.4}, abs: {:.6})",
-                i, y_quant[i], y_ref[i], rel_error, abs_error
+                i,
+                y_quant[i],
+                y_ref[i],
+                rel_error,
+                abs_error
             );
         }
     }
@@ -1071,7 +1077,11 @@ mod tests {
             assert!(
                 rel_error < 0.10 || abs_error < 0.1,
                 "INT4 GEMV error at row {}: {} vs {} (rel: {:.4}, abs: {:.6})",
-                i, y_quant[i], y_ref[i], rel_error, abs_error
+                i,
+                y_quant[i],
+                y_ref[i],
+                rel_error,
+                abs_error
             );
         }
     }
@@ -1093,7 +1103,9 @@ mod tests {
             assert!(
                 error < 0.01 || (v - back).abs() < 1e-6,
                 "F16 roundtrip error: {} -> {} -> {}",
-                v, h, back
+                v,
+                h,
+                back
             );
         }
     }
@@ -1124,11 +1136,7 @@ mod tests {
             let deq = (q as f32) * scale + min;
             let orig = data[i];
             let error = (deq - orig).abs();
-            assert!(
-                error < 0.2,
-                "Q4_K error at {}: {} vs {}",
-                i, deq, orig
-            );
+            assert!(error < 0.2, "Q4_K error at {}: {} vs {}", i, deq, orig);
         }
     }
 
@@ -1141,7 +1149,9 @@ mod tests {
 
         // Create matrix with values in a reasonable range that won't suffer from
         // heavy cancellation when both A and x are quantized
-        let a_f32: Vec<f32> = (0..m * n).map(|i| ((i % 127) as f32 - 63.0) / 100.0).collect();
+        let a_f32: Vec<f32> = (0..m * n)
+            .map(|i| ((i % 127) as f32 - 63.0) / 100.0)
+            .collect();
         let x: Vec<f32> = (0..n).map(|i| ((i % 63) as f32 - 31.0) / 50.0).collect();
 
         let (a_i8, scale) = quantize_to_int8(&a_f32);
@@ -1172,7 +1182,11 @@ mod tests {
             assert!(
                 abs_error < tolerance,
                 "Large INT8 GEMV error at row {}: {} vs {} (abs: {:.6}, tol: {:.6})",
-                i, y_quant[i], y_ref[i], abs_error, tolerance
+                i,
+                y_quant[i],
+                y_ref[i],
+                abs_error,
+                tolerance
             );
         }
     }
@@ -1195,7 +1209,9 @@ mod tests {
             assert!(
                 error < 0.15,
                 "INT4 boundary error at {}: {} vs {}",
-                i, data[i], dequantized[i]
+                i,
+                data[i],
+                dequantized[i]
             );
         }
     }

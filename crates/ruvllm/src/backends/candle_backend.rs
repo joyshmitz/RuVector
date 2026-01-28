@@ -45,8 +45,8 @@
 //! ```
 
 use super::{
-    DeviceType, DType, GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture,
-    ModelConfig, ModelInfo, Quantization, SpecialTokens, StreamEvent, TokenStream, Tokenizer,
+    DType, DeviceType, GenerateParams, GeneratedToken, LlmBackend, ModelArchitecture, ModelConfig,
+    ModelInfo, Quantization, SpecialTokens, StreamEvent, TokenStream, Tokenizer,
 };
 use crate::error::{Result, RuvLLMError};
 use crate::sona::{SonaConfig, SonaIntegration, Trajectory};
@@ -108,9 +108,7 @@ mod candle_impl {
     use super::*;
     use candle_core::quantized::gguf_file;
     use candle_transformers::models::{
-        llama as llama_model,
-        mistral as mistral_model,
-        quantized_llama as qlama,
+        llama as llama_model, mistral as mistral_model, quantized_llama as qlama,
     };
     use std::sync::Mutex;
 
@@ -144,16 +142,17 @@ mod candle_impl {
 
     impl Tokenizer for CandleTokenizer {
         fn encode(&self, text: &str) -> Result<Vec<u32>> {
-            let encoding = self.inner.encode(text, false).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Tokenization failed: {}", e))
-            })?;
+            let encoding = self
+                .inner
+                .encode(text, false)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Tokenization failed: {}", e)))?;
             Ok(encoding.get_ids().to_vec())
         }
 
         fn decode(&self, tokens: &[u32]) -> Result<String> {
-            self.inner.decode(tokens, true).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Decoding failed: {}", e))
-            })
+            self.inner
+                .decode(tokens, true)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Decoding failed: {}", e)))
         }
 
         fn vocab_size(&self) -> usize {
@@ -285,9 +284,10 @@ mod candle_impl {
         /// Uses the model's detected chat template format to properly
         /// format multi-turn conversations for instruction-tuned models.
         pub fn apply_chat_template(&self, messages: &[ChatMessage]) -> Result<String> {
-            let tokenizer = self.ruv_tokenizer.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .ruv_tokenizer
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
             tokenizer.apply_chat_template(messages)
         }
@@ -306,18 +306,20 @@ mod candle_impl {
 
         /// Decode a single token for streaming output
         pub fn decode_stream(&mut self, token: u32) -> Result<Option<String>> {
-            let tokenizer = self.ruv_tokenizer.as_mut().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .ruv_tokenizer
+                .as_mut()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
             tokenizer.decode_stream(token)
         }
 
         /// Flush any remaining bytes in the streaming buffer
         pub fn flush_stream(&mut self) -> Result<Option<String>> {
-            let tokenizer = self.ruv_tokenizer.as_mut().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .ruv_tokenizer
+                .as_mut()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
             tokenizer.flush_stream()
         }
@@ -351,7 +353,10 @@ mod candle_impl {
                     #[cfg(target_os = "macos")]
                     {
                         Device::new_metal(0).map_err(|e| {
-                            RuvLLMError::Backend(format!("Failed to initialize Metal device: {}", e))
+                            RuvLLMError::Backend(format!(
+                                "Failed to initialize Metal device: {}",
+                                e
+                            ))
                         })
                     }
                     #[cfg(not(target_os = "macos"))]
@@ -426,16 +431,12 @@ mod candle_impl {
                     "model.Q4_K_M.gguf",
                     "ggml-model-q4_k_m.gguf",
                 ],
-                Some(Quantization::Q4) => vec![
-                    "model-q4_0.gguf",
-                    "model.Q4_0.gguf",
-                    "ggml-model-q4_0.gguf",
-                ],
-                Some(Quantization::Q8) => vec![
-                    "model-q8_0.gguf",
-                    "model.Q8_0.gguf",
-                    "ggml-model-q8_0.gguf",
-                ],
+                Some(Quantization::Q4) => {
+                    vec!["model-q4_0.gguf", "model.Q4_0.gguf", "ggml-model-q4_0.gguf"]
+                }
+                Some(Quantization::Q8) => {
+                    vec!["model-q8_0.gguf", "model.Q8_0.gguf", "ggml-model-q8_0.gguf"]
+                }
                 _ => vec![],
             };
 
@@ -472,7 +473,8 @@ mod candle_impl {
                 let index: serde_json::Value = serde_json::from_str(&index_str)?;
 
                 if let Some(weight_map) = index.get("weight_map").and_then(|w| w.as_object()) {
-                    let mut shard_files: std::collections::HashSet<String> = std::collections::HashSet::new();
+                    let mut shard_files: std::collections::HashSet<String> =
+                        std::collections::HashSet::new();
                     for filename in weight_map.values() {
                         if let Some(f) = filename.as_str() {
                             shard_files.insert(f.to_string());
@@ -494,7 +496,7 @@ mod candle_impl {
             }
 
             Err(RuvLLMError::NotFound(
-                "No safetensors files found. Try using a quantized GGUF model.".to_string()
+                "No safetensors files found. Try using a quantized GGUF model.".to_string(),
             ))
         }
 
@@ -502,27 +504,31 @@ mod candle_impl {
         pub fn load_tokenizer(&mut self, path: &Path) -> Result<()> {
             tracing::info!("Loading tokenizer from: {:?}", path);
 
-            let tokenizer = HfTokenizer::from_file(path).map_err(|e| {
-                RuvLLMError::Storage(format!("Failed to load tokenizer: {}", e))
-            })?;
+            let tokenizer = HfTokenizer::from_file(path)
+                .map_err(|e| RuvLLMError::Storage(format!("Failed to load tokenizer: {}", e)))?;
 
             // Detect special tokens
             let special_tokens = SpecialTokens {
-                bos_token_id: tokenizer.token_to_id("<s>")
+                bos_token_id: tokenizer
+                    .token_to_id("<s>")
                     .or_else(|| tokenizer.token_to_id("<|begin_of_text|>"))
                     .or_else(|| tokenizer.token_to_id("<|startoftext|>")),
-                eos_token_id: tokenizer.token_to_id("</s>")
+                eos_token_id: tokenizer
+                    .token_to_id("</s>")
                     .or_else(|| tokenizer.token_to_id("<|end_of_text|>"))
                     .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
                     .or_else(|| tokenizer.token_to_id("<|eot_id|>")),
-                pad_token_id: tokenizer.token_to_id("<pad>")
+                pad_token_id: tokenizer
+                    .token_to_id("<pad>")
                     .or_else(|| tokenizer.token_to_id("<|pad|>"))
                     .or_else(|| tokenizer.token_to_id("[PAD]")),
-                unk_token_id: tokenizer.token_to_id("<unk>")
+                unk_token_id: tokenizer
+                    .token_to_id("<unk>")
                     .or_else(|| tokenizer.token_to_id("[UNK]")),
             };
 
-            tracing::debug!("Special tokens: bos={:?}, eos={:?}",
+            tracing::debug!(
+                "Special tokens: bos={:?}, eos={:?}",
                 special_tokens.bos_token_id,
                 special_tokens.eos_token_id
             );
@@ -539,68 +545,107 @@ mod candle_impl {
         pub fn load_gguf(&mut self, path: &Path, config: &ModelConfig) -> Result<()> {
             tracing::info!("Loading GGUF model from: {:?}", path);
 
-            let mut file = std::fs::File::open(path).map_err(|e| {
-                RuvLLMError::Storage(format!("Failed to open GGUF file: {}", e))
-            })?;
+            let mut file = std::fs::File::open(path)
+                .map_err(|e| RuvLLMError::Storage(format!("Failed to open GGUF file: {}", e)))?;
 
             // Read GGUF content
-            let gguf_content = gguf_file::Content::read(&mut file).map_err(|e| {
-                RuvLLMError::Storage(format!("Failed to read GGUF file: {}", e))
-            })?;
+            let gguf_content = gguf_file::Content::read(&mut file)
+                .map_err(|e| RuvLLMError::Storage(format!("Failed to read GGUF file: {}", e)))?;
 
             // Extract config from GGUF metadata
-            let hidden_size = self.get_gguf_u32(&gguf_content, &[
-                "llama.embedding_length",
-                "mistral.embedding_length",
-                "phi.embedding_length",
-            ]).unwrap_or(4096) as usize;
+            let hidden_size = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.embedding_length",
+                        "mistral.embedding_length",
+                        "phi.embedding_length",
+                    ],
+                )
+                .unwrap_or(4096) as usize;
 
-            let num_layers = self.get_gguf_u32(&gguf_content, &[
-                "llama.block_count",
-                "mistral.block_count",
-                "phi.block_count",
-            ]).unwrap_or(32) as usize;
+            let num_layers = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.block_count",
+                        "mistral.block_count",
+                        "phi.block_count",
+                    ],
+                )
+                .unwrap_or(32) as usize;
 
-            let num_heads = self.get_gguf_u32(&gguf_content, &[
-                "llama.attention.head_count",
-                "mistral.attention.head_count",
-                "phi.attention.head_count",
-            ]).unwrap_or(32) as usize;
+            let num_heads = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.attention.head_count",
+                        "mistral.attention.head_count",
+                        "phi.attention.head_count",
+                    ],
+                )
+                .unwrap_or(32) as usize;
 
-            let num_kv_heads = self.get_gguf_u32(&gguf_content, &[
-                "llama.attention.head_count_kv",
-                "mistral.attention.head_count_kv",
-                "phi.attention.head_count_kv",
-            ]).unwrap_or(num_heads as u32) as usize;
+            let num_kv_heads = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.attention.head_count_kv",
+                        "mistral.attention.head_count_kv",
+                        "phi.attention.head_count_kv",
+                    ],
+                )
+                .unwrap_or(num_heads as u32) as usize;
 
-            let vocab_size = self.get_gguf_u32(&gguf_content, &[
-                "llama.vocab_size",
-                "mistral.vocab_size",
-                "phi.vocab_size",
-            ]).unwrap_or(32000) as usize;
+            let vocab_size = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &["llama.vocab_size", "mistral.vocab_size", "phi.vocab_size"],
+                )
+                .unwrap_or(32000) as usize;
 
-            let intermediate_size = self.get_gguf_u32(&gguf_content, &[
-                "llama.feed_forward_length",
-                "mistral.feed_forward_length",
-                "phi.feed_forward_length",
-            ]).unwrap_or(14336) as usize;
+            let intermediate_size = self
+                .get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.feed_forward_length",
+                        "mistral.feed_forward_length",
+                        "phi.feed_forward_length",
+                    ],
+                )
+                .unwrap_or(14336) as usize;
 
-            let rope_theta = self.get_gguf_f32(&gguf_content, &[
-                "llama.rope.freq_base",
-                "mistral.rope.freq_base",
-                "phi.rope.freq_base",
-            ]).unwrap_or(10000.0) as f64;
+            let rope_theta = self
+                .get_gguf_f32(
+                    &gguf_content,
+                    &[
+                        "llama.rope.freq_base",
+                        "mistral.rope.freq_base",
+                        "phi.rope.freq_base",
+                    ],
+                )
+                .unwrap_or(10000.0) as f64;
 
-            let context_length = self.get_gguf_u32(&gguf_content, &[
-                "llama.context_length",
-                "mistral.context_length",
-                "phi.context_length",
-            ]).unwrap_or(config.max_sequence_length as u32) as usize;
+            let context_length =
+                self.get_gguf_u32(
+                    &gguf_content,
+                    &[
+                        "llama.context_length",
+                        "mistral.context_length",
+                        "phi.context_length",
+                    ],
+                )
+                .unwrap_or(config.max_sequence_length as u32) as usize;
 
-            let rms_norm_eps = self.get_gguf_f32(&gguf_content, &[
-                "llama.attention.layer_norm_rms_epsilon",
-                "mistral.attention.layer_norm_rms_epsilon",
-            ]).unwrap_or(1e-5) as f64;
+            let rms_norm_eps = self
+                .get_gguf_f32(
+                    &gguf_content,
+                    &[
+                        "llama.attention.layer_norm_rms_epsilon",
+                        "mistral.attention.layer_norm_rms_epsilon",
+                    ],
+                )
+                .unwrap_or(1e-5) as f64;
 
             let head_dim = hidden_size / num_heads;
 
@@ -618,19 +663,26 @@ mod candle_impl {
                 rms_norm_eps,
             };
 
-            tracing::info!("Model config: hidden={}, layers={}, heads={}, kv_heads={}, vocab={}",
-                hidden_size, num_layers, num_heads, num_kv_heads, vocab_size);
+            tracing::info!(
+                "Model config: hidden={}, layers={}, heads={}, kv_heads={}, vocab={}",
+                hidden_size,
+                num_layers,
+                num_heads,
+                num_kv_heads,
+                vocab_size
+            );
 
             // Load the quantized model weights
-            let model_weights = qlama::ModelWeights::from_gguf(gguf_content, &mut file, &self.device)
-                .map_err(|e| {
-                    RuvLLMError::Model(format!("Failed to load GGUF weights: {}", e))
-                })?;
+            let model_weights =
+                qlama::ModelWeights::from_gguf(gguf_content, &mut file, &self.device).map_err(
+                    |e| RuvLLMError::Model(format!("Failed to load GGUF weights: {}", e)),
+                )?;
 
             let memory_usage = estimate_gguf_memory(path)?;
 
             let info = ModelInfo {
-                name: path.file_stem()
+                name: path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown")
                     .to_string(),
@@ -691,9 +743,8 @@ mod candle_impl {
             tracing::info!("Loading safetensors from {} files", weights_files.len());
 
             // Read model config JSON
-            let config_str = std::fs::read_to_string(config_path).map_err(|e| {
-                RuvLLMError::Storage(format!("Failed to read config: {}", e))
-            })?;
+            let config_str = std::fs::read_to_string(config_path)
+                .map_err(|e| RuvLLMError::Storage(format!("Failed to read config: {}", e)))?;
 
             let model_json: serde_json::Value = serde_json::from_str(&config_str)?;
 
@@ -705,7 +756,8 @@ mod candle_impl {
                 .as_u64()
                 .unwrap_or(num_heads as u64) as usize;
             let vocab_size = model_json["vocab_size"].as_u64().unwrap_or(32000) as usize;
-            let intermediate_size = model_json["intermediate_size"].as_u64().unwrap_or(14336) as usize;
+            let intermediate_size =
+                model_json["intermediate_size"].as_u64().unwrap_or(14336) as usize;
             let rope_theta = model_json["rope_theta"].as_f64().unwrap_or(10000.0);
             let rms_norm_eps = model_json["rms_norm_eps"].as_f64().unwrap_or(1e-5);
             let head_dim = hidden_size / num_heads;
@@ -729,13 +781,8 @@ mod candle_impl {
 
             // Create VarBuilder from safetensors files
             let vb = unsafe {
-                VarBuilder::from_mmaped_safetensors(
-                    weights_files,
-                    dtype,
-                    &self.device,
-                ).map_err(|e| {
-                    RuvLLMError::Model(format!("Failed to load safetensors: {}", e))
-                })?
+                VarBuilder::from_mmaped_safetensors(weights_files, dtype, &self.device)
+                    .map_err(|e| RuvLLMError::Model(format!("Failed to load safetensors: {}", e)))?
             };
 
             // Load model based on architecture
@@ -788,8 +835,8 @@ mod candle_impl {
                     // Create KV cache for the Llama model
                     let cache = llama_model::Cache::new(true, dtype, &llama_config, &self.device)
                         .map_err(|e| {
-                            RuvLLMError::Model(format!("Failed to create Llama cache: {}", e))
-                        })?;
+                        RuvLLMError::Model(format!("Failed to create Llama cache: {}", e))
+                    })?;
 
                     LoadedModelInner::Llama(model, cache)
                 }
@@ -801,13 +848,15 @@ mod candle_impl {
                 }
             };
 
-            let memory_usage: usize = weights_files.iter()
+            let memory_usage: usize = weights_files
+                .iter()
                 .filter_map(|p| std::fs::metadata(p).ok())
                 .map(|m| m.len() as usize)
                 .sum();
 
             let info = ModelInfo {
-                name: weights_files.first()
+                name: weights_files
+                    .first()
                     .and_then(|p| p.parent())
                     .and_then(|p| p.file_name())
                     .and_then(|s| s.to_str())
@@ -838,9 +887,10 @@ mod candle_impl {
 
         /// Forward pass through the model
         fn forward(&self, input_ids: &Tensor, seq_len: usize) -> Result<Tensor> {
-            let model = self.model.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No model loaded".to_string())
-            })?;
+            let model = self
+                .model
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No model loaded".to_string()))?;
 
             let mut pos = self.current_pos.lock().expect("current_pos mutex poisoned");
             let current_pos = *pos;
@@ -850,21 +900,15 @@ mod candle_impl {
             })?;
 
             let logits = match &mut *inner {
-                LoadedModelInner::QuantizedLlama(m) => {
-                    m.forward(input_ids, current_pos).map_err(|e| {
-                        RuvLLMError::Generation(format!("Forward pass failed: {}", e))
-                    })?
-                }
-                LoadedModelInner::Mistral(m) => {
-                    m.forward(input_ids, current_pos).map_err(|e| {
-                        RuvLLMError::Generation(format!("Forward pass failed: {}", e))
-                    })?
-                }
-                LoadedModelInner::Llama(m, cache) => {
-                    m.forward(input_ids, current_pos, cache).map_err(|e| {
-                        RuvLLMError::Generation(format!("Forward pass failed: {}", e))
-                    })?
-                }
+                LoadedModelInner::QuantizedLlama(m) => m
+                    .forward(input_ids, current_pos)
+                    .map_err(|e| RuvLLMError::Generation(format!("Forward pass failed: {}", e)))?,
+                LoadedModelInner::Mistral(m) => m
+                    .forward(input_ids, current_pos)
+                    .map_err(|e| RuvLLMError::Generation(format!("Forward pass failed: {}", e)))?,
+                LoadedModelInner::Llama(m, cache) => m
+                    .forward(input_ids, current_pos, cache)
+                    .map_err(|e| RuvLLMError::Generation(format!("Forward pass failed: {}", e)))?,
             };
 
             *pos += seq_len;
@@ -928,9 +972,9 @@ mod candle_impl {
             };
 
             // Convert to f32 vector for processing
-            let mut logits_vec: Vec<f32> = last_logits.to_vec1().map_err(|e| {
-                RuvLLMError::Generation(format!("Failed to convert logits: {}", e))
-            })?;
+            let mut logits_vec: Vec<f32> = last_logits
+                .to_vec1()
+                .map_err(|e| RuvLLMError::Generation(format!("Failed to convert logits: {}", e)))?;
 
             // Apply repetition penalty
             if params.repetition_penalty != 1.0 {
@@ -960,7 +1004,8 @@ mod candle_impl {
                 .map(|(i, &v)| (i, v))
                 .collect();
 
-            indexed_logits.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            indexed_logits
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             // Apply top-k filtering
             if params.top_k > 0 && params.top_k < indexed_logits.len() {
@@ -969,8 +1014,14 @@ mod candle_impl {
 
             // Apply top-p (nucleus) sampling
             if params.top_p < 1.0 {
-                let max_logit = indexed_logits.iter().map(|(_, v)| *v).fold(f32::NEG_INFINITY, f32::max);
-                let exp_logits: Vec<f32> = indexed_logits.iter().map(|(_, v)| (v - max_logit).exp()).collect();
+                let max_logit = indexed_logits
+                    .iter()
+                    .map(|(_, v)| *v)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let exp_logits: Vec<f32> = indexed_logits
+                    .iter()
+                    .map(|(_, v)| (v - max_logit).exp())
+                    .collect();
                 let sum_exp: f32 = exp_logits.iter().sum();
                 let probs: Vec<f32> = exp_logits.iter().map(|e| e / sum_exp).collect();
 
@@ -996,11 +1047,9 @@ mod candle_impl {
             });
 
             let filtered_logits: Vec<f32> = indexed_logits.iter().map(|(_, v)| *v).collect();
-            let filtered_tensor = Tensor::from_vec(
-                filtered_logits,
-                indexed_logits.len(),
-                &self.device,
-            ).map_err(|e| RuvLLMError::Generation(e.to_string()))?;
+            let filtered_tensor =
+                Tensor::from_vec(filtered_logits, indexed_logits.len(), &self.device)
+                    .map_err(|e| RuvLLMError::Generation(e.to_string()))?;
 
             let mut logits_processor = LogitsProcessor::new(
                 seed,
@@ -1020,9 +1069,13 @@ mod candle_impl {
             let (tx, stream) = TokenStream::channel();
 
             // Determine mock response based on prompt
-            let response = if prompt.to_lowercase().contains("hello") || prompt.to_lowercase().contains("hi") {
+            let response = if prompt.to_lowercase().contains("hello")
+                || prompt.to_lowercase().contains("hi")
+            {
                 "Hello! I'm running in streaming mode. How can I help you today?"
-            } else if prompt.to_lowercase().contains("code") || prompt.to_lowercase().contains("function") {
+            } else if prompt.to_lowercase().contains("code")
+                || prompt.to_lowercase().contains("function")
+            {
                 "Here's an example function:\n\n```rust\nfn hello() {\n    println!(\"Hello from RuvLLM!\");\n}\n```"
             } else {
                 "I understand your request. This is a streaming response from RuvLLM mock mode."
@@ -1086,7 +1139,8 @@ mod candle_impl {
                 // Local path
                 if path.extension().map_or(false, |e| e == "gguf") {
                     // Direct GGUF file
-                    let tokenizer_path = path.parent()
+                    let tokenizer_path = path
+                        .parent()
                         .map(|p| p.join("tokenizer.json"))
                         .filter(|p| p.exists());
 
@@ -1121,7 +1175,8 @@ mod candle_impl {
                     let config_file = path.join("config.json");
                     if !config_file.exists() {
                         return Err(RuvLLMError::NotFound(format!(
-                            "config.json not found in {:?}", path
+                            "config.json not found in {:?}",
+                            path
                         )));
                     }
 
@@ -1138,7 +1193,7 @@ mod candle_impl {
 
                     if weights_files.is_empty() {
                         return Err(RuvLLMError::NotFound(
-                            "No .safetensors or .gguf files found".to_string()
+                            "No .safetensors or .gguf files found".to_string(),
                         ));
                     }
 
@@ -1152,9 +1207,10 @@ mod candle_impl {
         }
 
         fn generate(&self, prompt: &str, params: GenerateParams) -> Result<String> {
-            let tokenizer = self.tokenizer.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .tokenizer
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
             // Clear KV cache for new generation
             self.clear_kv_cache();
@@ -1166,9 +1222,10 @@ mod candle_impl {
             tracing::debug!("Prompt encoded to {} tokens", prompt_len);
 
             // Check max context
-            let model = self.model.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No model loaded".to_string())
-            })?;
+            let model = self
+                .model
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No model loaded".to_string()))?;
 
             let max_ctx = model.config.max_position_embeddings;
             if prompt_len >= max_ctx {
@@ -1241,10 +1298,13 @@ mod candle_impl {
                 let response_embedding = Self::simple_embedding(&output, 768);
 
                 let trajectory = Trajectory {
-                    request_id: format!("req-{}", std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis())
-                        .unwrap_or(0)),
+                    request_id: format!(
+                        "req-{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis())
+                            .unwrap_or(0)
+                    ),
                     session_id: "default".to_string(),
                     query_embedding,
                     response_embedding,
@@ -1278,22 +1338,21 @@ mod candle_impl {
             let stream = self.generate_stream_v2(prompt, params)?;
 
             // Create an adapter that converts StreamEvent to GeneratedToken
-            let iter = stream.filter_map(|event_result| {
-                match event_result {
-                    Ok(StreamEvent::Token(token)) => Some(Ok(token)),
-                    Ok(StreamEvent::Done { .. }) => None,
-                    Ok(StreamEvent::Error(msg)) => Some(Err(RuvLLMError::Generation(msg))),
-                    Err(e) => Some(Err(e)),
-                }
+            let iter = stream.filter_map(|event_result| match event_result {
+                Ok(StreamEvent::Token(token)) => Some(Ok(token)),
+                Ok(StreamEvent::Done { .. }) => None,
+                Ok(StreamEvent::Error(msg)) => Some(Err(RuvLLMError::Generation(msg))),
+                Err(e) => Some(Err(e)),
             });
 
             Ok(Box::new(iter))
         }
 
         fn generate_stream_v2(&self, prompt: &str, params: GenerateParams) -> Result<TokenStream> {
-            let tokenizer = self.tokenizer.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .tokenizer
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
             // Check if model is loaded
             if self.model.is_none() {
@@ -1363,12 +1422,18 @@ mod candle_impl {
                 };
 
                 if logits_vec.is_empty() {
-                    let _ = tx.send(StreamEvent::Error("Failed to process initial logits".to_string()));
+                    let _ = tx.send(StreamEvent::Error(
+                        "Failed to process initial logits".to_string(),
+                    ));
                     return;
                 }
 
                 // Sample tokens from logits
-                let mut indexed: Vec<(usize, f32)> = logits_vec.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+                let mut indexed: Vec<(usize, f32)> = logits_vec
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &v)| (i, v))
+                    .collect();
                 indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 // Simple top-k sampling
@@ -1429,13 +1494,15 @@ mod candle_impl {
         }
 
         fn get_embeddings(&self, text: &str) -> Result<Vec<f32>> {
-            let tokenizer = self.tokenizer.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No tokenizer loaded".to_string())
-            })?;
+            let tokenizer = self
+                .tokenizer
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer loaded".to_string()))?;
 
-            let model = self.model.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No model loaded".to_string())
-            })?;
+            let model = self
+                .model
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No model loaded".to_string()))?;
 
             let _input_ids = tokenizer.encode(text)?;
 
@@ -1494,11 +1561,15 @@ mod stub_impl {
 
     impl Tokenizer for CandleTokenizer {
         fn encode(&self, _text: &str) -> Result<Vec<u32>> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
         fn decode(&self, _tokens: &[u32]) -> Result<String> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
         fn vocab_size(&self) -> usize {
@@ -1541,12 +1612,14 @@ mod stub_impl {
     impl LlmBackend for CandleBackend {
         fn load_model(&mut self, _model_id: &str, _config: ModelConfig) -> Result<()> {
             Err(RuvLLMError::Config(
-                "Candle feature not enabled. Enable with `candle` feature.".to_string()
+                "Candle feature not enabled. Enable with `candle` feature.".to_string(),
             ))
         }
 
         fn generate(&self, _prompt: &str, _params: GenerateParams) -> Result<String> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
         fn generate_stream(
@@ -1554,15 +1627,25 @@ mod stub_impl {
             _prompt: &str,
             _params: GenerateParams,
         ) -> Result<Box<dyn Iterator<Item = Result<GeneratedToken>> + Send + '_>> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
-        fn generate_stream_v2(&self, _prompt: &str, _params: GenerateParams) -> Result<TokenStream> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+        fn generate_stream_v2(
+            &self,
+            _prompt: &str,
+            _params: GenerateParams,
+        ) -> Result<TokenStream> {
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
         fn get_embeddings(&self, _text: &str) -> Result<Vec<f32>> {
-            Err(RuvLLMError::Config("Candle feature not enabled".to_string()))
+            Err(RuvLLMError::Config(
+                "Candle feature not enabled".to_string(),
+            ))
         }
 
         fn tokenizer(&self) -> Option<&dyn Tokenizer> {
@@ -1605,9 +1688,8 @@ fn get_cache_dir() -> PathBuf {
 
 /// Estimate GGUF model memory usage
 fn estimate_gguf_memory(path: &Path) -> Result<usize> {
-    let metadata = std::fs::metadata(path).map_err(|e| {
-        RuvLLMError::Storage(format!("Failed to read file metadata: {}", e))
-    })?;
+    let metadata = std::fs::metadata(path)
+        .map_err(|e| RuvLLMError::Storage(format!("Failed to read file metadata: {}", e)))?;
     // GGUF file size plus overhead for KV cache and activations
     Ok((metadata.len() as f64 * 1.2) as usize)
 }

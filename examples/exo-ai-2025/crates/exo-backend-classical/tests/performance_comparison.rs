@@ -5,9 +5,9 @@
 use std::time::Instant;
 
 // EXO-AI crates
-use exo_core::{Pattern, PatternId, Metadata, SubstrateTime};
-use exo_temporal::{TemporalMemory, TemporalConfig, Query, ConsolidationConfig};
+use exo_core::{Metadata, Pattern, PatternId, SubstrateTime};
 use exo_federation::crypto::PostQuantumKeypair;
+use exo_temporal::{ConsolidationConfig, Query, TemporalConfig, TemporalMemory};
 
 const VECTOR_DIM: usize = 384;
 const NUM_VECTORS: usize = 1_000;
@@ -77,7 +77,7 @@ fn benchmark_temporal_memory() {
 
 #[test]
 fn benchmark_consciousness_metrics() {
-    use exo_core::consciousness::{ConsciousnessCalculator, SubstrateRegion, NodeState};
+    use exo_core::consciousness::{ConsciousnessCalculator, NodeState, SubstrateRegion};
     use std::collections::HashMap;
 
     println!("\n=== IIT Phi Calculation Performance ===\n");
@@ -93,7 +93,13 @@ fn benchmark_consciousness_metrics() {
 
     let mut states = HashMap::new();
     for &node in &nodes {
-        states.insert(node, NodeState { activation: 0.5, previous_activation: 0.4 });
+        states.insert(
+            node,
+            NodeState {
+                activation: 0.5,
+                previous_activation: 0.4,
+            },
+        );
     }
 
     let region = SubstrateRegion {
@@ -121,7 +127,7 @@ fn benchmark_consciousness_metrics() {
 
 #[test]
 fn benchmark_thermodynamic_tracking() {
-    use exo_core::thermodynamics::{ThermodynamicTracker, Operation};
+    use exo_core::thermodynamics::{Operation, ThermodynamicTracker};
 
     println!("\n=== Landauer Thermodynamic Tracking Performance ===\n");
 
@@ -140,11 +146,22 @@ fn benchmark_thermodynamic_tracking() {
     let report = tracker.efficiency_report();
     println!("\nEfficiency Report:");
     println!("  Total bit erasures: {}", report.total_bit_erasures);
-    println!("  Landauer minimum: {:.2e} J", report.landauer_minimum_joules);
-    println!("  Estimated actual: {:.2e} J", report.estimated_actual_joules);
-    println!("  Efficiency ratio: {:.0}x above Landauer", report.efficiency_ratio);
-    println!("  Reversible savings: {:.2}%",
-        (report.reversible_savings_potential / report.estimated_actual_joules) * 100.0);
+    println!(
+        "  Landauer minimum: {:.2e} J",
+        report.landauer_minimum_joules
+    );
+    println!(
+        "  Estimated actual: {:.2e} J",
+        report.estimated_actual_joules
+    );
+    println!(
+        "  Efficiency ratio: {:.0}x above Landauer",
+        report.efficiency_ratio
+    );
+    println!(
+        "  Reversible savings: {:.2}%",
+        (report.reversible_savings_potential / report.estimated_actual_joules) * 100.0
+    );
 }
 
 #[test]

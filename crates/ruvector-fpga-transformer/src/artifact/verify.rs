@@ -45,8 +45,8 @@ pub fn verify_artifact(artifact: &ModelArtifact) -> Result<()> {
     }
 
     // 4. Verify weights size
-    let expected_min = artifact.manifest.shape.embedding_params()
-        / artifact.manifest.quant.weights_per_byte();
+    let expected_min =
+        artifact.manifest.shape.embedding_params() / artifact.manifest.quant.weights_per_byte();
     if artifact.weights.len() < expected_min {
         return Err(Error::InvalidArtifact(format!(
             "Weights too small: {} < {}",
@@ -94,7 +94,7 @@ fn compute_signing_message(artifact: &ModelArtifact) -> Vec<u8> {
 /// Sign an artifact with Ed25519 private key
 #[cfg(feature = "sign")]
 pub fn sign_artifact(artifact: &mut ModelArtifact, secret_key: &[u8; 32]) -> Result<()> {
-    use ed25519_dalek::{SigningKey, Signer};
+    use ed25519_dalek::{Signer, SigningKey};
 
     let signing_key = SigningKey::from_bytes(secret_key);
     let message = compute_signing_message(artifact);
@@ -151,9 +151,7 @@ pub fn generate_test_vectors(
 
     for _ in 0..count {
         // Generate random input
-        let tokens: Vec<u16> = (0..seq_len)
-            .map(|_| rng.gen_range(0..vocab))
-            .collect();
+        let tokens: Vec<u16> = (0..seq_len).map(|_| rng.gen_range(0..vocab)).collect();
 
         // Run inference
         let expected = infer_fn(&tokens)?;
@@ -187,13 +185,7 @@ mod tests {
             tests: Default::default(),
         };
 
-        ModelArtifact::new(
-            manifest,
-            vec![0u8; 4096 * 64],
-            None,
-            None,
-            vec![],
-        )
+        ModelArtifact::new(manifest, vec![0u8; 4096 * 64], None, None, vec![])
     }
 
     #[test]

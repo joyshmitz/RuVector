@@ -171,10 +171,7 @@ impl TileAdapter {
         }
 
         if !self.tile.ingest_delta(delta) {
-            return Err(TilesError::buffer_full(
-                self.tile.tile_id,
-                MAX_DELTA_BUFFER,
-            ));
+            return Err(TilesError::buffer_full(self.tile.tile_id, MAX_DELTA_BUFFER));
         }
 
         self.total_deltas += 1;

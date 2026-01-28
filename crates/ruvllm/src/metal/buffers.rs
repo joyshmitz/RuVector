@@ -147,10 +147,9 @@ impl MetalBufferPool {
         }
 
         // Allocate new buffer
-        let buffer = self.device.new_buffer(
-            size_class as u64,
-            MTLResourceOptions::StorageModeShared,
-        );
+        let buffer = self
+            .device
+            .new_buffer(size_class as u64, MTLResourceOptions::StorageModeShared);
 
         MetalBuffer {
             buffer,

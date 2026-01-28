@@ -210,8 +210,8 @@ impl IsolationComparison {
             .copied()
             .collect();
 
-        let union_size = first.isolated_vertices.len() + second.isolated_vertices.len()
-            - common.len();
+        let union_size =
+            first.isolated_vertices.len() + second.isolated_vertices.len() - common.len();
         let jaccard = if union_size > 0 {
             common.len() as f64 / union_size as f64
         } else {

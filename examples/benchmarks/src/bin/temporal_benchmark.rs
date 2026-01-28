@@ -194,10 +194,7 @@ fn main() -> Result<()> {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!("📊 Summary:");
-    println!(
-        "   Total puzzles:  {}",
-        benchmark_results.total_puzzles
-    );
+    println!("   Total puzzles:  {}", benchmark_results.total_puzzles);
     println!("   Solved:         {}", benchmark_results.solved_count);
     println!("   Correct:        {}", benchmark_results.correct_count);
     println!(
@@ -206,14 +203,8 @@ fn main() -> Result<()> {
     );
     println!();
     println!("⏱️  Performance:");
-    println!(
-        "   Avg steps:      {:.1}",
-        benchmark_results.avg_steps
-    );
-    println!(
-        "   Avg tool calls: {:.1}",
-        benchmark_results.avg_tool_calls
-    );
+    println!("   Avg steps:      {:.1}", benchmark_results.avg_steps);
+    println!("   Avg tool calls: {:.1}", benchmark_results.avg_tool_calls);
     println!(
         "   Avg latency:    {:.1}ms",
         benchmark_results.avg_latency_ms
@@ -252,8 +243,7 @@ fn main() -> Result<()> {
         println!("🔧 Tool Analysis:");
         println!(
             "   Calendar rewriting success: {}/{}",
-            with_rewriting,
-            benchmark_results.total_puzzles
+            with_rewriting, benchmark_results.total_puzzles
         );
     }
 

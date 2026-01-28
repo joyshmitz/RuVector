@@ -23,15 +23,15 @@
 //!
 //! Birth-death pairs form the persistence diagram.
 
-mod simplex;
+mod distance;
 mod filtration;
 mod persistence;
-mod distance;
+mod simplex;
 
-pub use simplex::{Simplex, SimplicialComplex};
-pub use filtration::{Filtration, VietorisRips, AlphaComplex};
-pub use persistence::{PersistenceDiagram, PersistentHomology, BirthDeathPair};
 pub use distance::{BottleneckDistance, WassersteinDistance};
+pub use filtration::{AlphaComplex, Filtration, VietorisRips};
+pub use persistence::{BirthDeathPair, PersistenceDiagram, PersistentHomology};
+pub use simplex::{Simplex, SimplicialComplex};
 
 /// Betti numbers at a given scale
 #[derive(Debug, Clone, PartialEq)]
@@ -111,7 +111,10 @@ impl PointCloud {
     /// Create from points
     pub fn new(points: Vec<Point>) -> Self {
         let ambient_dim = points.first().map(|p| p.dim()).unwrap_or(0);
-        Self { points, ambient_dim }
+        Self {
+            points,
+            ambient_dim,
+        }
     }
 
     /// Create from flat array (row-major)
@@ -120,7 +123,10 @@ impl PointCloud {
             .chunks(dim)
             .map(|chunk| Point::new(chunk.to_vec()))
             .collect();
-        Self { points, ambient_dim: dim }
+        Self {
+            points,
+            ambient_dim: dim,
+        }
     }
 
     /// Number of points

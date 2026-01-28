@@ -131,15 +131,24 @@ unsafe fn rms_norm_neon_impl(x: &mut [f32], weight: &[f32], eps: f32) {
 
         let x1 = vld1q_f32(x_ptr.add(idx + 4));
         let w1 = vld1q_f32(w_ptr.add(idx + 4));
-        vst1q_f32(x_ptr.add(idx + 4), vmulq_f32(vmulq_f32(x1, inv_rms_vec), w1));
+        vst1q_f32(
+            x_ptr.add(idx + 4),
+            vmulq_f32(vmulq_f32(x1, inv_rms_vec), w1),
+        );
 
         let x2 = vld1q_f32(x_ptr.add(idx + 8));
         let w2 = vld1q_f32(w_ptr.add(idx + 8));
-        vst1q_f32(x_ptr.add(idx + 8), vmulq_f32(vmulq_f32(x2, inv_rms_vec), w2));
+        vst1q_f32(
+            x_ptr.add(idx + 8),
+            vmulq_f32(vmulq_f32(x2, inv_rms_vec), w2),
+        );
 
         let x3 = vld1q_f32(x_ptr.add(idx + 12));
         let w3 = vld1q_f32(w_ptr.add(idx + 12));
-        vst1q_f32(x_ptr.add(idx + 12), vmulq_f32(vmulq_f32(x3, inv_rms_vec), w3));
+        vst1q_f32(
+            x_ptr.add(idx + 12),
+            vmulq_f32(vmulq_f32(x3, inv_rms_vec), w3),
+        );
 
         idx += 16;
     }
@@ -356,7 +365,13 @@ fn layer_norm_scalar(x: &mut [f32], weight: &[f32], bias: &[f32], eps: f32) {
 /// * `batch_size` - Number of vectors in batch
 /// * `dim` - Dimension of each vector
 /// * `eps` - Numerical stability constant
-pub fn batched_rms_norm_neon(x: &mut [f32], weight: &[f32], batch_size: usize, dim: usize, eps: f32) {
+pub fn batched_rms_norm_neon(
+    x: &mut [f32],
+    weight: &[f32],
+    batch_size: usize,
+    dim: usize,
+    eps: f32,
+) {
     debug_assert_eq!(x.len(), batch_size * dim);
     debug_assert_eq!(weight.len(), dim);
 
@@ -492,7 +507,11 @@ mod tests {
 
         // Check that variance is approximately 1
         let var: f32 = x.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / 4.0;
-        assert!((var - 1.0).abs() < 1e-4, "Variance should be ~1, got {}", var);
+        assert!(
+            (var - 1.0).abs() < 1e-4,
+            "Variance should be ~1, got {}",
+            var
+        );
     }
 
     #[test]
@@ -578,7 +597,11 @@ mod tests {
     fn test_compute_rms() {
         let x = vec![3.0, 4.0]; // RMS = sqrt((9+16)/2) = sqrt(12.5) ~ 3.536
         let rms = compute_rms(&x);
-        assert!((rms - 3.5355).abs() < 0.01, "RMS should be ~3.536, got {}", rms);
+        assert!(
+            (rms - 3.5355).abs() < 0.01,
+            "RMS should be ~3.536, got {}",
+            rms
+        );
     }
 
     #[test]

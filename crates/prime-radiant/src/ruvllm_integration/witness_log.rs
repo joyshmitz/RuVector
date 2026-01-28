@@ -352,10 +352,7 @@ impl GenerationWitness {
     }
 
     /// Create a genesis witness (first in chain)
-    pub fn genesis(
-        inference: InferenceWitnessSummary,
-        coherence: CoherenceWitnessSummary,
-    ) -> Self {
+    pub fn genesis(inference: InferenceWitnessSummary, coherence: CoherenceWitnessSummary) -> Self {
         Self::new(inference, coherence, None)
     }
 
@@ -716,15 +713,9 @@ impl UnifiedWitnessLog {
 
         // Update indices
         self.by_id.insert(id, index);
-        self.by_session
-            .entry(session_id)
-            .or_default()
-            .push(index);
+        self.by_session.entry(session_id).or_default().push(index);
         if let Some(corr_id) = correlation_id {
-            self.by_correlation
-                .entry(corr_id)
-                .or_default()
-                .push(index);
+            self.by_correlation.entry(corr_id).or_default().push(index);
         }
 
         // Update head

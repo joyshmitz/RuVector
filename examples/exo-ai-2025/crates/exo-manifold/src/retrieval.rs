@@ -15,10 +15,7 @@ pub struct GradientDescentRetriever {
 }
 
 impl GradientDescentRetriever {
-    pub fn new(
-        network: Arc<RwLock<LearnedManifold>>,
-        config: ManifoldConfig,
-    ) -> Self {
+    pub fn new(network: Arc<RwLock<LearnedManifold>>, config: ManifoldConfig) -> Self {
         Self {
             _network: network,
             _config: config,

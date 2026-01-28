@@ -422,9 +422,7 @@ impl QuantizedKvPair {
         let (scale, zero_point) = Self::compute_scale_and_zero(&pair.keys, precision);
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        let quantize = |vals: &[f32]| -> Vec<f32> {
-            Self::quantize_neon(vals, scale, zero_point)
-        };
+        let quantize = |vals: &[f32]| -> Vec<f32> { Self::quantize_neon(vals, scale, zero_point) };
 
         #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
         let quantize = |vals: &[f32]| -> Vec<f32> {
@@ -559,9 +557,8 @@ impl QuantizedKvPair {
     /// M4 Pro optimization: NEON-accelerated dequantization with 8x unrolling
     fn dequantize(&self) -> KvPair {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        let dequant = |vals: &[f32]| -> Vec<f32> {
-            Self::dequantize_neon(vals, self.scale, self.zero_point)
-        };
+        let dequant =
+            |vals: &[f32]| -> Vec<f32> { Self::dequantize_neon(vals, self.scale, self.zero_point) };
 
         #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
         let dequant = |vals: &[f32]| -> Vec<f32> {
@@ -815,20 +812,16 @@ impl TwoTierKvCache {
 
         // Migrate to store if tail exceeds threshold
         while tail.len() > self.config.tail_length {
-            let batch_size = self.config.migration_batch.min(
-                tail.len() - self.config.tail_length
-            );
+            let batch_size = self
+                .config
+                .migration_batch
+                .min(tail.len() - self.config.tail_length);
 
-            let to_migrate: Vec<_> = (0..batch_size)
-                .filter_map(|_| tail.pop_front())
-                .collect();
+            let to_migrate: Vec<_> = (0..batch_size).filter_map(|_| tail.pop_front()).collect();
 
             let mut store = self.store.write();
             for pair in to_migrate {
-                let quantized = QuantizedKvPair::from_kv_pair(
-                    &pair,
-                    self.config.store_precision,
-                );
+                let quantized = QuantizedKvPair::from_kv_pair(&pair, self.config.store_precision);
                 store.push(quantized);
             }
         }
@@ -865,7 +858,8 @@ impl TwoTierKvCache {
             for _ in 0..remaining.min(tail.len()) {
                 tail.pop_front();
             }
-            self.total_tokens.fetch_sub(remaining.min(tail.len()), Ordering::SeqCst);
+            self.total_tokens
+                .fetch_sub(remaining.min(tail.len()), Ordering::SeqCst);
         }
 
         Ok(())
@@ -956,7 +950,8 @@ impl TwoTierKvCache {
             let k_offset = t * stride;
             let k_slice = &keys[k_offset..k_offset + stride];
 
-            let score: f32 = query.iter()
+            let score: f32 = query
+                .iter()
                 .zip(k_slice.iter())
                 .map(|(q, k)| q * k * scale)
                 .sum();
@@ -989,7 +984,8 @@ impl TwoTierKvCache {
         let stride = self.config.num_kv_heads * self.config.head_dim;
 
         let tail_bytes = tail.len() * stride * 4 * 2; // f32 * 2 (keys + values)
-        let store_bytes = store.len() * stride * self.config.store_precision.bytes_per_element() as usize * 2;
+        let store_bytes =
+            store.len() * stride * self.config.store_precision.bytes_per_element() as usize * 2;
 
         KvCacheStats {
             total_tokens: self.total_tokens.load(Ordering::SeqCst),
@@ -1227,15 +1223,18 @@ impl PooledKvCache {
                     self.tokens_per_block,
                     self.config.num_kv_heads,
                     self.config.head_dim,
-                ).ok_or_else(|| RuvLLMError::OutOfMemory(
-                    "Failed to allocate KV block from pool".to_string(),
-                ))?;
+                )
+                .ok_or_else(|| {
+                    RuvLLMError::OutOfMemory("Failed to allocate KV block from pool".to_string())
+                })?;
                 blocks.push(new_block);
             }
 
             // SAFETY: blocks is non-empty because we either just pushed a new block
             // or the loop condition ensures at least one block exists
-            let block = blocks.last_mut().expect("blocks should be non-empty after allocation");
+            let block = blocks
+                .last_mut()
+                .expect("blocks should be non-empty after allocation");
             let tokens_appended = block.append(remaining_keys, remaining_values);
 
             if tokens_appended == 0 {
@@ -1246,7 +1245,8 @@ impl PooledKvCache {
             remaining_keys = &remaining_keys[elements..];
             remaining_values = &remaining_values[elements..];
 
-            self.total_tokens.fetch_add(tokens_appended, Ordering::SeqCst);
+            self.total_tokens
+                .fetch_add(tokens_appended, Ordering::SeqCst);
         }
 
         // Enforce max tokens
@@ -1272,13 +1272,15 @@ impl PooledKvCache {
                 // Remove entire block
                 blocks.remove(0);
                 to_evict -= first_block_tokens;
-                self.total_tokens.fetch_sub(first_block_tokens, Ordering::SeqCst);
+                self.total_tokens
+                    .fetch_sub(first_block_tokens, Ordering::SeqCst);
             } else {
                 // Would need partial eviction - not supported in block model
                 // For simplicity, we just remove the whole block
                 let removed_tokens = blocks[0].token_count();
                 blocks.remove(0);
-                self.total_tokens.fetch_sub(removed_tokens, Ordering::SeqCst);
+                self.total_tokens
+                    .fetch_sub(removed_tokens, Ordering::SeqCst);
                 break;
             }
         }

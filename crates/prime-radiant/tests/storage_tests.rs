@@ -7,8 +7,7 @@
 //! - Governance storage operations
 
 use prime_radiant::storage::{
-    FileStorage, InMemoryStorage, StorageFormat,
-    GovernanceStorage, GraphStorage,
+    FileStorage, GovernanceStorage, GraphStorage, InMemoryStorage, StorageFormat,
 };
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -291,7 +290,9 @@ mod file_storage_tests {
         // First instance: write data
         {
             let storage = FileStorage::new(temp_dir.path()).unwrap();
-            storage.store_node("persistent-node", &[1.0, 2.0, 3.0]).unwrap();
+            storage
+                .store_node("persistent-node", &[1.0, 2.0, 3.0])
+                .unwrap();
             storage.store_edge("a", "b", 1.5).unwrap();
             storage.sync().unwrap();
         }
@@ -423,7 +424,9 @@ mod file_storage_tests {
 
                 for j in 0..25 {
                     let node_id = format!("concurrent-{}-{}", i, j);
-                    storage_clone.store_node(&node_id, &[i as f32, j as f32]).unwrap();
+                    storage_clone
+                        .store_node(&node_id, &[i as f32, j as f32])
+                        .unwrap();
                 }
             });
 
@@ -482,20 +485,12 @@ mod integration_tests {
         let storage = InMemoryStorage::new();
 
         // Tenant A data (with namespace prefix)
-        storage
-            .store_node("tenant-a::node-1", &[1.0, 0.0])
-            .unwrap();
-        storage
-            .store_node("tenant-a::node-2", &[0.0, 1.0])
-            .unwrap();
+        storage.store_node("tenant-a::node-1", &[1.0, 0.0]).unwrap();
+        storage.store_node("tenant-a::node-2", &[0.0, 1.0]).unwrap();
 
         // Tenant B data
-        storage
-            .store_node("tenant-b::node-1", &[0.5, 0.5])
-            .unwrap();
-        storage
-            .store_node("tenant-b::node-2", &[0.3, 0.7])
-            .unwrap();
+        storage.store_node("tenant-b::node-1", &[0.5, 0.5]).unwrap();
+        storage.store_node("tenant-b::node-2", &[0.3, 0.7]).unwrap();
 
         // Verify isolation - tenant A's node-1 is different from tenant B's
         let a_node = storage.get_node("tenant-a::node-1").unwrap().unwrap();
@@ -538,9 +533,15 @@ mod integration_tests {
             let storage = FileStorage::new(temp_dir.path()).unwrap();
 
             // Store graph data
-            storage.store_node("persistent-1", &[1.0, 2.0, 3.0]).unwrap();
-            storage.store_node("persistent-2", &[4.0, 5.0, 6.0]).unwrap();
-            storage.store_edge("persistent-1", "persistent-2", 0.5).unwrap();
+            storage
+                .store_node("persistent-1", &[1.0, 2.0, 3.0])
+                .unwrap();
+            storage
+                .store_node("persistent-2", &[4.0, 5.0, 6.0])
+                .unwrap();
+            storage
+                .store_edge("persistent-1", "persistent-2", 0.5)
+                .unwrap();
 
             // Store governance data
             storage.store_policy(b"durable-policy").unwrap();

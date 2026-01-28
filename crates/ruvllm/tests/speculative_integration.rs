@@ -4,9 +4,8 @@
 //! with mock backends.
 
 use ruvllm::speculative::{
-    SpeculativeConfig, SpeculativeStats, AtomicSpeculativeStats,
-    SpeculationTree, TreeNode, VerificationResult,
-    softmax, log_softmax, top_k_filter, top_p_filter,
+    log_softmax, softmax, top_k_filter, top_p_filter, AtomicSpeculativeStats, SpeculationTree,
+    SpeculativeConfig, SpeculativeStats, TreeNode, VerificationResult,
 };
 use std::time::Duration;
 

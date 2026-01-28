@@ -8,7 +8,7 @@
 use crate::causal::CausalGraph;
 use crate::long_term::LongTermStore;
 use crate::short_term::ShortTermBuffer;
-use crate::types::{TemporalPattern, SubstrateTime};
+use crate::types::{SubstrateTime, TemporalPattern};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Consolidation configuration
@@ -122,7 +122,8 @@ pub fn compute_salience_batch(
     long_term: &LongTermStore,
     config: &ConsolidationConfig,
 ) -> Vec<f32> {
-    patterns.iter()
+    patterns
+        .iter()
         .map(|tp| compute_salience(tp, causal_graph, long_term, config))
         .collect()
 }
@@ -262,8 +263,10 @@ impl ConsolidationStats {
             result.num_consolidated + result.num_forgotten,
             Ordering::Relaxed,
         );
-        self.total_consolidated.fetch_add(result.num_consolidated, Ordering::Relaxed);
-        self.total_forgotten.fetch_add(result.num_forgotten, Ordering::Relaxed);
+        self.total_consolidated
+            .fetch_add(result.num_consolidated, Ordering::Relaxed);
+        self.total_forgotten
+            .fetch_add(result.num_forgotten, Ordering::Relaxed);
     }
 
     pub fn consolidation_rate(&self) -> f32 {
@@ -287,7 +290,8 @@ mod tests {
         let long_term = LongTermStore::default();
         let config = ConsolidationConfig::default();
 
-        let mut temporal_pattern = TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
+        let mut temporal_pattern =
+            TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
         temporal_pattern.access_count = 10;
 
         let salience = compute_salience(&temporal_pattern, &causal_graph, &long_term, &config);

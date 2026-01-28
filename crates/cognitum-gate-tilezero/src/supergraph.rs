@@ -1,7 +1,7 @@
 //! Reduced supergraph from worker tile summaries
 
-use crate::{TileId, WitnessFragment};
 use crate::receipt::WitnessSummary;
+use crate::{TileId, WitnessFragment};
 use std::collections::HashMap;
 
 /// Reduced graph maintained by TileZero
@@ -23,7 +23,7 @@ impl ReducedGraph {
     pub fn new() -> Self {
         Self {
             tile_coherence: HashMap::new(),
-            global_cut_value: 100.0, // Start with high coherence
+            global_cut_value: 100.0,   // Start with high coherence
             aggregated_e_value: 100.0, // Start with high evidence
             shift_pressure: 0.0,
             boundary_edges: 0,

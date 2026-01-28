@@ -7,8 +7,7 @@
 //! - Property-based tests for merge invariants
 
 use cognitum_gate_tilezero::merge::{
-    EdgeSummary, MergeError, MergeStrategy, MergedReport, NodeSummary, ReportMerger,
-    WorkerReport,
+    EdgeSummary, MergeError, MergeStrategy, MergedReport, NodeSummary, ReportMerger, WorkerReport,
 };
 
 fn create_test_report(tile_id: u8, epoch: u64) -> WorkerReport {

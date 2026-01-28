@@ -8,8 +8,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 use cognitum_gate_tilezero::{
-    GateDecision, PermitState, PermitToken, ReceiptLog, TimestampProof,
-    WitnessReceipt, WitnessSummary,
+    GateDecision, PermitState, PermitToken, ReceiptLog, TimestampProof, WitnessReceipt,
+    WitnessSummary,
 };
 
 /// Create a test permit token
@@ -120,9 +120,7 @@ fn bench_receipt_hashing(c: &mut Criterion) {
 
     let receipt = create_test_receipt(0, [0u8; 32]);
 
-    group.bench_function("hash_receipt", |b| {
-        b.iter(|| black_box(receipt.hash()))
-    });
+    group.bench_function("hash_receipt", |b| b.iter(|| black_box(receipt.hash())));
 
     // Benchmark with different summary sizes
     for boundary_size in [0, 10, 50, 100] {
@@ -134,9 +132,7 @@ fn bench_receipt_hashing(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("hash_boundary_size", boundary_size),
             &receipt,
-            |b, receipt| {
-                b.iter(|| black_box(receipt.hash()))
-            },
+            |b, receipt| b.iter(|| black_box(receipt.hash())),
         );
     }
 
@@ -160,9 +156,7 @@ fn bench_chain_verification(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("verify_chain", chain_length),
             &log,
-            |b, log| {
-                b.iter(|| black_box(log.verify_chain_to((chain_length - 1) as u64)))
-            },
+            |b, log| b.iter(|| black_box(log.verify_chain_to((chain_length - 1) as u64))),
         );
     }
 
@@ -257,9 +251,7 @@ fn bench_token_encoding(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("encode_action_len", action_len),
             &signed,
-            |b, token| {
-                b.iter(|| black_box(token.encode_base64()))
-            },
+            |b, token| b.iter(|| black_box(token.encode_base64())),
         );
     }
 
@@ -285,9 +277,7 @@ fn bench_signable_content(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("action_len", action_len),
             &token,
-            |b, token| {
-                b.iter(|| black_box(token.signable_content()))
-            },
+            |b, token| b.iter(|| black_box(token.signable_content())),
         );
     }
 
@@ -301,14 +291,10 @@ fn bench_witness_summary_hash(c: &mut Criterion) {
 
     let summary = create_test_summary();
 
-    group.bench_function("hash", |b| {
-        b.iter(|| black_box(summary.hash()))
-    });
+    group.bench_function("hash", |b| b.iter(|| black_box(summary.hash())));
 
     // JSON serialization (used in hash)
-    group.bench_function("to_json", |b| {
-        b.iter(|| black_box(summary.to_json()))
-    });
+    group.bench_function("to_json", |b| b.iter(|| black_box(summary.to_json())));
 
     group.finish();
 }
@@ -321,7 +307,9 @@ fn bench_batch_signing(c: &mut Criterion) {
         group.throughput(Throughput::Elements(batch_size as u64));
 
         let state = PermitState::new();
-        let tokens: Vec<_> = (0..batch_size).map(|i| create_test_token(i as u64)).collect();
+        let tokens: Vec<_> = (0..batch_size)
+            .map(|i| create_test_token(i as u64))
+            .collect();
 
         group.bench_with_input(
             BenchmarkId::new("sequential", batch_size),
@@ -341,7 +329,6 @@ fn bench_batch_signing(c: &mut Criterion) {
 
     group.finish();
 }
-
 
 criterion_group!(
     benches,

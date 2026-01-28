@@ -219,15 +219,9 @@ fn bench_single_residual(c: &mut Criterion) {
             rho_target,
         };
 
-        group.bench_with_input(
-            BenchmarkId::new("identity_map", dim),
-            &dim,
-            |b, _| {
-                b.iter(|| {
-                    edge.residual(black_box(&source_state), black_box(&target_state))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("identity_map", dim), &dim, |b, _| {
+            b.iter(|| edge.residual(black_box(&source_state), black_box(&target_state)))
+        });
     }
 
     // Test with projection (non-identity maps)
@@ -248,11 +242,7 @@ fn bench_single_residual(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("projection_map", format!("{}to{}", input_dim, output_dim)),
             &(input_dim, output_dim),
-            |b, _| {
-                b.iter(|| {
-                    edge.residual(black_box(&source_state), black_box(&target_state))
-                })
-            },
+            |b, _| b.iter(|| edge.residual(black_box(&source_state), black_box(&target_state))),
         );
     }
 
@@ -407,9 +397,7 @@ fn bench_restriction_map(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("identity_apply_into", dim),
             &dim,
-            |b, _| {
-                b.iter(|| rho.apply_into(black_box(&input), black_box(&mut output)))
-            },
+            |b, _| b.iter(|| rho.apply_into(black_box(&input), black_box(&mut output))),
         );
     }
 
@@ -426,11 +414,12 @@ fn bench_restriction_map(c: &mut Criterion) {
         );
 
         group.bench_with_input(
-            BenchmarkId::new("projection_apply_into", format!("{}x{}", input_dim, output_dim)),
+            BenchmarkId::new(
+                "projection_apply_into",
+                format!("{}x{}", input_dim, output_dim),
+            ),
             &(input_dim, output_dim),
-            |b, _| {
-                b.iter(|| rho.apply_into(black_box(&input), black_box(&mut output)))
-            },
+            |b, _| b.iter(|| rho.apply_into(black_box(&input), black_box(&mut output))),
         );
     }
 
@@ -448,45 +437,57 @@ fn bench_simd_patterns(c: &mut Criterion) {
         let b = generate_state(dim, 123);
 
         // Scalar subtraction and norm
-        group.bench_with_input(BenchmarkId::new("scalar_diff_norm", dim), &dim, |b_iter, _| {
-            b_iter.iter(|| {
-                let mut norm_sq = 0.0f32;
-                for i in 0..dim {
-                    let diff = a[i] - b[i];
-                    norm_sq += diff * diff;
-                }
-                black_box(norm_sq)
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("scalar_diff_norm", dim),
+            &dim,
+            |b_iter, _| {
+                b_iter.iter(|| {
+                    let mut norm_sq = 0.0f32;
+                    for i in 0..dim {
+                        let diff = a[i] - b[i];
+                        norm_sq += diff * diff;
+                    }
+                    black_box(norm_sq)
+                })
+            },
+        );
 
         // Iterator-based (auto-vectorization friendly)
-        group.bench_with_input(BenchmarkId::new("iter_diff_norm", dim), &dim, |b_iter, _| {
-            b_iter.iter(|| {
-                let norm_sq: f32 = a
-                    .iter()
-                    .zip(b.iter())
-                    .map(|(x, y)| {
-                        let d = x - y;
-                        d * d
-                    })
-                    .sum();
-                black_box(norm_sq)
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("iter_diff_norm", dim),
+            &dim,
+            |b_iter, _| {
+                b_iter.iter(|| {
+                    let norm_sq: f32 = a
+                        .iter()
+                        .zip(b.iter())
+                        .map(|(x, y)| {
+                            let d = x - y;
+                            d * d
+                        })
+                        .sum();
+                    black_box(norm_sq)
+                })
+            },
+        );
 
         // Chunked for explicit SIMD opportunity
-        group.bench_with_input(BenchmarkId::new("chunked_diff_norm", dim), &dim, |b_iter, _| {
-            b_iter.iter(|| {
-                let mut accum = [0.0f32; 8];
-                for (chunk_a, chunk_b) in a.chunks(8).zip(b.chunks(8)) {
-                    for i in 0..chunk_a.len() {
-                        let d = chunk_a[i] - chunk_b[i];
-                        accum[i] += d * d;
+        group.bench_with_input(
+            BenchmarkId::new("chunked_diff_norm", dim),
+            &dim,
+            |b_iter, _| {
+                b_iter.iter(|| {
+                    let mut accum = [0.0f32; 8];
+                    for (chunk_a, chunk_b) in a.chunks(8).zip(b.chunks(8)) {
+                        for i in 0..chunk_a.len() {
+                            let d = chunk_a[i] - chunk_b[i];
+                            accum[i] += d * d;
+                        }
                     }
-                }
-                black_box(accum.iter().sum::<f32>())
-            })
-        });
+                    black_box(accum.iter().sum::<f32>())
+                })
+            },
+        );
     }
 
     group.finish();

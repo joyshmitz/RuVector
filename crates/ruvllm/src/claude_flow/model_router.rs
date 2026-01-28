@@ -29,9 +29,9 @@
 //! +-------------------+     +-------------------+
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 
 use super::claude_integration::ClaudeModel;
 use super::{AgentType, ClaudeFlowAgent, ClaudeFlowTask};
@@ -413,7 +413,8 @@ impl TaskComplexityAnalyzer {
         };
 
         // Additional factors
-        let factor = if contains_ci(task_bytes, b"architecture") || contains_ci(task_bytes, b"design")
+        let factor = if contains_ci(task_bytes, b"architecture")
+            || contains_ci(task_bytes, b"design")
         {
             3.0
         } else if contains_ci(task_bytes, b"test") {
@@ -447,7 +448,8 @@ impl TaskComplexityAnalyzer {
         }
 
         // Complex reasoning
-        if task.contains("distributed") || task.contains("concurrent") || task.contains("parallel") {
+        if task.contains("distributed") || task.contains("concurrent") || task.contains("parallel")
+        {
             depth += 0.3;
         }
 
@@ -637,11 +639,7 @@ impl TaskComplexityAnalyzer {
             reasons.push("balanced complexity factors".to_string());
         }
 
-        format!(
-            "Recommended {} due to: {}",
-            model,
-            reasons.join(", ")
-        )
+        format!("Recommended {} due to: {}", model, reasons.join(", "))
     }
 
     /// Record feedback for learning
@@ -661,7 +659,8 @@ impl TaskComplexityAnalyzer {
 
     /// Get accuracy statistics
     pub fn accuracy_stats(&self) -> AnalyzerStats {
-        let with_feedback: Vec<_> = self.accuracy_history
+        let with_feedback: Vec<_> = self
+            .accuracy_history
             .iter()
             .filter(|r| r.actual.is_some())
             .collect();
@@ -974,7 +973,8 @@ impl ModelSelector {
 
     /// Get selector statistics
     pub fn stats(&self) -> SelectorStats {
-        let with_outcome: Vec<_> = self.selection_history
+        let with_outcome: Vec<_> = self
+            .selection_history
             .iter()
             .filter(|r| r.success.is_some())
             .collect();
@@ -1104,10 +1104,8 @@ impl ModelRouter {
             if let Some(&model) = self.agent_overrides.get(&agent) {
                 let mut decision = self.selector.select_model(task);
                 decision.model = model;
-                decision.reasoning = format!(
-                    "Agent type {:?} override: {}",
-                    agent, decision.reasoning
-                );
+                decision.reasoning =
+                    format!("Agent type {:?} override: {}", agent, decision.reasoning);
                 return decision;
             }
         }
@@ -1116,10 +1114,8 @@ impl ModelRouter {
             if let Some(&model) = self.task_overrides.get(&task_t) {
                 let mut decision = self.selector.select_model(task);
                 decision.model = model;
-                decision.reasoning = format!(
-                    "Task type {:?} override: {}",
-                    task_t, decision.reasoning
-                );
+                decision.reasoning =
+                    format!("Task type {:?} override: {}", task_t, decision.reasoning);
                 return decision;
             }
         }
@@ -1193,7 +1189,7 @@ mod tests {
         let mut analyzer = TaskComplexityAnalyzer::new();
         let score = analyzer.analyze(
             "Design and implement a distributed authentication system with OAuth2, JWT tokens, \
-             and comprehensive security audit for vulnerabilities"
+             and comprehensive security audit for vulnerabilities",
         );
 
         assert!(score.overall > 0.7);
@@ -1204,9 +1200,8 @@ mod tests {
     #[test]
     fn test_complexity_analyzer_moderate_task() {
         let mut analyzer = TaskComplexityAnalyzer::new();
-        let score = analyzer.analyze(
-            "Implement a REST API endpoint for user registration with input validation"
-        );
+        let score = analyzer
+            .analyze("Implement a REST API endpoint for user registration with input validation");
 
         assert!(score.overall >= 0.35);
         assert!(score.overall < 0.7);
@@ -1223,7 +1218,7 @@ mod tests {
 
         // Complex task
         let decision = selector.select_model(
-            "Design microservices architecture with distributed tracing and security audit"
+            "Design microservices architecture with distributed tracing and security audit",
         );
         assert_eq!(decision.model, ClaudeModel::Opus);
     }

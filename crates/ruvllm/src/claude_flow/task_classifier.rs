@@ -84,21 +84,45 @@ impl TaskClassifier {
 
     fn build_language_patterns() -> Vec<(String, Vec<&'static str>)> {
         vec![
-            ("rust".to_string(), vec!["rust", "cargo", ".rs", "tokio", "async-std", "serde"]),
-            ("typescript".to_string(), vec!["typescript", "ts", ".tsx", "deno", "bun"]),
-            ("javascript".to_string(), vec!["javascript", "js", "node", "npm", "react", "vue"]),
-            ("python".to_string(), vec!["python", "pip", ".py", "django", "flask", "pytorch"]),
+            (
+                "rust".to_string(),
+                vec!["rust", "cargo", ".rs", "tokio", "async-std", "serde"],
+            ),
+            (
+                "typescript".to_string(),
+                vec!["typescript", "ts", ".tsx", "deno", "bun"],
+            ),
+            (
+                "javascript".to_string(),
+                vec!["javascript", "js", "node", "npm", "react", "vue"],
+            ),
+            (
+                "python".to_string(),
+                vec!["python", "pip", ".py", "django", "flask", "pytorch"],
+            ),
             ("go".to_string(), vec!["golang", "go ", ".go", "goroutine"]),
         ]
     }
 
     fn build_framework_patterns() -> Vec<(String, Vec<&'static str>)> {
         vec![
-            ("react".to_string(), vec!["react", "jsx", "tsx", "next.js", "nextjs"]),
-            ("express".to_string(), vec!["express", "middleware", "router"]),
-            ("tokio".to_string(), vec!["tokio", "async", "await", "spawn"]),
+            (
+                "react".to_string(),
+                vec!["react", "jsx", "tsx", "next.js", "nextjs"],
+            ),
+            (
+                "express".to_string(),
+                vec!["express", "middleware", "router"],
+            ),
+            (
+                "tokio".to_string(),
+                vec!["tokio", "async", "await", "spawn"],
+            ),
             ("actix".to_string(), vec!["actix", "actix-web"]),
-            ("jest".to_string(), vec!["jest", "describe", "it(", "expect("]),
+            (
+                "jest".to_string(),
+                vec!["jest", "describe", "it(", "expect("],
+            ),
             ("pytest".to_string(), vec!["pytest", "test_", "fixture"]),
         ]
     }
@@ -159,54 +183,117 @@ impl TaskClassifier {
     }
 
     fn score_code(&self, s: &str) -> f32 {
-        let keywords = ["implement", "create", "build", "code", "write", "function", "class", "module"];
+        let keywords = [
+            "implement",
+            "create",
+            "build",
+            "code",
+            "write",
+            "function",
+            "class",
+            "module",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_research(&self, s: &str) -> f32 {
-        let keywords = ["research", "analyze", "investigate", "explore", "find", "understand", "learn"];
+        let keywords = [
+            "research",
+            "analyze",
+            "investigate",
+            "explore",
+            "find",
+            "understand",
+            "learn",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_test(&self, s: &str) -> f32 {
-        let keywords = ["test", "verify", "validate", "assert", "coverage", "unit", "integration", "e2e"];
+        let keywords = [
+            "test",
+            "verify",
+            "validate",
+            "assert",
+            "coverage",
+            "unit",
+            "integration",
+            "e2e",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_review(&self, s: &str) -> f32 {
-        let keywords = ["review", "audit", "inspect", "check", "quality", "lint", "pr"];
+        let keywords = [
+            "review", "audit", "inspect", "check", "quality", "lint", "pr",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_docs(&self, s: &str) -> f32 {
-        let keywords = ["document", "readme", "api docs", "comment", "explain", "describe"];
+        let keywords = [
+            "document", "readme", "api docs", "comment", "explain", "describe",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_debug(&self, s: &str) -> f32 {
-        let keywords = ["debug", "fix", "error", "bug", "issue", "crash", "exception", "trace"];
+        let keywords = [
+            "debug",
+            "fix",
+            "error",
+            "bug",
+            "issue",
+            "crash",
+            "exception",
+            "trace",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_architecture(&self, s: &str) -> f32 {
-        let keywords = ["architecture", "design", "structure", "pattern", "system", "scalable", "modular"];
+        let keywords = [
+            "architecture",
+            "design",
+            "structure",
+            "pattern",
+            "system",
+            "scalable",
+            "modular",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_security(&self, s: &str) -> f32 {
-        let keywords = ["security", "vulnerability", "cve", "injection", "auth", "encrypt", "xss", "csrf"];
+        let keywords = [
+            "security",
+            "vulnerability",
+            "cve",
+            "injection",
+            "auth",
+            "encrypt",
+            "xss",
+            "csrf",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn score_performance(&self, s: &str) -> f32 {
-        let keywords = ["performance", "optimize", "speed", "memory", "benchmark", "profile", "latency", "throughput"];
+        let keywords = [
+            "performance",
+            "optimize",
+            "speed",
+            "memory",
+            "benchmark",
+            "profile",
+            "latency",
+            "throughput",
+        ];
         self.keyword_score(s, &keywords)
     }
 
     fn keyword_score(&self, text: &str, keywords: &[&str]) -> f32 {
-        let matches: f32 = keywords.iter()
-            .filter(|k| text.contains(*k))
-            .count() as f32;
+        let matches: f32 = keywords.iter().filter(|k| text.contains(*k)).count() as f32;
         (matches / keywords.len() as f32).min(1.0)
     }
 
@@ -256,9 +343,7 @@ impl TaskClassifier {
         };
 
         // Add agents for secondary task types
-        let secondary_count = secondary.iter()
-            .filter(|(_, score)| *score > 0.3)
-            .count() as u8;
+        let secondary_count = secondary.iter().filter(|(_, score)| *score > 0.3).count() as u8;
 
         (base + secondary_count.min(2)).min(6)
     }
@@ -289,7 +374,8 @@ mod tests {
         let classifier = TaskClassifier::new();
 
         let simple = classifier.classify("fix a typo");
-        let complex = classifier.classify("implement distributed authentication with security audit");
+        let complex =
+            classifier.classify("implement distributed authentication with security audit");
 
         assert!(complex.complexity > simple.complexity);
     }

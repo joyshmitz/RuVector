@@ -100,13 +100,13 @@ pub mod sona_llm;
 
 // Re-exports
 pub use metrics::{
-    InferenceMetrics, MetricsCollector, MetricsSnapshot, MovingAverage, LatencyHistogram,
+    InferenceMetrics, LatencyHistogram, MetricsCollector, MetricsSnapshot, MovingAverage,
 };
 pub use realtime::{
-    RealtimeOptimizer, RealtimeConfig, BatchSizeStrategy, KvCachePressurePolicy,
-    TokenBudgetAllocation, SpeculativeConfig, OptimizationDecision,
+    BatchSizeStrategy, KvCachePressurePolicy, OptimizationDecision, RealtimeConfig,
+    RealtimeOptimizer, SpeculativeConfig, TokenBudgetAllocation,
 };
 pub use sona_llm::{
-    SonaLlm, SonaLlmConfig, TrainingSample, AdaptationResult, LearningLoopStats,
-    ConsolidationStrategy, OptimizationTrigger,
+    AdaptationResult, ConsolidationStrategy, LearningLoopStats, OptimizationTrigger, SonaLlm,
+    SonaLlmConfig, TrainingSample,
 };

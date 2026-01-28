@@ -229,7 +229,11 @@ impl SDPSolver {
             let mut y = vec![0.0; n];
             for i in 0..n {
                 for j in 0..n {
-                    let val = if i == j { shift - x[i * n + j] } else { -x[i * n + j] };
+                    let val = if i == j {
+                        shift - x[i * n + j]
+                    } else {
+                        -x[i * n + j]
+                    };
                     y[i] += val * v[j];
                 }
             }
@@ -283,7 +287,9 @@ mod tests {
         let solution = solver.solve(&problem);
 
         // Should find X_{00} = 1, X_{11} close to 0 (or whatever makes X PSD)
-        assert!(solution.status == SDPStatus::Optimal || solution.status == SDPStatus::MaxIterations);
+        assert!(
+            solution.status == SDPStatus::Optimal || solution.status == SDPStatus::MaxIterations
+        );
     }
 
     #[test]

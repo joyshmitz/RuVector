@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hyperbolic_attention::prelude::*;
 use hyperbolic_attention::HyperbolicTransformerBlock;
 
@@ -41,13 +41,7 @@ fn bench_mobius_add(c: &mut Criterion) {
         let k = 1.0;
 
         group.bench_with_input(BenchmarkId::from_parameter(dim), &dim, |b, _| {
-            b.iter(|| {
-                black_box(mobius_add(
-                    black_box(&x),
-                    black_box(&y),
-                    black_box(k),
-                ))
-            });
+            b.iter(|| black_box(mobius_add(black_box(&x), black_box(&y), black_box(k))));
         });
     }
 
@@ -65,13 +59,7 @@ fn bench_exponential_map(c: &mut Criterion) {
         let k = 1.0;
 
         group.bench_with_input(BenchmarkId::from_parameter(dim), &dim, |b, _| {
-            b.iter(|| {
-                black_box(exponential_map(
-                    black_box(&x),
-                    black_box(&v),
-                    black_box(k),
-                ))
-            });
+            b.iter(|| black_box(exponential_map(black_box(&x), black_box(&v), black_box(k))));
         });
     }
 
@@ -123,13 +111,7 @@ fn bench_lorentz_distance(c: &mut Criterion) {
         let y = poincare_to_lorentz(&spatial_y, k);
 
         group.bench_with_input(BenchmarkId::from_parameter(dim), &dim, |b, _| {
-            b.iter(|| {
-                black_box(lorentz_distance(
-                    black_box(&x),
-                    black_box(&y),
-                    black_box(k),
-                ))
-            });
+            b.iter(|| black_box(lorentz_distance(black_box(&x), black_box(&y), black_box(k))));
         });
     }
 
@@ -151,13 +133,7 @@ fn bench_lorentz_exp(c: &mut Criterion) {
             .collect();
 
         group.bench_with_input(BenchmarkId::from_parameter(dim), &dim, |b, _| {
-            b.iter(|| {
-                black_box(lorentz_exp(
-                    black_box(&x),
-                    black_box(&v),
-                    black_box(k),
-                ))
-            });
+            b.iter(|| black_box(lorentz_exp(black_box(&x), black_box(&v), black_box(k))));
         });
     }
 
@@ -238,9 +214,7 @@ fn bench_transformer_block(c: &mut Criterion) {
 
         let label = format!("d{}_s{}_h{}", dim, seq_len, num_heads);
         group.bench_with_input(BenchmarkId::from_parameter(&label), &label, |b, _| {
-            b.iter(|| {
-                black_box(block.forward(black_box(&inputs)))
-            });
+            b.iter(|| black_box(block.forward(black_box(&inputs))));
         });
     }
 
@@ -302,15 +276,9 @@ fn bench_simd_dot_product(c: &mut Criterion) {
 
         use hyperbolic_attention::poincare_embedding::dot_product_simd;
 
-        group.bench_with_input(
-            BenchmarkId::new("dot_product", dim),
-            &dim,
-            |bench, _| {
-                bench.iter(|| {
-                    black_box(dot_product_simd(black_box(&a), black_box(&b)))
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("dot_product", dim), &dim, |bench, _| {
+            bench.iter(|| black_box(dot_product_simd(black_box(&a), black_box(&b))));
+        });
     }
 
     group.finish();
@@ -328,11 +296,7 @@ criterion_group!(
     bench_batch_distances,
 );
 
-criterion_group!(
-    lorentz_benches,
-    bench_lorentz_distance,
-    bench_lorentz_exp,
-);
+criterion_group!(lorentz_benches, bench_lorentz_distance, bench_lorentz_exp,);
 
 criterion_group!(
     attention_benches,
@@ -347,10 +311,7 @@ criterion_group!(
     bench_multi_curvature,
 );
 
-criterion_group!(
-    simd_benches,
-    bench_simd_dot_product,
-);
+criterion_group!(simd_benches, bench_simd_dot_product,);
 
 criterion_main!(
     poincare_benches,

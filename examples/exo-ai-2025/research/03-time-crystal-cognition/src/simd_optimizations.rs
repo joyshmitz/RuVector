@@ -128,11 +128,10 @@ impl SimdFloquet {
         let phase_offsets = Array1::from_vec(
             (0..self.n_neurons)
                 .map(|i| 2.0 * PI * i as f64 / self.n_neurons as f64)
-                .collect()
+                .collect(),
         );
-        let external_inputs = phase_offsets.mapv(|offset| {
-            self.drive_amplitude * (self.drive_phase + offset).cos()
-        });
+        let external_inputs =
+            phase_offsets.mapv(|offset| self.drive_amplitude * (self.drive_phase + offset).cos());
 
         // Vectorized recurrent input: W * r
         let recurrent_inputs = self.weights.dot(&self.firing_rates);
@@ -181,7 +180,12 @@ pub struct HierarchicalTimeCrystal {
 impl HierarchicalTimeCrystal {
     /// Create hierarchical time crystal with period multiplication
     /// Each level oscillates at frequency f/k for k = 1, 2, 3, ...
-    pub fn new(n_levels: usize, oscillators_per_level: usize, base_frequency: f64, dt: f64) -> Self {
+    pub fn new(
+        n_levels: usize,
+        oscillators_per_level: usize,
+        base_frequency: f64,
+        dt: f64,
+    ) -> Self {
         let total_oscillators = n_levels * oscillators_per_level;
 
         // Each level has a different frequency: f, f/2, f/3, f/4, ...
@@ -259,21 +263,25 @@ impl HierarchicalTimeCrystal {
     /// Compute hierarchical order parameter
     /// Measures synchronization across different temporal scales
     pub fn hierarchical_order_parameter(&self) -> Vec<f64> {
-        self.levels.iter().enumerate().map(|(level, positions)| {
-            let n = positions.len();
-            let omega = 2.0 * PI * self.level_frequencies[level];
+        self.levels
+            .iter()
+            .enumerate()
+            .map(|(level, positions)| {
+                let n = positions.len();
+                let omega = 2.0 * PI * self.level_frequencies[level];
 
-            let mut sum_real = 0.0;
-            let mut sum_imag = 0.0;
+                let mut sum_real = 0.0;
+                let mut sum_imag = 0.0;
 
-            for &pos in positions {
-                let phase = pos * PI;
-                sum_real += (omega * phase).cos();
-                sum_imag += (omega * phase).sin();
-            }
+                for &pos in positions {
+                    let phase = pos * PI;
+                    sum_real += (omega * phase).cos();
+                    sum_imag += (omega * phase).sin();
+                }
 
-            ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt()
-        }).collect()
+                ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt()
+            })
+            .collect()
     }
 
     /// Novel discovery: Temporal multiplexing capacity
@@ -281,10 +289,12 @@ impl HierarchicalTimeCrystal {
     pub fn temporal_multiplexing_capacity(&self) -> usize {
         // Each level provides log2(period_multiplier) bits
         // Total capacity is sum across levels
-        (1..=self.n_levels).map(|k| {
-            // Period k provides log2(k) temporal slots
-            (k as f64).log2().ceil() as usize
-        }).sum()
+        (1..=self.n_levels)
+            .map(|k| {
+                // Period k provides log2(k) temporal slots
+                (k as f64).log2().ceil() as usize
+            })
+            .sum()
     }
 }
 
@@ -306,21 +316,21 @@ impl TopologicalTimeCrystal {
         let mut hopping_matrix = Array2::zeros((n_sites, n_sites));
 
         // SSH-like model: alternating hopping strengths
-        for i in 0..n_sites-1 {
+        for i in 0..n_sites - 1 {
             let hop = if i % 2 == 0 {
                 hopping_strength * 1.5 // Strong bond
             } else {
                 hopping_strength * 0.5 // Weak bond
             };
-            hopping_matrix[[i, i+1]] = hop;
-            hopping_matrix[[i+1, i]] = hop;
+            hopping_matrix[[i, i + 1]] = hop;
+            hopping_matrix[[i + 1, i]] = hop;
         }
 
         // Edge protection: reduce coupling at boundaries
         hopping_matrix[[0, 1]] *= edge_protection;
         hopping_matrix[[1, 0]] *= edge_protection;
-        hopping_matrix[[n_sites-2, n_sites-1]] *= edge_protection;
-        hopping_matrix[[n_sites-1, n_sites-2]] *= edge_protection;
+        hopping_matrix[[n_sites - 2, n_sites - 1]] *= edge_protection;
+        hopping_matrix[[n_sites - 1, n_sites - 2]] *= edge_protection;
 
         Self {
             n_sites,
@@ -358,7 +368,9 @@ impl TopologicalTimeCrystal {
     /// Measure edge localization (topological protection metric)
     pub fn edge_localization(&self) -> f64 {
         let edge_amplitude = self.positions[0].abs() + self.positions[self.n_sites - 1].abs();
-        let bulk_amplitude: f64 = self.positions.iter()
+        let bulk_amplitude: f64 = self
+            .positions
+            .iter()
             .skip(1)
             .take(self.n_sites - 2)
             .map(|&x| x.abs())

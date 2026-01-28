@@ -7,8 +7,8 @@
 //! - Consciousness threshold based on integrated information
 
 use quantum_cognition::{
-    CognitiveState, AttentionOperator, ConsciousnessThreshold,
-    quantum_zeno_effect, SuperpositionBuilder,
+    quantum_zeno_effect, AttentionOperator, CognitiveState, ConsciousnessThreshold,
+    SuperpositionBuilder,
 };
 
 fn main() {
@@ -27,21 +27,35 @@ fn main() {
 
     println!("Initial cognitive state (maximally uncertain superposition):");
     println!("  Dimension:              {}", initial_state.dimension());
-    println!("  Von Neumann entropy:    {:.4}", initial_state.von_neumann_entropy());
+    println!(
+        "  Von Neumann entropy:    {:.4}",
+        initial_state.von_neumann_entropy()
+    );
     println!("  Max entropy (log N):    {:.4}", (5.0_f64).ln());
-    println!("  Participation ratio:    {:.4}\n", initial_state.participation_ratio());
+    println!(
+        "  Participation ratio:    {:.4}\n",
+        initial_state.participation_ratio()
+    );
 
     // Apply full attention
     let mut attention = AttentionOperator::full_attention(2, 5, 8.0); // 8 Hz alpha rhythm
     let collapsed_state = attention.apply(&initial_state);
 
     println!("After full attention (focused on concept_2):");
-    println!("  Von Neumann entropy:    {:.4}", collapsed_state.von_neumann_entropy());
-    println!("  Participation ratio:    {:.4}", collapsed_state.participation_ratio());
+    println!(
+        "  Von Neumann entropy:    {:.4}",
+        collapsed_state.von_neumann_entropy()
+    );
+    println!(
+        "  Participation ratio:    {:.4}",
+        collapsed_state.participation_ratio()
+    );
     let (idx, prob, label) = collapsed_state.most_likely();
     println!("  Most likely state:      {} (P = {:.4})", label, prob);
-    println!("\n  ⇒ Entropy reduced by {:.4} bits",
-             initial_state.von_neumann_entropy() - collapsed_state.von_neumann_entropy());
+    println!(
+        "\n  ⇒ Entropy reduced by {:.4} bits",
+        initial_state.von_neumann_entropy() - collapsed_state.von_neumann_entropy()
+    );
     println!("  ⇒ Superposition → definite conscious state ✓\n");
 
     println!("─────────────────────────────────────────────────────────────────\n");
@@ -72,7 +86,10 @@ fn main() {
             _ => "Full collapse",
         };
 
-        println!("  {:.1}      | {:.4}   | {}", strength, entropy, description);
+        println!(
+            "  {:.1}      | {:.4}   | {}",
+            strength, entropy, description
+        );
     }
 
     println!("\n  ⇒ Gradient of consciousness from diffuse to focused ✓\n");
@@ -128,25 +145,51 @@ fn main() {
     let pure = CognitiveState::definite(
         0,
         5,
-        vec!["single".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string()]
+        vec![
+            "single".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ],
     );
     let phi_pure = threshold.estimate_phi(&pure);
     println!("Pure state (single definite thought):");
     println!("  Entropy:        {:.4}", pure.von_neumann_entropy());
     println!("  Φ estimate:     {:.4}", phi_pure);
-    println!("  Conscious:      {}", if threshold.is_conscious(&pure) { "YES ✓" } else { "NO ✗" });
+    println!(
+        "  Conscious:      {}",
+        if threshold.is_conscious(&pure) {
+            "YES ✓"
+        } else {
+            "NO ✗"
+        }
+    );
     println!("  → Too simple, no integration\n");
 
     // Maximally mixed (complete uncertainty)
     let mixed = CognitiveState::uniform(
         5,
-        vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string()]
+        vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ],
     );
     let phi_mixed = threshold.estimate_phi(&mixed);
     println!("Maximally mixed (complete superposition):");
     println!("  Entropy:        {:.4}", mixed.von_neumann_entropy());
     println!("  Φ estimate:     {:.4}", phi_mixed);
-    println!("  Conscious:      {}", if threshold.is_conscious(&mixed) { "YES ✓" } else { "NO ✗" });
+    println!(
+        "  Conscious:      {}",
+        if threshold.is_conscious(&mixed) {
+            "YES ✓"
+        } else {
+            "NO ✗"
+        }
+    );
     println!("  → Too random, no structure\n");
 
     // Partially collapsed (integrated state)
@@ -161,7 +204,14 @@ fn main() {
     println!("Partially collapsed (integrated conscious state):");
     println!("  Entropy:        {:.4}", partial.von_neumann_entropy());
     println!("  Φ estimate:     {:.4}", phi_partial);
-    println!("  Conscious:      {}", if threshold.is_conscious(&partial) { "YES ✓" } else { "NO ✗" });
+    println!(
+        "  Conscious:      {}",
+        if threshold.is_conscious(&partial) {
+            "YES ✓"
+        } else {
+            "NO ✗"
+        }
+    );
     println!("  → Balance of structure and distribution ✓\n");
 
     println!("─────────────────────────────────────────────────────────────────\n");

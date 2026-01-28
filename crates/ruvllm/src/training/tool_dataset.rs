@@ -410,7 +410,11 @@ impl ToolCallDataset {
         train_ratio: f32,
         val_ratio: f32,
         seed: u64,
-    ) -> (Vec<ToolCallExample>, Vec<ToolCallExample>, Vec<ToolCallExample>) {
+    ) -> (
+        Vec<ToolCallExample>,
+        Vec<ToolCallExample>,
+        Vec<ToolCallExample>,
+    ) {
         let mut rng = StdRng::seed_from_u64(seed);
         let mut examples = self.examples.clone();
         examples.shuffle(&mut rng);
@@ -550,7 +554,10 @@ impl ToolDatasetGenerator {
         let error_types = [
             ("Missing required parameter", "Parameter validation failed"),
             ("Invalid parameter type", "Type mismatch error"),
-            ("Resource not found", "The specified resource does not exist"),
+            (
+                "Resource not found",
+                "The specified resource does not exist",
+            ),
             ("Permission denied", "Insufficient permissions"),
             ("Rate limited", "Too many requests"),
         ];
@@ -618,7 +625,11 @@ impl ToolDatasetGenerator {
     }
 
     /// Generate parameters for a tool
-    fn generate_params(&mut self, tool: &McpToolDef, _difficulty: DifficultyLevel) -> serde_json::Value {
+    fn generate_params(
+        &mut self,
+        tool: &McpToolDef,
+        _difficulty: DifficultyLevel,
+    ) -> serde_json::Value {
         let mut params = serde_json::Map::new();
 
         // Add required parameters
@@ -667,7 +678,9 @@ impl ToolDatasetGenerator {
         }
 
         match param.param_type {
-            ParamType::String => serde_json::Value::String(format!("example_{}", self.rng.gen::<u32>())),
+            ParamType::String => {
+                serde_json::Value::String(format!("example_{}", self.rng.gen::<u32>()))
+            }
             ParamType::Integer => serde_json::Value::Number((self.rng.gen_range(1..100)).into()),
             ParamType::Boolean => serde_json::Value::Bool(self.rng.gen()),
             ParamType::Float => {
@@ -705,7 +718,10 @@ impl ToolDatasetGenerator {
             ],
             DifficultyLevel::Expert => vec![
                 format!("Edge case handling for {}", tool.name),
-                format!("Production scenario with {} error handling", tool.category.name()),
+                format!(
+                    "Production scenario with {} error handling",
+                    tool.category.name()
+                ),
             ],
         };
 
@@ -780,7 +796,12 @@ impl ToolDatasetGenerator {
                 name: "agentType".to_string(),
                 param_type: ParamType::String,
                 description: "Type of agent to spawn".to_string(),
-                examples: vec!["coder".to_string(), "researcher".to_string(), "tester".to_string(), "reviewer".to_string()],
+                examples: vec![
+                    "coder".to_string(),
+                    "researcher".to_string(),
+                    "tester".to_string(),
+                    "reviewer".to_string(),
+                ],
             }],
             optional_params: vec![
                 ToolParam {
@@ -793,13 +814,20 @@ impl ToolDatasetGenerator {
                     name: "model".to_string(),
                     param_type: ParamType::Enum,
                     description: "Claude model to use".to_string(),
-                    examples: vec!["haiku".to_string(), "sonnet".to_string(), "opus".to_string()],
+                    examples: vec![
+                        "haiku".to_string(),
+                        "sonnet".to_string(),
+                        "opus".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "task".to_string(),
                     param_type: ParamType::String,
                     description: "Task description for model routing".to_string(),
-                    examples: vec!["implement authentication".to_string(), "write tests".to_string()],
+                    examples: vec![
+                        "implement authentication".to_string(),
+                        "write tests".to_string(),
+                    ],
                 },
             ],
             use_cases: vec![
@@ -858,7 +886,11 @@ impl ToolDatasetGenerator {
                     name: "status".to_string(),
                     param_type: ParamType::String,
                     description: "Filter by status".to_string(),
-                    examples: vec!["running".to_string(), "idle".to_string(), "terminated".to_string()],
+                    examples: vec![
+                        "running".to_string(),
+                        "idle".to_string(),
+                        "terminated".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "includeTerminated".to_string(),
@@ -881,16 +913,19 @@ impl ToolDatasetGenerator {
                 name: "action".to_string(),
                 param_type: ParamType::Enum,
                 description: "Pool action".to_string(),
-                examples: vec!["status".to_string(), "scale".to_string(), "drain".to_string(), "fill".to_string()],
+                examples: vec![
+                    "status".to_string(),
+                    "scale".to_string(),
+                    "drain".to_string(),
+                    "fill".to_string(),
+                ],
             }],
-            optional_params: vec![
-                ToolParam {
-                    name: "targetSize".to_string(),
-                    param_type: ParamType::Integer,
-                    description: "Target pool size".to_string(),
-                    examples: vec!["5".to_string(), "10".to_string()],
-                },
-            ],
+            optional_params: vec![ToolParam {
+                name: "targetSize".to_string(),
+                param_type: ParamType::Integer,
+                description: "Target pool size".to_string(),
+                examples: vec!["5".to_string(), "10".to_string()],
+            }],
             use_cases: vec![
                 "scale the agent pool to handle increased load".to_string(),
                 "drain the pool before maintenance".to_string(),
@@ -1058,7 +1093,11 @@ impl ToolDatasetGenerator {
                     name: "topology".to_string(),
                     param_type: ParamType::Enum,
                     description: "Swarm topology type".to_string(),
-                    examples: vec!["hierarchical".to_string(), "mesh".to_string(), "star".to_string()],
+                    examples: vec![
+                        "hierarchical".to_string(),
+                        "mesh".to_string(),
+                        "star".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "maxAgents".to_string(),
@@ -1142,7 +1181,11 @@ impl ToolDatasetGenerator {
                     name: "type".to_string(),
                     param_type: ParamType::Enum,
                     description: "Task type".to_string(),
-                    examples: vec!["feature".to_string(), "bugfix".to_string(), "research".to_string()],
+                    examples: vec![
+                        "feature".to_string(),
+                        "bugfix".to_string(),
+                        "research".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "description".to_string(),
@@ -1156,7 +1199,12 @@ impl ToolDatasetGenerator {
                     name: "priority".to_string(),
                     param_type: ParamType::Enum,
                     description: "Task priority".to_string(),
-                    examples: vec!["low".to_string(), "normal".to_string(), "high".to_string(), "critical".to_string()],
+                    examples: vec![
+                        "low".to_string(),
+                        "normal".to_string(),
+                        "high".to_string(),
+                        "critical".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "assignTo".to_string(),
@@ -1198,7 +1246,11 @@ impl ToolDatasetGenerator {
                     name: "status".to_string(),
                     param_type: ParamType::String,
                     description: "Filter by status".to_string(),
-                    examples: vec!["pending".to_string(), "in_progress".to_string(), "completed".to_string()],
+                    examples: vec![
+                        "pending".to_string(),
+                        "in_progress".to_string(),
+                        "completed".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "priority".to_string(),
@@ -1239,7 +1291,9 @@ impl ToolDatasetGenerator {
         tools.push(McpToolDef {
             name: "hooks_pre-task".to_string(),
             category: ToolCategory::HooksLearning,
-            description: "Record task start and get agent suggestions with intelligent model routing".to_string(),
+            description:
+                "Record task start and get agent suggestions with intelligent model routing"
+                    .to_string(),
             required_params: vec![
                 ToolParam {
                     name: "taskId".to_string(),
@@ -1357,7 +1411,11 @@ impl ToolDatasetGenerator {
                 name: "operation".to_string(),
                 param_type: ParamType::Enum,
                 description: "Type of operation".to_string(),
-                examples: vec!["create".to_string(), "update".to_string(), "refactor".to_string()],
+                examples: vec![
+                    "create".to_string(),
+                    "update".to_string(),
+                    "refactor".to_string(),
+                ],
             }],
             use_cases: vec![
                 "get suggestions before editing a source file".to_string(),
@@ -1618,7 +1676,11 @@ impl ToolDatasetGenerator {
                 name: "scope".to_string(),
                 param_type: ParamType::Enum,
                 description: "Configuration scope".to_string(),
-                examples: vec!["project".to_string(), "user".to_string(), "system".to_string()],
+                examples: vec![
+                    "project".to_string(),
+                    "user".to_string(),
+                    "system".to_string(),
+                ],
             }],
             use_cases: vec![
                 "get a specific configuration value".to_string(),
@@ -1667,7 +1729,11 @@ impl ToolDatasetGenerator {
                     name: "topology".to_string(),
                     param_type: ParamType::Enum,
                     description: "Network topology".to_string(),
-                    examples: vec!["mesh".to_string(), "hierarchical".to_string(), "ring".to_string()],
+                    examples: vec![
+                        "mesh".to_string(),
+                        "hierarchical".to_string(),
+                        "ring".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "queenId".to_string(),
@@ -1707,7 +1773,11 @@ impl ToolDatasetGenerator {
                 name: "action".to_string(),
                 param_type: ParamType::Enum,
                 description: "Consensus action".to_string(),
-                examples: vec!["propose".to_string(), "vote".to_string(), "status".to_string()],
+                examples: vec![
+                    "propose".to_string(),
+                    "vote".to_string(),
+                    "status".to_string(),
+                ],
             }],
             optional_params: vec![
                 ToolParam {
@@ -1738,7 +1808,11 @@ impl ToolDatasetGenerator {
                 name: "modelType".to_string(),
                 param_type: ParamType::Enum,
                 description: "Model type".to_string(),
-                examples: vec!["moe".to_string(), "transformer".to_string(), "classifier".to_string()],
+                examples: vec![
+                    "moe".to_string(),
+                    "transformer".to_string(),
+                    "classifier".to_string(),
+                ],
             }],
             optional_params: vec![
                 ToolParam {
@@ -1801,7 +1875,11 @@ impl ToolDatasetGenerator {
                     name: "format".to_string(),
                     param_type: ParamType::Enum,
                     description: "Report format".to_string(),
-                    examples: vec!["json".to_string(), "summary".to_string(), "detailed".to_string()],
+                    examples: vec![
+                        "json".to_string(),
+                        "summary".to_string(),
+                        "detailed".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "timeRange".to_string(),
@@ -1826,7 +1904,11 @@ impl ToolDatasetGenerator {
                     name: "suite".to_string(),
                     param_type: ParamType::Enum,
                     description: "Benchmark suite".to_string(),
-                    examples: vec!["all".to_string(), "memory".to_string(), "neural".to_string()],
+                    examples: vec![
+                        "all".to_string(),
+                        "memory".to_string(),
+                        "neural".to_string(),
+                    ],
                 },
                 ToolParam {
                     name: "iterations".to_string(),

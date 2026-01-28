@@ -9,8 +9,8 @@
 //! 5. Multi-core parallelism (12x on M3 Ultra)
 
 use crate::closed_form_phi::ClosedFormPhi;
-use crate::hierarchical_phi::{HierarchicalPhiBatcher, ConsciousnessParameterSpace};
 use crate::ergodic_consciousness::{ErgodicityAnalyzer, ErgodicityResult};
+use crate::hierarchical_phi::{ConsciousnessParameterSpace, HierarchicalPhiBatcher};
 
 /// Meta-simulation engine for consciousness
 pub struct MetaConsciousnessSimulator {
@@ -95,10 +95,7 @@ impl MetaConsciousnessSimulator {
         let param_space = ConsciousnessParameterSpace::new(self.config.network_size);
         let networks = param_space.generate_networks();
 
-        println!(
-            "Generated {} network variations",
-            networks.len()
-        );
+        println!("Generated {} network variations", networks.len());
 
         // Process through hierarchical Φ computation
         let hierarchical_results = self.hierarchical.process_hierarchical_batch(&networks);
@@ -110,8 +107,8 @@ impl MetaConsciousnessSimulator {
         let cei_distribution = self.compute_cei_distribution(&networks);
 
         // Total effective simulations
-        let effective_sims = hierarchical_results.effective_simulations
-            * self.config.effective_multiplier();
+        let effective_sims =
+            hierarchical_results.effective_simulations * self.config.effective_multiplier();
 
         let elapsed = start.elapsed();
 
@@ -211,7 +208,10 @@ impl MetaSimulationResults {
         summary.push_str("   META-SIMULATION OF CONSCIOUSNESS - RESULTS\n");
         summary.push_str("═══════════════════════════════════════════════════════\n\n");
 
-        summary.push_str(&format!("Total networks analyzed: {}\n", self.total_networks));
+        summary.push_str(&format!(
+            "Total networks analyzed: {}\n",
+            self.total_networks
+        ));
         summary.push_str(&format!(
             "Effective simulations: {:.2e}\n",
             self.effective_simulations as f64
@@ -264,8 +264,8 @@ impl MetaSimulationResults {
         // CEI stats
         summary.push_str("\nConsciousness Eigenvalue Index (CEI):\n");
         summary.push_str("─────────────────────────────────────\n");
-        let cei_mean: f64 = self.cei_distribution.iter().sum::<f64>()
-            / self.cei_distribution.len() as f64;
+        let cei_mean: f64 =
+            self.cei_distribution.iter().sum::<f64>() / self.cei_distribution.len() as f64;
         summary.push_str(&format!("  Mean CEI: {:.3}\n", cei_mean));
 
         let mut cei_sorted = self.cei_distribution.clone();

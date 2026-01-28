@@ -17,9 +17,9 @@
 //! - Fixed-point combinators (Y-combinator style)
 //! - Quine-like self-replication patterns
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// A strange loop implementing self-referential cognition
@@ -113,9 +113,9 @@ pub enum ElementType {
     Perception,
     Concept,
     Belief,
-    MetaBelief,      // Belief about beliefs
-    MetaMetaBelief,  // Belief about beliefs about beliefs
-    SelfConcept,     // Concept about self
+    MetaBelief,     // Belief about beliefs
+    MetaMetaBelief, // Belief about beliefs about beliefs
+    SelfConcept,    // Concept about self
 }
 
 impl StrangeLoop {
@@ -187,11 +187,10 @@ impl StrangeLoop {
 
         let meta_thought = MetaThought {
             original_thought: thought.to_string(),
-            reasoning_about_thought: format!(
-                "I am thinking about the thought: '{}'", thought
-            ),
+            reasoning_about_thought: format!("I am thinking about the thought: '{}'", thought),
             reasoning_about_reasoning: format!(
-                "I notice that I am analyzing my own thought process at level {}", level
+                "I notice that I am analyzing my own thought process at level {}",
+                level
             ),
             infinite_regress_detected: level >= self.max_depth,
             godel_reference: self.compute_godel_reference(thought),
@@ -205,8 +204,8 @@ impl StrangeLoop {
     fn compute_godel_reference(&self, s: &str) -> u64 {
         // Simplified Gödel numbering using prime factorization concept
         let primes: [u64; 26] = [
-            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41,
-            43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101
+            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83,
+            89, 97, 101,
         ];
 
         let mut result: u64 = 1;
@@ -221,7 +220,9 @@ impl StrangeLoop {
     fn update_godel_number(&mut self) {
         // Update Gödel number based on current state
         let depth = self.measure_depth() as u64;
-        self.godel_number = self.godel_number.wrapping_mul(2_u64.wrapping_pow(depth as u32 + 1));
+        self.godel_number = self
+            .godel_number
+            .wrapping_mul(2_u64.wrapping_pow(depth as u32 + 1));
     }
 
     /// Create a self-reference to a specific aspect
@@ -267,10 +268,8 @@ impl StrangeLoop {
             });
         }
 
-        self.visited_states.insert(
-            current_state,
-            self.current_level.load(Ordering::SeqCst)
-        );
+        self.visited_states
+            .insert(current_state, self.current_level.load(Ordering::SeqCst));
         None
     }
 
@@ -352,7 +351,7 @@ impl TangledHierarchy {
         current: usize,
         target: usize,
         visited: &mut [bool],
-        path: &mut Vec<usize>
+        path: &mut Vec<usize>,
     ) {
         path.push(current);
 
@@ -480,7 +479,7 @@ mod tests {
         let confidences = sl.confidence_by_level();
         // Each level should have lower confidence than the previous
         for i in 1..confidences.len() {
-            assert!(confidences[i].1 <= confidences[i-1].1);
+            assert!(confidences[i].1 <= confidences[i - 1].1);
         }
     }
 

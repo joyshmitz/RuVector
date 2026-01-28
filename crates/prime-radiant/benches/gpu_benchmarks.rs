@@ -18,9 +18,7 @@
 //! cargo bench --features gpu --bench gpu_benchmarks
 //! ```
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -222,7 +220,11 @@ fn batch_routing_cpu(
 
         // Sort by score (descending) and take top-k
         expert_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let top_experts: Vec<usize> = expert_scores.iter().take(top_k).map(|(idx, _)| *idx).collect();
+        let top_experts: Vec<usize> = expert_scores
+            .iter()
+            .take(top_k)
+            .map(|(idx, _)| *idx)
+            .collect();
 
         results.push((t, top_experts));
     }
@@ -254,7 +256,7 @@ mod gpu_impl {
         // Simulate GPU overhead
         let _upload_time = simulate_memory_transfer(
             graph.nodes.len() * graph.state_dim * 4, // bytes
-            true,                                      // host to device
+            true,                                    // host to device
         );
 
         // Actual computation would happen on GPU
@@ -427,9 +429,9 @@ fn bench_attention_cpu_vs_gpu(c: &mut Criterion) {
 
     // Typical attention configurations
     let configs = [
-        (128, 64, "small"),    // seq_len=128, head_dim=64
-        (512, 64, "medium"),   // seq_len=512, head_dim=64
-        (2048, 64, "large"),   // seq_len=2048, head_dim=64
+        (128, 64, "small"),  // seq_len=128, head_dim=64
+        (512, 64, "medium"), // seq_len=512, head_dim=64
+        (2048, 64, "large"), // seq_len=2048, head_dim=64
     ];
 
     for (seq_len, head_dim, label) in configs {
@@ -759,10 +761,7 @@ criterion_group!(
     bench_multihead_attention,
 );
 
-criterion_group!(
-    routing_benches,
-    bench_batch_routing_cpu_vs_gpu,
-);
+criterion_group!(routing_benches, bench_batch_routing_cpu_vs_gpu,);
 
 criterion_group!(
     transfer_benches,

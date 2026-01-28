@@ -1,7 +1,7 @@
 //! Calibration data for quantization
 
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
+use serde::{Deserialize, Serialize};
 
 /// Calibration data for a model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,9 +189,8 @@ where
     let mut calibration = CalibrationData::new(method);
 
     // Initialize layer stats
-    let mut layer_stats: Vec<ActivationStats> = (0..num_layers)
-        .map(|_| ActivationStats::new())
-        .collect();
+    let mut layer_stats: Vec<ActivationStats> =
+        (0..num_layers).map(|_| ActivationStats::new()).collect();
 
     // Run calibration passes
     for input in calibration_inputs {

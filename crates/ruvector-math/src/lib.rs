@@ -93,68 +93,65 @@ extern crate alloc;
 
 // Core modules
 pub mod error;
-pub mod optimal_transport;
 pub mod information_geometry;
-pub mod spherical;
+pub mod optimal_transport;
 pub mod product_manifold;
+pub mod spherical;
 pub mod utils;
 
 // New theoretical CS modules
-pub mod tropical;
-pub mod tensor_networks;
-pub mod spectral;
 pub mod homology;
 pub mod optimization;
+pub mod spectral;
+pub mod tensor_networks;
+pub mod tropical;
 
 // Re-exports for convenience - Core
 pub use error::{MathError, Result};
+pub use information_geometry::{FisherInformation, KFACApproximation, NaturalGradient};
 pub use optimal_transport::{
-    SlicedWasserstein, SinkhornSolver, GromovWasserstein,
-    TransportPlan, WassersteinConfig,
+    GromovWasserstein, SinkhornSolver, SlicedWasserstein, TransportPlan, WassersteinConfig,
 };
-pub use information_geometry::{
-    FisherInformation, NaturalGradient, KFACApproximation,
-};
-pub use spherical::{SphericalSpace, SphericalConfig};
-pub use product_manifold::{ProductManifold, ProductManifoldConfig, CurvatureType};
+pub use product_manifold::{CurvatureType, ProductManifold, ProductManifoldConfig};
+pub use spherical::{SphericalConfig, SphericalSpace};
 
 // Re-exports - Tropical Algebra
-pub use tropical::{Tropical, TropicalSemiring, TropicalPolynomial, TropicalMatrix};
 pub use tropical::{LinearRegionCounter, TropicalNeuralAnalysis};
+pub use tropical::{Tropical, TropicalMatrix, TropicalPolynomial, TropicalSemiring};
 
 // Re-exports - Tensor Networks
+pub use tensor_networks::{CPConfig, CPDecomposition, TuckerConfig, TuckerDecomposition};
 pub use tensor_networks::{DenseTensor, TensorTrain, TensorTrainConfig};
-pub use tensor_networks::{TuckerDecomposition, TuckerConfig, CPDecomposition, CPConfig};
 pub use tensor_networks::{TensorNetwork, TensorNode};
 
 // Re-exports - Spectral Methods
-pub use spectral::{ChebyshevPolynomial, ChebyshevExpansion};
-pub use spectral::{SpectralFilter, GraphFilter, FilterType};
-pub use spectral::{SpectralWaveletTransform, GraphWavelet, SpectralClustering};
 pub use spectral::ScaledLaplacian;
+pub use spectral::{ChebyshevExpansion, ChebyshevPolynomial};
+pub use spectral::{FilterType, GraphFilter, SpectralFilter};
+pub use spectral::{GraphWavelet, SpectralClustering, SpectralWaveletTransform};
 
 // Re-exports - Homology
-pub use homology::{PersistenceDiagram, PersistentHomology, BirthDeathPair};
-pub use homology::{Simplex, SimplicialComplex, Filtration, VietorisRips};
+pub use homology::{BirthDeathPair, PersistenceDiagram, PersistentHomology};
 pub use homology::{BottleneckDistance, WassersteinDistance as HomologyWasserstein};
+pub use homology::{Filtration, Simplex, SimplicialComplex, VietorisRips};
 
 // Re-exports - Optimization
-pub use optimization::{Polynomial, Monomial, Term};
+pub use optimization::{BoundsCertificate, NonnegativityCertificate};
+pub use optimization::{Monomial, Polynomial, Term};
 pub use optimization::{SOSDecomposition, SOSResult};
-pub use optimization::{NonnegativityCertificate, BoundsCertificate};
 
 /// Prelude module for convenient imports
 pub mod prelude {
-    pub use crate::optimal_transport::*;
-    pub use crate::information_geometry::*;
-    pub use crate::spherical::*;
-    pub use crate::product_manifold::*;
     pub use crate::error::*;
-    pub use crate::tropical::*;
-    pub use crate::tensor_networks::*;
-    pub use crate::spectral::*;
     pub use crate::homology::*;
+    pub use crate::information_geometry::*;
+    pub use crate::optimal_transport::*;
     pub use crate::optimization::*;
+    pub use crate::product_manifold::*;
+    pub use crate::spectral::*;
+    pub use crate::spherical::*;
+    pub use crate::tensor_networks::*;
+    pub use crate::tropical::*;
 }
 
 #[cfg(test)]

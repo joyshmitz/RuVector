@@ -189,8 +189,8 @@ impl QualityMonitor {
         let n = total.max(1) as f32;
         let z = 1.96; // 95% CI
         let center = (recall + z * z / (2.0 * n)) / (1.0 + z * z / n);
-        let width = z * (recall * (1.0 - recall) / n + z * z / (4.0 * n * n)).sqrt()
-            / (1.0 + z * z / n);
+        let width =
+            z * (recall * (1.0 - recall) / n + z * z / (4.0 * n * n)).sqrt() / (1.0 + z * z / n);
 
         RecallEstimate {
             recall,

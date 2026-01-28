@@ -53,8 +53,8 @@ pub use grpo::{
 // MCP tool training exports
 pub use mcp_tools::{
     EvaluationMetrics, McpToolTrainer, McpTrainingConfig, StepBuilder, ToolTrajectory,
-    TrajectoryBuilder, TrajectoryMetadata, TrajectoryStep, TrainingCheckpoint, TrainingResult,
-    TrainingStats,
+    TrainingCheckpoint, TrainingResult, TrainingStats, TrajectoryBuilder, TrajectoryMetadata,
+    TrajectoryStep,
 };
 
 // Tool dataset exports
@@ -65,14 +65,13 @@ pub use tool_dataset::{
 
 // Contrastive learning exports
 pub use contrastive::{
-    AgentEmbedding, ContrastiveConfig, ContrastiveTrainer,
-    TrainingResult as ContrastiveResult, TrainingStats as ContrastiveStats,
-    TrainingTriplet, AGENT_DESCRIPTIONS,
+    AgentEmbedding, ContrastiveConfig, ContrastiveTrainer, TrainingResult as ContrastiveResult,
+    TrainingStats as ContrastiveStats, TrainingTriplet, AGENT_DESCRIPTIONS,
 };
 
 // Real trainer exports (Candle-based with GGUF export)
 pub use real_trainer::{
-    EpochStats, GgufExportMetadata, GgufExportResult, GrpoEvaluator, GrpoFeedback,
-    LayerMetadata, RealContrastiveTrainer, RealTrainingConfig, RealTrainingResult,
-    TrainingConfigMeta, run_training_pipeline,
+    run_training_pipeline, EpochStats, GgufExportMetadata, GgufExportResult, GrpoEvaluator,
+    GrpoFeedback, LayerMetadata, RealContrastiveTrainer, RealTrainingConfig, RealTrainingResult,
+    TrainingConfigMeta,
 };

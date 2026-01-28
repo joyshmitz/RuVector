@@ -379,7 +379,12 @@ impl Chain {
         if coefficient.abs() > 1e-10 {
             *self.coefficients.entry(id).or_insert(0.0) += coefficient;
             // Remove if coefficient is now essentially zero
-            if self.coefficients.get(&id).map(|c| c.abs() < 1e-10).unwrap_or(false) {
+            if self
+                .coefficients
+                .get(&id)
+                .map(|c| c.abs() < 1e-10)
+                .unwrap_or(false)
+            {
                 self.coefficients.remove(&id);
             }
         }
@@ -394,7 +399,10 @@ impl Chain {
 
     /// Add another chain to this one
     pub fn add(&mut self, other: &Chain) {
-        assert_eq!(self.dimension, other.dimension, "Chain dimensions must match");
+        assert_eq!(
+            self.dimension, other.dimension,
+            "Chain dimensions must match"
+        );
         for (&id, &coeff) in &other.coefficients {
             self.add_simplex(id, coeff);
         }
@@ -407,7 +415,11 @@ impl Chain {
 
     /// L2 norm of the chain
     pub fn norm(&self) -> f64 {
-        self.coefficients.values().map(|c| c * c).sum::<f64>().sqrt()
+        self.coefficients
+            .values()
+            .map(|c| c * c)
+            .sum::<f64>()
+            .sqrt()
     }
 }
 
@@ -462,7 +474,10 @@ impl Cochain {
 
     /// Add another cochain to this one
     pub fn add(&mut self, other: &Cochain) {
-        assert_eq!(self.dimension, other.dimension, "Cochain dimensions must match");
+        assert_eq!(
+            self.dimension, other.dimension,
+            "Cochain dimensions must match"
+        );
         for (&id, &value) in &other.values {
             let new_val = self.get(id) + value;
             self.set(id, new_val);

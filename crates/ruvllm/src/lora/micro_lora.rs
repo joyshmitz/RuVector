@@ -215,16 +215,14 @@ impl LoraAdapter {
         alpha: f32,
         seed: u64,
     ) -> Self {
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
 
         let mut rng = StdRng::seed_from_u64(seed);
         let scaling = alpha / rank as f32;
 
         let std_a = (2.0 / in_features as f32).sqrt();
-        let lora_a = Array2::from_shape_fn((in_features, rank), |_| {
-            rng.gen_range(-std_a..std_a)
-        });
+        let lora_a = Array2::from_shape_fn((in_features, rank), |_| rng.gen_range(-std_a..std_a));
 
         let lora_b = Array2::zeros((rank, out_features));
 
@@ -335,18 +333,24 @@ impl LoraAdapter {
                     let inp1 = vld1q_f32(input.as_ptr().add(base + 4));
 
                     // Load A column 0 values (scattered in row-major)
-                    let a0 = vld1q_f32([
-                        self.lora_a[[base, 0]],
-                        self.lora_a[[base + 1, 0]],
-                        self.lora_a[[base + 2, 0]],
-                        self.lora_a[[base + 3, 0]],
-                    ].as_ptr());
-                    let a1 = vld1q_f32([
-                        self.lora_a[[base + 4, 0]],
-                        self.lora_a[[base + 5, 0]],
-                        self.lora_a[[base + 6, 0]],
-                        self.lora_a[[base + 7, 0]],
-                    ].as_ptr());
+                    let a0 = vld1q_f32(
+                        [
+                            self.lora_a[[base, 0]],
+                            self.lora_a[[base + 1, 0]],
+                            self.lora_a[[base + 2, 0]],
+                            self.lora_a[[base + 3, 0]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let a1 = vld1q_f32(
+                        [
+                            self.lora_a[[base + 4, 0]],
+                            self.lora_a[[base + 5, 0]],
+                            self.lora_a[[base + 6, 0]],
+                            self.lora_a[[base + 7, 0]],
+                        ]
+                        .as_ptr(),
+                    );
 
                     inter_sum0 = vfmaq_f32(inter_sum0, inp0, a0);
                     inter_sum1 = vfmaq_f32(inter_sum1, inp1, a1);
@@ -375,18 +379,24 @@ impl LoraAdapter {
                     let out1 = vld1q_f32(output.as_ptr().add(base + 4));
 
                     // Load B row 0 (contiguous for row-major)
-                    let b0 = vld1q_f32([
-                        self.lora_b[[0, base]],
-                        self.lora_b[[0, base + 1]],
-                        self.lora_b[[0, base + 2]],
-                        self.lora_b[[0, base + 3]],
-                    ].as_ptr());
-                    let b1 = vld1q_f32([
-                        self.lora_b[[0, base + 4]],
-                        self.lora_b[[0, base + 5]],
-                        self.lora_b[[0, base + 6]],
-                        self.lora_b[[0, base + 7]],
-                    ].as_ptr());
+                    let b0 = vld1q_f32(
+                        [
+                            self.lora_b[[0, base]],
+                            self.lora_b[[0, base + 1]],
+                            self.lora_b[[0, base + 2]],
+                            self.lora_b[[0, base + 3]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let b1 = vld1q_f32(
+                        [
+                            self.lora_b[[0, base + 4]],
+                            self.lora_b[[0, base + 5]],
+                            self.lora_b[[0, base + 6]],
+                            self.lora_b[[0, base + 7]],
+                        ]
+                        .as_ptr(),
+                    );
 
                     // FMA and store
                     let res0 = vfmaq_f32(out0, scaled_vec, b0);
@@ -419,30 +429,42 @@ impl LoraAdapter {
                     let inp1 = vld1q_f32(input.as_ptr().add(base + 4));
 
                     // Load A columns (scattered access for row-major)
-                    let a0_col0 = vld1q_f32([
-                        self.lora_a[[base, 0]],
-                        self.lora_a[[base + 1, 0]],
-                        self.lora_a[[base + 2, 0]],
-                        self.lora_a[[base + 3, 0]],
-                    ].as_ptr());
-                    let a1_col0 = vld1q_f32([
-                        self.lora_a[[base + 4, 0]],
-                        self.lora_a[[base + 5, 0]],
-                        self.lora_a[[base + 6, 0]],
-                        self.lora_a[[base + 7, 0]],
-                    ].as_ptr());
-                    let a0_col1 = vld1q_f32([
-                        self.lora_a[[base, 1]],
-                        self.lora_a[[base + 1, 1]],
-                        self.lora_a[[base + 2, 1]],
-                        self.lora_a[[base + 3, 1]],
-                    ].as_ptr());
-                    let a1_col1 = vld1q_f32([
-                        self.lora_a[[base + 4, 1]],
-                        self.lora_a[[base + 5, 1]],
-                        self.lora_a[[base + 6, 1]],
-                        self.lora_a[[base + 7, 1]],
-                    ].as_ptr());
+                    let a0_col0 = vld1q_f32(
+                        [
+                            self.lora_a[[base, 0]],
+                            self.lora_a[[base + 1, 0]],
+                            self.lora_a[[base + 2, 0]],
+                            self.lora_a[[base + 3, 0]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let a1_col0 = vld1q_f32(
+                        [
+                            self.lora_a[[base + 4, 0]],
+                            self.lora_a[[base + 5, 0]],
+                            self.lora_a[[base + 6, 0]],
+                            self.lora_a[[base + 7, 0]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let a0_col1 = vld1q_f32(
+                        [
+                            self.lora_a[[base, 1]],
+                            self.lora_a[[base + 1, 1]],
+                            self.lora_a[[base + 2, 1]],
+                            self.lora_a[[base + 3, 1]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let a1_col1 = vld1q_f32(
+                        [
+                            self.lora_a[[base + 4, 1]],
+                            self.lora_a[[base + 5, 1]],
+                            self.lora_a[[base + 6, 1]],
+                            self.lora_a[[base + 7, 1]],
+                        ]
+                        .as_ptr(),
+                    );
 
                     // Dual accumulator FMA chains
                     sum0_0 = vfmaq_f32(sum0_0, inp0, a0_col0);
@@ -479,30 +501,42 @@ impl LoraAdapter {
                     let out1 = vld1q_f32(output.as_ptr().add(base + 4));
 
                     // Load B rows (scattered for row-major)
-                    let b0_row0 = vld1q_f32([
-                        self.lora_b[[0, base]],
-                        self.lora_b[[0, base + 1]],
-                        self.lora_b[[0, base + 2]],
-                        self.lora_b[[0, base + 3]],
-                    ].as_ptr());
-                    let b1_row0 = vld1q_f32([
-                        self.lora_b[[0, base + 4]],
-                        self.lora_b[[0, base + 5]],
-                        self.lora_b[[0, base + 6]],
-                        self.lora_b[[0, base + 7]],
-                    ].as_ptr());
-                    let b0_row1 = vld1q_f32([
-                        self.lora_b[[1, base]],
-                        self.lora_b[[1, base + 1]],
-                        self.lora_b[[1, base + 2]],
-                        self.lora_b[[1, base + 3]],
-                    ].as_ptr());
-                    let b1_row1 = vld1q_f32([
-                        self.lora_b[[1, base + 4]],
-                        self.lora_b[[1, base + 5]],
-                        self.lora_b[[1, base + 6]],
-                        self.lora_b[[1, base + 7]],
-                    ].as_ptr());
+                    let b0_row0 = vld1q_f32(
+                        [
+                            self.lora_b[[0, base]],
+                            self.lora_b[[0, base + 1]],
+                            self.lora_b[[0, base + 2]],
+                            self.lora_b[[0, base + 3]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let b1_row0 = vld1q_f32(
+                        [
+                            self.lora_b[[0, base + 4]],
+                            self.lora_b[[0, base + 5]],
+                            self.lora_b[[0, base + 6]],
+                            self.lora_b[[0, base + 7]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let b0_row1 = vld1q_f32(
+                        [
+                            self.lora_b[[1, base]],
+                            self.lora_b[[1, base + 1]],
+                            self.lora_b[[1, base + 2]],
+                            self.lora_b[[1, base + 3]],
+                        ]
+                        .as_ptr(),
+                    );
+                    let b1_row1 = vld1q_f32(
+                        [
+                            self.lora_b[[1, base + 4]],
+                            self.lora_b[[1, base + 5]],
+                            self.lora_b[[1, base + 6]],
+                            self.lora_b[[1, base + 7]],
+                        ]
+                        .as_ptr(),
+                    );
 
                     // Fused FMA: out + scaled0*B[0,:] + scaled1*B[1,:]
                     let tmp0 = vfmaq_f32(out0, scaled0_vec, b0_row0);
@@ -627,7 +661,8 @@ impl LoraAdapter {
         for i in 0..self.lora_a.nrows() {
             for r in 0..self.rank {
                 let grad = self.grad_a[[i, r]] * scale;
-                let ewc_penalty = ewc_lambda * fisher_a[[i, r]] * (self.lora_a[[i, r]] - optimal_a[[i, r]]);
+                let ewc_penalty =
+                    ewc_lambda * fisher_a[[i, r]] * (self.lora_a[[i, r]] - optimal_a[[i, r]]);
                 self.lora_a[[i, r]] -= grad + ewc_penalty * learning_rate;
             }
         }
@@ -636,7 +671,8 @@ impl LoraAdapter {
         for r in 0..self.rank {
             for o in 0..self.lora_b.ncols() {
                 let grad = self.grad_b[[r, o]] * scale;
-                let ewc_penalty = ewc_lambda * fisher_b[[r, o]] * (self.lora_b[[r, o]] - optimal_b[[r, o]]);
+                let ewc_penalty =
+                    ewc_lambda * fisher_b[[r, o]] * (self.lora_b[[r, o]] - optimal_b[[r, o]]);
                 self.lora_b[[r, o]] -= grad + ewc_penalty * learning_rate;
             }
         }
@@ -788,12 +824,7 @@ impl MicroLoRA {
                 .copied()
                 .unwrap_or((config.in_features, config.out_features));
 
-            let adapter = LoraAdapter::new(
-                in_features,
-                out_features,
-                config.rank,
-                config.alpha,
-            );
+            let adapter = LoraAdapter::new(in_features, out_features, config.rank, config.alpha);
             adapters.insert(*module, Arc::new(RwLock::new(adapter)));
         }
 
@@ -930,18 +961,22 @@ impl MicroLoRA {
 
     /// Export state for serialization
     pub fn export_state(&self) -> MicroLoraState {
-        let adapters = self.adapters.iter().map(|(module, adapter)| {
-            let adapter = adapter.read();
-            let state = LoraAdapterState {
-                lora_a: adapter.lora_a.iter().copied().collect(),
-                lora_b: adapter.lora_b.iter().copied().collect(),
-                in_features: adapter.lora_a.nrows(),
-                out_features: adapter.lora_b.ncols(),
-                rank: adapter.rank,
-                scaling: adapter.scaling,
-            };
-            (*module, state)
-        }).collect();
+        let adapters = self
+            .adapters
+            .iter()
+            .map(|(module, adapter)| {
+                let adapter = adapter.read();
+                let state = LoraAdapterState {
+                    lora_a: adapter.lora_a.iter().copied().collect(),
+                    lora_b: adapter.lora_b.iter().copied().collect(),
+                    in_features: adapter.lora_a.nrows(),
+                    out_features: adapter.lora_b.ncols(),
+                    rank: adapter.rank,
+                    scaling: adapter.scaling,
+                };
+                (*module, state)
+            })
+            .collect();
 
         MicroLoraState {
             config: self.config.clone(),
@@ -958,12 +993,14 @@ impl MicroLoRA {
             let lora_a = Array2::from_shape_vec(
                 (adapter_state.in_features, adapter_state.rank),
                 adapter_state.lora_a,
-            ).map_err(|e| RuvLLMError::Config(e.to_string()))?;
+            )
+            .map_err(|e| RuvLLMError::Config(e.to_string()))?;
 
             let lora_b = Array2::from_shape_vec(
                 (adapter_state.rank, adapter_state.out_features),
                 adapter_state.lora_b,
-            ).map_err(|e| RuvLLMError::Config(e.to_string()))?;
+            )
+            .map_err(|e| RuvLLMError::Config(e.to_string()))?;
 
             let adapter = LoraAdapter {
                 lora_a: lora_a.clone(),
@@ -1005,14 +1042,13 @@ impl MicroLoRA {
 
     /// Get total parameter count
     pub fn param_count(&self) -> usize {
-        self.adapters.values()
-            .map(|a| a.read().param_count())
-            .sum()
+        self.adapters.values().map(|a| a.read().param_count()).sum()
     }
 
     /// Get total memory usage in bytes
     pub fn memory_bytes(&self) -> usize {
-        self.adapters.values()
+        self.adapters
+            .values()
             .map(|a| a.read().memory_bytes())
             .sum()
     }

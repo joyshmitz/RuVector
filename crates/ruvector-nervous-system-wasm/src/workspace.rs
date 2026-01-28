@@ -24,7 +24,12 @@ pub struct WorkspaceItem {
 impl WorkspaceItem {
     /// Create a new workspace item
     #[wasm_bindgen(constructor)]
-    pub fn new(content: &[f32], salience: f32, source_module: u16, timestamp: u64) -> WorkspaceItem {
+    pub fn new(
+        content: &[f32],
+        salience: f32,
+        source_module: u16,
+        timestamp: u64,
+    ) -> WorkspaceItem {
         Self {
             content: content.to_vec(),
             salience,
@@ -201,21 +206,26 @@ impl GlobalWorkspace {
         }
 
         // Remove items below threshold
-        self.buffer.retain(|item| item.salience >= self.salience_threshold);
+        self.buffer
+            .retain(|item| item.salience >= self.salience_threshold);
     }
 
     /// Retrieve all current representations as JSON
     #[wasm_bindgen]
     pub fn retrieve(&self) -> JsValue {
-        let items: Vec<_> = self.buffer.iter().map(|item| {
-            serde_json::json!({
-                "content": item.content,
-                "salience": item.salience,
-                "source_module": item.source_module,
-                "timestamp": item.timestamp,
-                "id": item.id
+        let items: Vec<_> = self
+            .buffer
+            .iter()
+            .map(|item| {
+                serde_json::json!({
+                    "content": item.content,
+                    "salience": item.salience,
+                    "source_module": item.source_module,
+                    "timestamp": item.timestamp,
+                    "id": item.id
+                })
             })
-        }).collect();
+            .collect();
 
         serde_wasm_bindgen::to_value(&items).unwrap_or(JsValue::NULL)
     }
@@ -231,15 +241,18 @@ impl GlobalWorkspace {
         });
         items.truncate(k);
 
-        let result: Vec<_> = items.iter().map(|item| {
-            serde_json::json!({
-                "content": item.content,
-                "salience": item.salience,
-                "source_module": item.source_module,
-                "timestamp": item.timestamp,
-                "id": item.id
+        let result: Vec<_> = items
+            .iter()
+            .map(|item| {
+                serde_json::json!({
+                    "content": item.content,
+                    "salience": item.salience,
+                    "source_module": item.source_module,
+                    "timestamp": item.timestamp,
+                    "id": item.id
+                })
             })
-        }).collect();
+            .collect();
 
         serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
     }

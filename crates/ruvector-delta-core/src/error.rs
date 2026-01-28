@@ -88,14 +88,13 @@ impl fmt::Display for DeltaError {
             Self::WindowError(msg) => write!(f, "Window error: {}", msg),
             Self::SerializationError(msg) => write!(f, "Serialization error: {}", msg),
             Self::IndexOutOfBounds { index, length } => {
-                write!(
-                    f,
-                    "Index out of bounds: {} (length: {})",
-                    index, length
-                )
+                write!(f, "Index out of bounds: {} (length: {})", index, length)
             }
             Self::InvalidOperation(msg) => write!(f, "Invalid operation: {}", msg),
-            Self::BufferOverflow { required, available } => {
+            Self::BufferOverflow {
+                required,
+                available,
+            } => {
                 write!(
                     f,
                     "Buffer overflow: required {}, available {}",
@@ -110,11 +109,7 @@ impl fmt::Display for DeltaError {
                 )
             }
             Self::VersionMismatch { expected, actual } => {
-                write!(
-                    f,
-                    "Version mismatch: expected {}, got {}",
-                    expected, actual
-                )
+                write!(f, "Version mismatch: expected {}, got {}", expected, actual)
             }
         }
     }

@@ -18,8 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create TileZero with conservative thresholds to trigger DEFER
     let thresholds = GateThresholds {
-        min_cut: 15.0,           // Higher threshold
-        max_shift: 0.3,          // Lower tolerance for shift
+        min_cut: 15.0,  // Higher threshold
+        max_shift: 0.3, // Lower tolerance for shift
         tau_deny: 0.01,
         tau_permit: 100.0,
         permit_ttl_ns: 300_000_000_000, // 5 minutes
@@ -104,7 +104,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("  - Provide additional context");
             }
         }
-
     } else {
         println!("Decision: {:?}", token.decision);
         println!("(Automatic - no human review needed)");

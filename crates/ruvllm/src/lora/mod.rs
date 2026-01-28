@@ -109,13 +109,14 @@ pub use adapter::{
     AdapterComposer, AdapterHandle, AdapterPool, AdapterRegistry, CompositionStrategy,
 };
 pub use adapters::{
-    LoraConfig, RuvLtraAdapters, AdapterMetadata,
-    trainer::{AdapterTrainer, AdapterTrainingConfig, AdapterDataset, SyntheticDataGenerator, TrainingExample},
-    merge::{AdapterMerger, MergeConfig, MergeStrategy, HotSwapManager},
+    merge::{AdapterMerger, HotSwapManager, MergeConfig, MergeStrategy},
+    trainer::{
+        AdapterDataset, AdapterTrainer, AdapterTrainingConfig, SyntheticDataGenerator,
+        TrainingExample,
+    },
+    AdapterMetadata, LoraConfig, RuvLtraAdapters,
 };
-pub use micro_lora::{
-    AdaptFeedback, LoraAdapter, MicroLoRA, MicroLoraConfig, TargetModule,
-};
+pub use micro_lora::{AdaptFeedback, LoraAdapter, MicroLoRA, MicroLoraConfig, TargetModule};
 pub use training::{
     EwcRegularizer, GradientAccumulator, LearningRateSchedule, TrainingConfig, TrainingPipeline,
 };

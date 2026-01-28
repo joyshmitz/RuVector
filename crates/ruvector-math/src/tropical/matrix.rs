@@ -40,7 +40,11 @@ impl TropicalMatrix {
         let rows = data.len();
         let cols = if rows > 0 { data[0].len() } else { 0 };
         let flat: Vec<f64> = data.into_iter().flatten().collect();
-        Self { rows, cols, data: flat }
+        Self {
+            rows,
+            cols,
+            data: flat,
+        }
     }
 
     /// Get element (returns -∞ for out of bounds)
@@ -237,7 +241,10 @@ impl TropicalEigen {
             eigenvalue = new_eigenvalue;
         }
 
-        Some(TropicalEigen { eigenvalue, eigenvector: v })
+        Some(TropicalEigen {
+            eigenvalue,
+            eigenvector: v,
+        })
     }
 }
 
@@ -303,10 +310,7 @@ mod tests {
     #[test]
     fn test_tropical_matrix_mul() {
         // A = [[0, 1], [-∞, 2]]
-        let a = TropicalMatrix::from_rows(vec![
-            vec![0.0, 1.0],
-            vec![f64::NEG_INFINITY, 2.0],
-        ]);
+        let a = TropicalMatrix::from_rows(vec![vec![0.0, 1.0], vec![f64::NEG_INFINITY, 2.0]]);
 
         // A² = [[max(0+0, 1-∞), max(0+1, 1+2)], ...]
         let a2 = a.mul(&a);

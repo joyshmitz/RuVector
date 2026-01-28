@@ -3,9 +3,8 @@
 #[cfg(test)]
 mod tests {
     use ruvllm::lora::{
-        RuvLtraAdapters, AdapterTrainer, AdapterTrainingConfig, SyntheticDataGenerator,
-        AdapterMerger, MergeConfig, MergeStrategy, HotSwapManager, AdaptFeedback,
-        TargetModule,
+        AdaptFeedback, AdapterMerger, AdapterTrainer, AdapterTrainingConfig, HotSwapManager,
+        MergeConfig, MergeStrategy, RuvLtraAdapters, SyntheticDataGenerator, TargetModule,
     };
     use std::collections::HashMap;
 
@@ -39,8 +38,10 @@ mod tests {
             }
 
             let stats = dataset.stats();
-            println!("{}: train={}, val={}, avg_quality={:.2}",
-                     task_type, stats.train_size, stats.val_size, stats.avg_quality);
+            println!(
+                "{}: train={}, val={}, avg_quality={:.2}",
+                task_type, stats.train_size, stats.val_size, stats.avg_quality
+            );
         }
     }
 
@@ -61,8 +62,10 @@ mod tests {
         assert!(result.total_steps > 0);
         assert!(result.final_loss >= 0.0);
 
-        println!("Training result: {} epochs, {} steps, loss={:.4}",
-                 result.epochs_completed, result.total_steps, result.final_loss);
+        println!(
+            "Training result: {} epochs, {} steps, loss={:.4}",
+            result.epochs_completed, result.total_steps, result.final_loss
+        );
     }
 
     #[test]
@@ -93,7 +96,9 @@ mod tests {
         let config = MergeConfig::average();
         let merger = AdapterMerger::new(config);
 
-        let merged = merger.merge(&adapters_to_merge, &adapters.coder, 256).unwrap();
+        let merged = merger
+            .merge(&adapters_to_merge, &adapters.coder, 256)
+            .unwrap();
 
         assert!(merged.is_enabled());
         assert!(merged.param_count() > 0);
@@ -119,7 +124,9 @@ mod tests {
         let config = MergeConfig::weighted(weights);
         let merger = AdapterMerger::new(config);
 
-        let merged = merger.merge(&adapters_to_merge, &adapters.coder, 256).unwrap();
+        let merged = merger
+            .merge(&adapters_to_merge, &adapters.coder, 256)
+            .unwrap();
 
         assert!(merged.is_enabled());
     }
@@ -138,7 +145,9 @@ mod tests {
         let config = MergeConfig::slerp(0.5);
         let merger = AdapterMerger::new(config);
 
-        let merged = merger.merge(&adapters_to_merge, &adapters.coder, 256).unwrap();
+        let merged = merger
+            .merge(&adapters_to_merge, &adapters.coder, 256)
+            .unwrap();
 
         assert!(merged.is_enabled());
     }
@@ -181,7 +190,10 @@ mod tests {
         let adapted = lora.forward(&input, &TargetModule::QProj);
         let adapted_mean = adapted.iter().sum::<f32>() / adapted.len() as f32;
 
-        println!("Baseline mean: {:.4}, Adapted mean: {:.4}", baseline_mean, adapted_mean);
+        println!(
+            "Baseline mean: {:.4}, Adapted mean: {:.4}",
+            baseline_mean, adapted_mean
+        );
 
         assert_eq!(lora.adaptation_count(), 1);
     }
@@ -223,11 +235,13 @@ mod tests {
             let mem_768 = config.estimate_memory(768);
             let mem_4096 = config.estimate_memory(4096);
 
-            println!("{}: 256d={:.1}KB, 768d={:.1}KB, 4096d={:.1}KB",
-                     name,
-                     mem_256 as f32 / 1024.0,
-                     mem_768 as f32 / 1024.0,
-                     mem_4096 as f32 / 1024.0);
+            println!(
+                "{}: 256d={:.1}KB, 768d={:.1}KB, 4096d={:.1}KB",
+                name,
+                mem_256 as f32 / 1024.0,
+                mem_768 as f32 / 1024.0,
+                mem_4096 as f32 / 1024.0
+            );
         }
     }
 
@@ -250,7 +264,9 @@ mod tests {
         // TIES merge
         let ties_config = MergeConfig::ties(0.6);
         let ties_merger = AdapterMerger::new(ties_config);
-        let ties_merged = ties_merger.merge(&trained_adapters, &adapters.coder, 256).unwrap();
+        let ties_merged = ties_merger
+            .merge(&trained_adapters, &adapters.coder, 256)
+            .unwrap();
 
         assert!(ties_merged.is_enabled());
 

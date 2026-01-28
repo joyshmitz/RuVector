@@ -240,7 +240,11 @@ impl ClaudeFlowMemoryBridge {
     }
 
     /// Retrieve a specific pattern by key
-    pub fn retrieve_pattern(&self, key: &str, namespace: Option<&str>) -> Result<Option<ClaudeFlowPattern>> {
+    pub fn retrieve_pattern(
+        &self,
+        key: &str,
+        namespace: Option<&str>,
+    ) -> Result<Option<ClaudeFlowPattern>> {
         let ns = namespace.unwrap_or(&self.config.patterns_namespace);
 
         let args = vec![
@@ -309,7 +313,12 @@ impl ClaudeFlowMemoryBridge {
         let mut tasks_synced = 0;
 
         // Sync patterns
-        match self.execute_cli(&["hive-mind".to_string(), "memory".to_string(), "--action".to_string(), "list".to_string()]) {
+        match self.execute_cli(&[
+            "hive-mind".to_string(),
+            "memory".to_string(),
+            "--action".to_string(),
+            "list".to_string(),
+        ]) {
             Ok(output) => {
                 patterns_synced = output.lines().count();
             }
@@ -367,12 +376,7 @@ impl ClaudeFlowMemoryBridge {
     }
 
     /// Record task outcome for learning
-    pub fn record_outcome(
-        &self,
-        task_id: &str,
-        success: bool,
-        quality: Option<f32>,
-    ) -> Result<()> {
+    pub fn record_outcome(&self, task_id: &str, success: bool, quality: Option<f32>) -> Result<()> {
         let mut args = vec![
             "hooks".to_string(),
             "post-task".to_string(),
@@ -497,7 +501,11 @@ impl ClaudeFlowMemoryBridge {
     }
 
     /// Parse search results from CLI output
-    fn parse_search_results(&self, output: &str, namespace: &str) -> Result<Vec<ClaudeFlowPattern>> {
+    fn parse_search_results(
+        &self,
+        output: &str,
+        namespace: &str,
+    ) -> Result<Vec<ClaudeFlowPattern>> {
         let mut patterns = Vec::new();
 
         // Try to parse as JSON first
@@ -640,7 +648,9 @@ mod tests {
             {"key": "pattern-2", "value": "value-2", "tags": []}
         ]"#;
 
-        let results = bridge.parse_search_results(json_output, "patterns").unwrap();
+        let results = bridge
+            .parse_search_results(json_output, "patterns")
+            .unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].key, "pattern-1");
         assert_eq!(results[0].tags, vec!["rust"]);
@@ -653,7 +663,9 @@ mod tests {
 
         let text_output = "key1: value1\nkey2: value2\n";
 
-        let results = bridge.parse_search_results(text_output, "patterns").unwrap();
+        let results = bridge
+            .parse_search_results(text_output, "patterns")
+            .unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].key, "key1");
         assert_eq!(results[0].value, "value1");

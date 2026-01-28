@@ -1571,10 +1571,7 @@ mod tests {
             "Same direction should be 1.0"
         );
         assert!(results[1].abs() < 0.001, "Orthogonal should be 0.0");
-        assert!(
-            (results[2] + 1.0).abs() < 0.001,
-            "Opposite should be -1.0"
-        );
+        assert!((results[2] + 1.0).abs() < 0.001, "Opposite should be -1.0");
     }
 
     #[test]

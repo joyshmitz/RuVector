@@ -266,7 +266,11 @@ fn generate_state(dim: usize, seed: u64) -> Vec<f32> {
         .collect()
 }
 
-fn create_random_graph(num_nodes: usize, avg_degree: usize, state_dim: usize) -> IncrementalCoherence {
+fn create_random_graph(
+    num_nodes: usize,
+    avg_degree: usize,
+    state_dim: usize,
+) -> IncrementalCoherence {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -487,14 +491,18 @@ fn bench_state_dim_impact(c: &mut Criterion) {
     for state_dim in [8, 32, 64, 128, 256] {
         let mut tracker = create_random_graph(num_nodes, avg_degree, state_dim);
 
-        group.bench_with_input(BenchmarkId::new("update", state_dim), &state_dim, |b, &dim| {
-            let node_id = 5000u64;
-            b.iter(|| {
-                let new_state = generate_state(dim, rand::random());
-                tracker.update_node(black_box(node_id), new_state);
-                black_box(tracker.energy())
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("update", state_dim),
+            &state_dim,
+            |b, &dim| {
+                let node_id = 5000u64;
+                b.iter(|| {
+                    let new_state = generate_state(dim, rand::random());
+                    tracker.update_node(black_box(node_id), new_state);
+                    black_box(tracker.energy())
+                })
+            },
+        );
     }
 
     group.finish();

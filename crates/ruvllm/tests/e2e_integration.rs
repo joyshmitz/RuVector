@@ -5,17 +5,17 @@
 
 use chrono::Utc;
 use ruvllm::{
-    RuvLLMConfig, RuvLLMEngine,
-    backends::{DeviceType, DType, GenerateParams, ModelConfig, ModelArchitecture, Quantization},
-    kv_cache::{TwoTierKvCache, KvCacheConfig},
-    paged_attention::{PagedAttention, PagedAttentionConfig},
-    lora::{MicroLoRA, MicroLoraConfig, TargetModule, AdaptFeedback},
-    sona::{SonaIntegration, SonaConfig, LearningLoop, Trajectory},
-    session::{SessionManager, SessionConfig},
-    policy_store::{PolicyStore, PolicyEntry, PolicyType, QuantizationPolicy, PolicySource},
-    witness_log::{WitnessLog, WitnessEntry, LatencyBreakdown, RoutingDecision},
-    types::ModelSize,
+    backends::{DType, DeviceType, GenerateParams, ModelArchitecture, ModelConfig, Quantization},
     error::Result,
+    kv_cache::{KvCacheConfig, TwoTierKvCache},
+    lora::{AdaptFeedback, MicroLoRA, MicroLoraConfig, TargetModule},
+    paged_attention::{PagedAttention, PagedAttentionConfig},
+    policy_store::{PolicyEntry, PolicySource, PolicyStore, PolicyType, QuantizationPolicy},
+    session::{SessionConfig, SessionManager},
+    sona::{LearningLoop, SonaConfig, SonaIntegration, Trajectory},
+    types::ModelSize,
+    witness_log::{LatencyBreakdown, RoutingDecision, WitnessEntry, WitnessLog},
+    RuvLLMConfig, RuvLLMEngine,
 };
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -137,7 +137,11 @@ fn test_kv_cache_eviction() {
 
     // Should have evicted to stay under max
     let stats = cache.stats();
-    assert!(stats.total_tokens <= 10, "Should evict to stay under max: {}", stats.total_tokens);
+    assert!(
+        stats.total_tokens <= 10,
+        "Should evict to stay under max: {}",
+        stats.total_tokens
+    );
 }
 
 #[test]
@@ -164,8 +168,16 @@ fn test_kv_cache_two_tier_storage() {
 
     // Should have some in tail and some in store
     assert_eq!(stats.total_tokens, 10);
-    assert!(stats.tail_tokens <= 4, "Tail should be limited: {}", stats.tail_tokens);
-    assert!(stats.store_tokens >= 6, "Store should have overflow: {}", stats.store_tokens);
+    assert!(
+        stats.tail_tokens <= 4,
+        "Tail should be limited: {}",
+        stats.tail_tokens
+    );
+    assert!(
+        stats.store_tokens >= 6,
+        "Store should have overflow: {}",
+        stats.store_tokens
+    );
 }
 
 #[test]
@@ -232,8 +244,8 @@ fn test_paged_attention_basic() {
 
 #[test]
 fn test_concurrent_kv_cache_access() {
-    use std::thread;
     use std::sync::Arc;
+    use std::thread;
 
     let config = KvCacheConfig {
         tail_length: 64,
@@ -349,15 +361,16 @@ fn test_witness_log() {
             format!("session-{}", i % 2),
             vec![i as f32 * 0.1; 64],
             routing_decision,
-        ).with_quality(0.85)
-         .with_latency(LatencyBreakdown {
+        )
+        .with_quality(0.85)
+        .with_latency(LatencyBreakdown {
             embedding_ms: 5.0,
             retrieval_ms: 2.0,
             routing_ms: 1.0,
             attention_ms: 30.0,
             generation_ms: 62.0,
             total_ms: 100.0 + (i as f32 * 10.0),
-         });
+        });
 
         log.record(entry).unwrap();
     }
@@ -428,7 +441,12 @@ fn test_end_to_end_adaptation_flow() {
     // Verify quality increased
     let first_qualities: f32 = quality_history[..5].iter().sum::<f32>() / 5.0;
     let last_qualities: f32 = quality_history[15..].iter().sum::<f32>() / 5.0;
-    assert!(last_qualities > first_qualities, "Quality should increase: {} vs {}", last_qualities, first_qualities);
+    assert!(
+        last_qualities > first_qualities,
+        "Quality should increase: {} vs {}",
+        last_qualities,
+        first_qualities
+    );
 }
 
 #[test]
@@ -626,9 +644,12 @@ fn test_memory_efficiency() {
         let bytes_per_store_token = stats.store_bytes as f32 / stats.store_tokens as f32;
 
         // Quantized store should use less memory (or same if not actually quantized)
-        assert!(bytes_per_store_token <= bytes_per_tail_token * 1.1,
+        assert!(
+            bytes_per_store_token <= bytes_per_tail_token * 1.1,
             "Store should be more memory efficient: {} vs {} bytes/token",
-            bytes_per_store_token, bytes_per_tail_token);
+            bytes_per_store_token,
+            bytes_per_tail_token
+        );
     }
 }
 

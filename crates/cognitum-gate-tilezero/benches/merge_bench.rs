@@ -35,7 +35,11 @@ fn create_worker_report(
     for i in 0..boundary_edge_count {
         report.add_boundary_edge(EdgeSummary {
             source: format!("node-{}-{}", tile_id, i % node_count.max(1)),
-            target: format!("node-{}-{}", (tile_id as usize + 1) % 256, i % node_count.max(1)),
+            target: format!(
+                "node-{}-{}",
+                (tile_id as usize + 1) % 256,
+                i % node_count.max(1)
+            ),
             capacity: rng.gen_range(1.0..100.0),
             is_boundary: true,
         });
@@ -84,9 +88,7 @@ fn bench_merge_255_tiles(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("minimal", name),
             &minimal_reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -99,9 +101,7 @@ fn bench_merge_255_tiles(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("realistic", name),
             &realistic_reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -114,9 +114,7 @@ fn bench_merge_255_tiles(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("heavy", name),
             &heavy_reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -139,9 +137,7 @@ fn bench_merge_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("tiles", tile_count),
             &reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -190,9 +186,7 @@ fn bench_node_merging(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("overlap_nodes", overlap),
             &reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -220,9 +214,7 @@ fn bench_edge_merging(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("edges_per_tile", edge_count),
             &reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -298,12 +290,16 @@ fn bench_confidence_aggregation(c: &mut Criterion) {
     for (name, strategy) in strategies {
         let merger = ReportMerger::new(strategy);
 
-        group.bench_with_input(BenchmarkId::new("strategy", name), &reports, |b, reports| {
-            b.iter(|| {
-                let merged = merger.merge(reports).unwrap();
-                black_box(merged.confidence)
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("strategy", name),
+            &reports,
+            |b, reports| {
+                b.iter(|| {
+                    let merged = merger.merge(reports).unwrap();
+                    black_box(merged.confidence)
+                })
+            },
+        );
     }
 
     group.finish();

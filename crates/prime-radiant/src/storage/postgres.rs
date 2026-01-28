@@ -1063,7 +1063,10 @@ mod tests {
         storage.migrate().await.unwrap();
 
         // Store node
-        storage.store_node("test-node", &[1.0, 2.0, 3.0]).await.unwrap();
+        storage
+            .store_node("test-node", &[1.0, 2.0, 3.0])
+            .await
+            .unwrap();
 
         // Get node
         let state = storage.get_node("test-node").await.unwrap();

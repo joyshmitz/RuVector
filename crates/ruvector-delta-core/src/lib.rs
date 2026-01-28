@@ -43,21 +43,23 @@ pub mod stream;
 pub mod window;
 
 // Re-exports
-pub use compression::{CompressionCodec, DeltaCompressor, CompressionLevel};
-pub use delta::{Delta, DeltaOp, DeltaValue, VectorDelta, SparseDelta};
-pub use encoding::{DeltaEncoding, DenseEncoding, SparseEncoding, RunLengthEncoding, HybridEncoding, EncodingType};
+pub use compression::{CompressionCodec, CompressionLevel, DeltaCompressor};
+pub use delta::{Delta, DeltaOp, DeltaValue, SparseDelta, VectorDelta};
+pub use encoding::{
+    DeltaEncoding, DenseEncoding, EncodingType, HybridEncoding, RunLengthEncoding, SparseEncoding,
+};
 pub use error::{DeltaError, Result};
 pub use stream::{DeltaStream, DeltaStreamConfig, StreamCheckpoint};
-pub use window::{DeltaWindow, WindowConfig, WindowAggregator, WindowType, WindowResult};
+pub use window::{DeltaWindow, WindowAggregator, WindowConfig, WindowResult, WindowType};
 
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::compression::{CompressionCodec, DeltaCompressor};
     pub use crate::delta::{Delta, DeltaOp, DeltaValue, VectorDelta};
     pub use crate::encoding::{DeltaEncoding, DenseEncoding, SparseEncoding};
+    pub use crate::error::Result;
     pub use crate::stream::{DeltaStream, StreamCheckpoint};
     pub use crate::window::{DeltaWindow, WindowAggregator};
-    pub use crate::error::Result;
 }
 
 #[cfg(test)]

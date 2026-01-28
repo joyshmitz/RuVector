@@ -381,7 +381,9 @@ mod soa_tests {
 
         // Add random-ish vectors
         for i in 0..num_vectors {
-            let vec: Vec<f32> = (0..dim).map(|j| ((i * dim + j) % 100) as f32 * 0.01).collect();
+            let vec: Vec<f32> = (0..dim)
+                .map(|j| ((i * dim + j) % 100) as f32 * 0.01)
+                .collect();
             storage.push(&vec);
         }
 

@@ -12,19 +12,19 @@
 //
 // Target: Nobel Prize / Turing Award level breakthrough in scalable AI systems
 
-pub mod mmap_neural_field;
 pub mod lazy_activation;
-pub mod tiered_memory;
+pub mod mmap_neural_field;
 pub mod prefetch_prediction;
+pub mod tiered_memory;
 
 // Re-exports for convenience
-pub use mmap_neural_field::{MmapNeuralField, FieldStats, HashTable, StorageTier};
-pub use lazy_activation::{LazyLayer, LazyNetwork, NetworkStats, ActivationState};
-pub use tiered_memory::{TieredMemory, Tier, Page, MemoryStats, TierStats};
+pub use lazy_activation::{ActivationState, LazyLayer, LazyNetwork, NetworkStats};
+pub use mmap_neural_field::{FieldStats, HashTable, MmapNeuralField, StorageTier};
 pub use prefetch_prediction::{
-    PrefetchCoordinator, HoeffdingTreePredictor, MarkovPredictor,
-    AccessFeatures, PredictorStats, CoordinatorStats,
+    AccessFeatures, CoordinatorStats, HoeffdingTreePredictor, MarkovPredictor, PredictorStats,
+    PrefetchCoordinator,
 };
+pub use tiered_memory::{MemoryStats, Page, Tier, TierStats, TieredMemory};
 
 /// System-wide configuration
 pub struct DPNCConfig {
@@ -109,11 +109,9 @@ impl DPNC {
 
         // 2. Predict next accesses
         let page_id = addr / self.config.page_size as u64;
-        let predictions = self.prefetcher.predict_and_queue(
-            page_id,
-            concept,
-            self.config.prefetch_depth,
-        );
+        let predictions =
+            self.prefetcher
+                .predict_and_queue(page_id, concept, self.config.prefetch_depth);
 
         // 3. Async prefetch (in real implementation, would be truly async)
         for pred_page in predictions {

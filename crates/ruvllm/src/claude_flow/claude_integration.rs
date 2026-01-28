@@ -26,11 +26,11 @@
 //! +-------------------+     +-------------------+
 //! ```
 
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::{AgentType, ClaudeFlowAgent, ClaudeFlowTask};
@@ -174,15 +174,18 @@ impl Message {
 
     /// Estimate token count for this message
     pub fn estimate_tokens(&self) -> usize {
-        self.content.iter().map(|block| {
-            match block {
-                ContentBlock::Text { text } => text.len() / 4, // ~4 chars per token
-                ContentBlock::ToolUse { input, .. } => {
-                    input.to_string().len() / 4 + 50 // overhead for tool structure
+        self.content
+            .iter()
+            .map(|block| {
+                match block {
+                    ContentBlock::Text { text } => text.len() / 4, // ~4 chars per token
+                    ContentBlock::ToolUse { input, .. } => {
+                        input.to_string().len() / 4 + 50 // overhead for tool structure
+                    }
+                    ContentBlock::ToolResult { content, .. } => content.len() / 4 + 20,
                 }
-                ContentBlock::ToolResult { content, .. } => content.len() / 4 + 20,
-            }
-        }).sum()
+            })
+            .sum()
     }
 }
 
@@ -267,10 +270,7 @@ pub enum StreamEvent {
     /// Token generated
     Token(StreamToken),
     /// Content block completed
-    ContentBlockComplete {
-        index: usize,
-        content: ContentBlock,
-    },
+    ContentBlockComplete { index: usize, content: ContentBlock },
     /// Stream completed
     Complete {
         usage: UsageStats,
@@ -278,10 +278,7 @@ pub enum StreamEvent {
         total_latency_ms: u64,
     },
     /// Error occurred
-    Error {
-        message: String,
-        is_retryable: bool,
-    },
+    Error { message: String, is_retryable: bool },
 }
 
 /// Quality monitoring for streaming responses
@@ -365,11 +362,7 @@ pub struct ResponseStreamer {
 
 impl ResponseStreamer {
     /// Create new response streamer
-    pub fn new(
-        request_id: String,
-        model: ClaudeModel,
-        sender: mpsc::Sender<StreamEvent>,
-    ) -> Self {
+    pub fn new(request_id: String, model: ClaudeModel, sender: mpsc::Sender<StreamEvent>) -> Self {
         Self {
             request_id: request_id.clone(),
             model,
@@ -385,7 +378,9 @@ impl ResponseStreamer {
     /// Process incoming token
     pub async fn process_token(&mut self, text: String, quality_score: Option<f32>) -> Result<()> {
         if self.is_complete {
-            return Err(RuvLLMError::InvalidOperation("Stream already complete".to_string()));
+            return Err(RuvLLMError::InvalidOperation(
+                "Stream already complete".to_string(),
+            ));
         }
 
         let token = StreamToken {
@@ -424,7 +419,9 @@ impl ResponseStreamer {
                 total_latency_ms: self.start_time.elapsed().as_millis() as u64,
             })
             .await
-            .map_err(|e| RuvLLMError::InvalidOperation(format!("Failed to send complete: {}", e)))?;
+            .map_err(|e| {
+                RuvLLMError::InvalidOperation(format!("Failed to send complete: {}", e))
+            })?;
 
         Ok(())
     }
@@ -900,7 +897,8 @@ impl AgentCoordinator {
     ) -> Result<WorkflowResult> {
         let start_time = Instant::now();
         let mut step_results: HashMap<String, StepResult> = HashMap::new();
-        let mut completed_steps: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut completed_steps: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
 
         // Build dependency graph
         let mut pending_steps: Vec<&WorkflowStep> = steps.iter().collect();
@@ -943,7 +941,7 @@ impl AgentCoordinator {
                     response: Some(format!("Completed: {}", step.task)),
                     duration: step_start.elapsed(),
                     tokens_used: 500, // Mock value
-                    cost: 0.001, // Mock value
+                    cost: 0.001,      // Mock value
                     success: true,
                     error: None,
                 };
@@ -1069,7 +1067,10 @@ impl CostEstimator {
 
     /// Record actual usage
     pub fn record_usage(&mut self, model: ClaudeModel, usage: &UsageStats) {
-        let entry = self.usage_by_model.entry(model).or_insert(UsageStats::default());
+        let entry = self
+            .usage_by_model
+            .entry(model)
+            .or_insert(UsageStats::default());
         entry.input_tokens += usage.input_tokens;
         entry.output_tokens += usage.output_tokens;
     }
@@ -1241,7 +1242,10 @@ mod tests {
 
         // Add many messages
         for i in 0..20 {
-            window.add_message(Message::user(format!("Message {} with some content to add tokens", i)));
+            window.add_message(Message::user(format!(
+                "Message {} with some content to add tokens",
+                i
+            )));
         }
 
         // Window should have compressed
@@ -1278,8 +1282,12 @@ mod tests {
     fn test_agent_coordinator() {
         let coordinator = AgentCoordinator::new(ClaudeModel::Sonnet, 10);
 
-        coordinator.spawn_agent("agent-1".to_string(), AgentType::Coder).unwrap();
-        coordinator.spawn_agent("agent-2".to_string(), AgentType::Researcher).unwrap();
+        coordinator
+            .spawn_agent("agent-1".to_string(), AgentType::Coder)
+            .unwrap();
+        coordinator
+            .spawn_agent("agent-2".to_string(), AgentType::Researcher)
+            .unwrap();
 
         assert_eq!(coordinator.total_agent_count(), 2);
 

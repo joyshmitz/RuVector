@@ -52,10 +52,10 @@ impl ComputeLane {
     #[inline]
     pub const fn latency_budget_us(&self) -> u64 {
         match self {
-            ComputeLane::Reflex => 1_000,      // 1ms
-            ComputeLane::Retrieval => 10_000,  // 10ms
-            ComputeLane::Heavy => 100_000,     // 100ms
-            ComputeLane::Human => u64::MAX,    // No limit (async)
+            ComputeLane::Reflex => 1_000,     // 1ms
+            ComputeLane::Retrieval => 10_000, // 10ms
+            ComputeLane::Heavy => 100_000,    // 100ms
+            ComputeLane::Human => u64::MAX,   // No limit (async)
         }
     }
 
@@ -381,7 +381,10 @@ impl EscalationReason {
 
     /// Is this an external trigger?
     pub fn is_external(&self) -> bool {
-        matches!(self, Self::ExternalTrigger { .. } | Self::SystemOverride { .. })
+        matches!(
+            self,
+            Self::ExternalTrigger { .. } | Self::SystemOverride { .. }
+        )
     }
 }
 
@@ -491,10 +494,7 @@ mod tests {
 
     #[test]
     fn test_lane_escalation() {
-        assert_eq!(
-            ComputeLane::Reflex.escalate(),
-            Some(ComputeLane::Retrieval)
-        );
+        assert_eq!(ComputeLane::Reflex.escalate(), Some(ComputeLane::Retrieval));
         assert_eq!(ComputeLane::Retrieval.escalate(), Some(ComputeLane::Heavy));
         assert_eq!(ComputeLane::Heavy.escalate(), Some(ComputeLane::Human));
         assert_eq!(ComputeLane::Human.escalate(), None);

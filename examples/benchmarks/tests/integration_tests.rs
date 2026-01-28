@@ -1,5 +1,6 @@
 //! Integration tests for benchmark suite
 
+use chrono::{NaiveDate, Weekday};
 use ruvector_benchmarks::{
     logging::BenchmarkLogger,
     swarm_regret::{EpisodeResult, RegretTracker, SwarmController},
@@ -7,7 +8,6 @@ use ruvector_benchmarks::{
     timepuzzles::{PuzzleGenerator, PuzzleGeneratorConfig, SamplePuzzles},
     vector_index::{CoherenceGate, DenseVec, IvfConfig, VectorIndex},
 };
-use chrono::{NaiveDate, Weekday};
 use tempfile::tempdir;
 
 // ============================================================================
@@ -242,7 +242,9 @@ fn test_sample_puzzles() {
     assert!(easy.iter().all(|p| p.difficulty <= 3));
 
     let medium = SamplePuzzles::medium();
-    assert!(medium.iter().all(|p| p.difficulty >= 4 && p.difficulty <= 6));
+    assert!(medium
+        .iter()
+        .all(|p| p.difficulty >= 4 && p.difficulty <= 6));
 
     let hard = SamplePuzzles::hard();
     assert!(hard.iter().all(|p| p.difficulty >= 7));
@@ -331,17 +333,7 @@ fn test_benchmark_logger() {
 
     logger
         .log_temporal(
-            "bench-1",
-            "puzzle-1",
-            5,
-            true,
-            true,
-            10,
-            2,
-            100,
-            3,
-            true,
-            false,
+            "bench-1", "puzzle-1", 5, true, true, 10, 2, 100, 3, true, false,
         )
         .unwrap();
 

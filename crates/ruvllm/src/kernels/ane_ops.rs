@@ -243,7 +243,7 @@ pub fn should_use_ane(batch_size: usize, dim: usize) -> bool {
         && batch_size >= ANE_MIN_BATCH
         && batch_size <= ANE_MAX_BATCH
         && dim >= ANE_MIN_DIM
-        && dim % 16 == 0  // ANE prefers 16-aligned dimensions
+        && dim % 16 == 0 // ANE prefers 16-aligned dimensions
 }
 
 /// Check if matrix dimensions are optimal for ANE
@@ -287,7 +287,9 @@ pub fn should_use_ane_matmul(m: usize, k: usize, n: usize) -> bool {
     }
 
     // Above crossover, only use ANE for small batch single-token inference
-    m == 1 && k >= ANE_MIN_DIM && n >= ANE_MIN_DIM
+    m == 1
+        && k >= ANE_MIN_DIM
+        && n >= ANE_MIN_DIM
         && max_dim <= ANE_MATMUL_CROSSOVER_DIM
         && (k % 16 == 0 || n % 16 == 0)
 }
@@ -389,14 +391,7 @@ pub struct AneRecommendation {
 /// - Best for batch sizes 1-64 with aligned dimensions
 /// - 2-3x more power efficient than GPU for supported shapes
 #[cfg(all(target_os = "macos", feature = "coreml"))]
-pub fn matmul_ane(
-    a: &[f32],
-    b: &[f32],
-    c: &mut [f32],
-    m: usize,
-    k: usize,
-    n: usize,
-) {
+pub fn matmul_ane(a: &[f32], b: &[f32], c: &mut [f32], m: usize, k: usize, n: usize) {
     debug_assert_eq!(a.len(), m * k, "Matrix A size mismatch");
     debug_assert_eq!(b.len(), k * n, "Matrix B size mismatch");
     debug_assert_eq!(c.len(), m * n, "Matrix C size mismatch");
@@ -430,14 +425,14 @@ pub unsafe fn matmul_ane_unchecked(
         m as i32,
         n as i32,
         k as i32,
-        1.0,             // alpha
+        1.0, // alpha
         a.as_ptr(),
-        k as i32,        // lda
+        k as i32, // lda
         b.as_ptr(),
-        n as i32,        // ldb
-        0.0,             // beta
+        n as i32, // ldb
+        0.0,      // beta
         c.as_mut_ptr(),
-        n as i32,        // ldc
+        n as i32, // ldc
     );
 }
 
@@ -577,9 +572,7 @@ pub fn layer_norm_ane(
         let mean: f32 = slice.iter().sum::<f32>() / dim as f32;
 
         // Compute variance
-        let variance: f32 = slice.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f32>() / dim as f32;
+        let variance: f32 = slice.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / dim as f32;
 
         let inv_std = 1.0 / (variance + eps).sqrt();
 
@@ -594,13 +587,7 @@ pub fn layer_norm_ane(
 ///
 /// Applies: output = x * weight / sqrt(mean(x^2) + eps)
 #[cfg(all(target_os = "macos", feature = "coreml"))]
-pub fn rms_norm_ane(
-    x: &mut [f32],
-    weight: &[f32],
-    batch_size: usize,
-    dim: usize,
-    eps: f32,
-) {
+pub fn rms_norm_ane(x: &mut [f32], weight: &[f32], batch_size: usize, dim: usize, eps: f32) {
     debug_assert_eq!(x.len(), batch_size * dim);
     debug_assert_eq!(weight.len(), dim);
 
@@ -669,14 +656,7 @@ fn softmax_scalar(x: &mut [f32]) {
 // ============================================================================
 
 #[cfg(not(all(target_os = "macos", feature = "coreml")))]
-pub fn matmul_ane(
-    _a: &[f32],
-    _b: &[f32],
-    _c: &mut [f32],
-    _m: usize,
-    _k: usize,
-    _n: usize,
-) {
+pub fn matmul_ane(_a: &[f32], _b: &[f32], _c: &mut [f32], _m: usize, _k: usize, _n: usize) {
     panic!("ANE operations require macOS with 'coreml' feature enabled");
 }
 
@@ -721,13 +701,7 @@ pub fn layer_norm_ane(
 }
 
 #[cfg(not(all(target_os = "macos", feature = "coreml")))]
-pub fn rms_norm_ane(
-    _x: &mut [f32],
-    _weight: &[f32],
-    _batch_size: usize,
-    _dim: usize,
-    _eps: f32,
-) {
+pub fn rms_norm_ane(_x: &mut [f32], _weight: &[f32], _batch_size: usize, _dim: usize, _eps: f32) {
     panic!("ANE operations require macOS with 'coreml' feature enabled");
 }
 
@@ -738,14 +712,7 @@ pub fn rms_norm_ane(
 /// Auto-dispatch matrix multiplication to best backend
 ///
 /// Automatically selects ANE or NEON based on tensor shapes and system capabilities.
-pub fn matmul_auto(
-    a: &[f32],
-    b: &[f32],
-    c: &mut [f32],
-    m: usize,
-    k: usize,
-    n: usize,
-) {
+pub fn matmul_auto(a: &[f32], b: &[f32], c: &mut [f32], m: usize, k: usize, n: usize) {
     #[cfg(all(target_os = "macos", feature = "coreml"))]
     {
         if should_use_ane_matmul(m, k, n) {
@@ -832,13 +799,7 @@ pub fn layer_norm_auto(
 }
 
 /// Auto-dispatch RMS normalization to best backend
-pub fn rms_norm_auto(
-    x: &mut [f32],
-    weight: &[f32],
-    batch_size: usize,
-    dim: usize,
-    eps: f32,
-) {
+pub fn rms_norm_auto(x: &mut [f32], weight: &[f32], batch_size: usize, dim: usize, eps: f32) {
     #[cfg(all(target_os = "macos", feature = "coreml"))]
     {
         if should_use_ane(batch_size, dim) {
@@ -912,18 +873,18 @@ mod tests {
     #[test]
     fn test_should_use_ane_boundary_conditions() {
         // At exact boundaries
-        assert!(!should_use_ane(0, 64));  // Zero batch
-        assert!(!should_use_ane(1, 63));  // Just below min dim
+        assert!(!should_use_ane(0, 64)); // Zero batch
+        assert!(!should_use_ane(1, 63)); // Just below min dim
         assert!(!should_use_ane(65, 64)); // Just above max batch
 
         // Alignment tests
-        assert!(!should_use_ane(1, 65));  // Not aligned to 16
-        assert!(!should_use_ane(1, 17));  // Not aligned to 16
+        assert!(!should_use_ane(1, 65)); // Not aligned to 16
+        assert!(!should_use_ane(1, 17)); // Not aligned to 16
 
         if is_ane_available() {
-            assert!(should_use_ane(1, 64));   // Exactly at min dim
-            assert!(should_use_ane(64, 64));  // At max batch
-            assert!(should_use_ane(1, 80));   // 80 % 16 == 0
+            assert!(should_use_ane(1, 64)); // Exactly at min dim
+            assert!(should_use_ane(64, 64)); // At max batch
+            assert!(should_use_ane(1, 80)); // 80 % 16 == 0
         }
     }
 
@@ -1162,7 +1123,11 @@ mod tests {
 
         // Sum should be 1.0
         let sum: f32 = x.iter().sum();
-        assert!(approx_eq(sum, 1.0, EPSILON), "Softmax sum should be 1.0, got {}", sum);
+        assert!(
+            approx_eq(sum, 1.0, EPSILON),
+            "Softmax sum should be 1.0, got {}",
+            sum
+        );
 
         // All values should be positive
         assert!(x.iter().all(|&v| v > 0.0));
@@ -1208,7 +1173,10 @@ mod tests {
         softmax_scalar(&mut large);
 
         let sum: f32 = large.iter().sum();
-        assert!(approx_eq(sum, 1.0, EPSILON), "Softmax should sum to 1 even with large inputs");
+        assert!(
+            approx_eq(sum, 1.0, EPSILON),
+            "Softmax should sum to 1 even with large inputs"
+        );
         assert!(large.iter().all(|v| v.is_finite()));
     }
 
@@ -1391,9 +1359,7 @@ mod tests {
     fn test_softmax_ane_matches_scalar() {
         let dim = 64;
         let batch_size = 4;
-        let mut x_ane: Vec<f32> = (0..batch_size * dim)
-            .map(|i| (i as f32) * 0.01)
-            .collect();
+        let mut x_ane: Vec<f32> = (0..batch_size * dim).map(|i| (i as f32) * 0.01).collect();
         let mut x_scalar = x_ane.clone();
 
         softmax_ane(&mut x_ane, batch_size, dim);
@@ -1417,9 +1383,7 @@ mod tests {
     fn test_layer_norm_ane() {
         let dim = 16;
         let batch_size = 2;
-        let mut x: Vec<f32> = (0..batch_size * dim)
-            .map(|i| (i as f32) * 0.1)
-            .collect();
+        let mut x: Vec<f32> = (0..batch_size * dim).map(|i| (i as f32) * 0.1).collect();
         let weight = vec![1.0; dim];
         let bias = vec![0.0; dim];
 
@@ -1445,7 +1409,7 @@ mod tests {
         let batch_size = 1;
         let mut x: Vec<f32> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let weight = vec![2.0; dim]; // Scale by 2
-        let bias = vec![1.0; dim];   // Shift by 1
+        let bias = vec![1.0; dim]; // Shift by 1
 
         layer_norm_ane(&mut x, &weight, &bias, batch_size, dim, 1e-6);
 
@@ -1681,11 +1645,7 @@ mod tests {
         use std::thread;
 
         let results: Vec<_> = (0..4)
-            .map(|_| {
-                thread::spawn(|| {
-                    is_ane_available()
-                })
-            })
+            .map(|_| thread::spawn(|| is_ane_available()))
             .collect();
 
         let first = results.into_iter().next().unwrap().join().unwrap();

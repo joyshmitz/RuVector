@@ -73,7 +73,10 @@ fn main() -> Result<()> {
 
     println!("Performance:");
     println!("  Total time: {:.2} s", total_elapsed.as_secs_f64());
-    println!("  Throughput: {:.0} QPS", 10_000.0 / total_elapsed.as_secs_f64());
+    println!(
+        "  Throughput: {:.0} QPS",
+        10_000.0 / total_elapsed.as_secs_f64()
+    );
     println!("\nLatency Distribution:");
     println!("  Mean:  {} μs", mean);
     println!("  p50:   {} μs", p50);
@@ -90,26 +93,33 @@ fn main() -> Result<()> {
     println!("  Dirty pages: {}", stats.storage.dirty_pages);
 
     println!("\nMemory Hierarchy:");
-    println!("  L1: {} pages ({:.1}% util)",
+    println!(
+        "  L1: {} pages ({:.1}% util)",
         stats.memory.l1.page_count,
         stats.memory.l1.utilization * 100.0,
     );
-    println!("  L2: {} pages ({:.1}% util)",
+    println!(
+        "  L2: {} pages ({:.1}% util)",
         stats.memory.l2.page_count,
         stats.memory.l2.utilization * 100.0,
     );
-    println!("  L3: {} pages ({:.1}% util)",
+    println!(
+        "  L3: {} pages ({:.1}% util)",
         stats.memory.l3.page_count,
         stats.memory.l3.utilization * 100.0,
     );
-    println!("  L4: {} pages ({:.1}% util)",
+    println!(
+        "  L4: {} pages ({:.1}% util)",
         stats.memory.l4.page_count,
         stats.memory.l4.utilization * 100.0,
     );
     println!("  Total migrations: {}", stats.memory.migration_count);
 
     println!("\nPrefetch Intelligence:");
-    println!("  ML accuracy: {:.1}%", stats.prefetcher.ml_accuracy * 100.0);
+    println!(
+        "  ML accuracy: {:.1}%",
+        stats.prefetcher.ml_accuracy * 100.0
+    );
     println!("  Queue depth: {}", stats.prefetcher.queue_size);
 
     // Estimate energy savings
@@ -117,7 +127,7 @@ fn main() -> Result<()> {
     let tiered_power = stats.memory.l1.used_bytes as f64 * 300.0 / (1024_u64.pow(4) as f64) +  // DRAM
         stats.memory.l2.used_bytes as f64 * 150.0 / (1024_u64.pow(4) as f64) +  // CXL
         stats.memory.l3.used_bytes as f64 * 10.0 / (1024_u64.pow(4) as f64) +   // SSD
-        stats.memory.l4.used_bytes as f64 * 5.0 / (1024_u64.pow(4) as f64);     // HDD
+        stats.memory.l4.used_bytes as f64 * 5.0 / (1024_u64.pow(4) as f64); // HDD
 
     println!("\nEnergy Efficiency:");
     println!("  All-DRAM (1 PB): {:.0} kW", all_dram_power / 1000.0);

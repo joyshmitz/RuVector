@@ -299,7 +299,9 @@ impl ClosedFormPhi {
                 }
 
                 if indices[w].is_none() {
-                    strongconnect(w, adjacency, node_ids, index, stack, indices, lowlinks, on_stack, sccs);
+                    strongconnect(
+                        w, adjacency, node_ids, index, stack, indices, lowlinks, on_stack, sccs,
+                    );
                     lowlinks[v] = lowlinks[v].min(lowlinks[w]);
                 } else if on_stack[w] {
                     lowlinks[v] = lowlinks[v].min(indices[w].unwrap());
@@ -323,8 +325,17 @@ impl ClosedFormPhi {
 
         for v in 0..n {
             if indices[v].is_none() {
-                strongconnect(v, adjacency, node_ids, &mut index, &mut stack,
-                            &mut indices, &mut lowlinks, &mut on_stack, &mut sccs);
+                strongconnect(
+                    v,
+                    adjacency,
+                    node_ids,
+                    &mut index,
+                    &mut stack,
+                    &mut indices,
+                    &mut lowlinks,
+                    &mut on_stack,
+                    &mut sccs,
+                );
             }
         }
 
