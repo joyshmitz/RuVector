@@ -17,8 +17,8 @@
 //! - Internal clock models (scalar timing theory)
 //! - Attention and time perception studies
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// System for experiencing and measuring subjective time
@@ -203,7 +203,8 @@ impl TemporalQualia {
 
     /// Get time crystal contribution at current time
     pub fn crystal_contribution(&self, time: f64) -> f64 {
-        self.time_crystals.iter()
+        self.time_crystals
+            .iter()
             .map(|crystal| {
                 let phase = (time / crystal.period + crystal.phase) * std::f64::consts::TAU;
                 crystal.amplitude * phase.sin() * crystal.stability
@@ -257,9 +258,11 @@ impl TemporalQualia {
         let avg_novelty = if self.experience_buffer.is_empty() {
             0.0
         } else {
-            self.experience_buffer.iter()
+            self.experience_buffer
+                .iter()
                 .map(|e| e.novelty)
-                .sum::<f64>() / self.experience_buffer.len() as f64
+                .sum::<f64>()
+                / self.experience_buffer.len() as f64
         };
 
         TemporalStatistics {

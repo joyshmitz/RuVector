@@ -43,9 +43,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::backends::{DeviceType, DType, Quantization};
 #[cfg(feature = "coreml")]
 use crate::backends::{AneCapabilities, ComputeUnits};
+use crate::backends::{DType, DeviceType, Quantization};
 use crate::kernels::AttentionConfig;
 
 // =============================================================================
@@ -133,7 +133,10 @@ impl Platform {
 
     /// Check if this platform supports GPU acceleration
     pub fn supports_gpu(&self) -> bool {
-        matches!(self, Self::MacOS | Self::Linux | Self::Windows | Self::IOS | Self::Wasm)
+        matches!(
+            self,
+            Self::MacOS | Self::Linux | Self::Windows | Self::IOS | Self::Wasm
+        )
     }
 
     /// Get the default GPU backend for this platform
@@ -184,7 +187,11 @@ impl Architecture {
             Self::Wasm32
         }
 
-        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "wasm32")))]
+        #[cfg(not(any(
+            target_arch = "aarch64",
+            target_arch = "x86_64",
+            target_arch = "wasm32"
+        )))]
         {
             Self::Unknown
         }
@@ -612,10 +619,7 @@ impl CoreInfo {
             .output()
             .ok()?;
 
-        String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .parse()
-            .ok()
+        String::from_utf8_lossy(&output.stdout).trim().parse().ok()
     }
 
     /// Get physical cores from /proc/cpuinfo on Linux
@@ -633,9 +637,15 @@ impl CoreInfo {
 
         for line in cpuinfo.lines() {
             if line.starts_with("physical id") {
-                physical_id = line.split(':').nth(1).and_then(|s| s.trim().parse::<usize>().ok());
+                physical_id = line
+                    .split(':')
+                    .nth(1)
+                    .and_then(|s| s.trim().parse::<usize>().ok());
             } else if line.starts_with("core id") {
-                core_id = line.split(':').nth(1).and_then(|s| s.trim().parse::<usize>().ok());
+                core_id = line
+                    .split(':')
+                    .nth(1)
+                    .and_then(|s| s.trim().parse::<usize>().ok());
             }
 
             if let (Some(pid), Some(cid)) = (physical_id, core_id) {
@@ -647,7 +657,12 @@ impl CoreInfo {
 
         if cores.is_empty() {
             // Fallback: count "processor" lines
-            Some(cpuinfo.lines().filter(|l| l.starts_with("processor")).count())
+            Some(
+                cpuinfo
+                    .lines()
+                    .filter(|l| l.starts_with("processor"))
+                    .count(),
+            )
         } else {
             Some(cores.len())
         }
@@ -1268,7 +1283,11 @@ impl SystemCapabilities {
         ));
 
         if let Some(perf) = self.cores.performance_cores {
-            parts.push(format!("{}P+{}E cores", perf, self.cores.efficiency_cores.unwrap_or(0)));
+            parts.push(format!(
+                "{}P+{}E cores",
+                perf,
+                self.cores.efficiency_cores.unwrap_or(0)
+            ));
         }
 
         parts.push(format!("{}GB RAM", self.memory_mb / 1024));
@@ -1351,7 +1370,10 @@ pub enum ComputeBackend {
 impl ComputeBackend {
     /// Check if this is a GPU/accelerator backend
     pub fn is_gpu(&self) -> bool {
-        matches!(self, Self::Metal | Self::CoreML | Self::HybridAne | Self::Cuda | Self::WebGPU)
+        matches!(
+            self,
+            Self::Metal | Self::CoreML | Self::HybridAne | Self::Cuda | Self::WebGPU
+        )
     }
 
     /// Check if this backend uses the Neural Engine
@@ -1363,15 +1385,15 @@ impl ComputeBackend {
     /// Note: ANE performance depends heavily on model size and batch configuration
     pub fn relative_performance(&self) -> f32 {
         match self {
-            Self::HybridAne => 12.0,  // Best for models that benefit from ANE+GPU
-            Self::Metal => 10.0,      // Apple Silicon GPU is very efficient
-            Self::CoreML => 8.0,      // ANE alone (great for small models, limited for large)
-            Self::Cuda => 15.0,       // NVIDIA is fastest for large models
-            Self::WebGPU => 5.0,      // WebGPU has overhead
-            Self::CpuAvx512 => 4.0,   // AVX-512 is fast
-            Self::CpuAvx2 => 2.5,     // AVX2 is good
-            Self::CpuNeon => 2.0,     // NEON is comparable to AVX2
-            Self::CpuScalar => 1.0,   // Baseline
+            Self::HybridAne => 12.0, // Best for models that benefit from ANE+GPU
+            Self::Metal => 10.0,     // Apple Silicon GPU is very efficient
+            Self::CoreML => 8.0,     // ANE alone (great for small models, limited for large)
+            Self::Cuda => 15.0,      // NVIDIA is fastest for large models
+            Self::WebGPU => 5.0,     // WebGPU has overhead
+            Self::CpuAvx512 => 4.0,  // AVX-512 is fast
+            Self::CpuAvx2 => 2.5,    // AVX2 is good
+            Self::CpuNeon => 2.0,    // NEON is comparable to AVX2
+            Self::CpuScalar => 1.0,  // Baseline
         }
     }
 
@@ -1379,14 +1401,14 @@ impl ComputeBackend {
     /// ANE is significantly more power efficient than GPU
     pub fn power_efficiency(&self) -> f32 {
         match self {
-            Self::CoreML => 4.0,      // ANE is 3-4x more power efficient than GPU
-            Self::HybridAne => 3.0,   // Hybrid gets some efficiency benefits
-            Self::Metal => 2.0,       // Apple Silicon GPU is efficient
-            Self::Cuda => 1.0,        // NVIDIA uses more power
-            Self::WebGPU => 1.5,      // Varies
+            Self::CoreML => 4.0,    // ANE is 3-4x more power efficient than GPU
+            Self::HybridAne => 3.0, // Hybrid gets some efficiency benefits
+            Self::Metal => 2.0,     // Apple Silicon GPU is efficient
+            Self::Cuda => 1.0,      // NVIDIA uses more power
+            Self::WebGPU => 1.5,    // Varies
             Self::CpuAvx512 => 1.2,
             Self::CpuAvx2 => 1.3,
-            Self::CpuNeon => 1.5,     // ARM is power efficient
+            Self::CpuNeon => 1.5, // ARM is power efficient
             Self::CpuScalar => 1.0,
         }
     }
@@ -1472,9 +1494,9 @@ impl InferenceConfig {
     /// Get estimated tokens per second for this configuration
     pub fn estimated_tokens_per_second(&self) -> f32 {
         let base = match self.compute_backend {
-            ComputeBackend::HybridAne => 90.0,  // Hybrid can exceed pure Metal for suitable models
+            ComputeBackend::HybridAne => 90.0, // Hybrid can exceed pure Metal for suitable models
             ComputeBackend::Metal => 80.0,
-            ComputeBackend::CoreML => 60.0,    // ANE alone (great for small models)
+            ComputeBackend::CoreML => 60.0, // ANE alone (great for small models)
             ComputeBackend::Cuda => 100.0,
             ComputeBackend::WebGPU => 40.0,
             ComputeBackend::CpuAvx512 => 30.0,
@@ -1485,11 +1507,11 @@ impl InferenceConfig {
 
         // Adjust for quantization
         let quant_factor = match self.quantization {
-            Quantization::Q4 | Quantization::Q4K => 2.0,  // 4-bit is fastest
+            Quantization::Q4 | Quantization::Q4K => 2.0, // 4-bit is fastest
             Quantization::Q8 => 1.5,
             Quantization::F16 | Quantization::Bf16 => 1.0,
             Quantization::None => 0.5,
-            Quantization::Q2K => 2.5,  // Most aggressive quantization
+            Quantization::Q2K => 2.5, // Most aggressive quantization
         };
 
         // Adjust for batch size (throughput scales sublinearly)
@@ -1674,7 +1696,10 @@ mod tests {
         assert!(caps.can_run_model(0.1), "Should be able to run 100MB model");
 
         // Likely can't run a 1TB model
-        assert!(!caps.can_run_model(1000.0), "Should not be able to run 1TB model");
+        assert!(
+            !caps.can_run_model(1000.0),
+            "Should not be able to run 1TB model"
+        );
     }
 
     #[test]
@@ -1695,7 +1720,10 @@ mod tests {
         assert!(!ComputeBackend::CpuScalar.is_gpu());
 
         // GPU should have higher relative performance
-        assert!(ComputeBackend::Metal.relative_performance() > ComputeBackend::CpuNeon.relative_performance());
+        assert!(
+            ComputeBackend::Metal.relative_performance()
+                > ComputeBackend::CpuNeon.relative_performance()
+        );
     }
 
     #[test]
@@ -1761,13 +1789,22 @@ mod tests {
         {
             assert!(ane.available, "ANE should be available on Apple Silicon");
             assert!(ane.tops > 0.0, "ANE TOPS should be positive");
-            assert!(ane.max_model_size_mb > 0, "ANE max model size should be positive");
-            assert!(!ane.supported_ops.is_empty(), "ANE should have supported ops");
+            assert!(
+                ane.max_model_size_mb > 0,
+                "ANE max model size should be positive"
+            );
+            assert!(
+                !ane.supported_ops.is_empty(),
+                "ANE should have supported ops"
+            );
         }
 
         #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
         {
-            assert!(!ane.available, "ANE should not be available on non-Apple Silicon");
+            assert!(
+                !ane.available,
+                "ANE should not be available on non-Apple Silicon"
+            );
         }
     }
 

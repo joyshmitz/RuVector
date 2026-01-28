@@ -23,10 +23,7 @@
 //! cargo test --package ruvllm --features coreml,hybrid-ane ruvltra_e2e
 //! ```
 
-use ruvllm::backends::{
-    GenerateParams, LlmBackend,
-    ModelArchitecture, ModelConfig, Quantization,
-};
+use ruvllm::backends::{GenerateParams, LlmBackend, ModelArchitecture, ModelConfig, Quantization};
 use ruvllm::error::{Result, RuvLLMError};
 use ruvllm::gguf::quantization::GgufQuantType;
 use ruvllm::kernels::is_ane_available;
@@ -140,7 +137,9 @@ mod full_inference_pipeline {
         /// Simulate token generation
         fn generate_mock_tokens(&self, prompt: &str, max_tokens: usize) -> Vec<u32> {
             // Generate deterministic "tokens" based on prompt hash
-            let hash = prompt.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let hash = prompt
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             let mut tokens = Vec::with_capacity(max_tokens);
             let mut state = hash;
 
@@ -257,8 +256,11 @@ mod full_inference_pipeline {
         let tokens = model.generate_mock_tokens(prompt, 100);
 
         assert!(!tokens.is_empty());
-        assert!(tokens.len() >= quality_thresholds::MIN_OUTPUT_TOKENS,
-            "Code generation should produce at least {} tokens", quality_thresholds::MIN_OUTPUT_TOKENS);
+        assert!(
+            tokens.len() >= quality_thresholds::MIN_OUTPUT_TOKENS,
+            "Code generation should produce at least {} tokens",
+            quality_thresholds::MIN_OUTPUT_TOKENS
+        );
     }
 
     #[test]
@@ -424,8 +426,11 @@ mod streaming_generation {
         let first_token_time = start.elapsed();
 
         // First token should come quickly (for mock)
-        assert!(first_token_time < Duration::from_millis(100),
-            "First token took {:?}", first_token_time);
+        assert!(
+            first_token_time < Duration::from_millis(100),
+            "First token took {:?}",
+            first_token_time
+        );
     }
 
     #[test]
@@ -442,8 +447,12 @@ mod streaming_generation {
 
         // All latencies should be below threshold
         for (i, latency) in latencies.iter().enumerate() {
-            assert!(*latency < Duration::from_millis(quality_thresholds::MAX_TOKEN_LATENCY_MS),
-                "Token {} latency {:?} exceeds threshold", i, latency);
+            assert!(
+                *latency < Duration::from_millis(quality_thresholds::MAX_TOKEN_LATENCY_MS),
+                "Token {} latency {:?} exceeds threshold",
+                i,
+                latency
+            );
         }
     }
 
@@ -517,7 +526,9 @@ mod streaming_generation {
             state.record_token(*token as u32, chunk, Duration::from_millis(10));
         }
 
-        let non_empty: Vec<_> = state.chunks_received.iter()
+        let non_empty: Vec<_> = state
+            .chunks_received
+            .iter()
             .filter(|c| !c.is_empty())
             .collect();
 
@@ -544,7 +555,9 @@ mod quality_validation {
     /// Check if output contains expected patterns
     fn contains_expected_patterns(output: &str, patterns: &[&str]) -> bool {
         let output_lower = output.to_lowercase();
-        patterns.iter().any(|p| output_lower.contains(&p.to_lowercase()))
+        patterns
+            .iter()
+            .any(|p| output_lower.contains(&p.to_lowercase()))
     }
 
     #[test]
@@ -568,8 +581,11 @@ mod quality_validation {
         let log_probs: Vec<f32> = (0..100).map(|_| -2.5).collect();
         let ppl = calculate_perplexity(&log_probs);
 
-        assert!(ppl < quality_thresholds::MAX_PERPLEXITY,
-            "Perplexity {} exceeds threshold", ppl);
+        assert!(
+            ppl < quality_thresholds::MAX_PERPLEXITY,
+            "Perplexity {} exceeds threshold",
+            ppl
+        );
     }
 
     #[test]
@@ -583,7 +599,10 @@ mod quality_validation {
     fn test_output_coherence_simple() {
         // Test expected patterns for simple completion
         let output = "jumps over the lazy dog";
-        assert!(contains_expected_patterns(output, expected_patterns::SIMPLE_COMPLETION_WORDS));
+        assert!(contains_expected_patterns(
+            output,
+            expected_patterns::SIMPLE_COMPLETION_WORDS
+        ));
     }
 
     #[test]
@@ -597,7 +616,10 @@ mod quality_validation {
     fn test_output_coherence_code() {
         // Test expected patterns for code
         let output = "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)";
-        assert!(contains_expected_patterns(output, expected_patterns::FIBONACCI_WORDS));
+        assert!(contains_expected_patterns(
+            output,
+            expected_patterns::FIBONACCI_WORDS
+        ));
     }
 
     #[test]
@@ -649,9 +671,11 @@ mod quality_validation {
             }
 
             // Check for excessive special characters
-            let special_ratio = text.chars()
+            let special_ratio = text
+                .chars()
                 .filter(|c| !c.is_alphanumeric() && !c.is_whitespace())
-                .count() as f32 / text.len().max(1) as f32;
+                .count() as f32
+                / text.len().max(1) as f32;
             if special_ratio > 0.5 {
                 return true;
             }
@@ -722,8 +746,11 @@ mod memory_validation {
 
         // Memory increase should be bounded
         let memory_increase = allocations.len() * 10000 * std::mem::size_of::<f32>();
-        assert!(memory_increase < quality_thresholds::MAX_MEMORY_INCREASE,
-            "Memory increase {} exceeds bound", memory_increase);
+        assert!(
+            memory_increase < quality_thresholds::MAX_MEMORY_INCREASE,
+            "Memory increase {} exceeds bound",
+            memory_increase
+        );
 
         // Clean up
         drop(allocations);
@@ -741,8 +768,11 @@ mod memory_validation {
         let kv_cache_bytes = 2 * num_layers * num_kv_heads * head_dim * max_seq_len * 2;
 
         // Should be reasonable
-        assert!(kv_cache_bytes < 500_000_000,
-            "KV cache {} bytes too large", kv_cache_bytes);
+        assert!(
+            kv_cache_bytes < 500_000_000,
+            "KV cache {} bytes too large",
+            kv_cache_bytes
+        );
     }
 
     #[test]
@@ -755,8 +785,11 @@ mod memory_validation {
         // Activation: batch * seq * hidden * sizeof(f32)
         let activation_bytes = batch_size * seq_len * hidden_size * 4;
 
-        assert!(activation_bytes < 100_000_000,
-            "Activation memory {} too large", activation_bytes);
+        assert!(
+            activation_bytes < 100_000_000,
+            "Activation memory {} too large",
+            activation_bytes
+        );
     }
 
     #[test]
@@ -783,8 +816,11 @@ mod memory_validation {
         let savings_ratio = 1.0 - (q4k_size as f32 / f32_size as f32);
 
         // Q4_K should save at least 70% memory
-        assert!(savings_ratio > 0.7,
-            "Q4_K savings ratio {} below expected", savings_ratio);
+        assert!(
+            savings_ratio > 0.7,
+            "Q4_K savings ratio {} below expected",
+            savings_ratio
+        );
     }
 }
 
@@ -801,8 +837,12 @@ mod error_handling {
         let invalid_tokens = [u32::MAX, vocab_size as u32, vocab_size as u32 + 1000];
 
         for token in invalid_tokens {
-            assert!(token >= vocab_size as u32,
-                "Token {} should be invalid for vocab size {}", token, vocab_size);
+            assert!(
+                token >= vocab_size as u32,
+                "Token {} should be invalid for vocab size {}",
+                token,
+                vocab_size
+            );
         }
     }
 
@@ -872,7 +912,9 @@ mod stress_tests {
         for i in 0..iterations {
             // Simulate rapid generation
             let prompt = format!("Test prompt {}", i);
-            let hash = prompt.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let hash = prompt
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             let _ = hash % 32000; // Mock token
         }
     }
@@ -884,7 +926,9 @@ mod stress_tests {
                 thread::spawn(move || {
                     for j in 0..25 {
                         let prompt = format!("Thread {} prompt {}", i, j);
-                        let hash = prompt.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                        let hash = prompt
+                            .bytes()
+                            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                         let _ = hash % 32000;
                     }
                 })
@@ -901,7 +945,9 @@ mod stress_tests {
         let lengths = [1, 10, 100, 1000];
 
         for len in lengths {
-            let prompt: String = (0..len).map(|i| char::from((b'a' + (i % 26) as u8))).collect();
+            let prompt: String = (0..len)
+                .map(|i| char::from((b'a' + (i % 26) as u8)))
+                .collect();
             assert_eq!(prompt.len(), len);
         }
     }
@@ -973,9 +1019,7 @@ mod benchmarks {
         let start = Instant::now();
         for _ in 0..iterations {
             // Simulate tokenization
-            let _tokens: Vec<u32> = prompt.bytes()
-                .map(|b| b as u32)
-                .collect();
+            let _tokens: Vec<u32> = prompt.bytes().map(|b| b as u32).collect();
         }
         let duration = start.elapsed();
 

@@ -173,7 +173,9 @@ impl MemoryCompressor {
         let mut steps_with_reward: Vec<(usize, &TrajectoryStep)> =
             trajectory.steps.iter().enumerate().collect();
         steps_with_reward.sort_by(|a, b| {
-            b.1.reward.partial_cmp(&a.1.reward).unwrap_or(std::cmp::Ordering::Equal)
+            b.1.reward
+                .partial_cmp(&a.1.reward)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let key_steps: Vec<&TrajectoryStep> = steps_with_reward
@@ -236,10 +238,8 @@ impl MemoryCompressor {
 
     /// Compress embedding (average or reduce dimensions)
     fn compress_embedding(&self, steps: &[&TrajectoryStep]) -> Vec<f32> {
-        let embeddings: Vec<&Vec<f32>> = steps
-            .iter()
-            .filter_map(|s| s.embedding.as_ref())
-            .collect();
+        let embeddings: Vec<&Vec<f32>> =
+            steps.iter().filter_map(|s| s.embedding.as_ref()).collect();
 
         if embeddings.is_empty() {
             return Vec::new();
@@ -407,7 +407,9 @@ impl EpisodicMemory {
             .fetch_add(latency, Ordering::SeqCst);
 
         if !found.is_empty() {
-            self.stats.successful_retrievals.fetch_add(1, Ordering::SeqCst);
+            self.stats
+                .successful_retrievals
+                .fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(found)
@@ -443,9 +445,7 @@ impl EpisodicMemory {
         task_type: &str,
         k: usize,
     ) -> Result<Vec<Episode>> {
-        self.search_with_filter(query_embedding, k, |meta| {
-            meta.task_type == task_type
-        })
+        self.search_with_filter(query_embedding, k, |meta| meta.task_type == task_type)
     }
 
     /// Search successful episodes only
@@ -547,7 +547,10 @@ impl EpisodicMemory {
     /// Get statistics
     pub fn stats(&self) -> EpisodicMemoryStats {
         let episodes = self.episodes.read();
-        let compressed = episodes.iter().filter(|(_, e)| e.metadata.is_compressed).count() as u64;
+        let compressed = episodes
+            .iter()
+            .filter(|(_, e)| e.metadata.is_compressed)
+            .count() as u64;
         let total = episodes.len() as u64;
 
         let searches = self.stats.total_searches.load(Ordering::SeqCst);
@@ -580,8 +583,12 @@ impl EpisodicMemory {
             max_elements: self.config.max_episodes,
         };
 
-        let new_index = HnswIndex::new(self.config.embedding_dim, DistanceMetric::Cosine, hnsw_config)
-            .map_err(|e| RuvLLMError::Ruvector(e.to_string()))?;
+        let new_index = HnswIndex::new(
+            self.config.embedding_dim,
+            DistanceMetric::Cosine,
+            hnsw_config,
+        )
+        .map_err(|e| RuvLLMError::Ruvector(e.to_string()))?;
 
         *self.index.write() = new_index;
 
@@ -679,7 +686,9 @@ mod tests {
         let results = memory.search_by_task_type(&embedding, "coding", 5).unwrap();
         assert_eq!(results.len(), 1);
 
-        let results = memory.search_by_task_type(&embedding, "research", 5).unwrap();
+        let results = memory
+            .search_by_task_type(&embedding, "research", 5)
+            .unwrap();
         assert_eq!(results.len(), 0);
     }
 
@@ -706,9 +715,7 @@ mod tests {
         let trajectory = test_trajectory();
         let embedding = test_embedding(128);
 
-        memory
-            .store_episode(trajectory, embedding, vec![])
-            .unwrap();
+        memory.store_episode(trajectory, embedding, vec![]).unwrap();
 
         assert!(memory.get("traj-1").is_some());
         assert!(memory.delete("traj-1").unwrap());
@@ -726,9 +733,7 @@ mod tests {
         let trajectory = test_trajectory();
         let embedding = test_embedding(128);
 
-        memory
-            .store_episode(trajectory, embedding, vec![])
-            .unwrap();
+        memory.store_episode(trajectory, embedding, vec![]).unwrap();
 
         assert_eq!(memory.stats().total_episodes, 1);
         memory.clear().unwrap();

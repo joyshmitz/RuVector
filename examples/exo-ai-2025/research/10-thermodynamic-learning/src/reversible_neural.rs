@@ -9,7 +9,6 @@
 /// - Invertible activation functions
 /// - Orthogonal weight constraints
 /// - Energy tracking for reversible operations
-
 use std::f64::consts::{LN_2, PI};
 
 /// Reversible layer trait - must be bijective
@@ -373,7 +372,8 @@ impl ReversibleNetwork {
     }
 
     pub fn add_coupling_layer(&mut self, hidden_dim: usize, split: usize) {
-        self.layers.push(Box::new(CouplingLayer::new(self.dim, hidden_dim, split)));
+        self.layers
+            .push(Box::new(CouplingLayer::new(self.dim, hidden_dim, split)));
     }
 
     pub fn add_orthogonal_layer(&mut self) {
@@ -637,6 +637,9 @@ pub fn example_reversible_autoencoder() {
     // Compare to fully irreversible computation
     let total_bits = 8.0 * 32.0 * network.layers.len() as f64;
     let savings = tracker.energy_savings(total_bits);
-    println!("Energy savings vs irreversible: {:.3e} J ({:.1}%)",
-        savings, 100.0 * savings / (tracker.energy_dissipated + savings));
+    println!(
+        "Energy savings vs irreversible: {:.3e} J ({:.1}%)",
+        savings,
+        100.0 * savings / (tracker.energy_dissipated + savings)
+    );
 }

@@ -313,11 +313,7 @@ mod tests {
 
     #[test]
     fn test_euclidean_distance_scalar() {
-        let points = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let points = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]];
 
         let matrix = euclidean_distance_matrix_scalar(&points);
 
@@ -390,8 +386,14 @@ mod tests {
         for i in 0..10 {
             for j in (i + 1)..10 {
                 let diff = (matrix_scalar.get(i, j) - matrix_avx2.get(i, j)).abs();
-                assert!(diff < 1e-4, "Mismatch at ({}, {}): {} vs {}", i, j,
-                        matrix_scalar.get(i, j), matrix_avx2.get(i, j));
+                assert!(
+                    diff < 1e-4,
+                    "Mismatch at ({}, {}): {} vs {}",
+                    i,
+                    j,
+                    matrix_scalar.get(i, j),
+                    matrix_avx2.get(i, j)
+                );
             }
         }
     }

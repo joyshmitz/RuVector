@@ -350,10 +350,10 @@ impl ReportMerger {
             }
             MergeStrategy::WeightedAverage => {
                 // OPTIMIZATION: Single pass for both sums
-                let (weighted_sum, coherence_sum) = data.iter().fold(
-                    (0.0, 0.0),
-                    |(ws, cs), (_, n)| (ws + n.weight * n.coherence, cs + n.coherence),
-                );
+                let (weighted_sum, coherence_sum) =
+                    data.iter().fold((0.0, 0.0), |(ws, cs), (_, n)| {
+                        (ws + n.weight * n.coherence, cs + n.coherence)
+                    });
                 if coherence_sum > 0.0 {
                     weighted_sum / coherence_sum
                 } else {

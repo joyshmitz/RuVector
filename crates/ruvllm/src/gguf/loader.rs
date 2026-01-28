@@ -45,9 +45,9 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use super::{GgufFile, GgufQuantType, ModelConfig as GgufConfig, QuantizedTensor, TensorInfo};
 use crate::backends::ModelArchitecture;
 use crate::error::{Result, RuvLLMError};
-use super::{GgufFile, GgufQuantType, QuantizedTensor, TensorInfo, ModelConfig as GgufConfig};
 
 // ============================================================================
 // Progress Tracking
@@ -393,7 +393,8 @@ impl TensorNameMapper {
 
         // Normalization
         if lower.contains("norm") || lower.contains("ln_") || lower.contains("layer_norm") {
-            if lower.contains("final") || lower.contains("model.norm") || !lower.contains("layers") {
+            if lower.contains("final") || lower.contains("model.norm") || !lower.contains("layers")
+            {
                 return TensorCategory::FinalNorm;
             }
             if lower.contains("input") || lower.contains("attn") || lower.contains("attention") {
@@ -538,11 +539,16 @@ impl GgufLoader {
             let (normalized_name, layer_index, category) = mapper.map(&tensor_info.name);
 
             // Load tensor data
-            let loaded = self.load_single_tensor(tensor_info, &normalized_name, layer_index, category)?;
+            let loaded =
+                self.load_single_tensor(tensor_info, &normalized_name, layer_index, category)?;
 
             // Update memory tracking
             let tensor_bytes = loaded.data_f32.as_ref().map(|d| d.len() * 4).unwrap_or(0)
-                + loaded.data_quantized.as_ref().map(|q| q.data.len()).unwrap_or(0);
+                + loaded
+                    .data_quantized
+                    .as_ref()
+                    .map(|q| q.data.len())
+                    .unwrap_or(0);
             weights.memory_bytes += tensor_bytes;
 
             // Store tensor
@@ -550,7 +556,9 @@ impl GgufLoader {
 
             // Update progress
             let count = self.loaded_count.fetch_add(1, Ordering::Relaxed) + 1;
-            let bytes = self.loaded_bytes.fetch_add(tensor_info.byte_size(), Ordering::Relaxed)
+            let bytes = self
+                .loaded_bytes
+                .fetch_add(tensor_info.byte_size(), Ordering::Relaxed)
                 + tensor_info.byte_size();
 
             if let Some(ref callback) = self.config.progress_callback {
@@ -603,7 +611,8 @@ impl GgufLoader {
             }
 
             let (normalized_name, layer_idx, category) = mapper.map(&tensor_info.name);
-            let loaded = self.load_single_tensor(tensor_info, &normalized_name, layer_idx, category)?;
+            let loaded =
+                self.load_single_tensor(tensor_info, &normalized_name, layer_idx, category)?;
             tensors.push(loaded);
         }
 
@@ -612,9 +621,10 @@ impl GgufLoader {
 
     /// Load a single tensor by name.
     pub fn load_tensor(&self, name: &str) -> Result<LoadedTensor> {
-        let tensor_info = self.file.get_tensor(name).ok_or_else(|| {
-            RuvLLMError::NotFound(format!("Tensor not found: {}", name))
-        })?;
+        let tensor_info = self
+            .file
+            .get_tensor(name)
+            .ok_or_else(|| RuvLLMError::NotFound(format!("Tensor not found: {}", name)))?;
 
         let mapper = self.mapper.as_ref();
         let (normalized_name, layer_idx, category) = mapper
@@ -632,7 +642,8 @@ impl GgufLoader {
         layer_index: Option<usize>,
         category: TensorCategory,
     ) -> Result<LoadedTensor> {
-        let (data_f32, data_quantized) = if self.config.keep_quantized && info.dtype.is_quantized() {
+        let (data_f32, data_quantized) = if self.config.keep_quantized && info.dtype.is_quantized()
+        {
             // Keep as quantized
             let quantized = self.file.load_tensor_quantized(&info.name)?;
             (None, Some(quantized))
@@ -658,9 +669,11 @@ impl GgufLoader {
     fn should_load_tensor(&self, info: &TensorInfo) -> bool {
         // Check tensor filter
         if !self.config.tensor_filter.is_empty() {
-            let matches = self.config.tensor_filter.iter().any(|pattern| {
-                info.name.contains(pattern)
-            });
+            let matches = self
+                .config
+                .tensor_filter
+                .iter()
+                .any(|pattern| info.name.contains(pattern));
             if !matches {
                 return false;
             }
@@ -731,9 +744,11 @@ impl StreamingLoader {
 
     /// Load embedding and pre-layer normalization tensors.
     pub fn load_embeddings(&self) -> Result<Vec<LoadedTensor>> {
-        let mapper = self.loader.mapper.as_ref().ok_or_else(|| {
-            RuvLLMError::Model("Unknown architecture".to_string())
-        })?;
+        let mapper = self
+            .loader
+            .mapper
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::Model("Unknown architecture".to_string()))?;
 
         let mut tensors = Vec::new();
 
@@ -769,9 +784,11 @@ impl StreamingLoader {
 
     /// Load final normalization and output head tensors.
     pub fn load_output_head(&self) -> Result<Vec<LoadedTensor>> {
-        let mapper = self.loader.mapper.as_ref().ok_or_else(|| {
-            RuvLLMError::Model("Unknown architecture".to_string())
-        })?;
+        let mapper = self
+            .loader
+            .mapper
+            .as_ref()
+            .ok_or_else(|| RuvLLMError::Model("Unknown architecture".to_string()))?;
 
         let mut tensors = Vec::new();
 
@@ -784,7 +801,10 @@ impl StreamingLoader {
             }
 
             // Load output head and final norm
-            if matches!(category, TensorCategory::OutputHead | TensorCategory::FinalNorm) {
+            if matches!(
+                category,
+                TensorCategory::OutputHead | TensorCategory::FinalNorm
+            ) {
                 let loaded = self.loader.load_tensor(&tensor_info.name)?;
                 tensors.push(loaded);
             }
@@ -842,10 +862,22 @@ mod tests {
         let mapper = TensorNameMapper::new(ModelArchitecture::Llama);
 
         // Attention components
-        assert_eq!(mapper.categorize("self_attn.q_proj"), TensorCategory::AttentionQuery);
-        assert_eq!(mapper.categorize("attention.k_proj"), TensorCategory::AttentionKey);
-        assert_eq!(mapper.categorize("self_attn.v_proj"), TensorCategory::AttentionValue);
-        assert_eq!(mapper.categorize("attn.o_proj"), TensorCategory::AttentionOutput);
+        assert_eq!(
+            mapper.categorize("self_attn.q_proj"),
+            TensorCategory::AttentionQuery
+        );
+        assert_eq!(
+            mapper.categorize("attention.k_proj"),
+            TensorCategory::AttentionKey
+        );
+        assert_eq!(
+            mapper.categorize("self_attn.v_proj"),
+            TensorCategory::AttentionValue
+        );
+        assert_eq!(
+            mapper.categorize("attn.o_proj"),
+            TensorCategory::AttentionOutput
+        );
 
         // MLP components
         assert_eq!(mapper.categorize("mlp.gate_proj"), TensorCategory::FfnGate);
@@ -853,10 +885,16 @@ mod tests {
         assert_eq!(mapper.categorize("mlp.down_proj"), TensorCategory::FfnDown);
 
         // Normalization
-        assert_eq!(mapper.categorize("model.norm.weight"), TensorCategory::FinalNorm);
+        assert_eq!(
+            mapper.categorize("model.norm.weight"),
+            TensorCategory::FinalNorm
+        );
 
         // Output
-        assert_eq!(mapper.categorize("lm_head.weight"), TensorCategory::OutputHead);
+        assert_eq!(
+            mapper.categorize("lm_head.weight"),
+            TensorCategory::OutputHead
+        );
     }
 
     #[test]

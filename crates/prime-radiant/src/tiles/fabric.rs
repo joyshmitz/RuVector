@@ -182,7 +182,11 @@ impl CoherenceFabric {
     }
 
     /// Distribute an edge removal.
-    pub fn distribute_edge_remove(&mut self, source_node: u64, target_node: u64) -> TilesResult<()> {
+    pub fn distribute_edge_remove(
+        &mut self,
+        source_node: u64,
+        target_node: u64,
+    ) -> TilesResult<()> {
         let tile_id = self.coordinator.tile_for_node(source_node);
         let tile = self
             .tiles

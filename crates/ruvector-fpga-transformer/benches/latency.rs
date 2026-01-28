@@ -1,10 +1,10 @@
 //! Latency benchmarks for FPGA Transformer
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
 use ruvector_fpga_transformer::{
-    artifact::{ModelArtifact, Manifest},
+    artifact::{Manifest, ModelArtifact},
     backend::native_sim::NativeSimBackend,
     backend::TransformerBackend,
     gating::DefaultCoherenceGate,
@@ -105,14 +105,21 @@ fn bench_load_unload(c: &mut Criterion) {
 }
 
 fn bench_gating(c: &mut Criterion) {
-    use ruvector_fpga_transformer::gating::{CoherenceGate, CoherenceConfig};
+    use ruvector_fpga_transformer::gating::{CoherenceConfig, CoherenceGate};
 
     let gate = DefaultCoherenceGate::with_config(CoherenceConfig::default());
 
     let hints = [
         ("allow_all", GateHint::allow_all()),
         ("reflex_only", GateHint::reflex_only()),
-        ("low_coherence", GateHint::new(-500, true, ruvector_fpga_transformer::types::ComputeClass::Deliberative)),
+        (
+            "low_coherence",
+            GateHint::new(
+                -500,
+                true,
+                ruvector_fpga_transformer::types::ComputeClass::Deliberative,
+            ),
+        ),
     ];
 
     let mut group = c.benchmark_group("gating_preflight");

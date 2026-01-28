@@ -17,7 +17,7 @@
 mod fisher;
 mod natural_gradient;
 
-pub use fisher::{FisherMetric, FisherConfig};
+pub use fisher::{FisherConfig, FisherMetric};
 pub use natural_gradient::{NaturalGradient, NaturalGradientConfig};
 
 #[cfg(test)]

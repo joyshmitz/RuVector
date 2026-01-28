@@ -17,8 +17,7 @@
 //! - `claude_training_stats.json` - Dataset statistics
 
 use ruvllm::training::{
-    DatasetGenerator, DatasetConfig, AugmentationConfig,
-    TaskCategory, ClaudeTaskDataset,
+    AugmentationConfig, ClaudeTaskDataset, DatasetConfig, DatasetGenerator, TaskCategory,
 };
 use std::error::Error;
 
@@ -39,11 +38,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     println!("📋 Configuration:");
-    println!("  • Examples per category: {}", config.examples_per_category);
+    println!(
+        "  • Examples per category: {}",
+        config.examples_per_category
+    );
     println!("  • Augmentation enabled: {}", config.enable_augmentation);
-    println!("  • Paraphrases per example: {}", config.augmentation.paraphrases_per_example);
-    println!("  • Complexity variations: {}", config.augmentation.complexity_variations);
-    println!("  • Domain transfer: {}\n", config.augmentation.enable_domain_transfer);
+    println!(
+        "  • Paraphrases per example: {}",
+        config.augmentation.paraphrases_per_example
+    );
+    println!(
+        "  • Complexity variations: {}",
+        config.augmentation.complexity_variations
+    );
+    println!(
+        "  • Domain transfer: {}\n",
+        config.augmentation.enable_domain_transfer
+    );
 
     // Generate dataset
     println!("⚙️  Generating dataset...");
@@ -59,7 +70,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("\n💾 Exporting datasets...");
 
     dataset.export_jsonl("claude_training_full.jsonl")?;
-    println!("  ✓ Full dataset: claude_training_full.jsonl ({} examples)", dataset.examples.len());
+    println!(
+        "  ✓ Full dataset: claude_training_full.jsonl ({} examples)",
+        dataset.examples.len()
+    );
 
     dataset.export_json("claude_training_full.json")?;
     println!("  ✓ Full dataset JSON: claude_training_full.json");
@@ -69,15 +83,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let train_dataset = ClaudeTaskDataset::new(train);
     train_dataset.export_jsonl("claude_training_train.jsonl")?;
-    println!("  ✓ Training set: claude_training_train.jsonl ({} examples)", train_dataset.examples.len());
+    println!(
+        "  ✓ Training set: claude_training_train.jsonl ({} examples)",
+        train_dataset.examples.len()
+    );
 
     let val_dataset = ClaudeTaskDataset::new(val);
     val_dataset.export_jsonl("claude_training_val.jsonl")?;
-    println!("  ✓ Validation set: claude_training_val.jsonl ({} examples)", val_dataset.examples.len());
+    println!(
+        "  ✓ Validation set: claude_training_val.jsonl ({} examples)",
+        val_dataset.examples.len()
+    );
 
     let test_dataset = ClaudeTaskDataset::new(test);
     test_dataset.export_jsonl("claude_training_test.jsonl")?;
-    println!("  ✓ Test set: claude_training_test.jsonl ({} examples)", test_dataset.examples.len());
+    println!(
+        "  ✓ Test set: claude_training_test.jsonl ({} examples)",
+        test_dataset.examples.len()
+    );
 
     // Export statistics
     dataset.export_stats("claude_training_stats.json")?;
@@ -100,15 +123,25 @@ fn print_statistics(dataset: &ClaudeTaskDataset) {
     println!("📊 Dataset Statistics:");
     println!("  ═══════════════════════════════════════════════════");
     println!("  Total examples: {}", dataset.stats.total_examples);
-    println!("  Average quality score: {:.2}", dataset.stats.avg_quality_score);
+    println!(
+        "  Average quality score: {:.2}",
+        dataset.stats.avg_quality_score
+    );
 
     println!("\n  📂 Examples by Category:");
     for category in TaskCategory::all() {
-        let count = dataset.stats.examples_per_category
+        let count = dataset
+            .stats
+            .examples_per_category
             .get(category.name())
             .unwrap_or(&0);
         let percentage = (*count as f32 / dataset.stats.total_examples as f32) * 100.0;
-        println!("    • {:12} {:4} ({:5.1}%)", category.name(), count, percentage);
+        println!(
+            "    • {:12} {:4} ({:5.1}%)",
+            category.name(),
+            count,
+            percentage
+        );
     }
 
     println!("\n  📈 Examples by Complexity:");
@@ -129,13 +162,21 @@ fn print_sample_examples(dataset: &ClaudeTaskDataset) {
     println!("  ═══════════════════════════════════════════════════");
 
     for category in TaskCategory::all() {
-        let sample = dataset.examples.iter()
+        let sample = dataset
+            .examples
+            .iter()
             .find(|e| e.metadata.category == category);
 
         if let Some(example) = sample {
-            println!("\n  🔹 {} ({})", category.name(), example.metadata.expected_model);
-            println!("     Complexity: {:?}, Domain: {:?}",
-                example.metadata.complexity, example.metadata.domain);
+            println!(
+                "\n  🔹 {} ({})",
+                category.name(),
+                example.metadata.expected_model
+            );
+            println!(
+                "     Complexity: {:?}, Domain: {:?}",
+                example.metadata.complexity, example.metadata.domain
+            );
             println!("     Input: {}", truncate(&example.input, 80));
             println!("     Context: {}", truncate(&example.context, 80));
             println!("     Quality: {:.2}", example.metadata.quality_score);
@@ -149,7 +190,9 @@ fn print_model_routing_analysis(dataset: &ClaudeTaskDataset) {
 
     let mut model_counts = std::collections::HashMap::new();
     for example in &dataset.examples {
-        *model_counts.entry(&example.metadata.expected_model).or_insert(0) += 1;
+        *model_counts
+            .entry(&example.metadata.expected_model)
+            .or_insert(0) += 1;
     }
 
     for (model, count) in model_counts.iter() {
@@ -160,7 +203,10 @@ fn print_model_routing_analysis(dataset: &ClaudeTaskDataset) {
             "opus" => "💰💰💰 (most capable)",
             _ => "",
         };
-        println!("  • {:8} {:4} ({:5.1}%) {}", model, count, percentage, cost_indicator);
+        println!(
+            "  • {:8} {:4} ({:5.1}%) {}",
+            model, count, percentage, cost_indicator
+        );
     }
 
     println!("\n  ℹ️  Model Selection Guide:");

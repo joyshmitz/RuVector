@@ -63,16 +63,15 @@ pub use energy::{
     EnergyStatistics, HotspotInfo, ScopeEnergy, ScopeId,
 };
 pub use engine::{
-    CoherenceConfig, CoherenceEngine, CoherenceError, NodeState, RestrictionMap, Result,
-    SheafEdge, SheafNode,
+    CoherenceConfig, CoherenceEngine, CoherenceError, NodeState, RestrictionMap, Result, SheafEdge,
+    SheafNode,
 };
 pub use history::{EnergyHistory, EnergyHistoryConfig, EnergyTrend, TrendDirection};
 pub use incremental::{
     DeltaResult, IncrementalCache, IncrementalConfig, IncrementalEngine, UpdateEvent,
 };
 pub use spectral::{
-    compute_eigenvalues, DriftEvent, DriftSeverity, SpectralAnalyzer, SpectralConfig,
-    SpectralStats,
+    compute_eigenvalues, DriftEvent, DriftSeverity, SpectralAnalyzer, SpectralConfig, SpectralStats,
 };
 
 // Alias for compatibility

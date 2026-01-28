@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use sparse_persistent_homology::*;
 use rand::Rng;
+use sparse_persistent_homology::*;
 
 /// Generate random points in d-dimensional space
 fn generate_random_points(n: usize, d: usize) -> Vec<Vec<f32>> {
@@ -42,15 +42,11 @@ fn bench_distance_matrix(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64 * (*n as u64 - 1) / 2));
         group.bench_with_input(BenchmarkId::new("scalar", n), &points, |b, points| {
-            b.iter(|| {
-                simd_filtration::euclidean_distance_matrix_scalar(black_box(points))
-            });
+            b.iter(|| simd_filtration::euclidean_distance_matrix_scalar(black_box(points)));
         });
 
         group.bench_with_input(BenchmarkId::new("auto", n), &points, |b, points| {
-            b.iter(|| {
-                simd_filtration::euclidean_distance_matrix(black_box(points))
-            });
+            b.iter(|| simd_filtration::euclidean_distance_matrix(black_box(points)));
         });
     }
 
@@ -66,15 +62,11 @@ fn bench_apparent_pairs(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(filt.len() as u64));
         group.bench_with_input(BenchmarkId::new("standard", n), &filt, |b, filt| {
-            b.iter(|| {
-                apparent_pairs::identify_apparent_pairs(black_box(filt))
-            });
+            b.iter(|| apparent_pairs::identify_apparent_pairs(black_box(filt)));
         });
 
         group.bench_with_input(BenchmarkId::new("fast", n), &filt, |b, filt| {
-            b.iter(|| {
-                apparent_pairs::identify_apparent_pairs_fast(black_box(filt))
-            });
+            b.iter(|| apparent_pairs::identify_apparent_pairs_fast(black_box(filt)));
         });
     }
 
@@ -145,14 +137,15 @@ fn bench_persistence_landscape(c: &mut Criterion) {
             .collect();
 
         group.throughput(Throughput::Elements(*n as u64));
-        group.bench_with_input(BenchmarkId::new("landscape", n), &features, |b, features| {
-            b.iter(|| {
-                persistence_vectors::PersistenceLandscape::from_features(
-                    black_box(features),
-                    5,
-                )
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("landscape", n),
+            &features,
+            |b, features| {
+                b.iter(|| {
+                    persistence_vectors::PersistenceLandscape::from_features(black_box(features), 5)
+                });
+            },
+        );
 
         group.bench_with_input(
             BenchmarkId::new("persistence_image", n),
@@ -203,9 +196,7 @@ fn bench_topological_attention(c: &mut Criterion) {
             BenchmarkId::new("apply_attention", n),
             &activations,
             |b, activations| {
-                b.iter(|| {
-                    attention.apply(black_box(activations))
-                });
+                b.iter(|| attention.apply(black_box(activations)));
             },
         );
     }
@@ -255,9 +246,7 @@ fn bench_betti_numbers(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(*n as u64));
         group.bench_with_input(BenchmarkId::new("fast", n), &matrix, |b, matrix| {
-            b.iter(|| {
-                betti::compute_betti_fast(black_box(matrix), 2)
-            });
+            b.iter(|| betti::compute_betti_fast(black_box(matrix), 2));
         });
     }
 

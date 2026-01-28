@@ -1,10 +1,10 @@
 //! Model upload functionality for publishing to HuggingFace Hub
 
-use super::{HubError, Result, get_hf_token};
 use super::model_card::{ModelCard, ModelCardBuilder};
-use std::path::{Path, PathBuf};
-use std::fs;
+use super::{get_hf_token, HubError, Result};
 use regex::Regex;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 // ============================================================================
 // Security: Input Validation (H-002)
@@ -40,7 +40,9 @@ fn validate_repo_id(repo_id: &str) -> Result<()> {
     }
 
     // Prevent shell metacharacters that could be used for injection
-    let dangerous_chars = ['`', '$', '(', ')', ';', '&', '|', '<', '>', '\n', '\r', '"', '\'', '\\'];
+    let dangerous_chars = [
+        '`', '$', '(', ')', ';', '&', '|', '<', '>', '\n', '\r', '"', '\'', '\\',
+    ];
     for c in dangerous_chars {
         if repo_id.contains(c) {
             return Err(HubError::InvalidFormat(format!(
@@ -298,9 +300,7 @@ impl ModelUploader {
 
         if !status.success() && status.code() != Some(1) {
             // Exit code 1 might mean repo already exists
-            return Err(HubError::Network(
-                "Failed to create repository".to_string(),
-            ));
+            return Err(HubError::Network("Failed to create repository".to_string()));
         }
 
         Ok(())
@@ -323,9 +323,7 @@ impl ModelUploader {
             .map_err(|e| HubError::Network(e.to_string()))?;
 
         if !status.success() {
-            return Err(HubError::Network(
-                "Failed to upload file".to_string(),
-            ));
+            return Err(HubError::Network("Failed to upload file".to_string()));
         }
 
         Ok(())
@@ -333,7 +331,7 @@ impl ModelUploader {
 
     /// Generate model card from metadata
     fn generate_model_card(&self, metadata: &ModelMetadata) -> ModelCard {
-        use super::model_card::{TaskType, Framework, License};
+        use super::model_card::{Framework, License, TaskType};
 
         let mut builder = ModelCardBuilder::new(&metadata.name);
 

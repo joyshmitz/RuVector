@@ -70,7 +70,9 @@ impl Hypervector {
 
         for i in 0..dim {
             // Simple LCG for deterministic generation
-            let mixed = seed.wrapping_mul(6364136223846793005).wrapping_add(i as u64);
+            let mixed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(i as u64);
             let normalized = (mixed as f32 / u64::MAX as f32) * 2.0 - 1.0;
             components.push(normalized);
         }
@@ -358,13 +360,7 @@ mod tests {
 
     #[test]
     fn test_witness_encoding() {
-        let enc = WitnessEncoding::new(
-            "test_witness",
-            0.5,
-            true,
-            &[1, 2, 3, 4],
-            1000,
-        );
+        let enc = WitnessEncoding::new("test_witness", 0.5, true, &[1, 2, 3, 4], 1000);
 
         assert_eq!(enc.witness_id, "test_witness");
         assert!(enc.allow);

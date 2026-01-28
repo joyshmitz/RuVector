@@ -332,7 +332,11 @@ impl QuantizedTensor {
 /// # Returns
 ///
 /// Vector of FP32 values
-pub fn dequantize_tensor(data: &[u8], dtype: GgufQuantType, num_elements: usize) -> Result<Vec<f32>> {
+pub fn dequantize_tensor(
+    data: &[u8],
+    dtype: GgufQuantType,
+    num_elements: usize,
+) -> Result<Vec<f32>> {
     let mut output = vec![0.0f32; num_elements];
 
     match dtype {
@@ -901,8 +905,8 @@ const IQ4_NL_TYPE_SIZE: usize = 18;
 
 // Non-linear quantization lookup table (simplified version)
 const IQ4_NL_LUT: [f32; 16] = [
-    -1.0, -0.75, -0.5, -0.375, -0.25, -0.125, 0.0, 0.125,
-    0.25, 0.375, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0,
+    -1.0, -0.75, -0.5, -0.375, -0.25, -0.125, 0.0, 0.125, 0.25, 0.375, 0.5, 0.75, 1.0, 1.5, 2.0,
+    3.0,
 ];
 
 fn dequantize_iq4_nl(data: &[u8], output: &mut [f32]) {

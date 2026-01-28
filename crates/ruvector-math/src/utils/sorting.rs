@@ -3,7 +3,11 @@
 /// Argsort: returns indices that would sort the array
 pub fn argsort(data: &[f64]) -> Vec<usize> {
     let mut indices: Vec<usize> = (0..data.len()).collect();
-    indices.sort_by(|&a, &b| data[a].partial_cmp(&data[b]).unwrap_or(std::cmp::Ordering::Equal));
+    indices.sort_by(|&a, &b| {
+        data[a]
+            .partial_cmp(&data[b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     indices
 }
 

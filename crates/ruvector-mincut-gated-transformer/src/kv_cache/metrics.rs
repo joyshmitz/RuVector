@@ -46,7 +46,13 @@ impl MemoryStats {
     }
 
     /// Calculate memory saved compared to FP16 baseline
-    pub fn memory_saved(&self, baseline_tokens: usize, head_dim: usize, num_heads: usize, num_layers: usize) -> usize {
+    pub fn memory_saved(
+        &self,
+        baseline_tokens: usize,
+        head_dim: usize,
+        num_heads: usize,
+        num_layers: usize,
+    ) -> usize {
         let fp16_bytes = baseline_tokens * head_dim * num_heads * num_layers * 2 * 2; // 2 bytes * 2 (kv)
         fp16_bytes.saturating_sub(self.total_bytes)
     }
@@ -234,10 +240,12 @@ impl QualityTracker {
         let variance = (self.sum_sq_score / self.count as f32) - (avg * avg);
         let std_dev = variance.max(0.0).sqrt();
 
-        let (min_score, max_score) = self.history.iter().fold(
-            (f32::MAX, f32::MIN),
-            |(min, max), f| (min.min(f.score), max.max(f.score)),
-        );
+        let (min_score, max_score) = self
+            .history
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(min, max), f| {
+                (min.min(f.score), max.max(f.score))
+            });
 
         let trend = self.compute_trend();
 
@@ -260,18 +268,24 @@ impl QualityTracker {
         let recent_count = 10.min(self.history.len() / 2);
         let earlier_count = recent_count;
 
-        let recent_avg: f32 = self.history.iter()
+        let recent_avg: f32 = self
+            .history
+            .iter()
             .rev()
             .take(recent_count)
             .map(|f| f.score)
-            .sum::<f32>() / recent_count as f32;
+            .sum::<f32>()
+            / recent_count as f32;
 
-        let earlier_avg: f32 = self.history.iter()
+        let earlier_avg: f32 = self
+            .history
+            .iter()
             .rev()
             .skip(recent_count)
             .take(earlier_count)
             .map(|f| f.score)
-            .sum::<f32>() / earlier_count as f32;
+            .sum::<f32>()
+            / earlier_count as f32;
 
         recent_avg - earlier_avg
     }
@@ -414,7 +428,11 @@ mod tests {
         }
 
         let metrics = tracker.current_metrics();
-        assert!(metrics.trend > 0.0, "Expected positive trend, got {}", metrics.trend);
+        assert!(
+            metrics.trend > 0.0,
+            "Expected positive trend, got {}",
+            metrics.trend
+        );
     }
 
     #[test]
@@ -437,9 +455,11 @@ mod tests {
             tracker.record(feedback);
         }
 
-        assert!(tracker.boundary_adjustment_factor() < 1.0,
+        assert!(
+            tracker.boundary_adjustment_factor() < 1.0,
             "Expected factor < 1.0 for high quality, got {}",
-            tracker.boundary_adjustment_factor());
+            tracker.boundary_adjustment_factor()
+        );
     }
 
     #[test]

@@ -72,20 +72,15 @@ fn main() -> anyhow::Result<()> {
 
             // Run inference
             println!("\nRunning FPGA inference...");
-            let req = InferenceRequest::new(
-                model_id,
-                shape,
-                &tokens,
-                &mask,
-                GateHint::allow_all(),
-            );
+            let req = InferenceRequest::new(model_id, shape, &tokens, &mask, GateHint::allow_all());
 
             match engine.infer(req) {
                 Ok(result) => {
                     println!("Inference successful!");
                     println!("  Backend: {:?}", result.witness.backend);
                     println!("  Cycles: {}", result.witness.cycles);
-                    println!("  Latency: {}ns ({:.3}ms)",
+                    println!(
+                        "  Latency: {}ns ({:.3}ms)",
                         result.witness.latency_ns,
                         result.witness.latency_ns as f64 / 1_000_000.0
                     );

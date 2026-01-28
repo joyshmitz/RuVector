@@ -49,8 +49,7 @@
 use crate::error::{Result, RuvLLMError};
 use crate::training::grpo::{GrpoConfig, GrpoOptimizer, GrpoSample, GrpoUpdateResult, SampleGroup};
 use crate::training::tool_dataset::{
-    DifficultyLevel, McpToolDef, ToolCallDataset, ToolCallExample,
-    ToolDatasetConfig,
+    DifficultyLevel, McpToolDef, ToolCallDataset, ToolCallExample, ToolDatasetConfig,
 };
 use ndarray::Array2;
 use parking_lot::RwLock;
@@ -498,7 +497,10 @@ impl McpToolTrainer {
     }
 
     /// Evaluate tool selection accuracy on a test set
-    pub fn evaluate_tool_accuracy(&self, test_examples: &[ToolCallExample]) -> Result<EvaluationMetrics> {
+    pub fn evaluate_tool_accuracy(
+        &self,
+        test_examples: &[ToolCallExample],
+    ) -> Result<EvaluationMetrics> {
         if test_examples.is_empty() {
             return Ok(EvaluationMetrics::default());
         }
@@ -550,12 +552,16 @@ impl McpToolTrainer {
 
         // Convert category stats
         for (cat, (c, t)) in by_category {
-            metrics.accuracy_by_category.insert(cat, c as f32 / t as f32);
+            metrics
+                .accuracy_by_category
+                .insert(cat, c as f32 / t as f32);
         }
 
         // Convert difficulty stats
         for (diff, (c, t)) in by_difficulty {
-            metrics.accuracy_by_difficulty.insert(diff, c as f32 / t as f32);
+            metrics
+                .accuracy_by_difficulty
+                .insert(diff, c as f32 / t as f32);
         }
 
         metrics.confusion = confusion;
@@ -675,8 +681,16 @@ impl McpToolTrainer {
 
     /// Check if two tools are in the same category
     fn same_category(&self, tool1: &str, tool2: &str) -> bool {
-        let cat1 = self.tool_defs.iter().find(|t| t.name == tool1).map(|t| t.category);
-        let cat2 = self.tool_defs.iter().find(|t| t.name == tool2).map(|t| t.category);
+        let cat1 = self
+            .tool_defs
+            .iter()
+            .find(|t| t.name == tool1)
+            .map(|t| t.category);
+        let cat2 = self
+            .tool_defs
+            .iter()
+            .find(|t| t.name == tool2)
+            .map(|t| t.category);
         cat1.is_some() && cat1 == cat2
     }
 
@@ -701,7 +715,11 @@ impl McpToolTrainer {
             stats: self.stats.read().clone(),
             grpo_stats: self.grpo.stats(),
             tool_embeddings: {
-                let (vec, _offset) = self.tool_embeddings.read().clone().into_raw_vec_and_offset();
+                let (vec, _offset) = self
+                    .tool_embeddings
+                    .read()
+                    .clone()
+                    .into_raw_vec_and_offset();
                 vec
             },
             embedding_shape: {
@@ -719,10 +737,8 @@ impl McpToolTrainer {
 
         let (rows, cols) = checkpoint.embedding_shape;
         if checkpoint.tool_embeddings.len() == rows * cols {
-            let embeddings = Array2::from_shape_vec(
-                (rows, cols),
-                checkpoint.tool_embeddings,
-            ).map_err(|e| RuvLLMError::InvalidOperation(e.to_string()))?;
+            let embeddings = Array2::from_shape_vec((rows, cols), checkpoint.tool_embeddings)
+                .map_err(|e| RuvLLMError::InvalidOperation(e.to_string()))?;
             *self.tool_embeddings.write() = embeddings;
         }
 
@@ -1024,7 +1040,9 @@ mod tests {
         let dataset_config = ToolDatasetConfig::minimal();
         let dataset = trainer.generate_tool_dataset(dataset_config).unwrap();
 
-        let metrics = trainer.evaluate_tool_accuracy(&dataset.examples[..5]).unwrap();
+        let metrics = trainer
+            .evaluate_tool_accuracy(&dataset.examples[..5])
+            .unwrap();
         assert!(metrics.num_samples == 5);
         assert!(metrics.tool_accuracy >= 0.0 && metrics.tool_accuracy <= 1.0);
     }

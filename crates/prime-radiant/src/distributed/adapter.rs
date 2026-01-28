@@ -2,36 +2,22 @@
 //!
 //! Wraps Raft consensus for coherence state replication.
 
-use super::{DistributedCoherenceConfig, DistributedError, Result};
 use super::config::NodeRole;
+use super::{DistributedCoherenceConfig, DistributedError, Result};
 
 /// Command types for coherence state machine
 #[derive(Debug, Clone)]
 pub enum CoherenceCommand {
     /// Update energy for an edge
-    UpdateEnergy {
-        edge_id: (u64, u64),
-        energy: f32,
-    },
+    UpdateEnergy { edge_id: (u64, u64), energy: f32 },
     /// Set node state vector
-    SetNodeState {
-        node_id: u64,
-        state: Vec<f32>,
-    },
+    SetNodeState { node_id: u64, state: Vec<f32> },
     /// Record coherence checkpoint
-    Checkpoint {
-        total_energy: f32,
-        timestamp: u64,
-    },
+    Checkpoint { total_energy: f32, timestamp: u64 },
     /// Mark region as incoherent
-    MarkIncoherent {
-        region_id: u64,
-        nodes: Vec<u64>,
-    },
+    MarkIncoherent { region_id: u64, nodes: Vec<u64> },
     /// Clear incoherence flag
-    ClearIncoherent {
-        region_id: u64,
-    },
+    ClearIncoherent { region_id: u64 },
 }
 
 impl CoherenceCommand {
@@ -54,7 +40,10 @@ impl CoherenceCommand {
                     bytes.extend(v.to_le_bytes());
                 }
             }
-            Self::Checkpoint { total_energy, timestamp } => {
+            Self::Checkpoint {
+                total_energy,
+                timestamp,
+            } => {
                 bytes.push(2);
                 bytes.extend(total_energy.to_le_bytes());
                 bytes.extend(timestamp.to_le_bytes());
@@ -111,7 +100,10 @@ impl CoherenceCommand {
             2 if data.len() >= 12 => {
                 let total_energy = f32::from_le_bytes(data[0..4].try_into().ok()?);
                 let timestamp = u64::from_le_bytes(data[4..12].try_into().ok()?);
-                Some(Self::Checkpoint { total_energy, timestamp })
+                Some(Self::Checkpoint {
+                    total_energy,
+                    timestamp,
+                })
             }
             3 if data.len() >= 12 => {
                 let region_id = u64::from_le_bytes(data[0..8].try_into().ok()?);
@@ -169,9 +161,17 @@ impl RaftAdapter {
     pub fn new(config: DistributedCoherenceConfig) -> Self {
         let is_leader = config.is_single_node();
         Self {
-            role: if is_leader { NodeRole::Leader } else { NodeRole::Follower },
+            role: if is_leader {
+                NodeRole::Leader
+            } else {
+                NodeRole::Follower
+            },
             current_term: 1,
-            current_leader: if is_leader { Some(config.node_id.clone()) } else { None },
+            current_leader: if is_leader {
+                Some(config.node_id.clone())
+            } else {
+                None
+            },
             log_index: 0,
             pending_commands: Vec::new(),
             config,
@@ -231,7 +231,10 @@ impl RaftAdapter {
 
     /// Record checkpoint
     pub fn checkpoint(&mut self, total_energy: f32, timestamp: u64) -> Result<CommandResult> {
-        let command = CoherenceCommand::Checkpoint { total_energy, timestamp };
+        let command = CoherenceCommand::Checkpoint {
+            total_energy,
+            timestamp,
+        };
         self.submit_command(command)
     }
 
@@ -358,7 +361,11 @@ mod tests {
     fn test_not_leader_error() {
         let config = DistributedCoherenceConfig {
             node_id: "node1".to_string(),
-            cluster_members: vec!["node1".to_string(), "node2".to_string(), "node3".to_string()],
+            cluster_members: vec![
+                "node1".to_string(),
+                "node2".to_string(),
+                "node3".to_string(),
+            ],
             ..Default::default()
         };
         let mut adapter = RaftAdapter::new(config);

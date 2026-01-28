@@ -2,9 +2,9 @@
 //!
 //! Attention as heat diffusion on a key similarity graph.
 
+use super::laplacian::{GraphLaplacian, LaplacianType};
 use crate::error::{AttentionError, AttentionResult};
 use crate::traits::Attention;
-use super::laplacian::{GraphLaplacian, LaplacianType};
 use serde::{Deserialize, Serialize};
 
 /// Diffusion attention configuration
@@ -84,11 +84,7 @@ impl DiffusionAttention {
                 self.config.laplacian_type,
             )
         } else {
-            GraphLaplacian::from_keys(
-                keys,
-                self.config.sigma,
-                self.config.laplacian_type,
-            )
+            GraphLaplacian::from_keys(keys, self.config.sigma, self.config.laplacian_type)
         };
 
         // Initial logits from dot product
@@ -147,11 +143,7 @@ impl DiffusionAttention {
                 self.config.laplacian_type,
             )
         } else {
-            GraphLaplacian::from_keys(
-                keys,
-                self.config.sigma,
-                self.config.laplacian_type,
-            )
+            GraphLaplacian::from_keys(keys, self.config.sigma, self.config.laplacian_type)
         };
 
         let mut x: Vec<f32> = keys
@@ -294,12 +286,8 @@ mod tests {
         let attention = DiffusionAttention::with_dim(16);
 
         let query = vec![1.0f32; 16];
-        let keys: Vec<Vec<f32>> = (0..8)
-            .map(|i| vec![i as f32 * 0.1; 16])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..8)
-            .map(|i| vec![i as f32; 16])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..8).map(|i| vec![i as f32 * 0.1; 16]).collect();
+        let values: Vec<Vec<f32>> = (0..8).map(|i| vec![i as f32; 16]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -318,9 +306,7 @@ mod tests {
         let attention = DiffusionAttention::new(config);
 
         let query = vec![1.0f32; 8];
-        let keys: Vec<Vec<f32>> = (0..5)
-            .map(|i| vec![i as f32 * 0.1; 8])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..5).map(|i| vec![i as f32 * 0.1; 8]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
@@ -345,12 +331,8 @@ mod tests {
         let attention = DiffusionAttention::new(config);
 
         let query = vec![1.0f32; 8];
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32 * 0.1; 8])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32; 8])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32 * 0.1; 8]).collect();
+        let values: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32; 8]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();

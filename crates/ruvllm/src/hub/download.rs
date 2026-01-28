@@ -1,13 +1,13 @@
 //! Model download functionality with progress tracking and resume support
 
-use super::{HubError, Result, default_cache_dir, get_hf_token};
-use super::registry::ModelInfo;
 use super::progress::{ProgressBar, ProgressStyle};
+use super::registry::ModelInfo;
+use super::{default_cache_dir, get_hf_token, HubError, Result};
+use regex::Regex;
+use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use sha2::{Sha256, Digest};
-use regex::Regex;
 
 // ============================================================================
 // Security: URL and Input Validation (H-001)
@@ -37,9 +37,9 @@ fn validate_url(url: &str) -> Result<()> {
     let host = host.split(':').next().unwrap_or(host);
 
     // Check against allowlist
-    let is_allowed = ALLOWED_DOMAINS.iter().any(|&domain| {
-        host == domain || host.ends_with(&format!(".{}", domain))
-    });
+    let is_allowed = ALLOWED_DOMAINS
+        .iter()
+        .any(|&domain| host == domain || host.ends_with(&format!(".{}", domain)));
 
     if !is_allowed {
         return Err(HubError::InvalidFormat(format!(
@@ -86,9 +86,9 @@ fn validate_repo_id(repo_id: &str) -> Result<()> {
 /// Canonicalize and validate file path to prevent path traversal
 fn validate_and_canonicalize_path(path: &Path, base_dir: &Path) -> Result<PathBuf> {
     // Canonicalize both paths
-    let canonical_base = base_dir.canonicalize().map_err(|e| {
-        HubError::Config(format!("Failed to canonicalize base directory: {}", e))
-    })?;
+    let canonical_base = base_dir
+        .canonicalize()
+        .map_err(|e| HubError::Config(format!("Failed to canonicalize base directory: {}", e)))?;
 
     // Create parent directories if needed, then canonicalize
     if let Some(parent) = path.parent() {
@@ -97,16 +97,16 @@ fn validate_and_canonicalize_path(path: &Path, base_dir: &Path) -> Result<PathBu
 
     // For new files, canonicalize the parent and append filename
     let canonical_path = if path.exists() {
-        path.canonicalize().map_err(|e| {
-            HubError::Config(format!("Failed to canonicalize path: {}", e))
-        })?
+        path.canonicalize()
+            .map_err(|e| HubError::Config(format!("Failed to canonicalize path: {}", e)))?
     } else if let Some(parent) = path.parent() {
-        let canonical_parent = parent.canonicalize().map_err(|e| {
-            HubError::Config(format!("Failed to canonicalize parent path: {}", e))
-        })?;
-        canonical_parent.join(path.file_name().ok_or_else(|| {
-            HubError::InvalidFormat("Invalid file path".to_string())
-        })?)
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|e| HubError::Config(format!("Failed to canonicalize parent path: {}", e)))?;
+        canonical_parent.join(
+            path.file_name()
+                .ok_or_else(|| HubError::InvalidFormat("Invalid file path".to_string()))?,
+        )
     } else {
         return Err(HubError::InvalidFormat("Invalid file path".to_string()));
     };
@@ -279,11 +279,7 @@ impl ModelDownloader {
     }
 
     /// Download a model from ModelInfo
-    pub fn download(
-        &self,
-        model_info: &ModelInfo,
-        target_path: Option<&Path>,
-    ) -> Result<PathBuf> {
+    pub fn download(&self, model_info: &ModelInfo, target_path: Option<&Path>) -> Result<PathBuf> {
         // Determine target path
         let path = if let Some(p) = target_path {
             p.to_path_buf()
@@ -310,7 +306,12 @@ impl ModelDownloader {
         // SECURITY: Validate URL is from allowed domains
         validate_url(&url)?;
 
-        self.download_file(&url, &path, model_info.size_bytes, model_info.checksum.as_deref())?;
+        self.download_file(
+            &url,
+            &path,
+            model_info.size_bytes,
+            model_info.checksum.as_deref(),
+        )?;
 
         Ok(path)
     }
@@ -363,7 +364,7 @@ impl ModelDownloader {
         expected_checksum: Option<&str>,
     ) -> Result<()> {
         let mut args = vec![
-            "-L".to_string(),    // Follow redirects
+            "-L".to_string(),     // Follow redirects
             "-#".to_string(),     // Progress bar
             "--fail".to_string(), // Fail on HTTP errors
         ];
@@ -415,7 +416,7 @@ impl ModelDownloader {
         expected_checksum: Option<&str>,
     ) -> Result<()> {
         let mut args = vec![
-            "-q".to_string(),            // Quiet
+            "-q".to_string(),              // Quiet
             "--show-progress".to_string(), // But show progress
         ];
 

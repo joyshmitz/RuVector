@@ -4,10 +4,10 @@
 
 #![cfg(feature = "wasm")]
 
+use js_sys::{Array, Int16Array, Object, Reflect, Uint16Array, Uint8Array};
 use wasm_bindgen::prelude::*;
-use js_sys::{Array, Object, Reflect, Uint16Array, Uint8Array, Int16Array};
 
-use crate::artifact::{ModelArtifact, unpack_artifact};
+use crate::artifact::{unpack_artifact, ModelArtifact};
 use crate::backend::native_sim::{NativeSimBackend, NativeSimConfig};
 use crate::backend::TransformerBackend;
 use crate::gating::DefaultCoherenceGate;
@@ -53,7 +53,9 @@ impl WasmEngine {
         let artifact = unpack_artifact(artifact_bytes)
             .map_err(|e| JsValue::from_str(&format!("Failed to unpack artifact: {}", e)))?;
 
-        let model_id = self.backend.load(&artifact)
+        let model_id = self
+            .backend
+            .load(&artifact)
             .map_err(|e| JsValue::from_str(&format!("Failed to load model: {}", e)))?;
 
         self.loaded_models.push(model_id);
@@ -99,15 +101,17 @@ impl WasmEngine {
         }
 
         // Build gate hint
-        let compute_class = ComputeClass::from_u8(max_compute_class)
-            .unwrap_or(ComputeClass::Deliberative);
+        let compute_class =
+            ComputeClass::from_u8(max_compute_class).unwrap_or(ComputeClass::Deliberative);
         let gate_hint = GateHint::new(coherence_score_q, boundary_crossed, compute_class);
 
         // Create request
         let req = InferenceRequest::new(model, shape, tokens, mask, gate_hint);
 
         // Run inference
-        let result = self.backend.infer(req)
+        let result = self
+            .backend
+            .infer(req)
             .map_err(|e| JsValue::from_str(&format!("Inference failed: {}", e)))?;
 
         // Store witness
@@ -135,10 +139,26 @@ impl WasmEngine {
 
         // Add witness info
         let witness = Object::new();
-        Reflect::set(&witness, &"backend".into(), &format!("{:?}", result.witness.backend).into())?;
-        Reflect::set(&witness, &"cycles".into(), &JsValue::from(result.witness.cycles))?;
-        Reflect::set(&witness, &"latency_ns".into(), &JsValue::from(result.witness.latency_ns))?;
-        Reflect::set(&witness, &"gate_decision".into(), &format!("{:?}", result.witness.gate_decision).into())?;
+        Reflect::set(
+            &witness,
+            &"backend".into(),
+            &format!("{:?}", result.witness.backend).into(),
+        )?;
+        Reflect::set(
+            &witness,
+            &"cycles".into(),
+            &JsValue::from(result.witness.cycles),
+        )?;
+        Reflect::set(
+            &witness,
+            &"latency_ns".into(),
+            &JsValue::from(result.witness.latency_ns),
+        )?;
+        Reflect::set(
+            &witness,
+            &"gate_decision".into(),
+            &format!("{:?}", result.witness.gate_decision).into(),
+        )?;
         Reflect::set(&obj, &"witness".into(), &witness)?;
 
         Ok(obj.into())
@@ -179,7 +199,8 @@ impl WasmEngine {
         id_bytes.copy_from_slice(model_id);
         let model = ModelId::new(id_bytes);
 
-        self.backend.unload(model)
+        self.backend
+            .unload(model)
             .map_err(|e| JsValue::from_str(&format!("Unload failed: {}", e)))?;
 
         self.loaded_models.retain(|id| *id != model);
@@ -192,11 +213,31 @@ impl WasmEngine {
         let stats = self.backend.stats();
         let obj = Object::new();
 
-        Reflect::set(&obj, &"models_loaded".into(), &JsValue::from(stats.models_loaded as u32))?;
-        Reflect::set(&obj, &"total_inferences".into(), &JsValue::from(stats.total_inferences as f64))?;
-        Reflect::set(&obj, &"avg_latency_ns".into(), &JsValue::from(stats.avg_latency_ns as f64))?;
-        Reflect::set(&obj, &"early_exits".into(), &JsValue::from(stats.early_exits as f64))?;
-        Reflect::set(&obj, &"skipped".into(), &JsValue::from(stats.skipped as f64))?;
+        Reflect::set(
+            &obj,
+            &"models_loaded".into(),
+            &JsValue::from(stats.models_loaded as u32),
+        )?;
+        Reflect::set(
+            &obj,
+            &"total_inferences".into(),
+            &JsValue::from(stats.total_inferences as f64),
+        )?;
+        Reflect::set(
+            &obj,
+            &"avg_latency_ns".into(),
+            &JsValue::from(stats.avg_latency_ns as f64),
+        )?;
+        Reflect::set(
+            &obj,
+            &"early_exits".into(),
+            &JsValue::from(stats.early_exits as f64),
+        )?;
+        Reflect::set(
+            &obj,
+            &"skipped".into(),
+            &JsValue::from(stats.skipped as f64),
+        )?;
 
         Ok(obj.into())
     }
@@ -229,7 +270,8 @@ pub fn validate_artifact(artifact_bytes: &[u8]) -> Result<JsValue, JsValue> {
     let artifact = unpack_artifact(artifact_bytes)
         .map_err(|e| JsValue::from_str(&format!("Invalid artifact: {}", e)))?;
 
-    artifact.validate()
+    artifact
+        .validate()
         .map_err(|e| JsValue::from_str(&format!("Validation failed: {}", e)))?;
 
     let obj = Object::new();

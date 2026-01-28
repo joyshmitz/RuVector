@@ -1,8 +1,7 @@
 //! Graph database wrapper for ruvector-graph
 
 use exo_core::{
-    EntityId, HyperedgeId, HyperedgeResult, Relation, SheafConsistencyResult,
-    TopologicalQuery,
+    EntityId, HyperedgeId, HyperedgeResult, Relation, SheafConsistencyResult, TopologicalQuery,
 };
 use ruvector_graph::{GraphDB, Hyperedge, Node};
 use std::str::FromStr;
@@ -21,9 +20,7 @@ pub struct GraphWrapper {
 impl GraphWrapper {
     /// Create a new graph wrapper
     pub fn new() -> Self {
-        Self {
-            db: GraphDB::new(),
-        }
+        Self { db: GraphDB::new() }
     }
 
     /// Create a hyperedge spanning multiple entities
@@ -38,24 +35,17 @@ impl GraphWrapper {
             if self.db.get_node(&entity_id_str).is_none() {
                 // Create node if it doesn't exist
                 use ruvector_graph::types::{Label, Properties};
-                let node = Node::new(
-                    entity_id_str,
-                    vec![Label::new("Entity")],
-                    Properties::new()
-                );
-                self.db.create_node(node).map_err(|e| {
-                    ExoError::Backend(format!("Failed to create node: {}", e))
-                })?;
+                let node = Node::new(entity_id_str, vec![Label::new("Entity")], Properties::new());
+                self.db
+                    .create_node(node)
+                    .map_err(|e| ExoError::Backend(format!("Failed to create node: {}", e)))?;
             }
         }
 
         // Create hyperedge using ruvector-graph
         let entity_strs: Vec<String> = entities.iter().map(|e| e.0.to_string()).collect();
 
-        let mut hyperedge = Hyperedge::new(
-            entity_strs,
-            relation.relation_type.0.clone(),
-        );
+        let mut hyperedge = Hyperedge::new(entity_strs, relation.relation_type.0.clone());
 
         // Add properties if they're an object
         if let Some(obj) = relation.properties.as_object() {
@@ -67,14 +57,13 @@ impl GraphWrapper {
         }
 
         let hyperedge_id_str = hyperedge.id.clone();
-        
-        self.db.create_hyperedge(hyperedge).map_err(|e| {
-            ExoError::Backend(format!("Failed to create hyperedge: {}", e))
-        })?;
+
+        self.db
+            .create_hyperedge(hyperedge)
+            .map_err(|e| ExoError::Backend(format!("Failed to create hyperedge: {}", e)))?;
 
         // Convert string ID to HyperedgeId
-        let uuid = uuid::Uuid::from_str(&hyperedge_id_str)
-            .unwrap_or_else(|_| uuid::Uuid::new_v4());
+        let uuid = uuid::Uuid::from_str(&hyperedge_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4());
         Ok(HyperedgeId(uuid))
     }
 
@@ -123,7 +112,7 @@ impl GraphWrapper {
                 // Not supported on classical discrete backend
                 Ok(HyperedgeResult::SheafConsistency(
                     SheafConsistencyResult::Inconsistent(vec![
-                        "Sheaf consistency not supported on classical backend".to_string()
+                        "Sheaf consistency not supported on classical backend".to_string(),
                     ]),
                 ))
             }

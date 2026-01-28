@@ -44,7 +44,7 @@ mod config;
 mod error;
 mod tuner;
 
-pub use adjustment::{ThresholdAdjustment, AdjustmentReason};
-pub use config::{TunerConfig, ThresholdConfig, LearningLoopConfig};
+pub use adjustment::{AdjustmentReason, ThresholdAdjustment};
+pub use config::{LearningLoopConfig, ThresholdConfig, TunerConfig};
 pub use error::{SonaTuningError, SonaTuningResult};
-pub use tuner::{SonaThresholdTuner, TunerState, RegimeTracker};
+pub use tuner::{RegimeTracker, SonaThresholdTuner, TunerState};

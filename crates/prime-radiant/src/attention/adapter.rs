@@ -43,7 +43,8 @@ impl AttentionAdapter {
         for i in 0..n {
             for j in 0..n {
                 if i != j {
-                    similarity_matrix[i][j] = self.cosine_similarity(node_states[i], node_states[j]);
+                    similarity_matrix[i][j] =
+                        self.cosine_similarity(node_states[i], node_states[j]);
                 }
             }
         }
@@ -238,7 +239,9 @@ mod tests {
         let key_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let value_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
 
-        let output = adapter.compute_attention(&query, &key_refs, &value_refs).unwrap();
+        let output = adapter
+            .compute_attention(&query, &key_refs, &value_refs)
+            .unwrap();
 
         assert_eq!(output.len(), 16);
     }

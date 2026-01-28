@@ -10,16 +10,12 @@
 //!
 //! Target: Combined 10x speedup
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ruvector_mincut::graph::DynamicGraph;
 use ruvector_mincut::optimization::{
-    DegreePresparse, PresparseConfig,
-    PathDistanceCache, CacheConfig,
-    SimdDistanceOps, DistanceArray,
-    LevelPool, PoolConfig, LevelData,
-    ParallelLevelUpdater, ParallelConfig, LevelUpdateResult,
-    WasmBatchOps, BatchConfig,
-    BenchmarkSuite,
+    BatchConfig, BenchmarkSuite, CacheConfig, DegreePresparse, DistanceArray, LevelData, LevelPool,
+    LevelUpdateResult, ParallelConfig, ParallelLevelUpdater, PathDistanceCache, PoolConfig,
+    PresparseConfig, SimdDistanceOps, WasmBatchOps,
 };
 use std::collections::HashSet;
 
@@ -55,32 +51,24 @@ fn bench_dspar(c: &mut Criterion) {
     for size in [100, 1000, 5000].iter() {
         let graph = create_test_graph(*size, size * 5);
 
-        group.bench_with_input(
-            BenchmarkId::new("baseline", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    let edges: Vec<_> = graph.edges().collect();
-                    black_box(edges.len())
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("baseline", size), size, |b, _| {
+            b.iter(|| {
+                let edges: Vec<_> = graph.edges().collect();
+                black_box(edges.len())
+            })
+        });
 
         let mut dspar = DegreePresparse::with_config(PresparseConfig {
             target_sparsity: 0.1,
             ..Default::default()
         });
 
-        group.bench_with_input(
-            BenchmarkId::new("optimized", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    let result = dspar.presparse(&graph);
-                    black_box(result.edges.len())
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("optimized", size), size, |b, _| {
+            b.iter(|| {
+                let result = dspar.presparse(&graph);
+                black_box(result.edges.len())
+            })
+        });
     }
 
     group.finish();
@@ -146,34 +134,24 @@ fn bench_simd(c: &mut Criterion) {
         }
         arr.set((*size / 2) as u64, 0.1);
 
-        group.bench_with_input(
-            BenchmarkId::new("find_min_naive", size),
-            &arr,
-            |b, arr| {
-                b.iter(|| {
-                    let data = arr.as_slice();
-                    let mut min_val = f64::INFINITY;
-                    let mut min_idx = 0;
-                    for (i, &d) in data.iter().enumerate() {
-                        if d < min_val {
-                            min_val = d;
-                            min_idx = i;
-                        }
+        group.bench_with_input(BenchmarkId::new("find_min_naive", size), &arr, |b, arr| {
+            b.iter(|| {
+                let data = arr.as_slice();
+                let mut min_val = f64::INFINITY;
+                let mut min_idx = 0;
+                for (i, &d) in data.iter().enumerate() {
+                    if d < min_val {
+                        min_val = d;
+                        min_idx = i;
                     }
-                    black_box((min_val, min_idx))
-                })
-            },
-        );
+                }
+                black_box((min_val, min_idx))
+            })
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("find_min_simd", size),
-            &arr,
-            |b, arr| {
-                b.iter(|| {
-                    black_box(SimdDistanceOps::find_min(arr))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("find_min_simd", size), &arr, |b, arr| {
+            b.iter(|| black_box(SimdDistanceOps::find_min(arr)))
+        });
 
         let neighbors: Vec<_> = (0..(size / 10).min(100))
             .map(|i| ((i * 10) as u64, 1.0))
@@ -205,9 +183,7 @@ fn bench_simd(c: &mut Criterion) {
             size,
             |b, &size| {
                 let mut arr = DistanceArray::new(size);
-                b.iter(|| {
-                    black_box(SimdDistanceOps::relax_batch(&mut arr, 0.0, &neighbors))
-                })
+                b.iter(|| black_box(SimdDistanceOps::relax_batch(&mut arr, 0.0, &neighbors)))
             },
         );
     }
@@ -270,7 +246,8 @@ fn bench_parallel(c: &mut Criterion) {
             work_size,
             |b, &work_size| {
                 b.iter(|| {
-                    let _results: Vec<_> = levels.iter()
+                    let _results: Vec<_> = levels
+                        .iter()
                         .map(|&level| {
                             let mut sum = 0.0;
                             for i in 0..work_size {
@@ -346,17 +323,13 @@ fn bench_wasm_batch(c: &mut Criterion) {
             ..Default::default()
         });
 
-        group.bench_with_input(
-            BenchmarkId::new("batched_ops", size),
-            &edges,
-            |b, edges| {
-                b.iter(|| {
-                    batch.queue_insert_edges(edges.clone());
-                    let results = batch.execute_batch();
-                    black_box(results.len())
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("batched_ops", size), &edges, |b, edges| {
+            b.iter(|| {
+                batch.queue_insert_edges(edges.clone());
+                let results = batch.execute_batch();
+                black_box(results.len())
+            })
+        });
     }
 
     group.finish();

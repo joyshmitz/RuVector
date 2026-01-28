@@ -143,7 +143,10 @@ impl EnergySnapshot {
         let mut fingerprint = [0u8; 32];
         let hash_input = format!(
             "{}:{}:{}:{}",
-            total_energy, scope_energy, scope.as_str(), timestamp_ms
+            total_energy,
+            scope_energy,
+            scope.as_str(),
+            timestamp_ms
         );
         let hash = blake3::hash(hash_input.as_bytes());
         fingerprint.copy_from_slice(hash.as_bytes());
@@ -344,12 +347,7 @@ impl EnergyHistory {
     }
 
     /// Check if energy has been above threshold for the given duration.
-    pub fn is_above_threshold(
-        &self,
-        scope: &ScopeId,
-        threshold: f32,
-        duration: Duration,
-    ) -> bool {
+    pub fn is_above_threshold(&self, scope: &ScopeId, threshold: f32, duration: Duration) -> bool {
         let history = match self.histories.get(scope) {
             Some(h) => h,
             None => return false,
@@ -519,11 +517,9 @@ impl CoherenceGate {
         }
 
         // Check for persistent incoherence
-        let persistent = self.history.is_above_threshold(
-            scope,
-            self.thresholds.reflex,
-            self.persistence_window,
-        );
+        let persistent =
+            self.history
+                .is_above_threshold(scope, self.thresholds.reflex, self.persistence_window);
 
         let escalation = if persistent && lane < ComputeLane::Heavy {
             // Persistent incoherence requires at least Heavy lane

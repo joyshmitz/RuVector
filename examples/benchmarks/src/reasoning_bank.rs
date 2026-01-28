@@ -91,7 +91,14 @@ impl Trajectory {
         }
     }
 
-    pub fn record_attempt(&mut self, solution: String, confidence: f64, steps: usize, tool_calls: usize, strategy: &str) {
+    pub fn record_attempt(
+        &mut self,
+        solution: String,
+        confidence: f64,
+        steps: usize,
+        tool_calls: usize,
+        strategy: &str,
+    ) {
         self.attempts.push(SolutionAttempt {
             solution,
             confidence,
@@ -263,26 +270,41 @@ impl ReasoningBank {
     pub fn record_trajectory(&mut self, trajectory: Trajectory) {
         // Update strategy stats
         if let Some(attempt) = trajectory.attempts.first() {
-            let stats = self.strategy_stats
+            let stats = self
+                .strategy_stats
                 .entry(attempt.strategy.clone())
                 .or_default();
             stats.attempts += 1;
             stats.total_steps += attempt.steps;
             stats.total_latency_ms += trajectory.latency_ms;
 
-            if trajectory.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false) {
+            if trajectory
+                .verdict
+                .as_ref()
+                .map(|v| v.is_success())
+                .unwrap_or(false)
+            {
                 stats.successes += 1;
             }
         }
 
         // Update calibration
         if let Some(attempt) = trajectory.attempts.first() {
-            let correct = trajectory.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false);
+            let correct = trajectory
+                .verdict
+                .as_ref()
+                .map(|v| v.is_success())
+                .unwrap_or(false);
             self.calibration.record(attempt.confidence, correct);
         }
 
         // Learn patterns from successful trajectories
-        if trajectory.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false) {
+        if trajectory
+            .verdict
+            .as_ref()
+            .map(|v| v.is_success())
+            .unwrap_or(false)
+        {
             self.learn_from_success(&trajectory);
         }
 
@@ -307,11 +329,12 @@ impl ReasoningBank {
 
         for constraint_type in &trajectory.constraint_types {
             // Update constraint frequency
-            *self.constraint_frequency.entry(constraint_type.clone()).or_insert(0) += 1;
-
-            let patterns = self.patterns
+            *self
+                .constraint_frequency
                 .entry(constraint_type.clone())
-                .or_default();
+                .or_insert(0) += 1;
+
+            let patterns = self.patterns.entry(constraint_type.clone()).or_default();
 
             // Find or create pattern
             let pattern_idx = patterns.iter().position(|p| {
@@ -329,7 +352,8 @@ impl ReasoningBank {
                 p.observations += 1;
 
                 // Update pattern index for fast lookup
-                self.pattern_index.insert((constraint_type.clone(), trajectory.difficulty), idx);
+                self.pattern_index
+                    .insert((constraint_type.clone(), trajectory.difficulty), idx);
             } else {
                 // Create new pattern
                 let new_idx = patterns.len();
@@ -346,8 +370,11 @@ impl ReasoningBank {
                 });
 
                 // Index the new pattern
-                for d in trajectory.difficulty.saturating_sub(2)..=trajectory.difficulty.saturating_add(2) {
-                    self.pattern_index.insert((constraint_type.clone(), d), new_idx);
+                for d in trajectory.difficulty.saturating_sub(2)
+                    ..=trajectory.difficulty.saturating_add(2)
+                {
+                    self.pattern_index
+                        .insert((constraint_type.clone(), d), new_idx);
                 }
             }
         }
@@ -398,8 +425,11 @@ impl ReasoningBank {
         for ct in constraint_types {
             if let Some(patterns) = self.patterns.get(ct) {
                 // Find best pattern for this difficulty
-                let best = patterns.iter()
-                    .filter(|p| difficulty >= p.difficulty_range.0 && difficulty <= p.difficulty_range.1)
+                let best = patterns
+                    .iter()
+                    .filter(|p| {
+                        difficulty >= p.difficulty_range.0 && difficulty <= p.difficulty_range.1
+                    })
                     .max_by(|a, b| a.success_rate.partial_cmp(&b.success_rate).unwrap());
 
                 if let Some(pattern) = best {
@@ -411,7 +441,8 @@ impl ReasoningBank {
         }
 
         // Fall back to best strategy for difficulty
-        let strategy_name = self.best_strategies
+        let strategy_name = self
+            .best_strategies
             .get(&difficulty)
             .cloned()
             .unwrap_or_else(|| "default".to_string());
@@ -455,7 +486,9 @@ impl ReasoningBank {
                 for pattern in patterns.iter().filter(|p| p.observations >= 5) {
                     hints.push(format!(
                         "For {} constraints, {} strategy has {:.0}% success",
-                        ct, pattern.best_strategy, pattern.success_rate * 100.0
+                        ct,
+                        pattern.best_strategy,
+                        pattern.success_rate * 100.0
                     ));
                 }
             }
@@ -471,26 +504,30 @@ impl ReasoningBank {
             return LearningProgress::default();
         }
 
-        let successes = self.trajectories.iter()
+        let successes = self
+            .trajectories
+            .iter()
             .filter(|t| t.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false))
             .count();
 
         // Calculate improvement over time (compare first half vs second half)
         let half = total / 2;
-        let first_half_success = self.trajectories[..half].iter()
+        let first_half_success = self.trajectories[..half]
+            .iter()
             .filter(|t| t.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false))
-            .count() as f64 / half as f64;
+            .count() as f64
+            / half as f64;
 
-        let second_half_success = self.trajectories[half..].iter()
+        let second_half_success = self.trajectories[half..]
+            .iter()
             .filter(|t| t.verdict.as_ref().map(|v| v.is_success()).unwrap_or(false))
-            .count() as f64 / (total - half) as f64;
+            .count() as f64
+            / (total - half) as f64;
 
         let improvement = second_half_success - first_half_success;
 
         // Calculate pattern coverage
-        let unique_patterns: usize = self.patterns.values()
-            .map(|ps| ps.len())
-            .sum();
+        let unique_patterns: usize = self.patterns.values().map(|ps| ps.len()).sum();
 
         LearningProgress {
             total_trajectories: total,
@@ -526,13 +563,7 @@ mod tests {
         for i in 0..10 {
             let mut traj = Trajectory::new(&format!("puzzle_{}", i), 5);
             traj.constraint_types.push("RelativeDate".to_string());
-            traj.record_attempt(
-                "2024-01-15".to_string(),
-                0.8,
-                20,
-                5,
-                "adaptive",
-            );
+            traj.record_attempt("2024-01-15".to_string(), 0.8, 20, 5, "adaptive");
             traj.set_verdict(Verdict::Success, Some("2024-01-15".to_string()));
             traj.latency_ms = 100;
             bank.record_trajectory(traj);

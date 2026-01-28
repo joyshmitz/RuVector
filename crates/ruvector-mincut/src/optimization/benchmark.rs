@@ -10,13 +10,13 @@
 //!
 //! Target: Combined 10x speedup over naive implementation
 
-use crate::graph::DynamicGraph;
+use super::cache::{CacheConfig, PathDistanceCache};
 use super::dspar::{DegreePresparse, PresparseConfig};
-use super::cache::{PathDistanceCache, CacheConfig};
-use super::simd_distance::{SimdDistanceOps, DistanceArray};
-use super::pool::{LevelPool, PoolConfig, LevelData};
-use super::parallel::{ParallelLevelUpdater, ParallelConfig, LevelUpdateResult, WorkItem};
-use super::wasm_batch::{WasmBatchOps, BatchConfig};
+use super::parallel::{LevelUpdateResult, ParallelConfig, ParallelLevelUpdater, WorkItem};
+use super::pool::{LevelData, LevelPool, PoolConfig};
+use super::simd_distance::{DistanceArray, SimdDistanceOps};
+use super::wasm_batch::{BatchConfig, WasmBatchOps};
+use crate::graph::DynamicGraph;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
@@ -220,7 +220,10 @@ impl BenchmarkSuite {
             // Get sparsification stats
             let sparse_result = dspar.presparse(&graph);
             result.add_metric("sparsity_ratio", sparse_result.stats.sparsity_ratio);
-            result.add_metric("edges_reduced", (sparse_result.stats.original_edges - sparse_result.stats.sparse_edges) as f64);
+            result.add_metric(
+                "edges_reduced",
+                (sparse_result.stats.original_edges - sparse_result.stats.sparse_edges) as f64,
+            );
 
             results.push(result);
         }
@@ -323,7 +326,7 @@ impl BenchmarkSuite {
                 &format!("SIMD find_min n={}", size),
                 baseline_us,
                 opt_us.max(1), // Avoid divide by zero
-                2.0, // Target speedup
+                2.0,           // Target speedup
             );
 
             results.push(result);
@@ -408,15 +411,11 @@ impl BenchmarkSuite {
 
             let stats = pool.stats();
 
-            let mut result = BenchmarkResult::new(
-                &format!("Pool n={}", size),
-                baseline_us,
-                opt_us.max(1),
-                2.0,
-            );
+            let mut result =
+                BenchmarkResult::new(&format!("Pool n={}", size), baseline_us, opt_us.max(1), 2.0);
 
             result = result.with_memory(
-                baseline_memory * 10, // Baseline: all levels materialized
+                baseline_memory * 10,  // Baseline: all levels materialized
                 stats.pool_size_bytes, // Optimized: only max_materialized
             );
 
@@ -439,7 +438,8 @@ impl BenchmarkSuite {
             // Baseline: sequential processing
             let baseline_start = Instant::now();
             for _ in 0..self.iterations {
-                let _results: Vec<_> = levels.iter()
+                let _results: Vec<_> = levels
+                    .iter()
                     .map(|&level| {
                         // Simulate work
                         let mut sum = 0.0;
@@ -498,9 +498,7 @@ impl BenchmarkSuite {
         let mut results = Vec::new();
 
         for &size in &self.sizes {
-            let edges: Vec<_> = (0..size)
-                .map(|i| (i as u64, (i + 1) as u64, 1.0))
-                .collect();
+            let edges: Vec<_> = (0..size).map(|i| (i as u64, (i + 1) as u64, 1.0)).collect();
 
             // Baseline: individual operations
             let baseline_start = Instant::now();
@@ -556,24 +554,38 @@ impl BenchmarkSuite {
 
         for opt in &self.results {
             report.push_str(&format!("## {} Optimization\n", opt.name));
-            report.push_str(&format!("   Average Speedup: {:.2}x\n", opt.summary.avg_speedup));
-            report.push_str(&format!("   Min/Max: {:.2}x / {:.2}x\n",
-                opt.summary.min_speedup, opt.summary.max_speedup));
-            report.push_str(&format!("   Targets Achieved: {:.0}%\n",
-                opt.summary.targets_achieved_percent));
+            report.push_str(&format!(
+                "   Average Speedup: {:.2}x\n",
+                opt.summary.avg_speedup
+            ));
+            report.push_str(&format!(
+                "   Min/Max: {:.2}x / {:.2}x\n",
+                opt.summary.min_speedup, opt.summary.max_speedup
+            ));
+            report.push_str(&format!(
+                "   Targets Achieved: {:.0}%\n",
+                opt.summary.targets_achieved_percent
+            ));
 
             if opt.summary.avg_memory_reduction > 0.0 {
-                report.push_str(&format!("   Memory Reduction: {:.1}%\n",
-                    opt.summary.avg_memory_reduction));
+                report.push_str(&format!(
+                    "   Memory Reduction: {:.1}%\n",
+                    opt.summary.avg_memory_reduction
+                ));
             }
 
             report.push_str("\n   Details:\n");
             for result in &opt.results {
-                report.push_str(&format!("   - {}: {:.2}x (target: {:.2}x) {}\n",
+                report.push_str(&format!(
+                    "   - {}: {:.2}x (target: {:.2}x) {}\n",
                     result.name,
                     result.speedup,
                     result.target_speedup,
-                    if result.target_achieved { "[OK]" } else { "[MISS]" }
+                    if result.target_achieved {
+                        "[OK]"
+                    } else {
+                        "[MISS]"
+                    }
                 ));
             }
             report.push_str("\n");
@@ -582,8 +594,13 @@ impl BenchmarkSuite {
         let combined = self.combined_speedup();
         report.push_str(&format!("## Combined Speedup Estimate: {:.2}x\n", combined));
         report.push_str(&format!("   Target: 10x\n"));
-        report.push_str(&format!("   Status: {}\n",
-            if combined >= 10.0 { "TARGET ACHIEVED" } else { "In Progress" }
+        report.push_str(&format!(
+            "   Status: {}\n",
+            if combined >= 10.0 {
+                "TARGET ACHIEVED"
+            } else {
+                "In Progress"
+            }
         ));
 
         report
@@ -635,7 +652,8 @@ fn compute_summary(name: &str, results: Vec<BenchmarkResult>) -> OptimizationBen
 
     let speedups: Vec<f64> = results.iter().map(|r| r.speedup).collect();
     let achieved: Vec<bool> = results.iter().map(|r| r.target_achieved).collect();
-    let memory_reductions: Vec<f64> = results.iter()
+    let memory_reductions: Vec<f64> = results
+        .iter()
         .filter(|r| r.baseline_memory > 0)
         .map(|r| r.memory_reduction_percent)
         .collect();
@@ -679,8 +697,7 @@ mod tests {
 
     #[test]
     fn test_benchmark_result_memory() {
-        let result = BenchmarkResult::new("test", 100, 50, 1.0)
-            .with_memory(1000, 250);
+        let result = BenchmarkResult::new("test", 100, 50, 1.0).with_memory(1000, 250);
 
         assert_eq!(result.memory_reduction_percent, 75.0);
     }
@@ -715,8 +732,11 @@ mod tests {
 
         // For very small inputs, overhead may exceed benefit
         // Just verify we get a valid positive result
-        assert!(combined > 0.0 && combined.is_finite(),
-            "Combined speedup {} should be positive and finite", combined);
+        assert!(
+            combined > 0.0 && combined.is_finite(),
+            "Combined speedup {} should be positive and finite",
+            combined
+        );
     }
 
     #[test]

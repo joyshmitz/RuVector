@@ -17,9 +17,9 @@
 //! - Histogram CDF for ultra-fast comparisons
 //! - SIMD-friendly kernels throughout
 
+use super::cached_projections::{ProjectionCache, WindowCache};
 use crate::error::{AttentionError, AttentionResult};
 use crate::traits::Attention;
-use super::cached_projections::{ProjectionCache, WindowCache};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for Sliced Wasserstein Attention
@@ -81,11 +81,8 @@ pub struct SlicedWassersteinAttention {
 impl SlicedWassersteinAttention {
     /// Create new Sliced Wasserstein attention
     pub fn new(config: SlicedWassersteinConfig) -> Self {
-        let projection_cache = ProjectionCache::new(
-            config.dim,
-            config.num_projections,
-            config.seed,
-        );
+        let projection_cache =
+            ProjectionCache::new(config.dim, config.num_projections, config.seed);
 
         Self {
             config,
@@ -159,7 +156,8 @@ impl SlicedWassersteinAttention {
             .enumerate()
             .map(|(i, k)| (i, Self::dot_product_simd(query, k)))
             .collect();
-        dot_scores.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        dot_scores
+            .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let candidate_indices: Vec<usize> = dot_scores
             .iter()
@@ -188,10 +186,7 @@ impl SlicedWassersteinAttention {
         let weights = Self::stable_softmax(&logits);
 
         // Weighted sum using only candidate values
-        let candidate_values: Vec<&[f32]> = candidate_indices
-            .iter()
-            .map(|&i| values[i])
-            .collect();
+        let candidate_values: Vec<&[f32]> = candidate_indices.iter().map(|&i| values[i]).collect();
 
         self.weighted_sum(&weights, &candidate_values)
     }
@@ -393,12 +388,8 @@ mod tests {
         let attention = SlicedWassersteinAttention::with_dim(32);
 
         let query = vec![1.0f32; 32];
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![0.5 + i as f32 * 0.1; 32])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![0.5 + i as f32 * 0.1; 32]).collect();
+        let values: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32; 32]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -411,12 +402,8 @@ mod tests {
     fn test_window_cache_reuse() {
         let attention = SlicedWassersteinAttention::with_dim(64);
 
-        let keys: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32 * 0.05; 64])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32; 64])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32 * 0.05; 64]).collect();
+        let values: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32; 64]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -427,7 +414,9 @@ mod tests {
         // Reuse for multiple queries
         for _ in 0..5 {
             let query = vec![0.5f32; 64];
-            let output = attention.compute_with_cache(&query, &cache, &values_refs).unwrap();
+            let output = attention
+                .compute_with_cache(&query, &cache, &values_refs)
+                .unwrap();
             assert_eq!(output.len(), 64);
         }
     }
@@ -442,12 +431,8 @@ mod tests {
         let attention = SlicedWassersteinAttention::new(config);
 
         let query = vec![1.0f32; 32];
-        let keys: Vec<Vec<f32>> = (0..50)
-            .map(|i| vec![0.5 + i as f32 * 0.02; 32])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..50)
-            .map(|i| vec![i as f32; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..50).map(|i| vec![0.5 + i as f32 * 0.02; 32]).collect();
+        let values: Vec<Vec<f32>> = (0..50).map(|i| vec![i as f32; 32]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();

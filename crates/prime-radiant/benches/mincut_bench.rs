@@ -193,7 +193,12 @@ impl DynamicGraph {
         GraphStats {
             vertices: self.vertex_count,
             edges: self.edge_count,
-            max_degree: self.adjacency.values().map(|adj| adj.len()).max().unwrap_or(0),
+            max_degree: self
+                .adjacency
+                .values()
+                .map(|adj| adj.len())
+                .max()
+                .unwrap_or(0),
             avg_degree: if self.vertex_count > 0 {
                 (self.edge_count * 2) as f64 / self.vertex_count as f64
             } else {
@@ -316,7 +321,11 @@ impl SubpolynomialMinCut {
         } else {
             // Multiple components - use first vs rest
             let left = components[0].clone();
-            let right: HashSet<_> = components[1..].iter().flat_map(|c| c.iter()).copied().collect();
+            let right: HashSet<_> = components[1..]
+                .iter()
+                .flat_map(|c| c.iter())
+                .copied()
+                .collect();
             (left, right)
         }
     }
@@ -375,18 +384,14 @@ fn bench_insert_edge(c: &mut Criterion) {
             mincut.insert_edge(*u, *v, *w);
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("insert_single", size),
-            &size,
-            |b, &n| {
-                let mut i = edges.len() / 2;
-                b.iter(|| {
-                    let (u, v, w) = edges[i % edges.len()];
-                    black_box(mincut.insert_edge(u + n as u64, v + n as u64, w));
-                    i += 1;
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("insert_single", size), &size, |b, &n| {
+            let mut i = edges.len() / 2;
+            b.iter(|| {
+                let (u, v, w) = edges[i % edges.len()];
+                black_box(mincut.insert_edge(u + n as u64, v + n as u64, w));
+                i += 1;
+            })
+        });
     }
 
     group.finish();
@@ -520,45 +525,41 @@ fn bench_mixed_workload(c: &mut Criterion) {
     for size in [100, 1000, 10000] {
         let edges = generate_random_graph(size, size * 2, 42);
 
-        group.bench_with_input(
-            BenchmarkId::new("mixed_ops", size),
-            &size,
-            |b, &n| {
-                b.iter_batched(
-                    || {
-                        let mut mincut = SubpolynomialMinCut::with_capacity(n, n * 3);
-                        for (u, v, w) in &edges {
-                            mincut.insert_edge(*u, *v, *w);
-                        }
-                        (mincut, 0usize)
-                    },
-                    |(mut mincut, mut op_idx)| {
-                        // 50% insert, 30% delete, 20% query
-                        match op_idx % 10 {
-                            0..=4 => {
-                                let u = (op_idx * 37) as u64 % n as u64;
-                                let v = (op_idx * 73 + 1) as u64 % n as u64;
-                                if u != v {
-                                    mincut.insert_edge(u + n as u64, v + n as u64, 1.0);
-                                }
-                            }
-                            5..=7 => {
-                                if !edges.is_empty() {
-                                    let (u, v, _) = edges[op_idx % edges.len()];
-                                    mincut.delete_edge(u, v);
-                                }
-                            }
-                            _ => {
-                                let _ = mincut.min_cut();
+        group.bench_with_input(BenchmarkId::new("mixed_ops", size), &size, |b, &n| {
+            b.iter_batched(
+                || {
+                    let mut mincut = SubpolynomialMinCut::with_capacity(n, n * 3);
+                    for (u, v, w) in &edges {
+                        mincut.insert_edge(*u, *v, *w);
+                    }
+                    (mincut, 0usize)
+                },
+                |(mut mincut, mut op_idx)| {
+                    // 50% insert, 30% delete, 20% query
+                    match op_idx % 10 {
+                        0..=4 => {
+                            let u = (op_idx * 37) as u64 % n as u64;
+                            let v = (op_idx * 73 + 1) as u64 % n as u64;
+                            if u != v {
+                                mincut.insert_edge(u + n as u64, v + n as u64, 1.0);
                             }
                         }
-                        op_idx += 1;
-                        black_box(op_idx)
-                    },
-                    criterion::BatchSize::SmallInput,
-                )
-            },
-        );
+                        5..=7 => {
+                            if !edges.is_empty() {
+                                let (u, v, _) = edges[op_idx % edges.len()];
+                                mincut.delete_edge(u, v);
+                            }
+                        }
+                        _ => {
+                            let _ = mincut.min_cut();
+                        }
+                    }
+                    op_idx += 1;
+                    black_box(op_idx)
+                },
+                criterion::BatchSize::SmallInput,
+            )
+        });
     }
 
     group.finish();

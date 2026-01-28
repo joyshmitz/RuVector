@@ -11,10 +11,7 @@ pub struct ManifoldDeformer {
 }
 
 impl ManifoldDeformer {
-    pub fn new(
-        network: Arc<RwLock<LearnedManifold>>,
-        learning_rate: f32,
-    ) -> Self {
+    pub fn new(network: Arc<RwLock<LearnedManifold>>, learning_rate: f32) -> Self {
         Self {
             _network: network,
             _learning_rate: learning_rate,

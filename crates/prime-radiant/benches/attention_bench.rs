@@ -6,9 +6,7 @@ fn attention_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("attention");
 
     // Placeholder benchmark - requires attention feature
-    group.bench_function("placeholder", |b| {
-        b.iter(|| black_box(42))
-    });
+    group.bench_function("placeholder", |b| b.iter(|| black_box(42)));
 
     group.finish();
 }

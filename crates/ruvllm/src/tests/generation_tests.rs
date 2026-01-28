@@ -4,12 +4,11 @@
 //! streaming callbacks, KV cache integration, and speculative decoding.
 
 use crate::speculative::{
-    softmax, log_softmax, top_k_filter, top_p_filter, sample_from_probs,
-    SpeculativeConfig, SpeculativeStats, AtomicSpeculativeStats,
-    TreeNode, SpeculationTree, VerificationResult,
+    log_softmax, sample_from_probs, softmax, top_k_filter, top_p_filter, AtomicSpeculativeStats,
+    SpeculationTree, SpeculativeConfig, SpeculativeStats, TreeNode, VerificationResult,
 };
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::time::Duration;
 
 // ============================================================================
@@ -23,14 +22,24 @@ fn test_softmax_produces_valid_distribution() {
 
     // Sum should be 1.0
     let sum: f32 = probs.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-5, "Softmax sum should be 1.0, got {}", sum);
+    assert!(
+        (sum - 1.0).abs() < 1e-5,
+        "Softmax sum should be 1.0, got {}",
+        sum
+    );
 
     // All probabilities should be positive
-    assert!(probs.iter().all(|&p| p > 0.0), "All probabilities should be positive");
+    assert!(
+        probs.iter().all(|&p| p > 0.0),
+        "All probabilities should be positive"
+    );
 
     // Ordering should be preserved
     for i in 0..probs.len() - 1 {
-        assert!(probs[i] < probs[i + 1], "Higher logits should have higher probs");
+        assert!(
+            probs[i] < probs[i + 1],
+            "Higher logits should have higher probs"
+        );
     }
 }
 
@@ -41,8 +50,15 @@ fn test_softmax_handles_large_logits() {
     let probs = softmax(&logits);
 
     let sum: f32 = probs.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-4, "Should handle large logits: sum = {}", sum);
-    assert!(probs.iter().all(|p| p.is_finite()), "All probs should be finite");
+    assert!(
+        (sum - 1.0).abs() < 1e-4,
+        "Should handle large logits: sum = {}",
+        sum
+    );
+    assert!(
+        probs.iter().all(|p| p.is_finite()),
+        "All probs should be finite"
+    );
 }
 
 #[test]
@@ -67,7 +83,10 @@ fn test_softmax_single_element() {
     let logits = vec![5.0];
     let probs = softmax(&logits);
     assert_eq!(probs.len(), 1);
-    assert!((probs[0] - 1.0).abs() < 1e-5, "Single element should have prob 1.0");
+    assert!(
+        (probs[0] - 1.0).abs() < 1e-5,
+        "Single element should have prob 1.0"
+    );
 }
 
 #[test]
@@ -79,7 +98,10 @@ fn test_log_softmax_relationship() {
     // log_softmax should equal log(softmax)
     for (lp, p) in log_probs.iter().zip(probs.iter()) {
         let expected = p.ln();
-        assert!((lp - expected).abs() < 1e-4, "log_softmax should match log(softmax)");
+        assert!(
+            (lp - expected).abs() < 1e-4,
+            "log_softmax should match log(softmax)"
+        );
     }
 }
 
@@ -89,7 +111,10 @@ fn test_log_softmax_numerical_stability() {
     let logits = vec![-1000.0, -999.0, -998.0];
     let log_probs = log_softmax(&logits);
 
-    assert!(log_probs.iter().all(|p| p.is_finite()), "log_softmax should handle extreme values");
+    assert!(
+        log_probs.iter().all(|p| p.is_finite()),
+        "log_softmax should handle extreme values"
+    );
     // Check that relative ordering is preserved
     assert!(log_probs[0] < log_probs[1] && log_probs[1] < log_probs[2]);
 }
@@ -212,7 +237,9 @@ fn test_sample_from_probs_uniform() {
         assert!(
             (0.8..=1.2).contains(&ratio),
             "Index {} should be sampled uniformly, got {} (expected ~{})",
-            i, count, expected
+            i,
+            count,
+            expected
         );
     }
 }
@@ -245,7 +272,10 @@ fn test_temperature_scaling_sharpens() {
     let probs = softmax(&scaled);
 
     // Highest logit should have much higher probability
-    assert!(probs[3] > 0.99, "Low temperature should concentrate probability on max");
+    assert!(
+        probs[3] > 0.99,
+        "Low temperature should concentrate probability on max"
+    );
 }
 
 #[test]
@@ -260,7 +290,10 @@ fn test_temperature_scaling_flattens() {
     let min_prob = probs.iter().cloned().fold(f32::INFINITY, f32::min);
     let max_prob = probs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
 
-    assert!(max_prob - min_prob < 0.2, "High temperature should flatten distribution");
+    assert!(
+        max_prob - min_prob < 0.2,
+        "High temperature should flatten distribution"
+    );
 }
 
 #[test]
@@ -273,7 +306,10 @@ fn test_temperature_one_unchanged() {
     let probs2 = softmax(&scaled);
 
     for (p1, p2) in probs1.iter().zip(probs2.iter()) {
-        assert!((p1 - p2).abs() < 1e-6, "Temperature 1.0 should not change distribution");
+        assert!(
+            (p1 - p2).abs() < 1e-6,
+            "Temperature 1.0 should not change distribution"
+        );
     }
 }
 
@@ -358,7 +394,10 @@ fn test_speculative_stats_multiple_rounds() {
     assert!((stats.acceptance_rate - 0.75).abs() < 0.01); // 6/8 = 0.75
     assert_eq!(stats.main_forward_passes, 2);
     // Total tokens depends on implementation - just check it's reasonable
-    assert!(stats.total_tokens_generated >= 6, "Should generate at least accepted tokens");
+    assert!(
+        stats.total_tokens_generated >= 6,
+        "Should generate at least accepted tokens"
+    );
 }
 
 #[test]
@@ -381,7 +420,10 @@ fn test_speculative_stats_speedup_calculation() {
     stats.record_round(4, 4, 10.0);
 
     // 10 total tokens, 2 main passes -> 5 tokens/pass
-    assert!(stats.speedup > 4.0, "Speedup should reflect tokens per main pass");
+    assert!(
+        stats.speedup > 4.0,
+        "Speedup should reflect tokens per main pass"
+    );
 }
 
 // ============================================================================
@@ -626,8 +668,15 @@ fn test_full_sampling_pipeline() {
 
     // Verify softmax produces valid distribution
     let sum: f32 = probs.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-4, "Softmax should sum to 1.0, got {}", sum);
-    assert!(probs.iter().all(|&p| p > 0.0), "All probabilities should be positive");
+    assert!(
+        (sum - 1.0).abs() < 1e-4,
+        "Softmax should sum to 1.0, got {}",
+        sum
+    );
+    assert!(
+        probs.iter().all(|&p| p > 0.0),
+        "All probabilities should be positive"
+    );
 
     // Sample with fixed RNG
     let mut rng = StdRng::seed_from_u64(42);
@@ -648,7 +697,9 @@ fn test_full_sampling_pipeline() {
     // should be sampled more often than index 0 (lowest logit)
     assert!(
         samples[4] > samples[0],
-        "Higher logit should be sampled more: idx4={}, idx0={}", samples[4], samples[0]
+        "Higher logit should be sampled more: idx4={}, idx0={}",
+        samples[4],
+        samples[0]
     );
 }
 
@@ -680,7 +731,11 @@ fn test_beam_search_simulation() {
 
     let top_indices: Vec<usize> = indexed.iter().take(beam_width).map(|(i, _)| *i).collect();
 
-    assert_eq!(top_indices, vec![1, 3, 2], "Top-3 should be indices 1, 3, 2");
+    assert_eq!(
+        top_indices,
+        vec![1, 3, 2],
+        "Top-3 should be indices 1, 3, 2"
+    );
 }
 
 // ============================================================================
@@ -693,7 +748,10 @@ fn test_softmax_with_inf() {
     let probs = softmax(&logits);
 
     // First element should have probability ~0
-    assert!(probs[0] < 1e-10 || probs[0].abs() < 1e-10, "NEG_INFINITY should give ~0 probability");
+    assert!(
+        probs[0] < 1e-10 || probs[0].abs() < 1e-10,
+        "NEG_INFINITY should give ~0 probability"
+    );
 
     // Sum should still be ~1
     let sum: f32 = probs.iter().sum();
@@ -720,5 +778,8 @@ fn test_top_k_with_ties() {
 
     // All three 5.0s should remain
     let finite_count = logits.iter().filter(|x| x.is_finite()).count();
-    assert!(finite_count >= 3, "Should keep at least k elements when ties exist");
+    assert!(
+        finite_count >= 3,
+        "Should keep at least k elements when ties exist"
+    );
 }

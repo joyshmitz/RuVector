@@ -348,14 +348,15 @@ impl PrefetchCoordinator {
     }
 
     /// Predict and queue prefetches
-    pub fn predict_and_queue(
-        &self,
-        current_page: u64,
-        context: &[f32],
-        n: usize,
-    ) -> Vec<u64> {
+    pub fn predict_and_queue(&self, current_page: u64, context: &[f32], n: usize) -> Vec<u64> {
         // Get predictions from both models
-        let history: Vec<_> = self.access_history.read().unwrap().iter().copied().collect();
+        let history: Vec<_> = self
+            .access_history
+            .read()
+            .unwrap()
+            .iter()
+            .copied()
+            .collect();
         let features = AccessFeatures::from_history(&history, context);
 
         let ml_predictions = self.predictor.predict(&features, n);

@@ -1,5 +1,5 @@
 // Neural Field Benchmark - Memory-mapped operations performance
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use demand_paged_cognition::*;
 use tempfile::NamedTempFile;
 
@@ -7,9 +7,10 @@ fn bench_hash_address(c: &mut Criterion) {
     let temp = NamedTempFile::new().unwrap();
     let field = MmapNeuralField::new(
         temp.path(),
-        1024 * 1024 * 1024, // 1 GB
+        1024 * 1024 * 1024,    // 1 GB
         Some(4 * 1024 * 1024), // 4 MB pages
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut group = c.benchmark_group("hash_address");
 
@@ -17,9 +18,7 @@ fn bench_hash_address(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let concept = vec![0.1f32; size];
-            b.iter(|| {
-                field.hash_address(black_box(&concept))
-            });
+            b.iter(|| field.hash_address(black_box(&concept)));
         });
     }
     group.finish();
@@ -31,7 +30,8 @@ fn bench_read_write(c: &mut Criterion) {
         temp.path(),
         1024 * 1024 * 1024, // 1 GB
         Some(4 * 1024 * 1024),
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut group = c.benchmark_group("read_write");
 
@@ -41,17 +41,13 @@ fn bench_read_write(c: &mut Criterion) {
         // Write benchmark
         group.bench_with_input(BenchmarkId::new("write", size), size, |b, &size| {
             let data = vec![1.0f32; size];
-            b.iter(|| {
-                field.write(black_box(0), black_box(&data)).unwrap()
-            });
+            b.iter(|| field.write(black_box(0), black_box(&data)).unwrap());
         });
 
         // Read benchmark
         field.write(0, &vec![1.0f32; *size]).unwrap();
         group.bench_with_input(BenchmarkId::new("read", size), size, |b, &size| {
-            b.iter(|| {
-                field.read(black_box(0), black_box(size)).unwrap()
-            });
+            b.iter(|| field.read(black_box(0), black_box(size)).unwrap());
         });
     }
     group.finish();
@@ -86,9 +82,7 @@ fn bench_lazy_layer_forward(c: &mut Criterion) {
             &(*input_dim, *output_dim),
             |b, &(input_dim, _)| {
                 let input = vec![1.0f32; input_dim];
-                b.iter(|| {
-                    layer.forward(black_box(&input)).unwrap()
-                });
+                b.iter(|| layer.forward(black_box(&input)).unwrap());
             },
         );
     }
@@ -107,9 +101,7 @@ fn bench_tiered_memory(c: &mut Criterion) {
                 memory.insert(page).unwrap();
                 memory
             },
-            |mut memory| {
-                memory.promote(1, Tier::L1Dram, "bench").unwrap()
-            },
+            |mut memory| memory.promote(1, Tier::L1Dram, "bench").unwrap(),
         );
     });
 
@@ -122,9 +114,7 @@ fn bench_tiered_memory(c: &mut Criterion) {
                 memory.insert(page).unwrap();
                 memory
             },
-            |mut memory| {
-                memory.load(1).unwrap()
-            },
+            |mut memory| memory.load(1).unwrap(),
         );
     });
 
@@ -146,9 +136,7 @@ fn bench_prefetch_prediction(c: &mut Criterion) {
         }
 
         let features = AccessFeatures::new(5);
-        b.iter(|| {
-            predictor.predict(black_box(&features), black_box(10))
-        });
+        b.iter(|| predictor.predict(black_box(&features), black_box(10)));
     });
 
     // Markov prediction
@@ -162,9 +150,7 @@ fn bench_prefetch_prediction(c: &mut Criterion) {
             predictor.update(3, 1);
         }
 
-        b.iter(|| {
-            predictor.predict(black_box(1), black_box(10))
-        });
+        b.iter(|| predictor.predict(black_box(1), black_box(10)));
     });
 
     // Coordinator
@@ -177,9 +163,7 @@ fn bench_prefetch_prediction(c: &mut Criterion) {
             coordinator.record_access(i, &context);
         }
 
-        b.iter(|| {
-            coordinator.predict_and_queue(black_box(50), black_box(&context), black_box(5))
-        });
+        b.iter(|| coordinator.predict_and_queue(black_box(50), black_box(&context), black_box(5)));
     });
 
     group.finish();

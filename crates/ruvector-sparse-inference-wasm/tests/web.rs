@@ -1,7 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
-use wasm_bindgen_test::*;
 use ruvector_sparse_inference_wasm::*;
+use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -145,7 +145,9 @@ fn test_measure_inference_time() {
 #[wasm_bindgen_test]
 async fn test_load_streaming_with_bad_url() {
     let config = r#"{"sparsity": {"enabled": true}}"#;
-    let result = SparseInferenceEngine::load_streaming("https://invalid.example.com/model.gguf", config).await;
+    let result =
+        SparseInferenceEngine::load_streaming("https://invalid.example.com/model.gguf", config)
+            .await;
 
     // Should fail gracefully
     assert!(result.is_err());

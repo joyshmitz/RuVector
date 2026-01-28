@@ -42,7 +42,7 @@ pub struct CoherenceConfig {
 impl Default for CoherenceConfig {
     fn default() -> Self {
         Self {
-            min_coherence: -256, // -1.0 in Q8.8, very permissive
+            min_coherence: -256,       // -1.0 in Q8.8, very permissive
             early_exit_threshold: 512, // 2.0 in Q8.8
             early_exit_enabled: true,
             min_layers: 2,
@@ -241,7 +241,10 @@ mod tests {
 
         // Low coherence should fail
         let hint = GateHint::new(-512, false, ComputeClass::Deliberative);
-        assert!(matches!(gate.preflight(&hint), GateDecision::Skipped { .. }));
+        assert!(matches!(
+            gate.preflight(&hint),
+            GateDecision::Skipped { .. }
+        ));
     }
 
     #[test]
@@ -253,7 +256,10 @@ mod tests {
 
         // Layer 4 with high signal - should exit
         let decision = gate.checkpoint(4, 1000);
-        assert!(matches!(decision, Some(GateDecision::EarlyExit { layer: 4 })));
+        assert!(matches!(
+            decision,
+            Some(GateDecision::EarlyExit { layer: 4 })
+        ));
     }
 
     #[test]
@@ -278,7 +284,10 @@ mod tests {
 
         // Strict should require positive coherence
         let hint = GateHint::new(-1, false, ComputeClass::Deliberative);
-        assert!(matches!(gate.preflight(&hint), GateDecision::Skipped { .. }));
+        assert!(matches!(
+            gate.preflight(&hint),
+            GateDecision::Skipped { .. }
+        ));
     }
 
     #[test]

@@ -45,7 +45,11 @@ impl fmt::Display for IndexError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DimensionMismatch { expected, actual } => {
-                write!(f, "Dimension mismatch: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "Dimension mismatch: expected {}, got {}",
+                    expected, actual
+                )
             }
             Self::DuplicateId(id) => write!(f, "Duplicate ID: {}", id),
             Self::NotFound(id) => write!(f, "ID not found: {}", id),

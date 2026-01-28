@@ -136,7 +136,7 @@ impl AneCapabilities {
             // M4 Pro ANE specs
             Self {
                 available: true,
-                tops: 38.0, // M4 Pro: 38 TOPS
+                tops: 38.0,              // M4 Pro: 38 TOPS
                 max_model_size_mb: 2048, // ~2GB models work well on ANE
                 supported_ops: vec![
                     "MatMul".to_string(),
@@ -267,7 +267,15 @@ pub mod coreml_native {
         }
 
         /// Extract model description and feature names from MLModel
-        fn extract_model_info(model: &MLModel) -> (String, Vec<String>, Vec<String>, Option<usize>, Option<usize>) {
+        fn extract_model_info(
+            model: &MLModel,
+        ) -> (
+            String,
+            Vec<String>,
+            Vec<String>,
+            Option<usize>,
+            Option<usize>,
+        ) {
             unsafe {
                 let desc = model.modelDescription();
                 let input_desc = desc.inputDescriptionsByName();
@@ -277,8 +285,11 @@ pub mod coreml_native {
                 let output_count = output_desc.count();
 
                 // Extract input names
-                let input_names: Vec<String> =
-                    input_desc.allKeys().iter().map(|key| key.to_string()).collect();
+                let input_names: Vec<String> = input_desc
+                    .allKeys()
+                    .iter()
+                    .map(|key| key.to_string())
+                    .collect();
 
                 // Extract output names
                 let output_names: Vec<String> = output_desc
@@ -294,7 +305,13 @@ pub mod coreml_native {
                 let vocab_size = None; // Would need to inspect output shapes
                 let hidden_size = None;
 
-                (description, input_names, output_names, vocab_size, hidden_size)
+                (
+                    description,
+                    input_names,
+                    output_names,
+                    vocab_size,
+                    hidden_size,
+                )
             }
         }
 
@@ -387,21 +404,19 @@ pub mod coreml_native {
 
                 // Create NSDictionary directly with dictionaryWithObject_forKey
                 // Use AnyObject as value type since initWithDictionary_error expects NSDictionary<NSString, AnyObject>
-                let dict: Retained<NSDictionary<NSString, AnyObject>> =
-                    msg_send_id![NSDictionary::<NSString, AnyObject>::class(), dictionaryWithObject: &*feature_value, forKey: &*input_key];
+                let dict: Retained<NSDictionary<NSString, AnyObject>> = msg_send_id![NSDictionary::<NSString, AnyObject>::class(), dictionaryWithObject: &*feature_value, forKey: &*input_key];
 
                 // Create feature provider using msg_send_id for allocation
                 use objc2::rc::Allocated;
                 let alloc: Allocated<MLDictionaryFeatureProvider> =
                     msg_send_id![MLDictionaryFeatureProvider::class(), alloc];
-                let provider =
-                    MLDictionaryFeatureProvider::initWithDictionary_error(alloc, &*dict)
-                        .map_err(|e| {
-                            RuvLLMError::CoreML(format!(
-                                "Failed to create feature provider: {}",
-                                e.localizedDescription()
-                            ))
-                        })?;
+                let provider = MLDictionaryFeatureProvider::initWithDictionary_error(alloc, &*dict)
+                    .map_err(|e| {
+                        RuvLLMError::CoreML(format!(
+                            "Failed to create feature provider: {}",
+                            e.localizedDescription()
+                        ))
+                    })?;
 
                 // Create prediction options
                 let options = MLPredictionOptions::new();
@@ -471,20 +486,18 @@ pub mod coreml_native {
 
                 // Create NSDictionary directly with dictionaryWithObject_forKey
                 // Use AnyObject as value type since initWithDictionary_error expects NSDictionary<NSString, AnyObject>
-                let dict: Retained<NSDictionary<NSString, AnyObject>> =
-                    msg_send_id![NSDictionary::<NSString, AnyObject>::class(), dictionaryWithObject: &*feature_value, forKey: &*input_key];
+                let dict: Retained<NSDictionary<NSString, AnyObject>> = msg_send_id![NSDictionary::<NSString, AnyObject>::class(), dictionaryWithObject: &*feature_value, forKey: &*input_key];
 
                 // Create feature provider using msg_send_id for allocation
                 let alloc: Allocated<MLDictionaryFeatureProvider> =
                     msg_send_id![MLDictionaryFeatureProvider::class(), alloc];
-                let provider =
-                    MLDictionaryFeatureProvider::initWithDictionary_error(alloc, &*dict)
-                        .map_err(|e| {
-                            RuvLLMError::CoreML(format!(
-                                "Failed to create feature provider: {}",
-                                e.localizedDescription()
-                            ))
-                        })?;
+                let provider = MLDictionaryFeatureProvider::initWithDictionary_error(alloc, &*dict)
+                    .map_err(|e| {
+                        RuvLLMError::CoreML(format!(
+                            "Failed to create feature provider: {}",
+                            e.localizedDescription()
+                        ))
+                    })?;
 
                 let options = MLPredictionOptions::new();
                 // Run prediction - cast provider to protocol object
@@ -615,7 +628,12 @@ pub use coreml_native::CoreMLModelHandle;
 // =============================================================================
 
 /// Iterator for streaming Core ML token generation
-#[cfg(all(target_os = "macos", target_arch = "aarch64", feature = "coreml", feature = "candle"))]
+#[cfg(all(
+    target_os = "macos",
+    target_arch = "aarch64",
+    feature = "coreml",
+    feature = "candle"
+))]
 pub struct CoreMLStreamIterator<'a> {
     model_handle: &'a CoreMLModelHandle,
     tokenizer: &'a crate::tokenizer::RuvTokenizer,
@@ -630,7 +648,12 @@ pub struct CoreMLStreamIterator<'a> {
     finished: bool,
 }
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64", feature = "coreml", feature = "candle"))]
+#[cfg(all(
+    target_os = "macos",
+    target_arch = "aarch64",
+    feature = "coreml",
+    feature = "candle"
+))]
 impl<'a> CoreMLStreamIterator<'a> {
     /// Create a new streaming iterator
     pub fn new(
@@ -675,15 +698,22 @@ impl<'a> CoreMLStreamIterator<'a> {
         };
 
         // Softmax
-        let max_logit = scaled_logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_logits: Vec<f32> = scaled_logits.iter().map(|&x| (x - max_logit).exp()).collect();
+        let max_logit = scaled_logits
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let exp_logits: Vec<f32> = scaled_logits
+            .iter()
+            .map(|&x| (x - max_logit).exp())
+            .collect();
         let sum_exp: f32 = exp_logits.iter().sum();
         let probs: Vec<f32> = exp_logits.iter().map(|&x| x / sum_exp).collect();
 
         // Top-p sampling
         if self.top_p < 1.0 {
             let mut indexed_probs: Vec<(usize, f32)> = probs.iter().copied().enumerate().collect();
-            indexed_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            indexed_probs
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             let mut cumsum = 0.0;
             let mut cutoff_idx = indexed_probs.len();
@@ -734,7 +764,12 @@ impl<'a> CoreMLStreamIterator<'a> {
     }
 }
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64", feature = "coreml", feature = "candle"))]
+#[cfg(all(
+    target_os = "macos",
+    target_arch = "aarch64",
+    feature = "coreml",
+    feature = "candle"
+))]
 impl<'a> Iterator for CoreMLStreamIterator<'a> {
     type Item = Result<GeneratedToken>;
 
@@ -744,7 +779,10 @@ impl<'a> Iterator for CoreMLStreamIterator<'a> {
         }
 
         // Run inference
-        let logits = match self.model_handle.predict(&self.input_feature_name, &self.input_ids) {
+        let logits = match self
+            .model_handle
+            .predict(&self.input_feature_name, &self.input_ids)
+        {
             Ok(l) => l,
             Err(e) => {
                 self.finished = true;
@@ -791,7 +829,12 @@ impl<'a> Iterator for CoreMLStreamIterator<'a> {
 }
 
 // Safety: The iterator holds references to CoreMLModelHandle and RuvTokenizer which are Send+Sync
-#[cfg(all(target_os = "macos", target_arch = "aarch64", feature = "coreml", feature = "candle"))]
+#[cfg(all(
+    target_os = "macos",
+    target_arch = "aarch64",
+    feature = "coreml",
+    feature = "candle"
+))]
 unsafe impl<'a> Send for CoreMLStreamIterator<'a> {}
 
 // =============================================================================
@@ -864,7 +907,7 @@ impl Default for CoreMLBackend {
             #[cfg(feature = "candle")]
             tokenizer: None,
             input_feature_name: "input_ids".to_string(),
-            eos_token_id: 2, // Common default EOS token
+            eos_token_id: 2,   // Common default EOS token
             vocab_size: 32000, // Common default vocab size
         }
     }
@@ -902,7 +945,7 @@ impl CoreMLBackend {
             #[cfg(feature = "candle")]
             tokenizer: None,
             input_feature_name: "input_ids".to_string(),
-            eos_token_id: 2, // Common default EOS token
+            eos_token_id: 2,   // Common default EOS token
             vocab_size: 32000, // Common default vocab size
         })
     }
@@ -1075,15 +1118,22 @@ impl CoreMLBackend {
         };
 
         // Softmax to get probabilities
-        let max_logit = scaled_logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_logits: Vec<f32> = scaled_logits.iter().map(|&x| (x - max_logit).exp()).collect();
+        let max_logit = scaled_logits
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let exp_logits: Vec<f32> = scaled_logits
+            .iter()
+            .map(|&x| (x - max_logit).exp())
+            .collect();
         let sum_exp: f32 = exp_logits.iter().sum();
         let probs: Vec<f32> = exp_logits.iter().map(|&x| x / sum_exp).collect();
 
         // Top-p (nucleus) sampling
         if top_p < 1.0 {
             let mut indexed_probs: Vec<(usize, f32)> = probs.iter().copied().enumerate().collect();
-            indexed_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            indexed_probs
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             let mut cumsum = 0.0;
             let mut cutoff_idx = indexed_probs.len();
@@ -1244,7 +1294,8 @@ impl LlmBackend for CoreMLBackend {
             })?;
 
             // Encode the prompt
-            let mut input_ids: Vec<i32> = tokenizer.encode(prompt)?
+            let mut input_ids: Vec<i32> = tokenizer
+                .encode(prompt)?
                 .into_iter()
                 .map(|t| t as i32)
                 .collect();
@@ -1319,7 +1370,8 @@ impl LlmBackend for CoreMLBackend {
             })?;
 
             // Encode the prompt
-            let input_ids: Vec<i32> = tokenizer.encode(prompt)?
+            let input_ids: Vec<i32> = tokenizer
+                .encode(prompt)?
                 .into_iter()
                 .map(|t| t as i32)
                 .collect();
@@ -1377,7 +1429,8 @@ impl LlmBackend for CoreMLBackend {
             })?;
 
             // Encode the prompt
-            let mut input_ids: Vec<i32> = tokenizer.encode(prompt)?
+            let mut input_ids: Vec<i32> = tokenizer
+                .encode(prompt)?
                 .into_iter()
                 .map(|t| t as i32)
                 .collect();
@@ -1476,7 +1529,8 @@ impl LlmBackend for CoreMLBackend {
             })?;
 
             // Encode the text
-            let token_ids: Vec<i32> = tokenizer.encode(text)?
+            let token_ids: Vec<i32> = tokenizer
+                .encode(text)?
                 .into_iter()
                 .map(|t| t as i32)
                 .collect();
@@ -1826,7 +1880,9 @@ mod tests {
             assert!(backend.is_err());
 
             let err = backend.unwrap_err();
-            assert!(err.to_string().contains("Apple Neural Engine not available"));
+            assert!(err
+                .to_string()
+                .contains("Apple Neural Engine not available"));
         }
 
         #[test]
@@ -1974,7 +2030,8 @@ mod tests {
         #[test]
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         fn test_coreml_backend_validate_path_nonexistent() {
-            let result = CoreMLBackend::validate_coreml_path(Path::new("/nonexistent/model.mlmodel"));
+            let result =
+                CoreMLBackend::validate_coreml_path(Path::new("/nonexistent/model.mlmodel"));
             assert!(result.is_err());
             assert!(result.unwrap_err().to_string().contains("does not exist"));
         }

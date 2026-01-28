@@ -97,17 +97,19 @@ mod kernels;
 mod pipeline;
 
 // Core exports
-pub use buffer::{BufferUsage, GpuBuffer, GpuBufferManager, GpuBufferPool, BufferUsageFlags, BufferKey};
+pub use buffer::{
+    BufferKey, BufferUsage, BufferUsageFlags, GpuBuffer, GpuBufferManager, GpuBufferPool,
+};
 pub use device::{GpuDevice, GpuDeviceInfo, GpuDeviceOptions};
-pub use dispatch::{DispatchConfig, GpuDispatcher, DispatchBuilder};
+pub use dispatch::{DispatchBuilder, DispatchConfig, GpuDispatcher};
 pub use error::{GpuError, GpuResult};
 pub use pipeline::{BindingDesc, BindingType, ComputePipeline, PipelineCache};
 
 // Re-export buffer types
-pub use buffer::{GpuNodeState, GpuEdge, GpuRestrictionMap, GpuParams};
+pub use buffer::{GpuEdge, GpuNodeState, GpuParams, GpuRestrictionMap};
 
 // Re-export engine types
-pub use engine::{GpuCoherenceEngine, GpuConfig, GpuCapabilities, GpuCoherenceEnergy};
+pub use engine::{GpuCapabilities, GpuCoherenceEnergy, GpuCoherenceEngine, GpuConfig};
 
 /// Synchronous API for GPU coherence engine (uses pollster)
 pub mod sync {
@@ -116,8 +118,8 @@ pub mod sync {
 
 // Re-export kernel types
 pub use kernels::{
-    ComputeResidualsKernel, ComputeEnergyKernel, SheafAttentionKernel, TokenRoutingKernel,
-    AttentionWeight, Token, RoutingDecision, LaneStats, EnergyParams,
+    AttentionWeight, ComputeEnergyKernel, ComputeResidualsKernel, EnergyParams, LaneStats,
+    RoutingDecision, SheafAttentionKernel, Token, TokenRoutingKernel,
 };
 
 /// Default workgroup size for compute shaders

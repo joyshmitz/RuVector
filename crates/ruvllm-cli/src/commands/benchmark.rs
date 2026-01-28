@@ -151,9 +151,7 @@ pub async fn run(
             let token_count = text.split_whitespace().count();
             tokens_generated.push(token_count);
             // Estimate TTFT as a fraction of total time
-            ttft_times.push(Duration::from_secs_f64(
-                total_time.as_secs_f64() * 0.1,
-            ));
+            ttft_times.push(Duration::from_secs_f64(total_time.as_secs_f64() * 0.1));
         } else {
             tokens_generated.push(gen_length);
             ttft_times.push(Duration::from_millis(50));
@@ -248,21 +246,25 @@ fn calculate_metrics(
     ttft_times: &[Duration],
     tokens_generated: &[usize],
 ) -> BenchmarkMetrics {
-    let total_time_ms = latencies.iter().map(|d| d.as_secs_f64() * 1000.0).sum::<f64>()
+    let total_time_ms = latencies
+        .iter()
+        .map(|d| d.as_secs_f64() * 1000.0)
+        .sum::<f64>()
         / latencies.len() as f64;
 
     let total_tokens: usize = tokens_generated.iter().sum();
     let total_duration: Duration = latencies.iter().sum();
     let tokens_per_second = total_tokens as f64 / total_duration.as_secs_f64();
 
-    let ttft_avg = ttft_times.iter().map(|d| d.as_secs_f64() * 1000.0).sum::<f64>()
+    let ttft_avg = ttft_times
+        .iter()
+        .map(|d| d.as_secs_f64() * 1000.0)
+        .sum::<f64>()
         / ttft_times.len() as f64;
 
     // Calculate percentiles
-    let mut sorted_latencies: Vec<f64> = latencies
-        .iter()
-        .map(|d| d.as_secs_f64() * 1000.0)
-        .collect();
+    let mut sorted_latencies: Vec<f64> =
+        latencies.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
     sorted_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     let p50_idx = (sorted_latencies.len() as f64 * 0.50) as usize;
@@ -367,9 +369,18 @@ fn print_results(results: &BenchmarkResults) {
     println!("{}", style("Latency Distribution").bold());
     let mut lat_table = Table::new();
     lat_table.add_row(row!["Percentile", "Latency (ms)"]);
-    lat_table.add_row(row!["P50", format!("{:.2}", results.metrics.latency_p50_ms)]);
-    lat_table.add_row(row!["P95", format!("{:.2}", results.metrics.latency_p95_ms)]);
-    lat_table.add_row(row!["P99", format!("{:.2}", results.metrics.latency_p99_ms)]);
+    lat_table.add_row(row![
+        "P50",
+        format!("{:.2}", results.metrics.latency_p50_ms)
+    ]);
+    lat_table.add_row(row![
+        "P95",
+        format!("{:.2}", results.metrics.latency_p95_ms)
+    ]);
+    lat_table.add_row(row![
+        "P99",
+        format!("{:.2}", results.metrics.latency_p99_ms)
+    ]);
     lat_table.printstd();
     println!();
 

@@ -5,9 +5,9 @@
 //! - LWW-Register (Last-Writer-Wins Register)
 //! - Reconciliation algorithms
 
-use std::collections::{HashMap, HashSet};
+use crate::{FederationError, Result};
 use serde::{Deserialize, Serialize};
-use crate::{Result, FederationError};
+use std::collections::{HashMap, HashSet};
 
 /// Grow-only Set CRDT
 ///
@@ -199,9 +199,7 @@ pub struct FederatedResponse<T: Clone> {
 ///     final_results.sort(by=score, descending=True)
 ///     RETURN final_results
 /// ```
-pub fn reconcile_crdt<T>(
-    responses: Vec<FederatedResponse<T>>,
-) -> Result<Vec<(T, f32)>>
+pub fn reconcile_crdt<T>(responses: Vec<FederatedResponse<T>>) -> Result<Vec<(T, f32)>>
 where
     T: Clone + Eq + std::hash::Hash,
 {
@@ -293,13 +291,13 @@ mod tests {
         map1.set("key2", 200, 1);
 
         let mut map2 = LWWMap::new();
-        map2.set("key2", 250, 2);  // Newer timestamp
+        map2.set("key2", 250, 2); // Newer timestamp
         map2.set("key3", 300, 1);
 
         map1.merge(&map2);
 
         assert_eq!(*map1.get(&"key1").unwrap(), 100);
-        assert_eq!(*map1.get(&"key2").unwrap(), 250);  // Updated
+        assert_eq!(*map1.get(&"key2").unwrap(), 250); // Updated
         assert_eq!(*map1.get(&"key3").unwrap(), 300);
     }
 
@@ -307,16 +305,13 @@ mod tests {
     fn test_reconcile_crdt() {
         let response1 = FederatedResponse {
             results: vec![1, 2, 3],
-            rankings: vec![
-                ("1".to_string(), 0.9, 100),
-                ("2".to_string(), 0.8, 100),
-            ],
+            rankings: vec![("1".to_string(), 0.9, 100), ("2".to_string(), 0.8, 100)],
         };
 
         let response2 = FederatedResponse {
             results: vec![2, 3, 4],
             rankings: vec![
-                ("2".to_string(), 0.85, 101),  // Newer
+                ("2".to_string(), 0.85, 101), // Newer
                 ("3".to_string(), 0.7, 100),
             ],
         };

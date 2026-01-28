@@ -14,9 +14,7 @@
 //! - aarch64: NEON (128-bit, f32x4)
 //! - WASM: SIMD128 (128-bit)
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -405,26 +403,14 @@ fn bench_dense_matmul(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("naive", size), &size, |b, _| {
             b.iter(|| {
-                matmul_naive(
-                    black_box(&matrix),
-                    black_box(&x),
-                    &mut y,
-                    size,
-                    size,
-                );
+                matmul_naive(black_box(&matrix), black_box(&x), &mut y, size, size);
                 black_box(y[0])
             })
         });
 
         group.bench_with_input(BenchmarkId::new("unrolled", size), &size, |b, _| {
             b.iter(|| {
-                matmul_unrolled(
-                    black_box(&matrix),
-                    black_box(&x),
-                    &mut y,
-                    size,
-                    size,
-                );
+                matmul_unrolled(black_box(&matrix), black_box(&x), &mut y, size, size);
                 black_box(y[0])
             })
         });
@@ -432,13 +418,7 @@ fn bench_dense_matmul(c: &mut Criterion) {
         #[cfg(feature = "simd")]
         group.bench_with_input(BenchmarkId::new("simd", size), &size, |b, _| {
             b.iter(|| {
-                simd_impl::matmul_simd(
-                    black_box(&matrix),
-                    black_box(&x),
-                    &mut y,
-                    size,
-                    size,
-                );
+                simd_impl::matmul_simd(black_box(&matrix), black_box(&x), &mut y, size, size);
                 black_box(y[0])
             })
         });
@@ -464,13 +444,7 @@ fn bench_projection_matmul(c: &mut Criterion) {
             &(in_dim, out_dim),
             |b, _| {
                 b.iter(|| {
-                    matmul_naive(
-                        black_box(&matrix),
-                        black_box(&x),
-                        &mut y,
-                        out_dim,
-                        in_dim,
-                    );
+                    matmul_naive(black_box(&matrix), black_box(&x), &mut y, out_dim, in_dim);
                     black_box(y[0])
                 })
             },
@@ -481,13 +455,7 @@ fn bench_projection_matmul(c: &mut Criterion) {
             &(in_dim, out_dim),
             |b, _| {
                 b.iter(|| {
-                    matmul_unrolled(
-                        black_box(&matrix),
-                        black_box(&x),
-                        &mut y,
-                        out_dim,
-                        in_dim,
-                    );
+                    matmul_unrolled(black_box(&matrix), black_box(&x), &mut y, out_dim, in_dim);
                     black_box(y[0])
                 })
             },
@@ -636,7 +604,12 @@ fn bench_batch_residual(c: &mut Criterion) {
             BenchmarkId::new("naive", batch_size),
             &batch_size,
             |b, _| {
-                b.iter(|| black_box(batch_residual_naive(black_box(&sources), black_box(&targets))))
+                b.iter(|| {
+                    black_box(batch_residual_naive(
+                        black_box(&sources),
+                        black_box(&targets),
+                    ))
+                })
             },
         );
 
@@ -728,9 +701,14 @@ fn bench_throughput_scaling(c: &mut Criterion) {
         );
 
         #[cfg(feature = "simd")]
-        group.bench_with_input(BenchmarkId::new("residual_simd", size), &size, |bench, _| {
-            bench.iter(|| black_box(simd_impl::residual_norm_simd(black_box(&a), black_box(&b))))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("residual_simd", size),
+            &size,
+            |bench, _| {
+                bench
+                    .iter(|| black_box(simd_impl::residual_norm_simd(black_box(&a), black_box(&b))))
+            },
+        );
     }
 
     group.finish();
@@ -796,11 +774,7 @@ fn bench_fma_pattern(c: &mut Criterion) {
 // CRITERION CONFIGURATION
 // ============================================================================
 
-criterion_group!(
-    matmul_benches,
-    bench_dense_matmul,
-    bench_projection_matmul,
-);
+criterion_group!(matmul_benches, bench_dense_matmul, bench_projection_matmul,);
 
 criterion_group!(
     vector_ops_benches,
@@ -809,10 +783,7 @@ criterion_group!(
     bench_residual_norm,
 );
 
-criterion_group!(
-    batch_benches,
-    bench_batch_residual,
-);
+criterion_group!(batch_benches, bench_batch_residual,);
 
 criterion_group!(
     optimization_benches,

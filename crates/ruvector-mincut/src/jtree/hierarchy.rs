@@ -131,7 +131,12 @@ impl CutResult {
     }
 
     /// Create an approximate result
-    pub fn approximate(value: f64, factor: f64, partition: HashSet<VertexId>, level: usize) -> Self {
+    pub fn approximate(
+        value: f64,
+        factor: f64,
+        partition: HashSet<VertexId>,
+        level: usize,
+    ) -> Self {
         Self {
             value,
             partition,
@@ -214,7 +219,9 @@ impl JTreeHierarchy {
 
         // Initialize levels (lazy by default)
         let levels = if config.lazy_evaluation {
-            (0..num_levels).map(|_| LevelState::Unmaterialized).collect()
+            (0..num_levels)
+                .map(|_| LevelState::Unmaterialized)
+                .collect()
         } else {
             // Eagerly build all levels
             Self::build_all_levels(&graph, num_levels, alpha, &config)?
@@ -469,13 +476,11 @@ impl JTreeHierarchy {
         for level in 0..self.num_levels {
             if let LevelState::Materialized(_) = &self.levels[level] {
                 self.dirty_levels.insert(level);
-                self.levels[level] = match std::mem::replace(
-                    &mut self.levels[level],
-                    LevelState::Unmaterialized,
-                ) {
-                    LevelState::Materialized(l) => LevelState::Dirty(l),
-                    other => other,
-                };
+                self.levels[level] =
+                    match std::mem::replace(&mut self.levels[level], LevelState::Unmaterialized) {
+                        LevelState::Materialized(l) => LevelState::Dirty(l),
+                        other => other,
+                    };
             }
         }
 
@@ -504,13 +509,11 @@ impl JTreeHierarchy {
         for level in 0..self.num_levels {
             if let LevelState::Materialized(_) = &self.levels[level] {
                 self.dirty_levels.insert(level);
-                self.levels[level] = match std::mem::replace(
-                    &mut self.levels[level],
-                    LevelState::Unmaterialized,
-                ) {
-                    LevelState::Materialized(l) => LevelState::Dirty(l),
-                    other => other,
-                };
+                self.levels[level] =
+                    match std::mem::replace(&mut self.levels[level], LevelState::Unmaterialized) {
+                        LevelState::Materialized(l) => LevelState::Dirty(l),
+                        other => other,
+                    };
             }
         }
 

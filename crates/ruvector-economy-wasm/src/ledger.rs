@@ -3,10 +3,10 @@
 //! Implements a conflict-free replicated data type (CRDT) ledger for P2P consistency.
 //! Uses G-Counters for earnings (monotonically increasing) and PN-Counters for spending.
 
-use wasm_bindgen::prelude::*;
 use rustc_hash::FxHashMap;
-use serde::{Serialize, Deserialize};
-use sha2::{Sha256, Digest};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use wasm_bindgen::prelude::*;
 
 use crate::curve::ContributionCurve;
 
@@ -38,7 +38,11 @@ pub enum CreditReason {
     /// Staked for participation
     Stake { amount: u64, locked: bool },
     /// Transferred between nodes
-    Transfer { from: String, to: String, memo: String },
+    Transfer {
+        from: String,
+        to: String,
+        memo: String,
+    },
     /// Penalty for invalid work
     Penalty { reason: String },
 }
@@ -120,7 +124,9 @@ impl CreditLedger {
     #[wasm_bindgen]
     pub fn balance(&self) -> u64 {
         let total_earned: u64 = self.earned.values().sum();
-        let total_spent: u64 = self.spent.values()
+        let total_spent: u64 = self
+            .spent
+            .values()
             .map(|(pos, neg)| pos.saturating_sub(*neg))
             .sum();
 
@@ -138,7 +144,8 @@ impl CreditLedger {
     /// Get total credits spent
     #[wasm_bindgen(js_name = totalSpent)]
     pub fn total_spent(&self) -> u64 {
-        self.spent.values()
+        self.spent
+            .values()
             .map(|(pos, neg)| pos.saturating_sub(*neg))
             .sum()
     }
@@ -170,7 +177,8 @@ impl CreditLedger {
     /// Get state root as hex string
     #[wasm_bindgen(js_name = stateRootHex)]
     pub fn state_root_hex(&self) -> String {
-        self.state_root.iter()
+        self.state_root
+            .iter()
             .map(|b| format!("{:02x}", b))
             .collect()
     }
@@ -200,7 +208,11 @@ impl CreditLedger {
 
     /// Credit with multiplier applied (for task rewards)
     #[wasm_bindgen(js_name = creditWithMultiplier)]
-    pub fn credit_with_multiplier(&mut self, base_amount: u64, reason: &str) -> Result<String, JsValue> {
+    pub fn credit_with_multiplier(
+        &mut self,
+        base_amount: u64,
+        reason: &str,
+    ) -> Result<String, JsValue> {
         let multiplier = self.current_multiplier();
         let amount = (base_amount as f32 * multiplier) as u64;
         self.credit(amount, reason)
@@ -234,7 +246,9 @@ impl CreditLedger {
     /// This updates the PN-Counter negative side for the given event.
     #[wasm_bindgen]
     pub fn refund(&mut self, event_id: &str, amount: u64) -> Result<(), JsValue> {
-        let entry = self.spent.get_mut(event_id)
+        let entry = self
+            .spent
+            .get_mut(event_id)
             .ok_or_else(|| JsValue::from_str("Event not found"))?;
 
         if entry.1 + amount > entry.0 {

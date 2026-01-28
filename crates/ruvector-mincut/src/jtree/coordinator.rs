@@ -303,9 +303,9 @@ impl TwoTierCoordinator {
     /// Get the j-tree hierarchy, building if necessary
     fn tier1_mut(&mut self) -> Result<&mut JTreeHierarchy> {
         self.ensure_built()?;
-        self.tier1
-            .as_mut()
-            .ok_or_else(|| crate::error::MinCutError::InternalError("Hierarchy not built".to_string()))
+        self.tier1.as_mut().ok_or_else(|| {
+            crate::error::MinCutError::InternalError("Hierarchy not built".to_string())
+        })
     }
 
     /// Query global minimum cut with automatic tier selection
@@ -377,14 +377,15 @@ impl TwoTierCoordinator {
                 escalated: false,
             };
         }
-        self.query_tier2_global(start).unwrap_or_else(|_| QueryResult {
-            value: f64::INFINITY,
-            is_exact: false,
-            tier: 0,
-            confidence: 0.0,
-            latency: start.elapsed(),
-            escalated: false,
-        })
+        self.query_tier2_global(start)
+            .unwrap_or_else(|_| QueryResult {
+                value: f64::INFINITY,
+                is_exact: false,
+                tier: 0,
+                confidence: 0.0,
+                latency: start.elapsed(),
+                escalated: false,
+            })
     }
 
     /// Force approximate (Tier 1) query
@@ -400,14 +401,15 @@ impl TwoTierCoordinator {
                 escalated: false,
             };
         }
-        self.query_tier1_global(start).unwrap_or_else(|_| QueryResult {
-            value: f64::INFINITY,
-            is_exact: false,
-            tier: 0,
-            confidence: 0.0,
-            latency: start.elapsed(),
-            escalated: false,
-        })
+        self.query_tier1_global(start)
+            .unwrap_or_else(|_| QueryResult {
+                value: f64::INFINITY,
+                is_exact: false,
+                tier: 0,
+                confidence: 0.0,
+                latency: start.elapsed(),
+                escalated: false,
+            })
     }
 
     /// Query Tier 1 for global min cut
@@ -436,7 +438,12 @@ impl TwoTierCoordinator {
     }
 
     /// Query Tier 1 for s-t min cut
-    fn query_tier1_st(&mut self, _s: VertexId, _t: VertexId, start: Instant) -> Result<QueryResult> {
+    fn query_tier1_st(
+        &mut self,
+        _s: VertexId,
+        _t: VertexId,
+        start: Instant,
+    ) -> Result<QueryResult> {
         // JTreeHierarchy doesn't have s-t min cut directly, use approximate global
         // In a full implementation, we'd traverse levels to find s-t cut
         let hierarchy = self.tier1_mut()?;
@@ -498,7 +505,12 @@ impl TwoTierCoordinator {
     }
 
     /// Query Tier 2 (exact) for s-t min cut
-    fn query_tier2_st(&mut self, _s: VertexId, _t: VertexId, start: Instant) -> Result<QueryResult> {
+    fn query_tier2_st(
+        &mut self,
+        _s: VertexId,
+        _t: VertexId,
+        start: Instant,
+    ) -> Result<QueryResult> {
         // Use global min cut with exact flag for now
         let hierarchy = self.tier1_mut()?;
         let cut_result = hierarchy.min_cut(true)?;
@@ -767,10 +779,8 @@ mod tests {
     #[test]
     fn test_escalation_periodic() {
         let g = create_test_graph();
-        let mut coord = TwoTierCoordinator::new(
-            g,
-            EscalationPolicy::Periodic { query_interval: 3 },
-        );
+        let mut coord =
+            TwoTierCoordinator::new(g, EscalationPolicy::Periodic { query_interval: 3 });
         coord.build().unwrap();
 
         // First query should escalate (queries_since_exact starts at 0, >= 3 is false)

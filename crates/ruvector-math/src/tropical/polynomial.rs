@@ -208,7 +208,11 @@ impl MultivariateTropicalPolynomial {
                 if *coeff == f64::NEG_INFINITY {
                     f64::NEG_INFINITY
                 } else {
-                    let linear: f64 = exp.iter().zip(x.iter()).map(|(&e, &xi)| e as f64 * xi).sum();
+                    let linear: f64 = exp
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(&e, &xi)| e as f64 * xi)
+                        .sum();
                     coeff + linear
                 }
             })
@@ -230,9 +234,9 @@ mod tests {
         // p(x) = max(2 + 0x, 1 + 1x, -1 + 2x) = max(2, 1+x, -1+2x)
         let p = TropicalPolynomial::from_coeffs(&[2.0, 1.0, -1.0]);
 
-        assert!((p.eval(0.0) - 2.0).abs() < 1e-10);  // max(2, 1, -1) = 2
-        assert!((p.eval(1.0) - 2.0).abs() < 1e-10);  // max(2, 2, 1) = 2
-        assert!((p.eval(3.0) - 5.0).abs() < 1e-10);  // max(2, 4, 5) = 5
+        assert!((p.eval(0.0) - 2.0).abs() < 1e-10); // max(2, 1, -1) = 2
+        assert!((p.eval(1.0) - 2.0).abs() < 1e-10); // max(2, 2, 1) = 2
+        assert!((p.eval(3.0) - 5.0).abs() < 1e-10); // max(2, 4, 5) = 5
     }
 
     #[test]
@@ -260,11 +264,10 @@ mod tests {
     #[test]
     fn test_multivariate() {
         // p(x,y) = max(0, x, y)
-        let p = MultivariateTropicalPolynomial::new(2, vec![
-            (0.0, vec![0, 0]),
-            (0.0, vec![1, 0]),
-            (0.0, vec![0, 1]),
-        ]);
+        let p = MultivariateTropicalPolynomial::new(
+            2,
+            vec![(0.0, vec![0, 0]), (0.0, vec![1, 0]), (0.0, vec![0, 1])],
+        );
 
         assert!((p.eval(&[1.0, 2.0]) - 2.0).abs() < 1e-10);
         assert!((p.eval(&[3.0, 1.0]) - 3.0).abs() < 1e-10);

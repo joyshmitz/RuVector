@@ -24,7 +24,12 @@ impl TensorNode {
         assert_eq!(data.len(), expected_size);
         assert_eq!(leg_dims.len(), leg_labels.len());
 
-        Self { id, data, leg_dims, leg_labels }
+        Self {
+            id,
+            data,
+            leg_dims,
+            leg_labels,
+        }
     }
 
     /// Number of legs
@@ -50,14 +55,23 @@ pub struct TensorNetwork {
 impl TensorNetwork {
     /// Create empty network
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), next_id: 0 }
+        Self {
+            nodes: Vec::new(),
+            next_id: 0,
+        }
     }
 
     /// Add a tensor node
-    pub fn add_node(&mut self, data: Vec<f64>, leg_dims: Vec<usize>, leg_labels: Vec<String>) -> usize {
+    pub fn add_node(
+        &mut self,
+        data: Vec<f64>,
+        leg_dims: Vec<usize>,
+        leg_labels: Vec<String>,
+    ) -> usize {
         let id = self.next_id;
         self.next_id += 1;
-        self.nodes.push(TensorNode::new(id, data, leg_dims, leg_labels));
+        self.nodes
+            .push(TensorNode::new(id, data, leg_dims, leg_labels));
         id
     }
 
@@ -104,7 +118,8 @@ impl TensorNetwork {
 
         let new_id = self.next_id;
         self.next_id += 1;
-        self.nodes.push(TensorNode::new(new_id, result.0, result.1, result.2));
+        self.nodes
+            .push(TensorNode::new(new_id, result.0, result.1, result.2));
 
         Some(new_id)
     }
@@ -131,7 +146,8 @@ impl TensorNetwork {
 
         let new_id = self.next_id;
         self.next_id += 1;
-        self.nodes.push(TensorNode::new(new_id, new_data, new_dims, new_labels));
+        self.nodes
+            .push(TensorNode::new(new_id, new_data, new_dims, new_labels));
 
         Some(new_id)
     }
@@ -187,21 +203,35 @@ fn contract_tensors(
     let contracted1: Vec<usize> = contract_pairs.iter().map(|p| p.0).collect();
     let contracted2: Vec<usize> = contract_pairs.iter().map(|p| p.1).collect();
 
-    for (i, (dim, label)) in node1.leg_dims.iter().zip(node1.leg_labels.iter()).enumerate() {
+    for (i, (dim, label)) in node1
+        .leg_dims
+        .iter()
+        .zip(node1.leg_labels.iter())
+        .enumerate()
+    {
         if !contracted1.contains(&i) {
             out_dims.push(*dim);
             out_labels.push(label.clone());
         }
     }
 
-    for (i, (dim, label)) in node2.leg_dims.iter().zip(node2.leg_labels.iter()).enumerate() {
+    for (i, (dim, label)) in node2
+        .leg_dims
+        .iter()
+        .zip(node2.leg_labels.iter())
+        .enumerate()
+    {
         if !contracted2.contains(&i) {
             out_dims.push(*dim);
             out_labels.push(label.clone());
         }
     }
 
-    let out_size: usize = if out_dims.is_empty() { 1 } else { out_dims.iter().product() };
+    let out_size: usize = if out_dims.is_empty() {
+        1
+    } else {
+        out_dims.iter().product()
+    };
     let mut out_data = vec![0.0; out_size];
 
     // Contract by enumeration
@@ -217,8 +247,13 @@ fn contract_tensors(
     for out_flat in 0..out_size {
         // Map to input indices
         // Sum over contracted indices
-        let contract_sizes: Vec<usize> = contract_pairs.iter().map(|p| node1.leg_dims[p.0]).collect();
-        let contract_total: usize = if contract_sizes.is_empty() { 1 } else { contract_sizes.iter().product() };
+        let contract_sizes: Vec<usize> =
+            contract_pairs.iter().map(|p| node1.leg_dims[p.0]).collect();
+        let contract_total: usize = if contract_sizes.is_empty() {
+            1
+        } else {
+            contract_sizes.iter().product()
+        };
 
         let mut sum = 0.0;
 
@@ -244,7 +279,8 @@ fn contract_tensors(
             for i in 0..node1.num_legs() {
                 if !contracted1.contains(&i) {
                     if free1_pos < out_dims.len() {
-                        idx1[i] = (out_idx_copy / out_strides.get(free1_pos).unwrap_or(&1)) % node1.leg_dims[i];
+                        idx1[i] = (out_idx_copy / out_strides.get(free1_pos).unwrap_or(&1))
+                            % node1.leg_dims[i];
                     }
                     free1_pos += 1;
                 }
@@ -254,7 +290,8 @@ fn contract_tensors(
                 if !contracted2.contains(&i) {
                     let pos = (node1.num_legs() - contracted1.len()) + free2_pos;
                     if pos < out_dims.len() {
-                        idx2[i] = (out_flat / out_strides.get(pos).unwrap_or(&1)) % node2.leg_dims[i];
+                        idx2[i] =
+                            (out_flat / out_strides.get(pos).unwrap_or(&1)) % node2.leg_dims[i];
                     }
                     free2_pos += 1;
                 }
@@ -264,7 +301,8 @@ fn contract_tensors(
             let lin1: usize = idx1.iter().zip(strides1.iter()).map(|(i, s)| i * s).sum();
             let lin2: usize = idx2.iter().zip(strides2.iter()).map(|(i, s)| i * s).sum();
 
-            sum += node1.data[lin1.min(node1.data.len() - 1)] * node2.data[lin2.min(node2.data.len() - 1)];
+            sum += node1.data[lin1.min(node1.data.len() - 1)]
+                * node2.data[lin2.min(node2.data.len() - 1)];
         }
 
         out_data[out_flat] = sum;
@@ -408,18 +446,10 @@ mod tests {
         let mut network = TensorNetwork::new();
 
         // v1 = [1, 2, 3]
-        let id1 = network.add_node(
-            vec![1.0, 2.0, 3.0],
-            vec![3],
-            vec!["i".into()],
-        );
+        let id1 = network.add_node(vec![1.0, 2.0, 3.0], vec![3], vec!["i".into()]);
 
         // v2 = [1, 1, 1]
-        let id2 = network.add_node(
-            vec![1.0, 1.0, 1.0],
-            vec![3],
-            vec!["i".into()],
-        );
+        let id2 = network.add_node(vec![1.0, 1.0, 1.0], vec![3], vec!["i".into()]);
 
         let result_id = network.contract(id1, id2).unwrap();
         let result = network.get_node(result_id).unwrap();

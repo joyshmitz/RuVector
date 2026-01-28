@@ -4,7 +4,7 @@
 //! Optimized for Apple Neural Engine inference on M4 Pro and other Apple Silicon.
 
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Read, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -12,9 +12,8 @@ use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use ruvllm::{
-    RuvltraQuantizer, QuantConfig, TargetFormat,
-    estimate_memory_q4, estimate_memory_q5, estimate_memory_q8,
-    GgufFile, GgufQuantType,
+    estimate_memory_q4, estimate_memory_q5, estimate_memory_q8, GgufFile, GgufQuantType,
+    QuantConfig, RuvltraQuantizer, TargetFormat,
 };
 
 /// Run the quantize command
@@ -36,13 +35,13 @@ pub async fn run(
         )
     })?;
 
-    println!(
-        "\n{} RuvLTRA Model Quantizer",
-        "==>".bright_blue().bold()
-    );
+    println!("\n{} RuvLTRA Model Quantizer", "==>".bright_blue().bold());
     println!("    Target format: {}", format.name().bright_cyan());
     println!("    Bits per weight: {:.1}", format.bits_per_weight());
-    println!("    ANE optimization: {}", if ane_optimize { "enabled" } else { "disabled" });
+    println!(
+        "    ANE optimization: {}",
+        if ane_optimize { "enabled" } else { "disabled" }
+    );
 
     // Resolve input model path
     let input_path = resolve_model_path(model, cache_dir)?;
@@ -55,11 +54,15 @@ pub async fn run(
     // Determine output path
     let output_path = if output.is_empty() {
         // Generate output name based on input
-        let stem = input_path.file_stem()
+        let stem = input_path
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("model");
         let output_name = format!("{}-{}.gguf", stem, quant.to_lowercase());
-        input_path.parent().unwrap_or(Path::new(".")).join(output_name)
+        input_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(output_name)
     } else {
         PathBuf::from(output)
     };
@@ -72,7 +75,10 @@ pub async fn run(
 
     // Check if input exists
     if !input_path.exists() {
-        return Err(anyhow::anyhow!("Input model not found: {}", input_path.display()));
+        return Err(anyhow::anyhow!(
+            "Input model not found: {}",
+            input_path.display()
+        ));
     }
 
     // Check if output already exists
@@ -115,15 +121,13 @@ pub async fn run(
     config.keep_output_fp16 = keep_output_fp16;
 
     // Check if input is GGUF
-    let is_gguf = input_path.extension()
+    let is_gguf = input_path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase() == "gguf")
         .unwrap_or(false);
 
-    println!(
-        "\n{} Starting quantization...",
-        "==>".bright_blue().bold()
-    );
+    println!("\n{} Starting quantization...", "==>".bright_blue().bold());
 
     let start_time = Instant::now();
 
@@ -141,10 +145,7 @@ pub async fn run(
     let output_metadata = fs::metadata(&output_path)?;
     let output_size = output_metadata.len();
 
-    println!(
-        "\n{} Quantization complete!",
-        "==>".bright_green().bold()
-    );
+    println!("\n{} Quantization complete!", "==>".bright_green().bold());
     println!(
         "    Output size: {:.2} MB",
         output_size as f64 / (1024.0 * 1024.0)
@@ -153,10 +154,7 @@ pub async fn run(
         "    Compression: {:.1}x",
         input_size as f64 / output_size as f64
     );
-    println!(
-        "    Time: {:.1}s",
-        elapsed.as_secs_f64()
-    );
+    println!("    Time: {:.1}s", elapsed.as_secs_f64());
     println!(
         "    Throughput: {:.1} MB/s",
         input_size as f64 / (1024.0 * 1024.0) / elapsed.as_secs_f64()
@@ -173,11 +171,7 @@ pub async fn run(
         "\n{} To use the quantized model:",
         "Tip:".bright_cyan().bold()
     );
-    println!(
-        "    ruvllm chat {} -q {}",
-        output_path.display(),
-        quant
-    );
+    println!("    ruvllm chat {} -q {}", output_path.display(), quant);
 
     Ok(())
 }
@@ -248,23 +242,20 @@ fn print_memory_estimates(format: TargetFormat) {
     let est_05b = estimate_fn(0.5, 151936, 896, 24);
     println!(
         "    RuvLTRA-Small (0.5B): {:.0} MB ({:.1}x compression)",
-        est_05b.total_mb,
-        est_05b.compression_ratio
+        est_05b.total_mb, est_05b.compression_ratio
     );
 
     // Also show for 1B and 3B for reference
     let est_1b = estimate_fn(1.0, 151936, 1536, 28);
     println!(
         "    1B model: {:.0} MB ({:.1}x compression)",
-        est_1b.total_mb,
-        est_1b.compression_ratio
+        est_1b.total_mb, est_1b.compression_ratio
     );
 
     let est_3b = estimate_fn(3.0, 151936, 2048, 36);
     println!(
         "    3B model: {:.0} MB ({:.1}x compression)",
-        est_3b.total_mb,
-        est_3b.compression_ratio
+        est_3b.total_mb, est_3b.compression_ratio
     );
 }
 
@@ -282,10 +273,7 @@ async fn quantize_gguf_model(
         "    Architecture: {}",
         gguf.architecture().unwrap_or("unknown")
     );
-    println!(
-        "    Tensors: {}",
-        gguf.tensors.len()
-    );
+    println!("    Tensors: {}", gguf.tensors.len());
 
     let total_size: usize = gguf.tensors.iter().map(|t| t.byte_size()).sum();
 
@@ -334,14 +322,8 @@ async fn quantize_gguf_model(
     // Print stats
     let stats = quantizer.stats();
     if verbose {
-        println!(
-            "\n    Tensors quantized: {}",
-            stats.tensors_quantized
-        );
-        println!(
-            "    Elements processed: {}",
-            stats.elements_processed
-        );
+        println!("\n    Tensors quantized: {}", stats.tensors_quantized);
+        println!("    Elements processed: {}", stats.elements_processed);
     }
 
     Ok(())
@@ -374,7 +356,8 @@ async fn quantize_model(
     pb.set_message("Loading model...");
 
     // Check file type and process accordingly
-    let extension = input_path.extension()
+    let extension = input_path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase())
         .unwrap_or_default();
@@ -415,8 +398,7 @@ async fn quantize_model(
         let stats = quantizer.stats();
         println!(
             "\n    Quantizer stats: {} tensors, {} elements",
-            stats.tensors_quantized,
-            stats.elements_processed
+            stats.tensors_quantized, stats.elements_processed
         );
     }
 
@@ -462,15 +444,25 @@ pub fn print_format_comparison() {
         "==>".bright_blue().bold()
     );
     println!();
-    println!("  {:<10} {:<8} {:<12} {:<12} {:<15}",
-        "Format", "Bits", "Memory (0.5B)", "Quality", "Use Case");
+    println!(
+        "  {:<10} {:<8} {:<12} {:<12} {:<15}",
+        "Format", "Bits", "Memory (0.5B)", "Quality", "Use Case"
+    );
     println!("  {}", "-".repeat(60));
-    println!("  {:<10} {:<8} {:<12} {:<12} {:<15}",
-        "Q4_K_M", "4.5", "~300 MB", "Good", "Best tradeoff");
-    println!("  {:<10} {:<8} {:<12} {:<12} {:<15}",
-        "Q5_K_M", "5.5", "~375 MB", "Better", "Higher quality");
-    println!("  {:<10} {:<8} {:<12} {:<12} {:<15}",
-        "Q8_0", "8.5", "~500 MB", "Best", "Near-lossless");
-    println!("  {:<10} {:<8} {:<12} {:<12} {:<15}",
-        "F16", "16", "~1000 MB", "Excellent", "No quant loss");
+    println!(
+        "  {:<10} {:<8} {:<12} {:<12} {:<15}",
+        "Q4_K_M", "4.5", "~300 MB", "Good", "Best tradeoff"
+    );
+    println!(
+        "  {:<10} {:<8} {:<12} {:<12} {:<15}",
+        "Q5_K_M", "5.5", "~375 MB", "Better", "Higher quality"
+    );
+    println!(
+        "  {:<10} {:<8} {:<12} {:<12} {:<15}",
+        "Q8_0", "8.5", "~500 MB", "Best", "Near-lossless"
+    );
+    println!(
+        "  {:<10} {:<8} {:<12} {:<12} {:<15}",
+        "F16", "16", "~1000 MB", "Excellent", "No quant loss"
+    );
 }

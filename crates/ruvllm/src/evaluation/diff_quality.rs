@@ -81,7 +81,9 @@ impl EditLocality {
         let concentration_bonus = self.primary_module_fraction;
 
         // Combine: high concentration and low scatter is good
-        (concentration_bonus - scatter_penalty - boundary_penalty).max(0.0).min(1.0)
+        (concentration_bonus - scatter_penalty - boundary_penalty)
+            .max(0.0)
+            .min(1.0)
     }
 
     /// Check if edits are well-localized
@@ -184,10 +186,10 @@ impl Default for DiffAnalyzer {
     fn default() -> Self {
         Self {
             mechanical_patterns: vec![
-                r"^[-+]\s*use\s+".to_string(),      // import changes
-                r"^[-+]\s*$".to_string(),           // blank line changes
-                r"^[-+]\s*//".to_string(),          // comment changes
-                r"^[-+]\s*#\[".to_string(),         // attribute changes
+                r"^[-+]\s*use\s+".to_string(), // import changes
+                r"^[-+]\s*$".to_string(),      // blank line changes
+                r"^[-+]\s*//".to_string(),     // comment changes
+                r"^[-+]\s*#\[".to_string(),    // attribute changes
             ],
             boundary_markers: vec![
                 "Cargo.toml".to_string(),

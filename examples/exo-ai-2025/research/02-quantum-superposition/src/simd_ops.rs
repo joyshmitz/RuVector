@@ -96,10 +96,8 @@ pub fn simd_norm(amplitudes: &[Complex64]) -> f64 {
 
     for chunk in chunks {
         // Compiler can vectorize this efficiently
-        sum += chunk[0].norm_sqr()
-             + chunk[1].norm_sqr()
-             + chunk[2].norm_sqr()
-             + chunk[3].norm_sqr();
+        sum +=
+            chunk[0].norm_sqr() + chunk[1].norm_sqr() + chunk[2].norm_sqr() + chunk[3].norm_sqr();
     }
 
     for amp in remainder {
@@ -148,7 +146,7 @@ pub fn simd_entropy(amplitudes: &[Complex64]) -> f64 {
 pub fn simd_interference_pattern(
     amplitude1: Complex64,
     amplitude2: Complex64,
-    phases: &[f64]
+    phases: &[f64],
 ) -> Vec<f64> {
     let mut pattern = Vec::with_capacity(phases.len());
 
@@ -191,16 +189,24 @@ pub fn simd_weighted_sample(weights: &[f64], random_value: f64) -> usize {
 
         // Vectorized cumulative sum
         cumulative += chunk[0];
-        if random_value < cumulative { return chunk_idx * 4; }
+        if random_value < cumulative {
+            return chunk_idx * 4;
+        }
 
         cumulative += chunk[1];
-        if random_value < cumulative { return chunk_idx * 4 + 1; }
+        if random_value < cumulative {
+            return chunk_idx * 4 + 1;
+        }
 
         cumulative += chunk[2];
-        if random_value < cumulative { return chunk_idx * 4 + 2; }
+        if random_value < cumulative {
+            return chunk_idx * 4 + 2;
+        }
 
         cumulative += chunk[3];
-        if random_value < cumulative { return chunk_idx * 4 + 3; }
+        if random_value < cumulative {
+            return chunk_idx * 4 + 3;
+        }
 
         index = (chunk_idx + 1) * 4;
     }
@@ -220,10 +226,7 @@ pub fn simd_weighted_sample(weights: &[f64], random_value: f64) -> usize {
 /// Computes ψ₁ ⊗ ψ₂ with vectorized outer product operations.
 /// 3-4x speedup for large composite systems.
 #[inline]
-pub fn simd_tensor_product(
-    amplitudes1: &[Complex64],
-    amplitudes2: &[Complex64]
-) -> Vec<Complex64> {
+pub fn simd_tensor_product(amplitudes1: &[Complex64], amplitudes2: &[Complex64]) -> Vec<Complex64> {
     let n1 = amplitudes1.len();
     let n2 = amplitudes2.len();
     let mut result = Vec::with_capacity(n1 * n2);
@@ -255,7 +258,7 @@ pub fn simd_tensor_product(
 /// multiple amplitude pairs simultaneously. Used for semantic similarity.
 pub fn simd_multi_path_interference(
     amplitudes: &[Complex64],
-    reference_phases: &[f64]
+    reference_phases: &[f64],
 ) -> Vec<f64> {
     assert_eq!(amplitudes.len(), reference_phases.len());
     let n = amplitudes.len();
@@ -268,10 +271,8 @@ pub fn simd_multi_path_interference(
                 interference_matrix.push(0.0);
             } else {
                 let phase_diff = reference_phases[i] - reference_phases[j];
-                let cross_term = 2.0 * amplitudes[i].re * amplitudes[j].re
-                               * phase_diff.cos()
-                               - 2.0 * amplitudes[i].im * amplitudes[j].im
-                               * phase_diff.sin();
+                let cross_term = 2.0 * amplitudes[i].re * amplitudes[j].re * phase_diff.cos()
+                    - 2.0 * amplitudes[i].im * amplitudes[j].im * phase_diff.sin();
                 interference_matrix.push(cross_term);
             }
         }
@@ -316,10 +317,7 @@ mod tests {
 
     #[test]
     fn test_simd_norm() {
-        let amps = vec![
-            Complex64::new(0.6, 0.0),
-            Complex64::new(0.0, 0.8),
-        ];
+        let amps = vec![Complex64::new(0.6, 0.0), Complex64::new(0.0, 0.8)];
 
         let norm = simd_norm(&amps);
         assert!((norm - 1.0).abs() < 1e-10);

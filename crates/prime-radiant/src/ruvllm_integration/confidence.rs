@@ -554,11 +554,17 @@ mod tests {
 
         // Energy much below threshold should give high confidence
         let conf = mapper.confidence_from_energy(0.1);
-        assert!(conf > 0.7, "Low energy should give high confidence, got {conf}");
+        assert!(
+            conf > 0.7,
+            "Low energy should give high confidence, got {conf}"
+        );
 
         // Zero energy should give ~1.0 confidence
         let conf = mapper.confidence_from_energy(0.0);
-        assert!(conf > 0.9, "Zero energy should give very high confidence, got {conf}");
+        assert!(
+            conf > 0.9,
+            "Zero energy should give very high confidence, got {conf}"
+        );
     }
 
     #[test]
@@ -567,11 +573,17 @@ mod tests {
 
         // Energy above threshold should give low confidence
         let conf = mapper.confidence_from_energy(3.0);
-        assert!(conf < 0.3, "High energy should give low confidence, got {conf}");
+        assert!(
+            conf < 0.3,
+            "High energy should give low confidence, got {conf}"
+        );
 
         // Very high energy should give ~0 confidence
         let conf = mapper.confidence_from_energy(10.0);
-        assert!(conf < 0.01, "Very high energy should give near-zero confidence, got {conf}");
+        assert!(
+            conf < 0.01,
+            "Very high energy should give near-zero confidence, got {conf}"
+        );
     }
 
     #[test]
@@ -580,7 +592,10 @@ mod tests {
 
         // Confidence should decrease as energy increases
         let energies = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0];
-        let confidences: Vec<f32> = energies.iter().map(|&e| mapper.confidence_from_energy(e)).collect();
+        let confidences: Vec<f32> = energies
+            .iter()
+            .map(|&e| mapper.confidence_from_energy(e))
+            .collect();
 
         for i in 1..confidences.len() {
             assert!(
@@ -635,7 +650,10 @@ mod tests {
         let score = mapper.compute_confidence(&energy);
 
         assert!(score.value > 0.5, "Low energy should give >0.5 confidence");
-        assert!(score.witness_backed, "Should be witness-backed with edge data");
+        assert!(
+            score.witness_backed,
+            "Should be witness-backed with edge data"
+        );
         assert_eq!(score.edge_count, 3);
         assert!(!score.explanation.is_empty());
     }
@@ -677,11 +695,26 @@ mod tests {
 
     #[test]
     fn test_confidence_score_levels() {
-        assert_eq!(ConfidenceScore::from_value(0.95).level(), ConfidenceLevel::VeryHigh);
-        assert_eq!(ConfidenceScore::from_value(0.75).level(), ConfidenceLevel::High);
-        assert_eq!(ConfidenceScore::from_value(0.55).level(), ConfidenceLevel::Moderate);
-        assert_eq!(ConfidenceScore::from_value(0.35).level(), ConfidenceLevel::Low);
-        assert_eq!(ConfidenceScore::from_value(0.15).level(), ConfidenceLevel::VeryLow);
+        assert_eq!(
+            ConfidenceScore::from_value(0.95).level(),
+            ConfidenceLevel::VeryHigh
+        );
+        assert_eq!(
+            ConfidenceScore::from_value(0.75).level(),
+            ConfidenceLevel::High
+        );
+        assert_eq!(
+            ConfidenceScore::from_value(0.55).level(),
+            ConfidenceLevel::Moderate
+        );
+        assert_eq!(
+            ConfidenceScore::from_value(0.35).level(),
+            ConfidenceLevel::Low
+        );
+        assert_eq!(
+            ConfidenceScore::from_value(0.15).level(),
+            ConfidenceLevel::VeryLow
+        );
     }
 
     #[test]
@@ -717,13 +750,25 @@ mod tests {
 
         // Very large energy should not cause overflow
         let conf = mapper.confidence_from_energy(1000.0);
-        assert!(conf >= 0.0 && conf <= 1.0, "Large energy gave invalid confidence: {conf}");
-        assert!(conf < 0.001, "Large energy should give near-zero confidence");
+        assert!(
+            conf >= 0.0 && conf <= 1.0,
+            "Large energy gave invalid confidence: {conf}"
+        );
+        assert!(
+            conf < 0.001,
+            "Large energy should give near-zero confidence"
+        );
 
         // Negative energy (shouldn't happen, but test stability)
         let conf = mapper.confidence_from_energy(-100.0);
-        assert!(conf >= 0.0 && conf <= 1.0, "Negative energy gave invalid confidence: {conf}");
-        assert!(conf > 0.999, "Negative energy should give near-one confidence");
+        assert!(
+            conf >= 0.0 && conf <= 1.0,
+            "Negative energy gave invalid confidence: {conf}"
+        );
+        assert!(
+            conf > 0.999,
+            "Negative energy should give near-one confidence"
+        );
     }
 
     #[test]

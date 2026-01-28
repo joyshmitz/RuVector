@@ -91,7 +91,9 @@ impl DmaRingBuffer {
     /// Create a new DMA ring buffer (mock for non-PCIe builds)
     #[cfg(not(feature = "pcie"))]
     fn new(_config: &PcieConfig) -> Result<Self> {
-        Err(Error::FeatureNotAvailable("PCIe support not compiled".into()))
+        Err(Error::FeatureNotAvailable(
+            "PCIe support not compiled".into(),
+        ))
     }
 
     /// Create a new DMA ring buffer
@@ -221,9 +223,9 @@ pub struct FpgaPcieBackend {
 /// Cached model metadata
 struct ModelMetadata {
     artifact: ModelArtifact,
-    fpga_slot: u32,       // Slot in FPGA memory where model is loaded
-    weights_offset: u64,  // Offset in FPGA DDR where weights are stored
-    weights_size: usize,  // Size of weights in bytes
+    fpga_slot: u32,      // Slot in FPGA memory where model is loaded
+    weights_offset: u64, // Offset in FPGA DDR where weights are stored
+    weights_size: usize, // Size of weights in bytes
 }
 
 /// FPGA DDR base offset for model weights
@@ -256,21 +258,19 @@ impl FpgaPcieBackend {
 
     /// Write inference request to DMA buffer
     #[cfg(feature = "pcie")]
-    fn write_request(&self, ring: &mut DmaRingBuffer, slot: usize, req: &InferenceRequest) -> Result<()> {
+    fn write_request(
+        &self,
+        ring: &mut DmaRingBuffer,
+        slot: usize,
+        req: &InferenceRequest,
+    ) -> Result<()> {
         use crate::backend::{protocol, RequestFrame};
 
         let buffer = ring.request_buffer(slot);
         let shape = &req.shape;
 
         // Write header
-        let frame = RequestFrame::new(
-            shape.seq_len,
-            shape.d_model,
-            shape.vocab,
-            &req.model,
-            0,
-            16,
-        );
+        let frame = RequestFrame::new(shape.seq_len, shape.d_model, shape.vocab, &req.model, 0, 16);
         let header = frame.to_bytes();
         buffer[..protocol::HEADER_SIZE].copy_from_slice(&header);
 
@@ -298,7 +298,12 @@ impl FpgaPcieBackend {
 
     /// Read inference response from DMA buffer
     #[cfg(feature = "pcie")]
-    fn read_response(&self, ring: &DmaRingBuffer, slot: usize, shape: &crate::types::FixedShape) -> Result<(Vec<i16>, u32, u32, GateDecision)> {
+    fn read_response(
+        &self,
+        ring: &DmaRingBuffer,
+        slot: usize,
+        shape: &crate::types::FixedShape,
+    ) -> Result<(Vec<i16>, u32, u32, GateDecision)> {
         use crate::backend::ResponseFrame;
 
         let buffer = ring.response_buffer(slot);
@@ -308,7 +313,10 @@ impl FpgaPcieBackend {
 
         // Check status
         if response.status != 0 {
-            return Err(Error::backend(format!("FPGA error: status {}", response.status)));
+            return Err(Error::backend(format!(
+                "FPGA error: status {}",
+                response.status
+            )));
         }
 
         // Read logits
@@ -322,7 +330,12 @@ impl FpgaPcieBackend {
             offset += 2;
         }
 
-        Ok((logits, response.cycles, response.latency_ns, response.to_gate_decision()))
+        Ok((
+            logits,
+            response.cycles,
+            response.latency_ns,
+            response.to_gate_decision(),
+        ))
     }
 
     /// Ring doorbell to notify FPGA of pending request
@@ -374,9 +387,10 @@ impl FpgaPcieBackend {
         // DMA transfer configuration
         const DMA_CHUNK_SIZE: usize = 64 * 1024; // 64KB per transfer
 
-        let ring = self.ring.as_ref().ok_or_else(|| {
-            Error::FeatureNotAvailable("Ring buffer not initialized".into())
-        })?;
+        let ring = self
+            .ring
+            .as_ref()
+            .ok_or_else(|| Error::FeatureNotAvailable("Ring buffer not initialized".into()))?;
 
         // Transfer weights in chunks
         let mut transferred = 0usize;
@@ -439,7 +453,9 @@ impl TransformerBackend for FpgaPcieBackend {
         #[cfg(not(feature = "pcie"))]
         {
             let _ = artifact;
-            return Err(Error::FeatureNotAvailable("PCIe support not compiled".into()));
+            return Err(Error::FeatureNotAvailable(
+                "PCIe support not compiled".into(),
+            ));
         }
 
         #[cfg(feature = "pcie")]
@@ -488,7 +504,9 @@ impl TransformerBackend for FpgaPcieBackend {
         #[cfg(not(feature = "pcie"))]
         {
             let _ = req;
-            return Err(Error::FeatureNotAvailable("PCIe support not compiled".into()));
+            return Err(Error::FeatureNotAvailable(
+                "PCIe support not compiled".into(),
+            ));
         }
 
         #[cfg(feature = "pcie")]
@@ -501,20 +519,22 @@ impl TransformerBackend for FpgaPcieBackend {
             // Get model metadata
             let model_artifact = read_lock(&self.models, |models| {
                 models.get(&req.model).map(|m| m.artifact.clone())
-            })?.ok_or_else(|| Error::ModelNotFound(req.model))?;
+            })?
+            .ok_or_else(|| Error::ModelNotFound(req.model))?;
 
             // Validate tokens against vocabulary
             validate_tokens(req.tokens, model_artifact.manifest.shape.vocab)?;
 
             // Get ring buffer
-            let ring = self.ring.as_ref().ok_or_else(|| {
-                Error::FeatureNotAvailable("Ring buffer not initialized".into())
-            })?;
+            let ring = self
+                .ring
+                .as_ref()
+                .ok_or_else(|| Error::FeatureNotAvailable("Ring buffer not initialized".into()))?;
 
             // Acquire slot
-            let slot = ring.acquire_slot().ok_or_else(|| {
-                Error::ResourceExhausted("No DMA slots available".into())
-            })?;
+            let slot = ring
+                .acquire_slot()
+                .ok_or_else(|| Error::ResourceExhausted("No DMA slots available".into()))?;
 
             // Write request (need mutable access - simplified for now)
             // In production, this would use proper interior mutability
@@ -549,7 +569,8 @@ impl TransformerBackend for FpgaPcieBackend {
             );
 
             // Update stats
-            self.total_cycles.fetch_add(cycles as u64, Ordering::Relaxed);
+            self.total_cycles
+                .fetch_add(cycles as u64, Ordering::Relaxed);
             write_lock(&self.stats, |stats| {
                 stats.total_inferences += 1;
                 stats.total_cycles = self.total_cycles.load(Ordering::Relaxed);
@@ -569,7 +590,9 @@ impl TransformerBackend for FpgaPcieBackend {
     fn unload(&self, model: ModelId) -> Result<()> {
         // Remove from cache and get memory info for deallocation
         let removed = write_lock(&self.models, |models| {
-            models.remove(&model).map(|m| (m.weights_offset, m.weights_size))
+            models
+                .remove(&model)
+                .map(|m| (m.weights_offset, m.weights_size))
         })?;
 
         if let Some((offset, size)) = removed {

@@ -275,7 +275,12 @@ impl MemorySummarizer {
     }
 
     /// Summarize multiple memories into a single summary
-    pub fn summarize_memories(&self, memories: &[RetrievedMemory], max_tokens: usize, chars_per_token: f32) -> String {
+    pub fn summarize_memories(
+        &self,
+        memories: &[RetrievedMemory],
+        max_tokens: usize,
+        chars_per_token: f32,
+    ) -> String {
         let max_chars = (max_tokens as f32 * chars_per_token) as usize;
 
         let mut summary = String::with_capacity(max_chars);
@@ -555,8 +560,12 @@ impl IntelligentContextManager {
         }
 
         let elapsed = start.elapsed().as_micros() as u64;
-        self.stats.total_tokens.fetch_add(total_tokens as u64, Ordering::SeqCst);
-        self.stats.total_time_us.fetch_add(elapsed, Ordering::SeqCst);
+        self.stats
+            .total_tokens
+            .fetch_add(total_tokens as u64, Ordering::SeqCst);
+        self.stats
+            .total_time_us
+            .fetch_add(elapsed, Ordering::SeqCst);
 
         Ok(PreparedContext {
             elements: included,
@@ -711,7 +720,12 @@ mod tests {
         // Store some memory
         let embedding = vec![0.1; 128];
         manager
-            .store_memory("fact-1", "Test fact", embedding.clone(), MemoryType::Semantic)
+            .store_memory(
+                "fact-1",
+                "Test fact",
+                embedding.clone(),
+                MemoryType::Semantic,
+            )
             .unwrap();
 
         let messages = vec![Message {
@@ -750,7 +764,10 @@ mod tests {
         assert!(score <= 1.0);
 
         let priority = scorer.assign_priority(score);
-        assert!(matches!(priority, ElementPriority::High | ElementPriority::Critical));
+        assert!(matches!(
+            priority,
+            ElementPriority::High | ElementPriority::Critical
+        ));
     }
 
     #[test]

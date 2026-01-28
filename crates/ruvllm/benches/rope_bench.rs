@@ -427,7 +427,12 @@ fn bench_apply_rope(c: &mut Criterion) {
             group.bench_function(id, |b| {
                 b.iter(|| {
                     let mut x_copy = x.clone();
-                    apply_rope_neon(black_box(&mut x_copy), black_box(&positions), head_dim, base);
+                    apply_rope_neon(
+                        black_box(&mut x_copy),
+                        black_box(&positions),
+                        head_dim,
+                        base,
+                    );
                     x_copy
                 })
             });
@@ -479,10 +484,7 @@ fn bench_precompute_tables(c: &mut Criterion) {
 
     for max_seq_len in [512, 1024, 2048, 4096, 8192] {
         for head_dim in [64, 128] {
-            let id = BenchmarkId::new(
-                format!("seq_{}_dim_{}", max_seq_len, head_dim),
-                max_seq_len,
-            );
+            let id = BenchmarkId::new(format!("seq_{}_dim_{}", max_seq_len, head_dim), max_seq_len);
 
             group.throughput(Throughput::Elements((max_seq_len * head_dim) as u64));
             group.bench_function(id, |b| {
@@ -504,14 +506,22 @@ fn bench_precompute_with_config(c: &mut Criterion) {
     let configs = [
         ("llama2_4k", RopeConfig::llama2(128, 4096)),
         ("llama3_4k", RopeConfig::llama3(128, 4096)),
-        ("llama2_8k_ntk", RopeConfig::llama2(128, 8192).with_ntk(4096)),
-        ("llama2_8k_scaled", RopeConfig::llama2(128, 8192).with_scaling(2.0)),
+        (
+            "llama2_8k_ntk",
+            RopeConfig::llama2(128, 8192).with_ntk(4096),
+        ),
+        (
+            "llama2_8k_scaled",
+            RopeConfig::llama2(128, 8192).with_scaling(2.0),
+        ),
     ];
 
     for (name, config) in configs {
         let id = BenchmarkId::new(name, config.max_seq_len);
 
-        group.throughput(Throughput::Elements((config.max_seq_len * config.head_dim) as u64));
+        group.throughput(Throughput::Elements(
+            (config.max_seq_len * config.head_dim) as u64,
+        ));
         group.bench_with_input(id, &config, |b, cfg| {
             b.iter(|| precompute_rope_tables_with_config(black_box(cfg)))
         });
@@ -544,7 +554,12 @@ fn bench_rope_vs_tables(c: &mut Criterion) {
     group.bench_function("without_tables", |b| {
         b.iter(|| {
             let mut x_copy = x.clone();
-            apply_rope_neon(black_box(&mut x_copy), black_box(&positions), head_dim, base);
+            apply_rope_neon(
+                black_box(&mut x_copy),
+                black_box(&positions),
+                head_dim,
+                base,
+            );
             x_copy
         })
     });
@@ -580,7 +595,12 @@ fn bench_inverse_rope(c: &mut Criterion) {
             group.bench_function(id, |b| {
                 b.iter(|| {
                     let mut x_copy = x.clone();
-                    apply_inverse_rope_neon(black_box(&mut x_copy), black_box(&positions), head_dim, base);
+                    apply_inverse_rope_neon(
+                        black_box(&mut x_copy),
+                        black_box(&positions),
+                        head_dim,
+                        base,
+                    );
                     x_copy
                 })
             });
@@ -607,8 +627,18 @@ fn bench_rope_roundtrip(c: &mut Criterion) {
         group.bench_function(id, |b| {
             b.iter(|| {
                 let mut x_copy = x.clone();
-                apply_rope_neon(black_box(&mut x_copy), black_box(&positions), head_dim, base);
-                apply_inverse_rope_neon(black_box(&mut x_copy), black_box(&positions), head_dim, base);
+                apply_rope_neon(
+                    black_box(&mut x_copy),
+                    black_box(&positions),
+                    head_dim,
+                    base,
+                );
+                apply_inverse_rope_neon(
+                    black_box(&mut x_copy),
+                    black_box(&positions),
+                    head_dim,
+                    base,
+                );
                 x_copy
             })
         });
@@ -631,8 +661,14 @@ fn bench_rope_scaling_variants(c: &mut Criterion) {
         ("standard", RopeConfig::llama2(head_dim, 4096)),
         ("ntk_2x", RopeConfig::llama2(head_dim, 8192).with_ntk(4096)),
         ("ntk_4x", RopeConfig::llama2(head_dim, 16384).with_ntk(4096)),
-        ("linear_2x", RopeConfig::llama2(head_dim, 8192).with_scaling(2.0)),
-        ("linear_4x", RopeConfig::llama2(head_dim, 16384).with_scaling(4.0)),
+        (
+            "linear_2x",
+            RopeConfig::llama2(head_dim, 8192).with_scaling(2.0),
+        ),
+        (
+            "linear_4x",
+            RopeConfig::llama2(head_dim, 16384).with_scaling(4.0),
+        ),
     ];
 
     for (name, config) in configs {

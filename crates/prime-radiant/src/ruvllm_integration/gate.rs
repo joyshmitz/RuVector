@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::coherence::{CoherenceEngine, CoherenceEnergy};
+use crate::coherence::{CoherenceEnergy, CoherenceEngine};
 use crate::execution::ComputeLane;
 use crate::governance::PolicyBundle;
 
@@ -284,8 +284,18 @@ impl LlmCoherenceGate {
             .map(|(a, b)| a * b)
             .sum();
 
-        let mag_a: f32 = response.context_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let mag_b: f32 = response.response_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let mag_a: f32 = response
+            .context_embedding
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
+        let mag_b: f32 = response
+            .response_embedding
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
 
         if mag_a == 0.0 || mag_b == 0.0 {
             return 1.0;
@@ -309,14 +319,18 @@ impl LlmCoherenceGate {
     /// Estimate hallucination probability.
     fn estimate_hallucination_prob(&self, analysis: &CoherenceAnalysis) -> f64 {
         // Combine scores to estimate hallucination probability
-        let combined = (analysis.semantic_score + analysis.factual_score + analysis.citation_score) / 3.0;
+        let combined =
+            (analysis.semantic_score + analysis.factual_score + analysis.citation_score) / 3.0;
 
         // Higher combined score = lower hallucination probability
         (1.0 - combined) * self.config.hallucination_sensitivity
     }
 
     /// Determine the gate decision based on analysis.
-    fn determine_decision(&self, analysis: &CoherenceAnalysis) -> (bool, ComputeLane, LlmGateReason) {
+    fn determine_decision(
+        &self,
+        analysis: &CoherenceAnalysis,
+    ) -> (bool, ComputeLane, LlmGateReason) {
         // Check for hallucination
         if analysis.hallucination_prob > self.config.hallucination_sensitivity {
             return (

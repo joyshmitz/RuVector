@@ -6,7 +6,9 @@
 use super::correctness::{CorrectnessMetrics, TaskResult, VerificationLevel};
 use super::diff_quality::DiffAnalyzer;
 use super::economics::{CostTracker, EconomicsMetrics};
-use super::harness::{AblationMode, EvalConfig, EvalReport, EvalRun, EvalTask, LatencyBreakdown, ModeMetrics};
+use super::harness::{
+    AblationMode, EvalConfig, EvalReport, EvalRun, EvalTask, LatencyBreakdown, ModeMetrics,
+};
 use crate::backends::{create_backend, GenerateParams, LlmBackend, ModelConfig};
 use crate::claude_flow::{AgentType, ClaudeFlowTask, HnswRouter, HnswRouterConfig, TaskPattern};
 use crate::sona::integration::{SonaConfig, SonaIntegration, Trajectory};
@@ -123,7 +125,10 @@ impl RealEvaluationHarness {
 
         // Load model if path provided
         if !inference_config.model_path.is_empty() {
-            harness.load_model(&inference_config.model_path, inference_config.model_config.clone())?;
+            harness.load_model(
+                &inference_config.model_path,
+                inference_config.model_config.clone(),
+            )?;
         }
 
         // Initialize SONA if enabled
@@ -152,7 +157,10 @@ impl RealEvaluationHarness {
 
     /// Get the model's embedding dimension from model info
     fn get_model_embedding_dim(&self) -> Option<usize> {
-        self.backend.read().model_info().map(|info| info.hidden_size)
+        self.backend
+            .read()
+            .model_info()
+            .map(|info| info.hidden_size)
     }
 
     /// Bootstrap HNSW router with seed patterns for common code tasks
@@ -168,41 +176,109 @@ impl RealEvaluationHarness {
         // Seed patterns for different task types
         let seed_patterns = vec![
             // Bug fix patterns
-            ("Fix null pointer exception", AgentType::Coder, ClaudeFlowTask::Debugging),
-            ("Resolve memory leak", AgentType::Coder, ClaudeFlowTask::Debugging),
-            ("Fix off-by-one error", AgentType::Coder, ClaudeFlowTask::Debugging),
-            ("Handle edge case", AgentType::Coder, ClaudeFlowTask::Debugging),
+            (
+                "Fix null pointer exception",
+                AgentType::Coder,
+                ClaudeFlowTask::Debugging,
+            ),
+            (
+                "Resolve memory leak",
+                AgentType::Coder,
+                ClaudeFlowTask::Debugging,
+            ),
+            (
+                "Fix off-by-one error",
+                AgentType::Coder,
+                ClaudeFlowTask::Debugging,
+            ),
+            (
+                "Handle edge case",
+                AgentType::Coder,
+                ClaudeFlowTask::Debugging,
+            ),
             // Code generation patterns
-            ("Implement new function", AgentType::Coder, ClaudeFlowTask::CodeGeneration),
-            ("Add new feature", AgentType::Coder, ClaudeFlowTask::CodeGeneration),
-            ("Create API endpoint", AgentType::Coder, ClaudeFlowTask::CodeGeneration),
-            ("Build component", AgentType::Coder, ClaudeFlowTask::CodeGeneration),
+            (
+                "Implement new function",
+                AgentType::Coder,
+                ClaudeFlowTask::CodeGeneration,
+            ),
+            (
+                "Add new feature",
+                AgentType::Coder,
+                ClaudeFlowTask::CodeGeneration,
+            ),
+            (
+                "Create API endpoint",
+                AgentType::Coder,
+                ClaudeFlowTask::CodeGeneration,
+            ),
+            (
+                "Build component",
+                AgentType::Coder,
+                ClaudeFlowTask::CodeGeneration,
+            ),
             // Refactoring patterns
-            ("Refactor for performance", AgentType::Coder, ClaudeFlowTask::Refactoring),
-            ("Extract method", AgentType::Coder, ClaudeFlowTask::Refactoring),
-            ("Simplify code", AgentType::Coder, ClaudeFlowTask::Refactoring),
+            (
+                "Refactor for performance",
+                AgentType::Coder,
+                ClaudeFlowTask::Refactoring,
+            ),
+            (
+                "Extract method",
+                AgentType::Coder,
+                ClaudeFlowTask::Refactoring,
+            ),
+            (
+                "Simplify code",
+                AgentType::Coder,
+                ClaudeFlowTask::Refactoring,
+            ),
             // Testing patterns
-            ("Write unit tests", AgentType::Tester, ClaudeFlowTask::Testing),
-            ("Add integration tests", AgentType::Tester, ClaudeFlowTask::Testing),
-            ("Increase test coverage", AgentType::Tester, ClaudeFlowTask::Testing),
+            (
+                "Write unit tests",
+                AgentType::Tester,
+                ClaudeFlowTask::Testing,
+            ),
+            (
+                "Add integration tests",
+                AgentType::Tester,
+                ClaudeFlowTask::Testing,
+            ),
+            (
+                "Increase test coverage",
+                AgentType::Tester,
+                ClaudeFlowTask::Testing,
+            ),
             // Research patterns
-            ("Analyze codebase", AgentType::Researcher, ClaudeFlowTask::Research),
-            ("Find similar patterns", AgentType::Researcher, ClaudeFlowTask::Research),
+            (
+                "Analyze codebase",
+                AgentType::Researcher,
+                ClaudeFlowTask::Research,
+            ),
+            (
+                "Find similar patterns",
+                AgentType::Researcher,
+                ClaudeFlowTask::Research,
+            ),
             // Review patterns
-            ("Review code quality", AgentType::Reviewer, ClaudeFlowTask::CodeReview),
-            ("Security review", AgentType::Reviewer, ClaudeFlowTask::CodeReview),
+            (
+                "Review code quality",
+                AgentType::Reviewer,
+                ClaudeFlowTask::CodeReview,
+            ),
+            (
+                "Security review",
+                AgentType::Reviewer,
+                ClaudeFlowTask::CodeReview,
+            ),
         ];
 
         for (i, (description, agent_type, task_type)) in seed_patterns.iter().enumerate() {
             // Create deterministic pseudo-embedding from description
             let embedding = Self::create_seed_embedding(description, dim, i);
 
-            let mut pattern = TaskPattern::new(
-                embedding,
-                *agent_type,
-                *task_type,
-                description.to_string(),
-            );
+            let mut pattern =
+                TaskPattern::new(embedding, *agent_type, *task_type, description.to_string());
             // Give seed patterns initial trust
             pattern.usage_count = 10;
             pattern.success_count = 8;
@@ -211,7 +287,10 @@ impl RealEvaluationHarness {
             router.add_pattern(pattern)?;
         }
 
-        tracing::info!("Bootstrapped HNSW router with {} seed patterns", seed_patterns.len());
+        tracing::info!(
+            "Bootstrapped HNSW router with {} seed patterns",
+            seed_patterns.len()
+        );
         Ok(())
     }
 
@@ -253,7 +332,7 @@ impl RealEvaluationHarness {
     pub async fn run_evaluation(&mut self, tasks: &[EvalTask]) -> Result<EvalReport> {
         if !self.is_model_loaded() {
             return Err(crate::RuvLLMError::InvalidOperation(
-                "No model loaded. Call load_model() first.".into()
+                "No model loaded. Call load_model() first.".into(),
             ));
         }
 
@@ -322,7 +401,8 @@ impl RealEvaluationHarness {
 
         // Analyze diff quality
         let diff_quality = patch.as_ref().map(|p| {
-            self.diff_analyzer.analyze(p, task.reference_patch.as_deref())
+            self.diff_analyzer
+                .analyze(p, task.reference_patch.as_deref())
         });
 
         // Build correctness result
@@ -330,9 +410,9 @@ impl RealEvaluationHarness {
 
         // Determine acceptance
         let accepted = correctness.succeeded()
-            && diff_quality
-                .as_ref()
-                .map_or(false, |dq| dq.combined_score >= self.config.quality_threshold);
+            && diff_quality.as_ref().map_or(false, |dq| {
+                dq.combined_score >= self.config.quality_threshold
+            });
 
         // ========== LEARNING ==========
         // Learn from this task in modes that support learning
@@ -363,7 +443,8 @@ impl RealEvaluationHarness {
             let router = router.read();
 
             // Get embedding for task - use seed embedding if backend can't provide
-            let embedding = self.get_embedding(task_description)
+            let embedding = self
+                .get_embedding(task_description)
                 .unwrap_or_else(|_| Self::create_seed_embedding(task_description, 384, 0));
 
             // Use full routing with confidence scores
@@ -373,7 +454,9 @@ impl RealEvaluationHarness {
                 primary_agent: hnsw_result.primary_agent,
                 confidence: hnsw_result.confidence,
                 patterns_considered: hnsw_result.patterns_considered,
-                alternatives: hnsw_result.alternatives.iter()
+                alternatives: hnsw_result
+                    .alternatives
+                    .iter()
                     .map(|(agent, score)| format!("{:?}:{:.2}", agent, score))
                     .collect(),
                 reasoning: hnsw_result.reasoning,
@@ -394,7 +477,8 @@ impl RealEvaluationHarness {
         if let Some(ref router) = self.hnsw_router {
             let mut router = router.write();
 
-            let embedding = self.get_embedding(&task.description)
+            let embedding = self
+                .get_embedding(&task.description)
                 .unwrap_or_else(|_| Self::create_seed_embedding(&task.description, 384, 0));
 
             // Determine task type from description
@@ -442,7 +526,8 @@ impl RealEvaluationHarness {
     fn classify_task_type(description: &str) -> ClaudeFlowTask {
         let desc_lower = description.to_lowercase();
 
-        if desc_lower.contains("fix") || desc_lower.contains("bug") || desc_lower.contains("error") {
+        if desc_lower.contains("fix") || desc_lower.contains("bug") || desc_lower.contains("error")
+        {
             ClaudeFlowTask::Debugging
         } else if desc_lower.contains("test") {
             ClaudeFlowTask::Testing
@@ -470,10 +555,7 @@ impl RealEvaluationHarness {
             "Routing analysis (confidence: {:.1}%):\n",
             routing.confidence * 100.0
         ));
-        context.push_str(&format!(
-            "- Primary agent: {:?}\n",
-            routing.primary_agent
-        ));
+        context.push_str(&format!("- Primary agent: {:?}\n", routing.primary_agent));
         context.push_str(&format!(
             "- Patterns analyzed: {}\n",
             routing.patterns_considered
@@ -564,10 +646,14 @@ impl RealEvaluationHarness {
         let mut prompt = String::new();
 
         // Add context if using retrieval
-        if !context.is_empty() && matches!(
-            mode,
-            AblationMode::RetrievalOnly | AblationMode::RetrievalPlusAdapters | AblationMode::Full
-        ) {
+        if !context.is_empty()
+            && matches!(
+                mode,
+                AblationMode::RetrievalOnly
+                    | AblationMode::RetrievalPlusAdapters
+                    | AblationMode::Full
+            )
+        {
             prompt.push_str(context);
             prompt.push_str("\n---\n\n");
         }
@@ -634,11 +720,11 @@ impl RealEvaluationHarness {
             test_results: None, // Would run actual tests
             verification_level: task.verification_level,
             human_verified: None,
-            files_changed: patch.as_ref().map_or(0, |p| {
-                p.matches("--- a/").count()
-            }),
+            files_changed: patch.as_ref().map_or(0, |p| p.matches("--- a/").count()),
             lines_changed: patch.as_ref().map_or(0, |p| {
-                p.lines().filter(|l| l.starts_with('+') || l.starts_with('-')).count()
+                p.lines()
+                    .filter(|l| l.starts_with('+') || l.starts_with('-'))
+                    .count()
             }),
             is_multi_file: task.expected_files.len() > 1,
             coupling_score: 0.3,
@@ -670,8 +756,14 @@ impl RealEvaluationHarness {
                 }
 
                 // Add REAL latency samples
-                economics.latency.routing.add_secs(run.latency.routing_ms / 1000.0);
-                economics.latency.end_to_end.add_secs(run.latency.total_ms / 1000.0);
+                economics
+                    .latency
+                    .routing
+                    .add_secs(run.latency.routing_ms / 1000.0);
+                economics
+                    .latency
+                    .end_to_end
+                    .add_secs(run.latency.total_ms / 1000.0);
             }
 
             economics.recalculate();

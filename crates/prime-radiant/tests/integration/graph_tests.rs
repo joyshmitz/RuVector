@@ -238,11 +238,7 @@ fn test_subgraph_extraction_bfs() {
     adjacency.insert(5, vec![4]);
 
     // Extract 1-hop subgraph around node 3
-    fn extract_khop(
-        center: u64,
-        k: usize,
-        adjacency: &HashMap<u64, Vec<u64>>,
-    ) -> Vec<u64> {
+    fn extract_khop(center: u64, k: usize, adjacency: &HashMap<u64, Vec<u64>>) -> Vec<u64> {
         let mut visited = vec![center];
         let mut frontier = vec![center];
 
@@ -306,8 +302,8 @@ fn test_namespace_isolation() {
 #[test]
 fn test_fingerprint_changes_on_modification() {
     // Graph fingerprint should change when structure changes
-    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     fn compute_fingerprint(nodes: &HashMap<u64, Vec<f32>>, edges: &[(u64, u64)]) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -353,8 +349,8 @@ fn test_fingerprint_changes_on_modification() {
 #[test]
 fn test_fingerprint_stable_without_modification() {
     // Fingerprint should be deterministic and stable
-    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     fn compute_fingerprint(nodes: &HashMap<u64, Vec<f32>>) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -411,7 +407,8 @@ fn test_restriction_map_dimension_compatibility() {
             if input.len() != self.input_dim() {
                 return Err("Input dimension mismatch");
             }
-            Ok(self.matrix
+            Ok(self
+                .matrix
                 .iter()
                 .map(|row| row.iter().zip(input).map(|(a, b)| a * b).sum())
                 .collect())

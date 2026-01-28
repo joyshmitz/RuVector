@@ -99,7 +99,9 @@ impl TuckerDecomposition {
     pub fn compression_ratio(&self) -> f64 {
         let original: usize = self.shape.iter().product();
         let core_size: usize = self.core_shape.iter().product();
-        let factor_size: usize = self.factors.iter()
+        let factor_size: usize = self
+            .factors
+            .iter()
             .enumerate()
             .map(|(k, f)| self.shape[k] * self.core_shape[k])
             .sum();
@@ -112,7 +114,10 @@ impl TuckerDecomposition {
 fn mode_k_unfold(tensor: &DenseTensor, k: usize) -> Vec<f64> {
     let d = tensor.order();
     let n_k = tensor.shape[k];
-    let cols: usize = tensor.shape.iter().enumerate()
+    let cols: usize = tensor
+        .shape
+        .iter()
+        .enumerate()
         .filter(|&(i, _)| i != k)
         .map(|(_, &s)| s)
         .product();
@@ -153,16 +158,24 @@ fn mode_k_unfold(tensor: &DenseTensor, k: usize) -> Vec<f64> {
 }
 
 /// Compute left singular vectors via power iteration
-fn compute_left_singular_vectors(a: &[f64], rows: usize, cols: usize, rank: usize, max_iters: usize) -> Vec<f64> {
+fn compute_left_singular_vectors(
+    a: &[f64],
+    rows: usize,
+    cols: usize,
+    rank: usize,
+    max_iters: usize,
+) -> Vec<f64> {
     let mut u = vec![0.0; rows * rank];
 
     // Compute A * A^T iteratively
     for r in 0..rank {
         // Initialize random vector
-        let mut v: Vec<f64> = (0..rows).map(|i| {
-            let x = ((i * 2654435769 + r * 1103515245) as f64 / 4294967296.0) * 2.0 - 1.0;
-            x
-        }).collect();
+        let mut v: Vec<f64> = (0..rows)
+            .map(|i| {
+                let x = ((i * 2654435769 + r * 1103515245) as f64 / 4294967296.0) * 2.0 - 1.0;
+                x
+            })
+            .collect();
         normalize(&mut v);
 
         // Power iteration
@@ -233,7 +246,14 @@ fn compute_core(tensor: &DenseTensor, factors: &[Vec<f64>], core_shape: &[usize]
 }
 
 /// Apply mode-k product: result[...,:,...] = A[...,:,...] * U (n_k -> r_k)
-fn apply_mode_product_transpose(data: &[f64], shape: &[usize], u: &[f64], n_k: usize, r_k: usize, k: usize) -> Vec<f64> {
+fn apply_mode_product_transpose(
+    data: &[f64],
+    shape: &[usize],
+    u: &[f64],
+    n_k: usize,
+    r_k: usize,
+    k: usize,
+) -> Vec<f64> {
     let d = shape.len();
     let mut new_shape = shape.to_vec();
     new_shape[k] = r_k;
@@ -274,7 +294,14 @@ fn apply_mode_product_transpose(data: &[f64], shape: &[usize], u: &[f64], n_k: u
 }
 
 /// Apply mode-k product: result[...,:,...] = A[...,:,...] * U^T (r_k -> n_k)
-fn apply_mode_product(data: &[f64], shape: &[usize], u: &[f64], n_k: usize, r_k: usize, k: usize) -> Vec<f64> {
+fn apply_mode_product(
+    data: &[f64],
+    shape: &[usize],
+    u: &[f64],
+    n_k: usize,
+    r_k: usize,
+    k: usize,
+) -> Vec<f64> {
     let d = shape.len();
     let mut new_shape = shape.to_vec();
     new_shape[k] = n_k;

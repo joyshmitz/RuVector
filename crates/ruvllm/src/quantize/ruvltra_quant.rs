@@ -17,8 +17,8 @@
 //! - Blocked layouts matching ANE tile sizes (typically 16x16 or 32x32)
 //! - Interleaved scales for efficient fused operations
 
-use std::io::{Read, Write as IoWrite, BufWriter, Seek, SeekFrom};
 use std::fs::File;
+use std::io::{BufWriter, Read, Seek, SeekFrom, Write as IoWrite};
 use std::path::Path;
 
 use crate::error::{Result, RuvLLMError};
@@ -204,8 +204,19 @@ pub struct MemoryBreakdown {
 /// - Embeddings: ~32K vocab * 896 dim * 2 bytes (FP16) = ~57 MB
 /// - 24 layers * (Q,K,V,O + MLP) quantized to Q4_K = ~243 MB
 /// - Total: ~300 MB
-pub fn estimate_memory_q4(params_billions: f64, vocab_size: usize, hidden_dim: usize, num_layers: usize) -> MemoryEstimate {
-    estimate_memory_internal(params_billions, vocab_size, hidden_dim, num_layers, TargetFormat::Q4_K_M)
+pub fn estimate_memory_q4(
+    params_billions: f64,
+    vocab_size: usize,
+    hidden_dim: usize,
+    num_layers: usize,
+) -> MemoryEstimate {
+    estimate_memory_internal(
+        params_billions,
+        vocab_size,
+        hidden_dim,
+        num_layers,
+        TargetFormat::Q4_K_M,
+    )
 }
 
 /// Estimate memory for Q5_K_M quantization
@@ -213,8 +224,19 @@ pub fn estimate_memory_q4(params_billions: f64, vocab_size: usize, hidden_dim: u
 /// For a 0.5B parameter model:
 /// - Similar structure but 5.5 bits per weight
 /// - Total: ~375 MB
-pub fn estimate_memory_q5(params_billions: f64, vocab_size: usize, hidden_dim: usize, num_layers: usize) -> MemoryEstimate {
-    estimate_memory_internal(params_billions, vocab_size, hidden_dim, num_layers, TargetFormat::Q5_K_M)
+pub fn estimate_memory_q5(
+    params_billions: f64,
+    vocab_size: usize,
+    hidden_dim: usize,
+    num_layers: usize,
+) -> MemoryEstimate {
+    estimate_memory_internal(
+        params_billions,
+        vocab_size,
+        hidden_dim,
+        num_layers,
+        TargetFormat::Q5_K_M,
+    )
 }
 
 /// Estimate memory for Q8_0 quantization
@@ -222,8 +244,19 @@ pub fn estimate_memory_q5(params_billions: f64, vocab_size: usize, hidden_dim: u
 /// For a 0.5B parameter model:
 /// - 8.5 bits per weight
 /// - Total: ~500 MB
-pub fn estimate_memory_q8(params_billions: f64, vocab_size: usize, hidden_dim: usize, num_layers: usize) -> MemoryEstimate {
-    estimate_memory_internal(params_billions, vocab_size, hidden_dim, num_layers, TargetFormat::Q8_0)
+pub fn estimate_memory_q8(
+    params_billions: f64,
+    vocab_size: usize,
+    hidden_dim: usize,
+    num_layers: usize,
+) -> MemoryEstimate {
+    estimate_memory_internal(
+        params_billions,
+        vocab_size,
+        hidden_dim,
+        num_layers,
+        TargetFormat::Q8_0,
+    )
 }
 
 fn estimate_memory_internal(
@@ -613,7 +646,11 @@ fn quantize_q4_k_block(data: &[f32]) -> Q4KMBlock {
 
         // Compute sub-block scale (6-bit)
         let sb_range = sb_max - sb_min;
-        let sb_scale = if d > 0.0 { (sb_range / d).min(63.0) as u8 } else { 0 };
+        let sb_scale = if d > 0.0 {
+            (sb_range / d).min(63.0) as u8
+        } else {
+            0
+        };
 
         // Pack 6-bit scale into scales array
         let scale_byte_idx = (sb * 6) / 8;
@@ -873,8 +910,9 @@ impl RuvltraQuantizer {
         let is_output = tensor_name.contains("lm_head") || tensor_name.contains("output");
 
         // Keep certain layers in higher precision
-        if (self.config.keep_embed_fp16 && is_embedding) ||
-           (self.config.keep_output_fp16 && is_output) {
+        if (self.config.keep_embed_fp16 && is_embedding)
+            || (self.config.keep_output_fp16 && is_output)
+        {
             return self.quantize_to_fp16(data);
         }
 
@@ -915,9 +953,7 @@ impl RuvltraQuantizer {
                 self.stats.elements_processed += data.len();
                 Ok(bytes)
             }
-            TargetFormat::F16 => {
-                self.quantize_to_fp16(data)
-            }
+            TargetFormat::F16 => self.quantize_to_fp16(data),
         }
     }
 
@@ -990,18 +1026,27 @@ mod tests {
         // The estimate will be higher than real GGUF sizes but should scale correctly
         let estimate = estimate_memory_q4(0.5, 151936, 896, 24);
         // Allow wider range since this is a simplified estimate
-        assert!(estimate.total_mb > 100.0 && estimate.total_mb < 1000.0,
-            "Estimate should be reasonable, got {:.1}MB", estimate.total_mb);
+        assert!(
+            estimate.total_mb > 100.0 && estimate.total_mb < 1000.0,
+            "Estimate should be reasonable, got {:.1}MB",
+            estimate.total_mb
+        );
 
         let estimate_q8 = estimate_memory_q8(0.5, 151936, 896, 24);
         // Q8 should be larger than Q4
-        assert!(estimate_q8.total_mb > estimate.total_mb,
+        assert!(
+            estimate_q8.total_mb > estimate.total_mb,
             "Q8 ({:.1}MB) should be larger than Q4 ({:.1}MB)",
-            estimate_q8.total_mb, estimate.total_mb);
+            estimate_q8.total_mb,
+            estimate.total_mb
+        );
 
         // Compression ratio should be positive (FP32 is bigger)
-        assert!(estimate.compression_ratio > 1.0,
-            "Compression ratio should be > 1, got {:.2}", estimate.compression_ratio);
+        assert!(
+            estimate.compression_ratio > 1.0,
+            "Compression ratio should be > 1, got {:.2}",
+            estimate.compression_ratio
+        );
     }
 
     #[test]
@@ -1017,9 +1062,12 @@ mod tests {
         dequantize_for_ane(&blocks, &mut output);
 
         // Check that values are roughly preserved
-        let mse: f64 = data.iter().zip(output.iter())
+        let mse: f64 = data
+            .iter()
+            .zip(output.iter())
             .map(|(a, b)| ((a - b) as f64).powi(2))
-            .sum::<f64>() / 256.0;
+            .sum::<f64>()
+            / 256.0;
 
         assert!(mse < 0.01, "Quantization MSE too high: {}", mse);
     }
@@ -1043,7 +1091,12 @@ mod tests {
             let f16 = f32_to_f16(val);
             let back = f16_to_f32(f16);
             let error = (val - back).abs() / val.abs().max(1.0);
-            assert!(error < 0.01, "F16 roundtrip error too high for {}: got {}", val, back);
+            assert!(
+                error < 0.01,
+                "F16 roundtrip error too high for {}: got {}",
+                val,
+                back
+            );
         }
     }
 

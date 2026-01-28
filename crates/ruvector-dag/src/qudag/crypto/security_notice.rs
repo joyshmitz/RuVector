@@ -49,9 +49,7 @@ pub fn check_crypto_security() {
     let status = security_status();
 
     if status.production_ready {
-        tracing::info!(
-            "✓ QuDAG cryptography: Production mode enabled (Dilithium3 + Kyber768)"
-        );
+        tracing::info!("✓ QuDAG cryptography: Production mode enabled (Dilithium3 + Kyber768)");
     } else {
         tracing::warn!(
             "⚠️ SECURITY WARNING: Using placeholder cryptography. \
@@ -59,8 +57,16 @@ pub fn check_crypto_security() {
         );
         tracing::warn!(
             "   ML-DSA: {} | ML-KEM: {}",
-            if status.ml_dsa_ready { "Ready" } else { "PLACEHOLDER" },
-            if status.ml_kem_ready { "Ready" } else { "PLACEHOLDER" }
+            if status.ml_dsa_ready {
+                "Ready"
+            } else {
+                "PLACEHOLDER"
+            },
+            if status.ml_kem_ready {
+                "Ready"
+            } else {
+                "PLACEHOLDER"
+            }
         );
     }
 }

@@ -176,8 +176,7 @@ impl HyperbolicEnergy {
 
         for edge in &self.edge_energies {
             let avg_depth = edge.avg_depth();
-            let bucket_idx =
-                ((avg_depth - self.min_depth) / bucket_size).floor() as usize;
+            let bucket_idx = ((avg_depth - self.min_depth) / bucket_size).floor() as usize;
             let bucket_idx = bucket_idx.min(num_buckets - 1);
 
             buckets[bucket_idx].total_energy += edge.weighted_energy;

@@ -8,8 +8,8 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use std::collections::HashMap;
 
 use cognitum_gate_tilezero::{
-    ActionContext, ActionMetadata, ActionTarget, DecisionOutcome, EvidenceFilter,
-    GateThresholds, ReducedGraph, ThreeFilterDecision, TileZero,
+    ActionContext, ActionMetadata, ActionTarget, DecisionOutcome, EvidenceFilter, GateThresholds,
+    ReducedGraph, ThreeFilterDecision, TileZero,
 };
 
 /// Create a realistic action context for benchmarking
@@ -30,10 +30,7 @@ fn create_action_context(id: usize) -> ActionContext {
         context: ActionMetadata {
             agent_id: "agent-001".to_string(),
             session_id: Some("session-12345".to_string()),
-            prior_actions: vec![
-                "action-prev-1".to_string(),
-                "action-prev-2".to_string(),
-            ],
+            prior_actions: vec!["action-prev-1".to_string(), "action-prev-2".to_string()],
             urgency: "normal".to_string(),
         },
     }
@@ -98,15 +95,10 @@ fn bench_full_decision_pipeline(c: &mut Criterion) {
         let tilezero = TileZero::new(thresholds);
         let ctx = create_action_context(0);
 
-        group.bench_with_input(
-            BenchmarkId::new("tilezero_decide", name),
-            &ctx,
-            |b, ctx| {
-                b.to_async(&rt).iter(|| async {
-                    black_box(tilezero.decide(black_box(ctx)).await)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("tilezero_decide", name), &ctx, |b, ctx| {
+            b.to_async(&rt)
+                .iter(|| async { black_box(tilezero.decide(black_box(ctx)).await) });
+        });
     }
 
     group.finish();
@@ -174,9 +166,7 @@ fn bench_e_value_simd(c: &mut Criterion) {
     group.throughput(Throughput::Elements(tile_count as u64));
 
     // Generate test data aligned for SIMD
-    let e_values: Vec<f64> = (0..tile_count)
-        .map(|i| 1.0 + (i as f64 * 0.01))
-        .collect();
+    let e_values: Vec<f64> = (0..tile_count).map(|i| 1.0 + (i as f64 * 0.01)).collect();
 
     // Scalar baseline
     group.bench_function("aggregate_scalar", |b| {
@@ -272,13 +262,9 @@ fn bench_witness_summary(c: &mut Criterion) {
     });
 
     let summary = graph.witness_summary();
-    group.bench_function("hash", |b| {
-        b.iter(|| black_box(summary.hash()))
-    });
+    group.bench_function("hash", |b| b.iter(|| black_box(summary.hash())));
 
-    group.bench_function("to_json", |b| {
-        b.iter(|| black_box(summary.to_json()))
-    });
+    group.bench_function("to_json", |b| b.iter(|| black_box(summary.to_json())));
 
     group.finish();
 }

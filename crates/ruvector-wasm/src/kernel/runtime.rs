@@ -351,21 +351,28 @@ impl<R: KernelRuntime> KernelManager<R> {
     }
 
     /// Compile a kernel from a loaded pack
-    pub fn compile_kernel(&mut self, pack_name: &str, kernel_id: &str, wasm_bytes: &[u8]) -> KernelResult<()> {
-        let manifest = self.manifests.get(pack_name).ok_or_else(|| {
-            KernelError::KernelNotFound {
-                kernel_id: format!("pack:{}", pack_name),
-            }
-        })?;
+    pub fn compile_kernel(
+        &mut self,
+        pack_name: &str,
+        kernel_id: &str,
+        wasm_bytes: &[u8],
+    ) -> KernelResult<()> {
+        let manifest =
+            self.manifests
+                .get(pack_name)
+                .ok_or_else(|| KernelError::KernelNotFound {
+                    kernel_id: format!("pack:{}", pack_name),
+                })?;
 
-        let info = manifest.get_kernel(kernel_id).ok_or_else(|| {
-            KernelError::KernelNotFound {
+        let info = manifest
+            .get_kernel(kernel_id)
+            .ok_or_else(|| KernelError::KernelNotFound {
                 kernel_id: kernel_id.to_string(),
-            }
-        })?;
+            })?;
 
         let compiled = self.runtime.compile_kernel(kernel_id, wasm_bytes, info)?;
-        self.compiled_kernels.insert(kernel_id.to_string(), compiled);
+        self.compiled_kernels
+            .insert(kernel_id.to_string(), compiled);
 
         Ok(())
     }
@@ -389,21 +396,19 @@ impl<R: KernelRuntime> KernelManager<R> {
         descriptor: &KernelDescriptor,
         memory: &mut [u8],
     ) -> KernelResult<()> {
-        let compiled = self.compiled_kernels.get(kernel_id).ok_or_else(|| {
-            KernelError::KernelNotFound {
-                kernel_id: kernel_id.to_string(),
-            }
-        })?;
+        let compiled =
+            self.compiled_kernels
+                .get(kernel_id)
+                .ok_or_else(|| KernelError::KernelNotFound {
+                    kernel_id: kernel_id.to_string(),
+                })?;
 
         let mut instance = self.runtime.instantiate(compiled)?;
 
         // Set deadline if epoch is enabled
         if self.runtime.config().epoch.enabled {
             let budget = compiled.info.resource_limits.max_epoch_ticks;
-            let deadline = EpochDeadline::new(
-                self.runtime.epoch_controller().current(),
-                budget,
-            );
+            let deadline = EpochDeadline::new(self.runtime.epoch_controller().current(), budget);
             instance.set_deadline(deadline);
         }
 
@@ -429,7 +434,7 @@ impl<R: KernelRuntime> KernelManager<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kernel::manifest::{KernelCategory, ResourceLimits, TensorSpec, DataType, ShapeDim};
+    use crate::kernel::manifest::{DataType, KernelCategory, ResourceLimits, ShapeDim, TensorSpec};
 
     fn mock_kernel_info(id: &str) -> KernelInfo {
         KernelInfo {
@@ -495,10 +500,15 @@ mod tests {
     #[test]
     fn test_mock_runtime_failure() {
         let mut runtime = MockKernelRuntime::new(RuntimeConfig::default());
-        runtime.register_behavior("failing_kernel", MockKernelBehavior::Fail(KernelErrorCode::InvalidInput));
+        runtime.register_behavior(
+            "failing_kernel",
+            MockKernelBehavior::Fail(KernelErrorCode::InvalidInput),
+        );
 
         let info = mock_kernel_info("failing_kernel");
-        let compiled = runtime.compile_kernel("failing_kernel", &[], &info).unwrap();
+        let compiled = runtime
+            .compile_kernel("failing_kernel", &[], &info)
+            .unwrap();
         let mut instance = runtime.instantiate(&compiled).unwrap();
 
         let desc = KernelDescriptor::new();
@@ -556,7 +566,9 @@ mod tests {
         manager.set_active_pack("test-pack").unwrap();
 
         // Compile kernel
-        manager.compile_kernel("test-pack", "rope_f32", &[]).unwrap();
+        manager
+            .compile_kernel("test-pack", "rope_f32", &[])
+            .unwrap();
 
         assert_eq!(manager.list_kernels(), vec!["rope_f32"]);
     }

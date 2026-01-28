@@ -5,9 +5,9 @@
 //!
 //! logit(q,k) = a * dot(q_E, k_E) + b * dot(q_H_tan, k_H_tan) + c * dot(q_S, k_S)
 
+use super::tangent_space::{TangentSpaceConfig, TangentSpaceMapper};
 use crate::error::{AttentionError, AttentionResult};
 use crate::traits::Attention;
-use super::tangent_space::{TangentSpaceMapper, TangentSpaceConfig};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for fused mixed-curvature attention
@@ -65,7 +65,13 @@ impl FusedCurvatureConfig {
     }
 
     /// Get component ranges
-    pub fn component_ranges(&self) -> (std::ops::Range<usize>, std::ops::Range<usize>, std::ops::Range<usize>) {
+    pub fn component_ranges(
+        &self,
+    ) -> (
+        std::ops::Range<usize>,
+        std::ops::Range<usize>,
+        std::ops::Range<usize>,
+    ) {
         let e_end = self.euclidean_dim;
         let h_end = e_end + self.hyperbolic_dim;
         let s_end = h_end + self.spherical_dim;
@@ -213,10 +219,12 @@ impl MixedCurvatureFusedAttention {
                 let sim_h = Self::dot_product_simd(&q_h_tangent, &cache.keys_hyperbolic_tangent[i]);
 
                 // Spherical similarity (normalized dot product)
-                let sim_s = Self::dot_product_simd(&q_s_normalized, &cache.keys_spherical_normalized[i]);
+                let sim_s =
+                    Self::dot_product_simd(&q_s_normalized, &cache.keys_spherical_normalized[i]);
 
                 // Fused logit
-                (weights[0] * sim_e + weights[1] * sim_h + weights[2] * sim_s) / self.config.temperature
+                (weights[0] * sim_e + weights[1] * sim_h + weights[2] * sim_s)
+                    / self.config.temperature
             })
             .collect();
 
@@ -399,12 +407,8 @@ mod tests {
         let attention = MixedCurvatureFusedAttention::new(config);
 
         let query = vec![0.5f32; 64];
-        let keys: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![0.1 + i as f32 * 0.02; 64])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32; 64])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..20).map(|i| vec![0.1 + i as f32 * 0.02; 64]).collect();
+        let values: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32; 64]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -417,12 +421,8 @@ mod tests {
     fn test_cache_reuse() {
         let attention = MixedCurvatureFusedAttention::with_dim(32);
 
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![0.1 * i as f32; 32])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![0.1 * i as f32; 32]).collect();
+        let values: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32; 32]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -432,7 +432,9 @@ mod tests {
         // Multiple queries with same cache
         for h in 0..4 {
             let query = vec![0.5f32; 32];
-            let output = attention.compute_with_cache(&query, &keys_refs, &values_refs, &cache, h).unwrap();
+            let output = attention
+                .compute_with_cache(&query, &keys_refs, &values_refs, &cache, h)
+                .unwrap();
             assert_eq!(output.len(), 32);
         }
     }

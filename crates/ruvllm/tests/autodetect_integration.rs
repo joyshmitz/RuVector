@@ -71,7 +71,10 @@ fn test_optimal_config_generation() {
 
     // Verify reasonable defaults
     assert!(config.batch_size >= 1, "Batch size should be at least 1");
-    assert!(config.thread_count >= 1, "Thread count should be at least 1");
+    assert!(
+        config.thread_count >= 1,
+        "Thread count should be at least 1"
+    );
     assert!(config.block_size >= 16, "Block size should be at least 16");
 
     // Thread count should not exceed logical cores
@@ -110,7 +113,10 @@ fn test_quantization_recommendation_large_model() {
     // Unless you have 256GB+ RAM, this should be Q4K or Q4
     if caps.memory_mb < 256 * 1024 {
         assert!(
-            matches!(q_large, Quantization::Q4K | Quantization::Q4 | Quantization::Q2K),
+            matches!(
+                q_large,
+                Quantization::Q4K | Quantization::Q4 | Quantization::Q2K
+            ),
             "Large model should use aggressive quantization, got {:?}",
             q_large
         );
@@ -182,8 +188,10 @@ fn test_cpu_feature_detection_x86_64() {
 
         // SSE4.2 should be common on modern x86_64
         // Note: This depends on compile-time detection or runtime check
-        println!("SSE4.2: {}, AVX2: {}, AVX-512: {}",
-                 features.sse42, features.avx2, features.avx512);
+        println!(
+            "SSE4.2: {}, AVX2: {}, AVX-512: {}",
+            features.sse42, features.avx2, features.avx512
+        );
     }
 }
 
@@ -193,7 +201,10 @@ fn test_memory_detection() {
 
     // Memory should be in reasonable range (256MB to 1TB)
     assert!(caps.memory_mb >= 256, "Memory should be at least 256MB");
-    assert!(caps.memory_mb <= 1024 * 1024, "Memory should be at most 1TB");
+    assert!(
+        caps.memory_mb <= 1024 * 1024,
+        "Memory should be at most 1TB"
+    );
 
     println!(
         "Detected memory: {} MB ({:.1} GB)",
@@ -207,7 +218,10 @@ fn test_core_count_detection() {
     let cores = CoreInfo::detect();
 
     // Physical cores should be reasonable
-    assert!(cores.physical_cores >= 1, "Should have at least 1 physical core");
+    assert!(
+        cores.physical_cores >= 1,
+        "Should have at least 1 physical core"
+    );
     assert!(
         cores.physical_cores <= 256,
         "Should have at most 256 physical cores"
@@ -342,10 +356,7 @@ fn test_can_run_model() {
     let caps = SystemCapabilities::detect();
 
     // Should be able to run a tiny model
-    assert!(
-        caps.can_run_model(0.1),
-        "Should be able to run 100MB model"
-    );
+    assert!(caps.can_run_model(0.1), "Should be able to run 100MB model");
 
     // Likely can't run a 1TB model
     assert!(
@@ -440,7 +451,11 @@ fn test_all_architecture_variants() {
     ];
 
     let unique: HashSet<_> = archs.iter().collect();
-    assert_eq!(unique.len(), 4, "All architecture variants should be distinct");
+    assert_eq!(
+        unique.len(),
+        4,
+        "All architecture variants should be distinct"
+    );
 }
 
 #[test]
@@ -454,7 +469,11 @@ fn test_all_gpu_backend_variants() {
     ];
 
     let unique: HashSet<_> = backends.iter().collect();
-    assert_eq!(unique.len(), 5, "All GPU backend variants should be distinct");
+    assert_eq!(
+        unique.len(),
+        5,
+        "All GPU backend variants should be distinct"
+    );
 }
 
 #[test]
@@ -478,8 +497,7 @@ fn test_all_compute_backend_variants() {
 
     // Verify relative performance ordering
     assert!(
-        ComputeBackend::Cuda.relative_performance()
-            > ComputeBackend::Metal.relative_performance()
+        ComputeBackend::Cuda.relative_performance() > ComputeBackend::Metal.relative_performance()
     );
     assert!(
         ComputeBackend::Metal.relative_performance()
@@ -586,8 +604,14 @@ fn test_system_capabilities_display() {
         println!("  AVX-512: {}", caps.cpu_features.avx512);
     }
 
-    println!("  Best SIMD width: {} bits", caps.cpu_features.best_simd_width());
-    println!("  SIMD float lanes: {}", caps.cpu_features.simd_float_lanes());
+    println!(
+        "  Best SIMD width: {} bits",
+        caps.cpu_features.best_simd_width()
+    );
+    println!(
+        "  SIMD float lanes: {}",
+        caps.cpu_features.simd_float_lanes()
+    );
 
     let config = caps.optimal_config();
     println!("\n=== Optimal Configuration ===");
@@ -599,10 +623,7 @@ fn test_system_capabilities_display() {
     println!("Flash Attention: {}", config.use_flash_attention);
     println!("Device Type: {:?}", config.device_type);
     println!("DType: {:?}", config.dtype);
-    println!(
-        "Estimated TPS: {:.1}",
-        config.estimated_tokens_per_second()
-    );
+    println!("Estimated TPS: {:.1}", config.estimated_tokens_per_second());
 
     println!("\n=== Summary ===");
     println!("{}", caps.summary());
@@ -622,9 +643,15 @@ fn test_optimal_attention_config() {
 
     // Verify reasonable attention configuration
     assert!(attn_config.num_heads > 0, "Should have at least 1 head");
-    assert!(attn_config.num_kv_heads > 0, "Should have at least 1 KV head");
+    assert!(
+        attn_config.num_kv_heads > 0,
+        "Should have at least 1 KV head"
+    );
     assert!(attn_config.head_dim > 0, "Should have positive head dim");
-    assert!(attn_config.max_seq_len >= 1024, "Should support at least 1K context");
+    assert!(
+        attn_config.max_seq_len >= 1024,
+        "Should support at least 1K context"
+    );
 
     // GQA ratio should be valid
     let gqa_ratio = attn_config.gqa_ratio();
@@ -636,7 +663,10 @@ fn test_optimal_attention_config() {
 
     // Scale should be reasonable
     let scale = attn_config.effective_scale();
-    assert!(scale > 0.0 && scale < 1.0, "Scale should be between 0 and 1");
+    assert!(
+        scale > 0.0 && scale < 1.0,
+        "Scale should be between 0 and 1"
+    );
 
     println!(
         "Attention Config: {} heads, {} KV heads, {} head_dim, {} max_seq_len, GQA {}:1",

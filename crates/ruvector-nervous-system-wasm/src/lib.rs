@@ -74,14 +74,14 @@ use wasm_bindgen::prelude::*;
 
 pub mod btsp;
 pub mod hdc;
-pub mod wta;
 pub mod workspace;
+pub mod wta;
 
 // Re-export all public types
 pub use btsp::{BTSPAssociativeMemory, BTSPLayer, BTSPSynapse};
 pub use hdc::{HdcMemory, Hypervector};
-pub use wta::{KWTALayer, WTALayer};
 pub use workspace::{GlobalWorkspace, WorkspaceItem};
+pub use wta::{KWTALayer, WTALayer};
 
 /// Initialize the WASM module with panic hook
 #[wasm_bindgen(start)]
@@ -100,7 +100,10 @@ pub fn version() -> String {
 #[wasm_bindgen]
 pub fn available_mechanisms() -> JsValue {
     let mechanisms = vec![
-        ("btsp", "Behavioral Timescale Synaptic Plasticity - One-shot learning"),
+        (
+            "btsp",
+            "Behavioral Timescale Synaptic Plasticity - One-shot learning",
+        ),
         ("hdc", "Hyperdimensional Computing - 10,000-bit vectors"),
         ("wta", "Winner-Take-All - <1us decisions"),
         ("kwta", "K-Winner-Take-All - Sparse distributed coding"),
@@ -128,9 +131,15 @@ pub fn performance_targets() -> JsValue {
 pub fn biological_references() -> JsValue {
     let refs = vec![
         ("BTSP", "Bittner et al. 2017 - Hippocampal place fields"),
-        ("HDC", "Kanerva 1988, Plate 2003 - Hyperdimensional computing"),
+        (
+            "HDC",
+            "Kanerva 1988, Plate 2003 - Hyperdimensional computing",
+        ),
         ("WTA", "Cortical microcircuits - Lateral inhibition"),
-        ("Global Workspace", "Baars 1988, Dehaene 2014 - Consciousness"),
+        (
+            "Global Workspace",
+            "Baars 1988, Dehaene 2014 - Consciousness",
+        ),
     ];
     serde_wasm_bindgen::to_value(&refs).unwrap_or(JsValue::NULL)
 }

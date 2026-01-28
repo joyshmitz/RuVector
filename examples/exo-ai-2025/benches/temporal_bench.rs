@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use exo_temporal::{TemporalMemory, TemporalConfig, CausalConeType};
-use exo_core::{Pattern, Metadata, PatternId, SubstrateTime, Query};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use exo_core::{Metadata, Pattern, PatternId, Query, SubstrateTime};
+use exo_temporal::{CausalConeType, TemporalConfig, TemporalMemory};
 
 fn create_test_memory() -> TemporalMemory {
     TemporalMemory::new(TemporalConfig::default())
@@ -105,9 +105,7 @@ fn benchmark_pattern_retrieval(c: &mut Criterion) {
 
     c.bench_function("temporal_pattern_retrieval", |b| {
         let query_id = pattern_ids[500];
-        b.iter(|| {
-            memory.get(black_box(&query_id))
-        });
+        b.iter(|| memory.get(black_box(&query_id)));
     });
 }
 

@@ -108,7 +108,11 @@ pub fn gemv_neon(a: &[f32], x: &[f32], y: &mut [f32], m: usize, n: usize) {
     {
         if super::accelerate::should_use_accelerate(m, n) {
             super::accelerate::gemv_accelerate(
-                a, x, y, m, n,
+                a,
+                x,
+                y,
+                m,
+                n,
                 super::accelerate::MatrixLayout::RowMajor,
             );
             return;
@@ -216,51 +220,99 @@ unsafe fn gemv_neon_impl(a: &[f32], x: &[f32], y: &mut [f32], m: usize, n: usize
             // Process all 12 rows with these x values
             // Row 0
             sum0 = vfmaq_f32(sum0, vld1q_f32(a_ptr.add((row_base + 0) * n + col)), x_v0);
-            sum0 = vfmaq_f32(sum0, vld1q_f32(a_ptr.add((row_base + 0) * n + col + 4)), x_v1);
+            sum0 = vfmaq_f32(
+                sum0,
+                vld1q_f32(a_ptr.add((row_base + 0) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 1
             sum1 = vfmaq_f32(sum1, vld1q_f32(a_ptr.add((row_base + 1) * n + col)), x_v0);
-            sum1 = vfmaq_f32(sum1, vld1q_f32(a_ptr.add((row_base + 1) * n + col + 4)), x_v1);
+            sum1 = vfmaq_f32(
+                sum1,
+                vld1q_f32(a_ptr.add((row_base + 1) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 2
             sum2 = vfmaq_f32(sum2, vld1q_f32(a_ptr.add((row_base + 2) * n + col)), x_v0);
-            sum2 = vfmaq_f32(sum2, vld1q_f32(a_ptr.add((row_base + 2) * n + col + 4)), x_v1);
+            sum2 = vfmaq_f32(
+                sum2,
+                vld1q_f32(a_ptr.add((row_base + 2) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 3
             sum3 = vfmaq_f32(sum3, vld1q_f32(a_ptr.add((row_base + 3) * n + col)), x_v0);
-            sum3 = vfmaq_f32(sum3, vld1q_f32(a_ptr.add((row_base + 3) * n + col + 4)), x_v1);
+            sum3 = vfmaq_f32(
+                sum3,
+                vld1q_f32(a_ptr.add((row_base + 3) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 4
             sum4 = vfmaq_f32(sum4, vld1q_f32(a_ptr.add((row_base + 4) * n + col)), x_v0);
-            sum4 = vfmaq_f32(sum4, vld1q_f32(a_ptr.add((row_base + 4) * n + col + 4)), x_v1);
+            sum4 = vfmaq_f32(
+                sum4,
+                vld1q_f32(a_ptr.add((row_base + 4) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 5
             sum5 = vfmaq_f32(sum5, vld1q_f32(a_ptr.add((row_base + 5) * n + col)), x_v0);
-            sum5 = vfmaq_f32(sum5, vld1q_f32(a_ptr.add((row_base + 5) * n + col + 4)), x_v1);
+            sum5 = vfmaq_f32(
+                sum5,
+                vld1q_f32(a_ptr.add((row_base + 5) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 6
             sum6 = vfmaq_f32(sum6, vld1q_f32(a_ptr.add((row_base + 6) * n + col)), x_v0);
-            sum6 = vfmaq_f32(sum6, vld1q_f32(a_ptr.add((row_base + 6) * n + col + 4)), x_v1);
+            sum6 = vfmaq_f32(
+                sum6,
+                vld1q_f32(a_ptr.add((row_base + 6) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 7
             sum7 = vfmaq_f32(sum7, vld1q_f32(a_ptr.add((row_base + 7) * n + col)), x_v0);
-            sum7 = vfmaq_f32(sum7, vld1q_f32(a_ptr.add((row_base + 7) * n + col + 4)), x_v1);
+            sum7 = vfmaq_f32(
+                sum7,
+                vld1q_f32(a_ptr.add((row_base + 7) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 8
             sum8 = vfmaq_f32(sum8, vld1q_f32(a_ptr.add((row_base + 8) * n + col)), x_v0);
-            sum8 = vfmaq_f32(sum8, vld1q_f32(a_ptr.add((row_base + 8) * n + col + 4)), x_v1);
+            sum8 = vfmaq_f32(
+                sum8,
+                vld1q_f32(a_ptr.add((row_base + 8) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 9
             sum9 = vfmaq_f32(sum9, vld1q_f32(a_ptr.add((row_base + 9) * n + col)), x_v0);
-            sum9 = vfmaq_f32(sum9, vld1q_f32(a_ptr.add((row_base + 9) * n + col + 4)), x_v1);
+            sum9 = vfmaq_f32(
+                sum9,
+                vld1q_f32(a_ptr.add((row_base + 9) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 10
             sum10 = vfmaq_f32(sum10, vld1q_f32(a_ptr.add((row_base + 10) * n + col)), x_v0);
-            sum10 = vfmaq_f32(sum10, vld1q_f32(a_ptr.add((row_base + 10) * n + col + 4)), x_v1);
+            sum10 = vfmaq_f32(
+                sum10,
+                vld1q_f32(a_ptr.add((row_base + 10) * n + col + 4)),
+                x_v1,
+            );
 
             // Row 11
             sum11 = vfmaq_f32(sum11, vld1q_f32(a_ptr.add((row_base + 11) * n + col)), x_v0);
-            sum11 = vfmaq_f32(sum11, vld1q_f32(a_ptr.add((row_base + 11) * n + col + 4)), x_v1);
+            sum11 = vfmaq_f32(
+                sum11,
+                vld1q_f32(a_ptr.add((row_base + 11) * n + col + 4)),
+                x_v1,
+            );
 
             col += 8;
         }
@@ -1494,7 +1546,7 @@ pub fn gemv_metal_if_available_inplace(
 /// or an error occurred.
 #[cfg(all(target_os = "macos", feature = "metal-compute"))]
 fn try_gemv_metal(a: &[f32], x: &[f32], m: usize, n: usize) -> Option<Vec<f32>> {
-    use crate::metal::{is_metal_available, MetalContext, MetalConfig, gemv_metal};
+    use crate::metal::{gemv_metal, is_metal_available, MetalConfig, MetalContext};
 
     if !is_metal_available() {
         return None;
@@ -1911,7 +1963,9 @@ mod tests {
             assert!(
                 (y[i] - n as f32).abs() < 1e-5,
                 "y[{}] = {}, expected {}",
-                i, y[i], n
+                i,
+                y[i],
+                n
             );
         }
     }
@@ -1948,7 +2002,9 @@ mod tests {
             assert!(
                 (y[i] - n as f32).abs() < 1e-5,
                 "y[{}] = {}, expected {}",
-                i, y[i], n
+                i,
+                y[i],
+                n
             );
         }
     }
@@ -1984,7 +2040,9 @@ mod tests {
             assert!(
                 (y[i] - n as f32).abs() < 1e-3,
                 "y[{}] = {}, expected {}",
-                i, y[i], n
+                i,
+                y[i],
+                n
             );
         }
     }

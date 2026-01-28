@@ -131,8 +131,7 @@ pub mod scheduler;
 
 // Re-exports for convenience
 pub use batch::{
-    BatchedRequest, BatchStats, DecodeTask, IterationPlan, PrefillTask, ScheduledBatch,
-    TokenBudget,
+    BatchStats, BatchedRequest, DecodeTask, IterationPlan, PrefillTask, ScheduledBatch, TokenBudget,
 };
 pub use engine::{GenerationResult, ServingEngine, ServingEngineConfig, ServingMetrics};
 pub use kv_cache_manager::{
@@ -258,13 +257,13 @@ mod tests {
         let mut queue = RequestQueue::new();
 
         // Add low priority first
-        let low = InferenceRequest::new(vec![1], GenerateParams::default())
-            .with_priority(Priority::Low);
+        let low =
+            InferenceRequest::new(vec![1], GenerateParams::default()).with_priority(Priority::Low);
         queue.add(low);
 
         // Add high priority second
-        let high = InferenceRequest::new(vec![2], GenerateParams::default())
-            .with_priority(Priority::High);
+        let high =
+            InferenceRequest::new(vec![2], GenerateParams::default()).with_priority(Priority::High);
         queue.add(high);
 
         // Schedule - high priority should be processed first

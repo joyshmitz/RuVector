@@ -20,7 +20,7 @@
 //! let policy_id = storage.store_policy(b"policy-data")?;
 //! ```
 
-use super::{GraphStorage, GovernanceStorage, StorageConfig, StorageError};
+use super::{GovernanceStorage, GraphStorage, StorageConfig, StorageError};
 use ordered_float::OrderedFloat;
 use parking_lot::RwLock;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -231,7 +231,9 @@ impl Default for InMemoryStorage {
 
 impl GraphStorage for InMemoryStorage {
     fn store_node(&self, node_id: &str, state: &[f32]) -> Result<(), StorageError> {
-        self.nodes.write().insert(node_id.to_string(), state.to_vec());
+        self.nodes
+            .write()
+            .insert(node_id.to_string(), state.to_vec());
         self.log_event(
             StorageEventType::NodeStored,
             node_id.to_string(),
@@ -243,11 +245,7 @@ impl GraphStorage for InMemoryStorage {
     fn get_node(&self, node_id: &str) -> Result<Option<Vec<f32>>, StorageError> {
         let result = self.nodes.read().get(node_id).cloned();
         if result.is_some() {
-            self.log_event(
-                StorageEventType::NodeRetrieved,
-                node_id.to_string(),
-                None,
-            );
+            self.log_event(StorageEventType::NodeRetrieved, node_id.to_string(), None);
         }
         Ok(result)
     }
@@ -464,7 +462,9 @@ impl IndexedInMemoryStorage {
         bundle: &[u8],
     ) -> Result<String, StorageError> {
         let id = self.base.store_policy(bundle)?;
-        self.policy_by_name.write().insert(name.to_string(), id.clone());
+        self.policy_by_name
+            .write()
+            .insert(name.to_string(), id.clone());
         Ok(id)
     }
 
@@ -596,7 +596,9 @@ mod tests {
         storage.store_node("north", &[0.0, 1.0, 0.0]).unwrap();
         storage.store_node("south", &[0.0, -1.0, 0.0]).unwrap();
         storage.store_node("east", &[1.0, 0.0, 0.0]).unwrap();
-        storage.store_node("northeast", &[0.707, 0.707, 0.0]).unwrap();
+        storage
+            .store_node("northeast", &[0.707, 0.707, 0.0])
+            .unwrap();
 
         // Query for vectors similar to north
         let query = vec![0.0, 1.0, 0.0];
@@ -687,7 +689,9 @@ mod tests {
         assert_eq!(category_a.len(), 2);
 
         // Store and retrieve policy by name
-        storage.store_policy_with_name("default", b"default policy").unwrap();
+        storage
+            .store_policy_with_name("default", b"default policy")
+            .unwrap();
 
         let policy = storage.get_policy_by_name("default").unwrap();
         assert!(policy.is_some());

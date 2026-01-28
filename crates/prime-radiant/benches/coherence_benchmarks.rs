@@ -13,9 +13,7 @@
 //! 2. Restriction Maps - identity, diagonal, dense, sparse
 //! 3. Scaling Tests - nodes, edges, dimensions
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -532,11 +530,9 @@ fn bench_energy_computation(c: &mut Criterion) {
         group.sample_size(sample_size);
         group.throughput(Throughput::Elements(graph.edges.len() as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("nodes", num_nodes),
-            &num_nodes,
-            |b, _| b.iter(|| black_box(graph.compute_total_energy())),
-        );
+        group.bench_with_input(BenchmarkId::new("nodes", num_nodes), &num_nodes, |b, _| {
+            b.iter(|| black_box(graph.compute_total_energy()))
+        });
     }
 
     group.finish();
@@ -577,7 +573,11 @@ fn bench_incremental_update(c: &mut Criterion) {
                 node.state = new_state;
             }
 
-            let affected = self.node_to_edges.get(&node_id).cloned().unwrap_or_default();
+            let affected = self
+                .node_to_edges
+                .get(&node_id)
+                .cloned()
+                .unwrap_or_default();
             let mut source_buf = vec![0.0f32; self.graph.edge_dim];
             let mut target_buf = vec![0.0f32; self.graph.edge_dim];
 
@@ -793,8 +793,14 @@ fn bench_restriction_map_types(c: &mut Criterion) {
 
     // Identity maps
     {
-        let graph =
-            SheafGraph::with_restriction_type(num_nodes, 4, state_dim, state_dim, MapType::Identity, 42);
+        let graph = SheafGraph::with_restriction_type(
+            num_nodes,
+            4,
+            state_dim,
+            state_dim,
+            MapType::Identity,
+            42,
+        );
         group.throughput(Throughput::Elements(graph.edges.len() as u64));
         group.bench_function("identity", |b| {
             b.iter(|| black_box(graph.compute_total_energy()))
@@ -803,8 +809,14 @@ fn bench_restriction_map_types(c: &mut Criterion) {
 
     // Diagonal maps
     {
-        let graph =
-            SheafGraph::with_restriction_type(num_nodes, 4, state_dim, state_dim, MapType::Diagonal, 42);
+        let graph = SheafGraph::with_restriction_type(
+            num_nodes,
+            4,
+            state_dim,
+            state_dim,
+            MapType::Diagonal,
+            42,
+        );
         group.bench_function("diagonal", |b| {
             b.iter(|| black_box(graph.compute_total_energy()))
         });
@@ -812,8 +824,14 @@ fn bench_restriction_map_types(c: &mut Criterion) {
 
     // Dense maps
     {
-        let graph =
-            SheafGraph::with_restriction_type(num_nodes, 4, state_dim, state_dim, MapType::Dense, 42);
+        let graph = SheafGraph::with_restriction_type(
+            num_nodes,
+            4,
+            state_dim,
+            state_dim,
+            MapType::Dense,
+            42,
+        );
         group.bench_function("dense", |b| {
             b.iter(|| black_box(graph.compute_total_energy()))
         });
@@ -901,7 +919,9 @@ fn bench_batch_residual(c: &mut Criterion) {
             })
             .collect();
 
-        let states: Vec<Vec<f32>> = (0..batch_size + 1).map(|i| generate_state(dim, i as u64)).collect();
+        let states: Vec<Vec<f32>> = (0..batch_size + 1)
+            .map(|i| generate_state(dim, i as u64))
+            .collect();
 
         group.throughput(Throughput::Elements(batch_size as u64));
 
@@ -967,7 +987,15 @@ fn bench_memory_patterns(c: &mut Criterion) {
     // Chain graph (sequential access)
     {
         let nodes: HashMap<u64, SheafNode> = (0..num_nodes as u64)
-            .map(|id| (id, SheafNode { id, state: generate_state(dim, id) }))
+            .map(|id| {
+                (
+                    id,
+                    SheafNode {
+                        id,
+                        state: generate_state(dim, id),
+                    },
+                )
+            })
             .collect();
 
         let edges: Vec<SheafEdge> = (0..num_nodes - 1)

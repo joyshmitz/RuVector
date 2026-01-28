@@ -59,9 +59,9 @@ impl Default for ServingEngineConfig {
             coalesce_window_ms: 10,
             streaming_enabled: true,
             request_timeout_ms: 60000,
-            enable_speculative: true,  // Enabled by default for 2-3x decode speedup
+            enable_speculative: true, // Enabled by default for 2-3x decode speedup
             speculative_config: SpeculativeConfig::default(),
-            draft_model_path: None,  // Auto-detected based on main model size
+            draft_model_path: None, // Auto-detected based on main model size
         }
     }
 }
@@ -151,10 +151,8 @@ impl ServingEngine {
     pub fn new(model: Arc<dyn LlmBackend>, config: ServingEngineConfig) -> Self {
         use crate::optimization::realtime::RealtimeConfig;
 
-        let scheduler = ContinuousBatchScheduler::new(
-            config.scheduler.clone(),
-            config.kv_cache.clone(),
-        );
+        let scheduler =
+            ContinuousBatchScheduler::new(config.scheduler.clone(), config.kv_cache.clone());
 
         // Create realtime optimizer with speculative decoding enabled by default
         let realtime_config = RealtimeConfig {
@@ -198,8 +196,7 @@ impl ServingEngine {
         // Check capacity
         {
             let queue = self.queue.lock();
-            if queue.pending_count() + queue.running_count()
-                >= self.config.max_concurrent_requests
+            if queue.pending_count() + queue.running_count() >= self.config.max_concurrent_requests
             {
                 return Err(RuvLLMError::OutOfMemory(
                     "Maximum concurrent requests reached".to_string(),
@@ -216,7 +213,9 @@ impl ServingEngine {
                 completion_tx: None,
                 created_at: Instant::now(),
             };
-            self.pending_requests.write().insert(request_id, engine_request);
+            self.pending_requests
+                .write()
+                .insert(request_id, engine_request);
         }
 
         // Add to queue
@@ -237,8 +236,7 @@ impl ServingEngine {
         // Check capacity
         {
             let queue = self.queue.lock();
-            if queue.pending_count() + queue.running_count()
-                >= self.config.max_concurrent_requests
+            if queue.pending_count() + queue.running_count() >= self.config.max_concurrent_requests
             {
                 return Err(RuvLLMError::OutOfMemory(
                     "Maximum concurrent requests reached".to_string(),
@@ -255,7 +253,9 @@ impl ServingEngine {
                 completion_tx: None,
                 created_at: Instant::now(),
             };
-            self.pending_requests.write().insert(request_id, engine_request);
+            self.pending_requests
+                .write()
+                .insert(request_id, engine_request);
         }
 
         // Add to queue
@@ -489,11 +489,7 @@ impl ServingEngine {
     ///
     /// # Returns
     /// The generated token ID
-    fn generate_next_token(
-        &self,
-        request_id: RequestId,
-        running: &RunningRequest,
-    ) -> Result<u32> {
+    fn generate_next_token(&self, request_id: RequestId, running: &RunningRequest) -> Result<u32> {
         // Build the context: prompt tokens + already generated tokens
         let mut context = running.request.prompt_tokens.clone();
         context.extend(&running.generated_tokens);
@@ -524,7 +520,9 @@ impl ServingEngine {
             // No model loaded - simulate token generation for testing
             // In production this should be an error, but for tests without
             // a real model we return a pseudo-random token based on context
-            let hash = context.iter().fold(0u32, |acc, &t| acc.wrapping_add(t).wrapping_mul(31));
+            let hash = context
+                .iter()
+                .fold(0u32, |acc, &t| acc.wrapping_add(t).wrapping_mul(31));
             return Ok(hash % 32000);
         }
 
@@ -593,9 +591,10 @@ impl ServingEngine {
         let lookahead = spec_config.lookahead;
 
         // Get tokenizer for encoding/decoding
-        let tokenizer = self.model.tokenizer().ok_or_else(|| {
-            RuvLLMError::InvalidOperation("No tokenizer available".to_string())
-        })?;
+        let tokenizer = self
+            .model
+            .tokenizer()
+            .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer available".to_string()))?;
 
         // Decode context to text
         let context_text = tokenizer.decode(context)?;
@@ -605,7 +604,11 @@ impl ServingEngine {
             max_tokens: lookahead,
             temperature: spec_config.draft_temperature,
             top_p: spec_config.draft_top_p,
-            top_k: if spec_config.draft_temperature == 0.0 { 1 } else { 40 },
+            top_k: if spec_config.draft_temperature == 0.0 {
+                1
+            } else {
+                40
+            },
             ..Default::default()
         };
 
@@ -681,7 +684,8 @@ impl ServingEngine {
         let continuation_tokens = tokenizer.encode(&continuation_full)?;
 
         // Record successful speculation
-        self.optimizer.update_speculation_stats(draft_new.len(), draft_new.len());
+        self.optimizer
+            .update_speculation_stats(draft_new.len(), draft_new.len());
 
         if continuation_tokens.len() > verify_context.len() {
             Ok(continuation_tokens[verify_context.len()])
@@ -778,9 +782,7 @@ impl ServingEngine {
 
     /// Decode a single token to text (helper method)
     fn decode_token(&self, token: u32) -> Option<String> {
-        self.model
-            .tokenizer()
-            .and_then(|t| t.decode(&[token]).ok())
+        self.model.tokenizer().and_then(|t| t.decode(&[token]).ok())
     }
 
     /// Run the serving loop until stopped
@@ -1011,7 +1013,9 @@ impl ServingEngine {
                 completion_tx: Some(tx),
                 created_at: Instant::now(),
             };
-            self.pending_requests.write().insert(request_id, engine_request);
+            self.pending_requests
+                .write()
+                .insert(request_id, engine_request);
         }
 
         // Add to queue
@@ -1019,7 +1023,8 @@ impl ServingEngine {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
 
         // Wait for completion
-        rx.await.map_err(|_| RuvLLMError::Generation("Request cancelled".to_string()))
+        rx.await
+            .map_err(|_| RuvLLMError::Generation("Request cancelled".to_string()))
     }
 
     /// Stream tokens for a request
@@ -1173,7 +1178,11 @@ mod tests {
 
         let stats = engine.stats();
         // Should have processed at least one request
-        assert!(stats.running_requests > 0 || stats.completed_requests > 0 || stats.pending_requests > 0);
+        assert!(
+            stats.running_requests > 0
+                || stats.completed_requests > 0
+                || stats.pending_requests > 0
+        );
     }
 
     #[test]
@@ -1274,9 +1283,7 @@ mod tests {
         let engine = create_test_engine();
 
         // Two identical requests
-        let params = GenerateParams::default()
-            .with_max_tokens(5)
-            .with_seed(42);
+        let params = GenerateParams::default().with_max_tokens(5).with_seed(42);
 
         let request1 = InferenceRequest::new(vec![10, 20, 30], params.clone());
         let request2 = InferenceRequest::new(vec![10, 20, 30], params);

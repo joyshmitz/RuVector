@@ -135,7 +135,8 @@ impl WasmSimBackend {
                 let start = t * d_model;
                 // Simple ReLU-like activation
                 for i in 0..d_model {
-                    hidden[start + i] = hidden[start + i].max(0.0) * 0.99 + hidden[start + i] * 0.01;
+                    hidden[start + i] =
+                        hidden[start + i].max(0.0) * 0.99 + hidden[start + i] * 0.01;
                 }
             }
 

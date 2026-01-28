@@ -134,9 +134,7 @@ impl TimeCrystal {
     pub fn new(n: usize, period_ms: u32) -> Self {
         let base_frequency = 2.0 * std::f32::consts::PI / (period_ms as f32);
 
-        let oscillators = (0..n)
-            .map(|_| Oscillator::new(base_frequency))
-            .collect();
+        let oscillators = (0..n).map(|_| Oscillator::new(base_frequency)).collect();
 
         Self {
             oscillators,
@@ -217,7 +215,8 @@ impl TimeCrystal {
 
             // Floquet driving (discrete kicks)
             if is_drive_step {
-                dphi += self.driving_strength + rng.gen::<f32>() * self.disorder * 2.0 - self.disorder;
+                dphi +=
+                    self.driving_strength + rng.gen::<f32>() * self.disorder * 2.0 - self.disorder;
             }
 
             osc.phase = (osc.phase + dphi).rem_euclid(2.0 * std::f32::consts::PI);
@@ -553,7 +552,11 @@ mod tests {
 
         // Synchronized crystal should have high order parameter
         let order = crystal.order_parameter();
-        assert!(order > 0.95, "Synchronized crystal should have high order: {}", order);
+        assert!(
+            order > 0.95,
+            "Synchronized crystal should have high order: {}",
+            order
+        );
     }
 
     #[test]
@@ -587,12 +590,16 @@ mod tests {
 
         // Check that we see periodic behavior (not all random)
         // At least some patterns should repeat
-        let unique_count = patterns.iter()
+        let unique_count = patterns
+            .iter()
             .collect::<std::collections::HashSet<_>>()
             .len();
 
         // With crystallization, should have fewer unique patterns
-        assert!(unique_count < 10, "Crystallized patterns should show periodicity");
+        assert!(
+            unique_count < 10,
+            "Crystallized patterns should show periodicity"
+        );
     }
 
     #[test]
@@ -604,7 +611,10 @@ mod tests {
         let after_order = crystal.order_parameter();
 
         // Order should decrease after perturbation
-        assert!(after_order < initial_order, "Perturbation should reduce order");
+        assert!(
+            after_order < initial_order,
+            "Perturbation should reduce order"
+        );
     }
 
     #[test]
@@ -619,7 +629,10 @@ mod tests {
 
         let robustness = crystal.robustness();
         assert!(robustness >= 0.0 && robustness <= 1.0);
-        assert!(robustness > 0.0, "Crystallized system should have positive robustness");
+        assert!(
+            robustness > 0.0,
+            "Crystallized system should have positive robustness"
+        );
     }
 
     #[test]
@@ -659,9 +672,9 @@ mod tests {
         let pattern = crystal.detect_pattern();
         // Synchronized crystal should show coherent or period-doubled
         assert!(
-            pattern == CoordinationPattern::Coherent ||
-            pattern == CoordinationPattern::PeriodDoubled ||
-            pattern == CoordinationPattern::Quasiperiodic,
+            pattern == CoordinationPattern::Coherent
+                || pattern == CoordinationPattern::PeriodDoubled
+                || pattern == CoordinationPattern::Quasiperiodic,
             "Unexpected pattern: {:?}",
             pattern
         );

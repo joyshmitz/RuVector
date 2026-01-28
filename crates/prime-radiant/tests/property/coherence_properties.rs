@@ -58,7 +58,9 @@ impl Arbitrary for PositiveFloat {
     fn arbitrary(g: &mut Gen) -> Self {
         // Use u32 to generate a bounded positive integer, then convert to float
         let val: u32 = u32::arbitrary(g);
-        let float_val = (val as f32 / (u32::MAX as f32 / 1000.0)).max(0.001).min(1000.0);
+        let float_val = (val as f32 / (u32::MAX as f32 / 1000.0))
+            .max(0.001)
+            .min(1000.0);
         PositiveFloat(float_val)
     }
 }
@@ -208,10 +210,7 @@ fn compute_energy(residual: &[f32], weight: f32) -> f32 {
 }
 
 /// Compute total energy for a graph
-fn compute_total_energy(
-    states: &[(usize, Vec<f32>)],
-    edges: &[(usize, usize, f32)],
-) -> f32 {
+fn compute_total_energy(states: &[(usize, Vec<f32>)], edges: &[(usize, usize, f32)]) -> f32 {
     let dim = if states.is_empty() {
         0
     } else {
@@ -437,7 +436,10 @@ fn prop_zero_weight_zero_energy(source: StateVector, target: StateVector) -> Tes
     if energy.abs() < 1e-10 {
         TestResult::passed()
     } else {
-        TestResult::error(format!("Zero weight should give zero energy, got {}", energy))
+        TestResult::error(format!(
+            "Zero weight should give zero energy, got {}",
+            energy
+        ))
     }
 }
 
@@ -446,7 +448,11 @@ fn prop_zero_weight_zero_energy(source: StateVector, target: StateVector) -> Tes
 // ============================================================================
 
 #[quickcheck]
-fn prop_energy_additivity(state1: StateVector, state2: StateVector, state3: StateVector) -> TestResult {
+fn prop_energy_additivity(
+    state1: StateVector,
+    state2: StateVector,
+    state3: StateVector,
+) -> TestResult {
     // Ensure all states have the same dimension
     let dim = state1.dim();
     if dim == 0 || state2.dim() != dim || state3.dim() != dim {
@@ -475,7 +481,10 @@ fn prop_energy_additivity(state1: StateVector, state2: StateVector, state3: Stat
     if (total - expected).abs() < 1e-6 {
         TestResult::passed()
     } else {
-        TestResult::error(format!("Additivity failed: {} + {} != {}", e_12, e_23, total))
+        TestResult::error(format!(
+            "Additivity failed: {} + {} != {}",
+            e_12, e_23, total
+        ))
     }
 }
 
@@ -599,7 +608,12 @@ fn test_energy_stable_for_large_values() {
 
         assert!(!energy.is_nan(), "Energy became NaN for dim {}", dim);
         assert!(!energy.is_infinite(), "Energy became Inf for dim {}", dim);
-        assert!(energy >= 0.0, "Energy became negative for dim {}: {}", dim, energy);
+        assert!(
+            energy >= 0.0,
+            "Energy became negative for dim {}: {}",
+            dim,
+            energy
+        );
     }
 }
 
@@ -617,7 +631,12 @@ fn test_energy_stable_for_small_values() {
 
         assert!(!energy.is_nan(), "Energy became NaN for dim {}", dim);
         assert!(!energy.is_infinite(), "Energy became Inf for dim {}", dim);
-        assert!(energy >= 0.0, "Energy became negative for dim {}: {}", dim, energy);
+        assert!(
+            energy >= 0.0,
+            "Energy became negative for dim {}: {}",
+            dim,
+            energy
+        );
     }
 }
 
@@ -657,9 +676,6 @@ fn prop_energy_computation_deterministic(
     if (e1 - e2).abs() < 1e-10 && (e2 - e3).abs() < 1e-10 {
         TestResult::passed()
     } else {
-        TestResult::error(format!(
-            "Non-deterministic results: {}, {}, {}",
-            e1, e2, e3
-        ))
+        TestResult::error(format!("Non-deterministic results: {}, {}, {}", e1, e2, e3))
     }
 }

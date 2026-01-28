@@ -29,7 +29,7 @@ impl Default for BatchConfig {
         Self {
             max_batch_size: 1024,
             buffer_size: 64 * 1024, // 64KB
-            alignment: 64, // AVX-512 alignment
+            alignment: 64,          // AVX-512 alignment
             memory_pooling: true,
         }
     }
@@ -151,7 +151,11 @@ impl TypedArrayTransfer {
 
     /// Get buffer lengths
     pub fn len(&self) -> (usize, usize, usize) {
-        (self.f64_buffer.len(), self.u64_buffer.len(), self.u32_buffer.len())
+        (
+            self.f64_buffer.len(),
+            self.u64_buffer.len(),
+            self.u32_buffer.len(),
+        )
     }
 
     /// Check if empty
@@ -202,7 +206,8 @@ impl WasmBatchOps {
         if edges.len() > self.config.max_batch_size {
             // Split into multiple batches
             for chunk in edges.chunks(self.config.max_batch_size) {
-                self.pending.push(BatchOperation::InsertEdges(chunk.to_vec()));
+                self.pending
+                    .push(BatchOperation::InsertEdges(chunk.to_vec()));
             }
         } else {
             self.pending.push(BatchOperation::InsertEdges(edges));
@@ -213,7 +218,8 @@ impl WasmBatchOps {
     pub fn queue_delete_edges(&mut self, edges: Vec<(VertexId, VertexId)>) {
         if edges.len() > self.config.max_batch_size {
             for chunk in edges.chunks(self.config.max_batch_size) {
-                self.pending.push(BatchOperation::DeleteEdges(chunk.to_vec()));
+                self.pending
+                    .push(BatchOperation::DeleteEdges(chunk.to_vec()));
             }
         } else {
             self.pending.push(BatchOperation::DeleteEdges(edges));
@@ -224,7 +230,8 @@ impl WasmBatchOps {
     pub fn queue_distance_queries(&mut self, pairs: Vec<(VertexId, VertexId)>) {
         if pairs.len() > self.config.max_batch_size {
             for chunk in pairs.chunks(self.config.max_batch_size) {
-                self.pending.push(BatchOperation::QueryDistances(chunk.to_vec()));
+                self.pending
+                    .push(BatchOperation::QueryDistances(chunk.to_vec()));
             }
         } else {
             self.pending.push(BatchOperation::QueryDistances(pairs));
@@ -323,7 +330,8 @@ impl WasmBatchOps {
                 }
 
                 // Simulate distance results
-                let results: Vec<f64> = pairs.iter()
+                let results: Vec<f64> = pairs
+                    .iter()
                     .map(|(u, v)| if u == v { 0.0 } else { 1.0 })
                     .collect();
 

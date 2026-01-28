@@ -48,10 +48,8 @@ fn continuous_batching_process(requests: Vec<InferenceRequest>) -> Vec<Duration>
     let mut scheduler = ContinuousBatchScheduler::new(config, kv_config);
     let mut queue = RequestQueue::new();
     let mut latencies = Vec::new();
-    let request_times: std::collections::HashMap<_, _> = requests
-        .iter()
-        .map(|r| (r.id, Instant::now()))
-        .collect();
+    let request_times: std::collections::HashMap<_, _> =
+        requests.iter().map(|r| (r.id, Instant::now())).collect();
 
     // Add all requests to queue
     for request in requests {
@@ -114,7 +112,11 @@ fn continuous_batching_process(requests: Vec<InferenceRequest>) -> Vec<Duration>
     latencies
 }
 
-fn create_test_requests(count: usize, prompt_len: usize, max_tokens: usize) -> Vec<InferenceRequest> {
+fn create_test_requests(
+    count: usize,
+    prompt_len: usize,
+    max_tokens: usize,
+) -> Vec<InferenceRequest> {
     (0..count)
         .map(|_| {
             let prompt_tokens: Vec<u32> = (0..prompt_len as u32).collect();

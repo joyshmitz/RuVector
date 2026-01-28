@@ -131,20 +131,42 @@ impl ErrorPattern {
     fn extract_keywords(message: &str) -> Vec<String> {
         // Common error keywords to look for
         let important_words = [
-            "error", "failed", "invalid", "missing", "undefined", "null",
-            "type", "mismatch", "expected", "found", "cannot", "unable",
-            "permission", "denied", "timeout", "connection", "overflow",
-            "underflow", "bounds", "index", "panic", "unwrap", "option",
-            "result", "async", "await", "lifetime", "borrow", "move",
+            "error",
+            "failed",
+            "invalid",
+            "missing",
+            "undefined",
+            "null",
+            "type",
+            "mismatch",
+            "expected",
+            "found",
+            "cannot",
+            "unable",
+            "permission",
+            "denied",
+            "timeout",
+            "connection",
+            "overflow",
+            "underflow",
+            "bounds",
+            "index",
+            "panic",
+            "unwrap",
+            "option",
+            "result",
+            "async",
+            "await",
+            "lifetime",
+            "borrow",
+            "move",
         ];
 
         message
             .to_lowercase()
             .split(|c: char| !c.is_alphanumeric())
             .filter(|word| word.len() > 2)
-            .filter(|word| {
-                important_words.iter().any(|iw| word.contains(iw)) || word.len() > 5
-            })
+            .filter(|word| important_words.iter().any(|iw| word.contains(iw)) || word.len() > 5)
             .map(String::from)
             .take(10)
             .collect()
@@ -161,7 +183,11 @@ impl ErrorPattern {
         let matching = self
             .keywords
             .iter()
-            .filter(|k| other_keywords.iter().any(|ok| ok.contains(k.as_str()) || k.contains(ok.as_str())))
+            .filter(|k| {
+                other_keywords
+                    .iter()
+                    .any(|ok| ok.contains(k.as_str()) || k.contains(ok.as_str()))
+            })
             .count();
 
         let max_len = self.keywords.len().max(other_keywords.len());
@@ -771,10 +797,7 @@ impl ErrorPatternLearner {
             .filter(|(_, sim)| *sim > self.config.similarity_threshold * 0.5) // Lower threshold for suggestions
             .collect();
 
-        similar.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        similar.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         similar.truncate(10);
         similar
@@ -944,9 +967,15 @@ mod tests {
 
     #[test]
     fn test_error_pattern_creation() {
-        let pattern = ErrorPattern::new("type mismatch: expected i32, found String", ErrorCategory::TypeMismatch);
+        let pattern = ErrorPattern::new(
+            "type mismatch: expected i32, found String",
+            ErrorCategory::TypeMismatch,
+        );
         assert!(!pattern.keywords.is_empty());
-        assert!(pattern.keywords.iter().any(|k| k.contains("type") || k.contains("mismatch")));
+        assert!(pattern
+            .keywords
+            .iter()
+            .any(|k| k.contains("type") || k.contains("mismatch")));
     }
 
     #[test]

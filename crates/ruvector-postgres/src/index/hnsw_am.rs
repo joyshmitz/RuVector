@@ -254,6 +254,8 @@ struct HnswScanState {
     search_done: bool,
     /// Recall target for dynamic adjustment
     recall_target: f32,
+    /// Whether query vector was successfully extracted (prevents zero-vector crashes)
+    query_valid: bool,
 }
 
 impl HnswScanState {
@@ -268,6 +270,7 @@ impl HnswScanState {
             current_pos: 0,
             search_done: false,
             recall_target,
+            query_valid: false,
         }
     }
 
@@ -1394,51 +1397,173 @@ unsafe extern "C" fn hnsw_rescan(
     state.results.clear();
     state.current_pos = 0;
     state.search_done = false;
+    state.query_valid = false; // Reset validity flag
 
     // Extract query vector from ORDER BY
     if norderbys > 0 && !orderbys.is_null() {
         let orderby = &*orderbys;
         let datum = orderby.sk_argument;
+        let typoid = orderby.sk_subtype;
 
-        // Extract RuVector from datum using FromDatum trait
+        pgrx::debug1!(
+            "HNSW v2: Extracting query vector, datum null={}, typoid={}",
+            datum.is_null(),
+            typoid.as_u32()
+        );
+
+        // Method 1: Try direct RuVector extraction (works for literals and some casts)
         if let Some(vector) = RuVector::from_polymorphic_datum(
-            datum,
-            false, // not null
-            pg_sys::InvalidOid,
+            datum, false, // not null
+            typoid,
         ) {
             state.query_vector = vector.as_slice().to_vec();
+            state.query_valid = true;
             pgrx::debug1!(
-                "HNSW v2: Extracted query vector with {} dimensions",
+                "HNSW v2: Extracted query vector (direct) with {} dimensions",
                 state.query_vector.len()
             );
-        } else {
-            // Fallback: try to interpret as raw pointer to varlena
+        }
+
+        // Method 2: Handle parameterized queries - check if it's a text type needing conversion
+        if !state.query_valid && !datum.is_null() {
+            // Check if the type is text (OID 25) or varchar (OID 1043) or unknown (OID 705)
+            let is_text_type = typoid == pg_sys::Oid::from(25)
+                || typoid == pg_sys::Oid::from(1043)
+                || typoid == pg_sys::Oid::from(705)
+                || typoid == pg_sys::InvalidOid;
+
+            if is_text_type {
+                // Try to convert text to ruvector using the input function
+                if let Some(vec) = try_convert_text_to_ruvector(datum) {
+                    state.query_vector = vec;
+                    state.query_valid = true;
+                    pgrx::debug1!(
+                        "HNSW v2: Converted text parameter to query vector with {} dimensions",
+                        state.query_vector.len()
+                    );
+                }
+            }
+        }
+
+        // Method 3: Fallback - try raw varlena extraction
+        if !state.query_valid {
             let raw_ptr = datum.cast_mut_ptr::<pg_sys::varlena>();
             if !raw_ptr.is_null() {
                 let detoasted = pg_sys::pg_detoast_datum(raw_ptr);
                 if !detoasted.is_null() {
-                    // Read dimensions and data from varlena
-                    let data_ptr = pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
-                    let dimensions = ptr::read_unaligned(data_ptr as *const u16) as usize;
-                    let f32_ptr = data_ptr.add(4) as *const f32;
-                    state.query_vector = std::slice::from_raw_parts(f32_ptr, dimensions).to_vec();
-                    pgrx::debug1!(
-                        "HNSW v2: Extracted query vector (fallback) with {} dimensions",
-                        dimensions
-                    );
+                    // Check if this looks like our vector format
+                    let total_size = pgrx::varlena::varsize_any(detoasted as *const _);
+                    if total_size >= 8 {
+                        // Minimum: 4 byte header + 4 byte data
+                        let data_ptr =
+                            pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
+                        let dimensions = ptr::read_unaligned(data_ptr as *const u16) as usize;
+
+                        // Validate dimensions match expected and data size is correct
+                        let expected_data_size = 4 + (dimensions * 4); // 4 bytes header + f32 data
+                        let actual_data_size = total_size - pg_sys::VARHDRSZ;
+
+                        if dimensions > 0
+                            && dimensions <= 16384
+                            && actual_data_size >= expected_data_size
+                        {
+                            let f32_ptr = data_ptr.add(4) as *const f32;
+                            state.query_vector =
+                                std::slice::from_raw_parts(f32_ptr, dimensions).to_vec();
+                            state.query_valid = true;
+                            pgrx::debug1!(
+                                "HNSW v2: Extracted query vector (varlena fallback) with {} dimensions",
+                                dimensions
+                            );
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Use default if extraction failed
-    if state.query_vector.is_empty() {
-        pgrx::warning!("HNSW: Could not extract query vector, using zeros");
-        state.query_vector = vec![0.0; state.dimensions];
+    // Validate query vector - CRITICAL: Prevent crashes from invalid queries
+    if !state.query_valid || state.query_vector.is_empty() {
+        // Instead of using zeros which crash, raise a proper error
+        pgrx::error!(
+            "HNSW: Could not extract query vector from parameter. \
+             Ensure the query vector is properly cast to ruvector type, e.g.: \
+             ORDER BY embedding <=> '[1,2,3]'::ruvector(dim)"
+        );
+    }
+
+    // Validate vector is not all zeros (would cause issues in hyperbolic space)
+    if is_zero_vector(&state.query_vector) {
+        pgrx::error!(
+            "HNSW: Query vector is all zeros, which is invalid for similarity search. \
+             Please provide a valid non-zero query vector."
+        );
+    }
+
+    // Validate dimension match
+    if state.query_vector.len() != state.dimensions {
+        pgrx::error!(
+            "HNSW: Query vector has {} dimensions but index expects {}",
+            state.query_vector.len(),
+            state.dimensions
+        );
     }
 
     // Get ef_search from GUC (ruvector.ef_search)
     state.k = 10; // Default, will be overridden by LIMIT in executor
+}
+
+/// Try to convert a text datum to ruvector by calling the input function
+unsafe fn try_convert_text_to_ruvector(datum: Datum) -> Option<Vec<f32>> {
+    // Get the text value
+    let text_ptr = datum.cast_mut_ptr::<pg_sys::text>();
+    if text_ptr.is_null() {
+        return None;
+    }
+
+    // Detoast if needed
+    let detoasted = pg_sys::pg_detoast_datum(text_ptr as *mut pg_sys::varlena);
+    if detoasted.is_null() {
+        return None;
+    }
+
+    // Extract the text content
+    let text_len = pgrx::varlena::varsize_any_exhdr(detoasted as *const _);
+    let text_data = pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
+
+    if text_len == 0 {
+        return None;
+    }
+
+    // Convert to string for parsing
+    let text_slice = std::slice::from_raw_parts(text_data, text_len);
+    let text_str = match std::str::from_utf8(text_slice) {
+        Ok(s) => s.trim(),
+        Err(_) => return None,
+    };
+
+    // Must start with '[' and end with ']' for vector format
+    if !text_str.starts_with('[') || !text_str.ends_with(']') {
+        return None;
+    }
+
+    // Parse the vector values
+    let inner = &text_str[1..text_str.len() - 1];
+    let values: Vec<f32> = inner
+        .split(',')
+        .filter_map(|s| s.trim().parse::<f32>().ok())
+        .collect();
+
+    if values.is_empty() {
+        return None;
+    }
+
+    Some(values)
+}
+
+/// Check if a vector is all zeros
+fn is_zero_vector(v: &[f32]) -> bool {
+    v.iter().all(|&x| x == 0.0)
 }
 
 /// Get tuple callback - return next result

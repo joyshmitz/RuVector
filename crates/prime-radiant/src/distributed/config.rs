@@ -80,7 +80,10 @@ impl DistributedCoherenceConfig {
 
     /// Create configuration for a 3-node cluster
     pub fn three_node_cluster(node_id: &str, members: Vec<String>) -> Self {
-        assert!(members.len() >= 3, "Need at least 3 members for 3-node cluster");
+        assert!(
+            members.len() >= 3,
+            "Need at least 3 members for 3-node cluster"
+        );
         Self {
             node_id: node_id.to_string(),
             cluster_members: members,
@@ -91,7 +94,10 @@ impl DistributedCoherenceConfig {
 
     /// Create configuration for a 5-node cluster
     pub fn five_node_cluster(node_id: &str, members: Vec<String>) -> Self {
-        assert!(members.len() >= 5, "Need at least 5 members for 5-node cluster");
+        assert!(
+            members.len() >= 5,
+            "Need at least 5 members for 5-node cluster"
+        );
         Self {
             node_id: node_id.to_string(),
             cluster_members: members,
@@ -141,7 +147,9 @@ impl DistributedCoherenceConfig {
 
     /// Get number of tolerable failures
     pub fn max_failures(&self) -> usize {
-        self.cluster_members.len().saturating_sub(self.quorum_size())
+        self.cluster_members
+            .len()
+            .saturating_sub(self.quorum_size())
     }
 }
 

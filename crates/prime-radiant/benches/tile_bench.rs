@@ -271,7 +271,8 @@ impl TileState {
         for delta in self.delta_buffer.drain(..) {
             match delta.delta_type {
                 DeltaType::EdgeAdd => {
-                    self.graph.add_edge(delta.source, delta.target, delta.weight);
+                    self.graph
+                        .add_edge(delta.source, delta.target, delta.weight);
                 }
                 DeltaType::Observation => {
                     // Update evidence accumulator
@@ -385,9 +386,7 @@ fn bench_single_tile_tick(c: &mut Criterion) {
 
     // Empty tick
     let mut tile = TileState::new(0);
-    group.bench_function("empty", |b| {
-        b.iter(|| black_box(tile.tick(black_box(1))))
-    });
+    group.bench_function("empty", |b| b.iter(|| black_box(tile.tick(black_box(1)))));
 
     // Tick with small graph
     let mut tile = TileState::new(0);

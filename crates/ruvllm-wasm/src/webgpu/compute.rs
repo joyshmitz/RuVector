@@ -6,11 +6,11 @@
 //! Note: WebGPU bindings use JavaScript interop via js_sys/Reflect since
 //! web-sys WebGPU bindings are still unstable.
 
+use js_sys::{Array, Float32Array, Object, Promise, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use js_sys::{Array, Float32Array, Object, Promise, Reflect};
 
-use super::{AdapterInfo, AttentionConfig, shaders};
+use super::{shaders, AdapterInfo, AttentionConfig};
 
 /// Check if WebGPU is available in this browser
 pub async fn is_webgpu_available() -> bool {
@@ -34,7 +34,11 @@ pub async fn get_gpu_info() -> Option<AdapterInfo> {
 
         // Request adapter
         let options = Object::new();
-        let _ = Reflect::set(&options, &"powerPreference".into(), &"high-performance".into());
+        let _ = Reflect::set(
+            &options,
+            &"powerPreference".into(),
+            &"high-performance".into(),
+        );
 
         let adapter_promise = call_method(&gpu, "requestAdapter", &[options.into()]).ok()?;
         let adapter = JsFuture::from(adapter_promise.dyn_into::<Promise>().ok()?)
@@ -59,8 +63,10 @@ pub async fn get_gpu_info() -> Option<AdapterInfo> {
             architecture: get_string_prop(&info, "architecture").unwrap_or_default(),
             device_type: get_string_prop(&info, "device").unwrap_or_else(|| "unknown".to_string()),
             backend: "WebGPU".to_string(),
-            max_buffer_size: get_number_prop(&limits, "maxBufferSize").unwrap_or(256.0 * 1024.0 * 1024.0) as u64,
-            max_workgroup_size: get_number_prop(&limits, "maxComputeWorkgroupSizeX").unwrap_or(256.0) as u32,
+            max_buffer_size: get_number_prop(&limits, "maxBufferSize")
+                .unwrap_or(256.0 * 1024.0 * 1024.0) as u64,
+            max_workgroup_size: get_number_prop(&limits, "maxComputeWorkgroupSizeX")
+                .unwrap_or(256.0) as u32,
         })
     }
 
@@ -93,15 +99,12 @@ fn get_string_prop(obj: &JsValue, key: &str) -> Option<String> {
 
 #[cfg(target_arch = "wasm32")]
 fn get_number_prop(obj: &JsValue, key: &str) -> Option<f64> {
-    Reflect::get(obj, &key.into())
-        .ok()
-        .and_then(|v| v.as_f64())
+    Reflect::get(obj, &key.into()).ok().and_then(|v| v.as_f64())
 }
 
 #[cfg(target_arch = "wasm32")]
 fn call_method(obj: &JsValue, method: &str, args: &[JsValue]) -> Result<JsValue, JsValue> {
-    let func = Reflect::get(obj, &method.into())?
-        .dyn_into::<js_sys::Function>()?;
+    let func = Reflect::get(obj, &method.into())?.dyn_into::<js_sys::Function>()?;
 
     let args_array = Array::new();
     for arg in args {
@@ -141,16 +144,18 @@ impl WebGpuContext {
     pub async fn init() -> Result<WebGpuContext, JsValue> {
         #[cfg(target_arch = "wasm32")]
         {
-            let gpu = get_gpu_object()
-                .ok_or_else(|| JsValue::from_str("WebGPU not available"))?;
+            let gpu = get_gpu_object().ok_or_else(|| JsValue::from_str("WebGPU not available"))?;
 
             // Request adapter with high performance preference
             let adapter_options = Object::new();
-            Reflect::set(&adapter_options, &"powerPreference".into(), &"high-performance".into())?;
+            Reflect::set(
+                &adapter_options,
+                &"powerPreference".into(),
+                &"high-performance".into(),
+            )?;
 
             let adapter_promise = call_method(&gpu, "requestAdapter", &[adapter_options.into()])?;
-            let adapter = JsFuture::from(adapter_promise.dyn_into::<Promise>()?)
-                .await?;
+            let adapter = JsFuture::from(adapter_promise.dyn_into::<Promise>()?).await?;
 
             if adapter.is_null() || adapter.is_undefined() {
                 return Err(JsValue::from_str("No suitable GPU adapter found"));
@@ -158,26 +163,28 @@ impl WebGpuContext {
 
             // Get adapter info
             let info_promise = call_method(&adapter, "requestAdapterInfo", &[])?;
-            let info = JsFuture::from(info_promise.dyn_into::<Promise>()?)
-                .await?;
+            let info = JsFuture::from(info_promise.dyn_into::<Promise>()?).await?;
             let limits = Reflect::get(&adapter, &"limits".into())?;
 
             let adapter_info = AdapterInfo {
                 vendor: get_string_prop(&info, "vendor").unwrap_or_default(),
                 architecture: get_string_prop(&info, "architecture").unwrap_or_default(),
-                device_type: get_string_prop(&info, "device").unwrap_or_else(|| "unknown".to_string()),
+                device_type: get_string_prop(&info, "device")
+                    .unwrap_or_else(|| "unknown".to_string()),
                 backend: "WebGPU".to_string(),
-                max_buffer_size: get_number_prop(&limits, "maxBufferSize").unwrap_or(256.0 * 1024.0 * 1024.0) as u64,
-                max_workgroup_size: get_number_prop(&limits, "maxComputeWorkgroupSizeX").unwrap_or(256.0) as u32,
+                max_buffer_size: get_number_prop(&limits, "maxBufferSize")
+                    .unwrap_or(256.0 * 1024.0 * 1024.0) as u64,
+                max_workgroup_size: get_number_prop(&limits, "maxComputeWorkgroupSizeX")
+                    .unwrap_or(256.0) as u32,
             };
 
             // Request device
             let device_descriptor = Object::new();
             Reflect::set(&device_descriptor, &"label".into(), &"ruvllm-wasm".into())?;
 
-            let device_promise = call_method(&adapter, "requestDevice", &[device_descriptor.into()])?;
-            let device = JsFuture::from(device_promise.dyn_into::<Promise>()?)
-                .await?;
+            let device_promise =
+                call_method(&adapter, "requestDevice", &[device_descriptor.into()])?;
+            let device = JsFuture::from(device_promise.dyn_into::<Promise>()?).await?;
 
             // Get queue
             let queue = Reflect::get(&device, &"queue".into())?;
@@ -213,10 +220,19 @@ impl WebGpuContext {
 
     /// Create a GPU buffer
     #[cfg(target_arch = "wasm32")]
-    fn create_buffer_internal(&self, size: usize, usage: u32, label: Option<&str>) -> Result<JsValue, JsValue> {
+    fn create_buffer_internal(
+        &self,
+        size: usize,
+        usage: u32,
+        label: Option<&str>,
+    ) -> Result<JsValue, JsValue> {
         let descriptor = Object::new();
         Reflect::set(&descriptor, &"size".into(), &JsValue::from_f64(size as f64))?;
-        Reflect::set(&descriptor, &"usage".into(), &JsValue::from_f64(usage as f64))?;
+        Reflect::set(
+            &descriptor,
+            &"usage".into(),
+            &JsValue::from_f64(usage as f64),
+        )?;
         if let Some(lbl) = label {
             Reflect::set(&descriptor, &"label".into(), &lbl.into())?;
         }
@@ -228,11 +244,15 @@ impl WebGpuContext {
     #[cfg(target_arch = "wasm32")]
     fn write_buffer_internal(&self, buffer: &JsValue, data: &[f32]) -> Result<(), JsValue> {
         let data_array = Float32Array::from(data);
-        call_method(&self.queue, "writeBuffer", &[
-            buffer.clone(),
-            JsValue::from_f64(0.0),
-            data_array.buffer().into(),
-        ])?;
+        call_method(
+            &self.queue,
+            "writeBuffer",
+            &[
+                buffer.clone(),
+                JsValue::from_f64(0.0),
+                data_array.buffer().into(),
+            ],
+        )?;
         Ok(())
     }
 }
@@ -347,14 +367,16 @@ impl WebGpuInference {
         if a.len() != expected_a {
             return Err(JsValue::from_str(&format!(
                 "Matrix A dimension mismatch: expected {}, got {}",
-                expected_a, a.len()
+                expected_a,
+                a.len()
             )));
         }
 
         if b.len() != expected_b {
             return Err(JsValue::from_str(&format!(
                 "Matrix B dimension mismatch: expected {}, got {}",
-                expected_b, b.len()
+                expected_b,
+                b.len()
             )));
         }
 
@@ -363,20 +385,22 @@ impl WebGpuInference {
             let output_size = (m as usize) * (n as usize);
 
             // GPU buffer usage flags
-            const STORAGE: u32 = 0x80;  // GPUBufferUsage.STORAGE
+            const STORAGE: u32 = 0x80; // GPUBufferUsage.STORAGE
             const COPY_SRC: u32 = 0x04; // GPUBufferUsage.COPY_SRC
             const COPY_DST: u32 = 0x08; // GPUBufferUsage.COPY_DST
             const MAP_READ: u32 = 0x01; // GPUBufferUsage.MAP_READ
-            const UNIFORM: u32 = 0x40;  // GPUBufferUsage.UNIFORM
+            const UNIFORM: u32 = 0x40; // GPUBufferUsage.UNIFORM
 
             // Create buffers
             let buffer_a = self.create_buffer(a.len() * 4, STORAGE | COPY_DST, Some("matmul_a"))?;
             let buffer_b = self.create_buffer(b.len() * 4, STORAGE | COPY_DST, Some("matmul_b"))?;
-            let buffer_c = self.create_buffer(output_size * 4, STORAGE | COPY_SRC, Some("matmul_c"))?;
+            let buffer_c =
+                self.create_buffer(output_size * 4, STORAGE | COPY_SRC, Some("matmul_c"))?;
 
             // Create uniform buffer for dimensions
             let uniform_data: [f32; 4] = [m as f32, n as f32, k as f32, 1.0]; // M, N, K, alpha
-            let uniform_buffer = self.create_buffer(16, UNIFORM | COPY_DST, Some("matmul_uniforms"))?;
+            let uniform_buffer =
+                self.create_buffer(16, UNIFORM | COPY_DST, Some("matmul_uniforms"))?;
 
             // Write data to buffers
             self.write_buffer(&buffer_a, a)?;
@@ -386,7 +410,8 @@ impl WebGpuInference {
             // Create shader module
             let shader_desc = Object::new();
             Reflect::set(&shader_desc, &"code".into(), &shaders::MATMUL_SHADER.into())?;
-            let shader_module = call_method(&self.device, "createShaderModule", &[shader_desc.into()])?;
+            let shader_module =
+                call_method(&self.device, "createShaderModule", &[shader_desc.into()])?;
 
             // Create bind group layout
             let layout_entries = Array::new();
@@ -397,7 +422,16 @@ impl WebGpuInference {
                 Reflect::set(&entry, &"binding".into(), &JsValue::from_f64(i as f64))?;
                 Reflect::set(&entry, &"visibility".into(), &JsValue::from_f64(4.0))?; // COMPUTE stage
                 let buffer_layout = Object::new();
-                Reflect::set(&buffer_layout, &"type".into(), &(if i < 2 { "read-only-storage" } else { "storage" }).into())?;
+                Reflect::set(
+                    &buffer_layout,
+                    &"type".into(),
+                    &(if i < 2 {
+                        "read-only-storage"
+                    } else {
+                        "storage"
+                    })
+                    .into(),
+                )?;
                 Reflect::set(&entry, &"buffer".into(), &buffer_layout)?;
                 layout_entries.push(&entry);
             }
@@ -405,7 +439,11 @@ impl WebGpuInference {
             // Uniform buffer entry
             let uniform_entry = Object::new();
             Reflect::set(&uniform_entry, &"binding".into(), &JsValue::from_f64(3.0))?;
-            Reflect::set(&uniform_entry, &"visibility".into(), &JsValue::from_f64(4.0))?;
+            Reflect::set(
+                &uniform_entry,
+                &"visibility".into(),
+                &JsValue::from_f64(4.0),
+            )?;
             let uniform_layout = Object::new();
             Reflect::set(&uniform_layout, &"type".into(), &"uniform".into())?;
             Reflect::set(&uniform_entry, &"buffer".into(), &uniform_layout)?;
@@ -413,14 +451,19 @@ impl WebGpuInference {
 
             let layout_desc = Object::new();
             Reflect::set(&layout_desc, &"entries".into(), &layout_entries)?;
-            let bind_group_layout = call_method(&self.device, "createBindGroupLayout", &[layout_desc.into()])?;
+            let bind_group_layout =
+                call_method(&self.device, "createBindGroupLayout", &[layout_desc.into()])?;
 
             // Create pipeline layout
             let layouts = Array::new();
             layouts.push(&bind_group_layout);
             let pipeline_layout_desc = Object::new();
             Reflect::set(&pipeline_layout_desc, &"bindGroupLayouts".into(), &layouts)?;
-            let pipeline_layout = call_method(&self.device, "createPipelineLayout", &[pipeline_layout_desc.into()])?;
+            let pipeline_layout = call_method(
+                &self.device,
+                "createPipelineLayout",
+                &[pipeline_layout_desc.into()],
+            )?;
 
             // Create compute pipeline
             let compute_stage = Object::new();
@@ -431,11 +474,18 @@ impl WebGpuInference {
             Reflect::set(&pipeline_desc, &"layout".into(), &pipeline_layout)?;
             Reflect::set(&pipeline_desc, &"compute".into(), &compute_stage)?;
 
-            let pipeline = call_method(&self.device, "createComputePipeline", &[pipeline_desc.into()])?;
+            let pipeline = call_method(
+                &self.device,
+                "createComputePipeline",
+                &[pipeline_desc.into()],
+            )?;
 
             // Create bind group
             let bind_entries = Array::new();
-            for (i, buffer) in [&buffer_a, &buffer_b, &buffer_c, &uniform_buffer].iter().enumerate() {
+            for (i, buffer) in [&buffer_a, &buffer_b, &buffer_c, &uniform_buffer]
+                .iter()
+                .enumerate()
+            {
                 let entry = Object::new();
                 Reflect::set(&entry, &"binding".into(), &JsValue::from_f64(i as f64))?;
                 let resource = Object::new();
@@ -447,11 +497,13 @@ impl WebGpuInference {
             let bind_group_desc = Object::new();
             Reflect::set(&bind_group_desc, &"layout".into(), &bind_group_layout)?;
             Reflect::set(&bind_group_desc, &"entries".into(), &bind_entries)?;
-            let bind_group = call_method(&self.device, "createBindGroup", &[bind_group_desc.into()])?;
+            let bind_group =
+                call_method(&self.device, "createBindGroup", &[bind_group_desc.into()])?;
 
             // Create command encoder
             let encoder_desc = Object::new();
-            let encoder = call_method(&self.device, "createCommandEncoder", &[encoder_desc.into()])?;
+            let encoder =
+                call_method(&self.device, "createCommandEncoder", &[encoder_desc.into()])?;
 
             // Begin compute pass
             let pass_desc = Object::new();
@@ -459,29 +511,42 @@ impl WebGpuInference {
 
             // Set pipeline and bind group
             call_method(&pass, "setPipeline", &[pipeline.clone()])?;
-            call_method(&pass, "setBindGroup", &[JsValue::from_f64(0.0), bind_group.clone()])?;
+            call_method(
+                &pass,
+                "setBindGroup",
+                &[JsValue::from_f64(0.0), bind_group.clone()],
+            )?;
 
             // Dispatch workgroups (16x16 tile size)
             let workgroups_x = (m + 15) / 16;
             let workgroups_y = (n + 15) / 16;
-            call_method(&pass, "dispatchWorkgroups", &[
-                JsValue::from_f64(workgroups_x as f64),
-                JsValue::from_f64(workgroups_y as f64),
-            ])?;
+            call_method(
+                &pass,
+                "dispatchWorkgroups",
+                &[
+                    JsValue::from_f64(workgroups_x as f64),
+                    JsValue::from_f64(workgroups_y as f64),
+                ],
+            )?;
 
             call_method(&pass, "end", &[])?;
 
             // Create staging buffer for readback
-            let staging = self.create_buffer(output_size * 4, MAP_READ | COPY_DST, Some("staging"))?;
+            let staging =
+                self.create_buffer(output_size * 4, MAP_READ | COPY_DST, Some("staging"))?;
 
             // Copy result to staging
-            call_method(&encoder, "copyBufferToBuffer", &[
-                buffer_c.clone(),
-                JsValue::from_f64(0.0),
-                staging.clone(),
-                JsValue::from_f64(0.0),
-                JsValue::from_f64((output_size * 4) as f64),
-            ])?;
+            call_method(
+                &encoder,
+                "copyBufferToBuffer",
+                &[
+                    buffer_c.clone(),
+                    JsValue::from_f64(0.0),
+                    staging.clone(),
+                    JsValue::from_f64(0.0),
+                    JsValue::from_f64((output_size * 4) as f64),
+                ],
+            )?;
 
             // Submit commands
             let command_buffer = call_method(&encoder, "finish", &[])?;
@@ -533,7 +598,10 @@ impl WebGpuInference {
         if q.len() != expected_size || k.len() != expected_size || v.len() != expected_size {
             return Err(JsValue::from_str(&format!(
                 "Attention tensor dimension mismatch: expected {}, got Q:{}, K:{}, V:{}",
-                expected_size, q.len(), k.len(), v.len()
+                expected_size,
+                q.len(),
+                k.len(),
+                v.len()
             )));
         }
 
@@ -627,14 +695,16 @@ impl WebGpuInference {
         if weight.len() != hidden_dim as usize {
             return Err(JsValue::from_str(&format!(
                 "Weight dimension mismatch: expected {}, got {}",
-                hidden_dim, weight.len()
+                hidden_dim,
+                weight.len()
             )));
         }
 
         if input.len() % hidden_dim as usize != 0 {
             return Err(JsValue::from_str(&format!(
                 "Input size {} not divisible by hidden_dim {}",
-                input.len(), hidden_dim
+                input.len(),
+                hidden_dim
             )));
         }
 
@@ -675,7 +745,8 @@ impl WebGpuInference {
         if input.len() % dim as usize != 0 {
             return Err(JsValue::from_str(&format!(
                 "Input size {} not divisible by dim {}",
-                input.len(), dim
+                input.len(),
+                dim
             )));
         }
 
@@ -713,10 +784,19 @@ impl WebGpuInference {
 
     // Helper methods for GPU buffer management
     #[cfg(target_arch = "wasm32")]
-    fn create_buffer(&self, size: usize, usage: u32, label: Option<&str>) -> Result<JsValue, JsValue> {
+    fn create_buffer(
+        &self,
+        size: usize,
+        usage: u32,
+        label: Option<&str>,
+    ) -> Result<JsValue, JsValue> {
         let descriptor = Object::new();
         Reflect::set(&descriptor, &"size".into(), &JsValue::from_f64(size as f64))?;
-        Reflect::set(&descriptor, &"usage".into(), &JsValue::from_f64(usage as f64))?;
+        Reflect::set(
+            &descriptor,
+            &"usage".into(),
+            &JsValue::from_f64(usage as f64),
+        )?;
         if let Some(lbl) = label {
             Reflect::set(&descriptor, &"label".into(), &lbl.into())?;
         }
@@ -727,11 +807,15 @@ impl WebGpuInference {
     #[cfg(target_arch = "wasm32")]
     fn write_buffer(&self, buffer: &JsValue, data: &[f32]) -> Result<(), JsValue> {
         let data_array = Float32Array::from(data);
-        call_method(&self.queue, "writeBuffer", &[
-            buffer.clone(),
-            JsValue::from_f64(0.0),
-            data_array.buffer().into(),
-        ])?;
+        call_method(
+            &self.queue,
+            "writeBuffer",
+            &[
+                buffer.clone(),
+                JsValue::from_f64(0.0),
+                data_array.buffer().into(),
+            ],
+        )?;
         Ok(())
     }
 }

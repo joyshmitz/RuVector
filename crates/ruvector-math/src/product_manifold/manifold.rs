@@ -1,9 +1,9 @@
 //! Product manifold implementation
 
+use super::config::ProductManifoldConfig;
 use crate::error::{MathError, Result};
 use crate::spherical::SphericalSpace;
 use crate::utils::{dot, norm, EPS};
-use super::config::ProductManifoldConfig;
 
 /// Product manifold: M = E^e × H^h × S^s
 #[derive(Debug, Clone)]
@@ -442,8 +442,7 @@ impl ProductManifold {
 
         let scale = theta / theta.sin();
 
-        Ok(x
-            .iter()
+        Ok(x.iter()
             .zip(y.iter())
             .map(|(&xi, &yi)| scale * (yi - cos_theta * xi))
             .collect())

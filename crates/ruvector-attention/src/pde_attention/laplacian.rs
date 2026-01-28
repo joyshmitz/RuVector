@@ -30,11 +30,7 @@ pub struct GraphLaplacian {
 
 impl GraphLaplacian {
     /// Build Laplacian from keys using Gaussian kernel
-    pub fn from_keys(
-        keys: &[&[f32]],
-        sigma: f32,
-        lap_type: LaplacianType,
-    ) -> Self {
+    pub fn from_keys(keys: &[&[f32]], sigma: f32, lap_type: LaplacianType) -> Self {
         let n = keys.len();
         let sigma2 = (sigma * sigma).max(1e-9);
 
@@ -65,12 +61,7 @@ impl GraphLaplacian {
     }
 
     /// Build sparse Laplacian using k-NN
-    pub fn from_keys_knn(
-        keys: &[&[f32]],
-        k: usize,
-        sigma: f32,
-        lap_type: LaplacianType,
-    ) -> Self {
+    pub fn from_keys_knn(keys: &[&[f32]], k: usize, sigma: f32, lap_type: LaplacianType) -> Self {
         let n = keys.len();
         // Security: prevent integer underflow when n=0 or n=1
         let k = if n > 1 { k.min(n - 1) } else { 0 };
@@ -86,7 +77,9 @@ impl GraphLaplacian {
                 .map(|j| (j, Self::l2_sq(keys[i], keys[j])))
                 .collect();
 
-            dists.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            dists.sort_unstable_by(|a, b| {
+                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Keep only k nearest
             for (j, dist2) in dists.iter().take(k) {
@@ -127,7 +120,9 @@ impl GraphLaplacian {
             }
             LaplacianType::SymmetricNormalized => {
                 // L * x = x - D^{-1/2} W D^{-1/2} x
-                let d_inv_sqrt: Vec<f32> = self.degrees.iter()
+                let d_inv_sqrt: Vec<f32> = self
+                    .degrees
+                    .iter()
                     .map(|&d| if d > 0.0 { 1.0 / d.sqrt() } else { 0.0 })
                     .collect();
 
@@ -143,7 +138,11 @@ impl GraphLaplacian {
                 // L * x = x - D^{-1} W * x
                 for i in 0..self.n {
                     result[i] = x[i];
-                    let d_inv = if self.degrees[i] > 0.0 { 1.0 / self.degrees[i] } else { 0.0 };
+                    let d_inv = if self.degrees[i] > 0.0 {
+                        1.0 / self.degrees[i]
+                    } else {
+                        0.0
+                    };
                     for j in 0..self.n {
                         result[i] -= d_inv * self.weights[i * self.n + j] * x[j];
                     }
@@ -192,11 +191,7 @@ mod tests {
 
     #[test]
     fn test_laplacian_build() {
-        let keys: Vec<Vec<f32>> = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let keys: Vec<Vec<f32>> = vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]];
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let lap = GraphLaplacian::from_keys(&keys_refs, 1.0, LaplacianType::Unnormalized);
@@ -207,11 +202,7 @@ mod tests {
 
     #[test]
     fn test_laplacian_apply() {
-        let keys: Vec<Vec<f32>> = vec![
-            vec![0.0],
-            vec![1.0],
-            vec![2.0],
-        ];
+        let keys: Vec<Vec<f32>> = vec![vec![0.0], vec![1.0], vec![2.0]];
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let lap = GraphLaplacian::from_keys(&keys_refs, 1.0, LaplacianType::Unnormalized);
@@ -226,9 +217,7 @@ mod tests {
 
     #[test]
     fn test_knn_laplacian() {
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let lap = GraphLaplacian::from_keys_knn(&keys_refs, 3, 1.0, LaplacianType::RandomWalk);

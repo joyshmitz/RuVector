@@ -4,8 +4,8 @@
 //! EWC state management, and serialization.
 
 use ruvllm::{
-    lora::{AdaptFeedback, LoraAdapter, MicroLoRA, MicroLoraConfig, TargetModule},
     error::Result,
+    lora::{AdaptFeedback, LoraAdapter, MicroLoRA, MicroLoraConfig, TargetModule},
 };
 use std::collections::HashMap;
 
@@ -143,7 +143,11 @@ fn test_lora_adapter_forward() {
 
     // With zero-initialized B, output should be zero
     let sum: f32 = output.iter().sum();
-    assert!(sum.abs() < 1e-6, "Initial forward should be ~0, got {}", sum);
+    assert!(
+        sum.abs() < 1e-6,
+        "Initial forward should be ~0, got {}",
+        sum
+    );
 }
 
 #[test]
@@ -392,7 +396,12 @@ fn test_lora_adapter_simd_forward() {
     let expected = adapter.forward(&input_array);
 
     for (o, e) in output.iter().zip(expected.iter()) {
-        assert!((o - e).abs() < 1e-5, "SIMD forward mismatch: {} vs {}", o, e);
+        assert!(
+            (o - e).abs() < 1e-5,
+            "SIMD forward mismatch: {} vs {}",
+            o,
+            e
+        );
     }
 }
 
@@ -494,7 +503,11 @@ fn test_config_builder_methods() {
     let config = MicroLoraConfig::for_hidden_dim(256)
         .with_rank(1)
         .with_alpha(8.0)
-        .with_targets(vec![TargetModule::QProj, TargetModule::KProj, TargetModule::VProj]);
+        .with_targets(vec![
+            TargetModule::QProj,
+            TargetModule::KProj,
+            TargetModule::VProj,
+        ]);
 
     assert_eq!(config.rank, 1);
     assert_eq!(config.alpha, 8.0);

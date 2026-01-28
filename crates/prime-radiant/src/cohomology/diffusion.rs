@@ -7,8 +7,8 @@
 use super::laplacian::{LaplacianConfig, SheafLaplacian};
 use super::obstruction::{ObstructionDetector, ObstructionSeverity};
 use super::sheaf::SheafSection;
-use crate::substrate::SheafGraph;
 use crate::substrate::NodeId;
+use crate::substrate::SheafGraph;
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -109,9 +109,7 @@ impl DiffusionResult {
 
     /// Check if obstruction was detected
     pub fn has_obstruction(&self) -> bool {
-        self.residual_obstruction
-            .map(|e| e > 0.01)
-            .unwrap_or(false)
+        self.residual_obstruction.map(|e| e > 0.01).unwrap_or(false)
     }
 
     /// Get persistent obstructions
@@ -188,8 +186,10 @@ impl SheafDiffusion {
 
                 // Check if obstruction is persistent
                 if step > 20 {
-                    let recent_energies = &energy_history[energy_history.len().saturating_sub(10)..];
-                    let avg_recent: f64 = recent_energies.iter().sum::<f64>() / recent_energies.len() as f64;
+                    let recent_energies =
+                        &energy_history[energy_history.len().saturating_sub(10)..];
+                    let avg_recent: f64 =
+                        recent_energies.iter().sum::<f64>() / recent_energies.len() as f64;
                     indicator.is_persistent = (new_energy - avg_recent).abs() < 0.01 * avg_recent;
                 }
 
@@ -328,9 +328,7 @@ impl SheafDiffusion {
 
         for node_id in graph.node_ids() {
             if let Some(node) = graph.get_node(node_id) {
-                let values: Vec<f64> = node.state.as_slice().iter()
-                    .map(|&x| x as f64)
-                    .collect();
+                let values: Vec<f64> = node.state.as_slice().iter().map(|&x| x as f64).collect();
                 section.set(node_id, Array1::from_vec(values));
             }
         }
@@ -353,7 +351,11 @@ impl SheafDiffusion {
     }
 
     /// Compute per-node energies
-    fn compute_node_energies(&self, graph: &SheafGraph, section: &SheafSection) -> HashMap<NodeId, f64> {
+    fn compute_node_energies(
+        &self,
+        graph: &SheafGraph,
+        section: &SheafSection,
+    ) -> HashMap<NodeId, f64> {
         let mut node_energies: HashMap<NodeId, f64> = HashMap::new();
 
         for node_id in graph.node_ids() {
@@ -367,10 +369,9 @@ impl SheafDiffusion {
                         edge.source
                     };
 
-                    if let (Some(this_val), Some(other_val)) = (
-                        section.get(node_id),
-                        section.get(other),
-                    ) {
+                    if let (Some(this_val), Some(other_val)) =
+                        (section.get(node_id), section.get(other))
+                    {
                         let residual = this_val - other_val;
                         let residual_norm: f64 = residual.iter().map(|x| x * x).sum();
                         energy += (edge.weight as f64) * residual_norm;
@@ -462,12 +463,8 @@ mod tests {
     fn test_adaptive_diffusion() {
         let graph = SheafGraph::new();
 
-        let node1 = SheafNodeBuilder::new()
-            .state_from_slice(&[5.0])
-            .build();
-        let node2 = SheafNodeBuilder::new()
-            .state_from_slice(&[-5.0])
-            .build();
+        let node1 = SheafNodeBuilder::new().state_from_slice(&[5.0]).build();
+        let node2 = SheafNodeBuilder::new().state_from_slice(&[-5.0]).build();
 
         let id1 = graph.add_node(node1);
         let id2 = graph.add_node(node2);

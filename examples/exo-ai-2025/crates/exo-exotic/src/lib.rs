@@ -23,28 +23,28 @@
 //! - Cache-friendly memory layouts
 //! - Early termination heuristics
 
-pub mod strange_loops;
+pub mod black_holes;
+pub mod collective;
 pub mod dreams;
+pub mod emergence;
 pub mod free_energy;
 pub mod morphogenesis;
-pub mod collective;
-pub mod temporal_qualia;
 pub mod multiple_selves;
+pub mod strange_loops;
+pub mod temporal_qualia;
 pub mod thermodynamics;
-pub mod emergence;
-pub mod black_holes;
 
 // Re-exports for convenience
-pub use strange_loops::{StrangeLoop, SelfReference, TangledHierarchy};
-pub use dreams::{DreamEngine, DreamState, DreamReport};
-pub use free_energy::{FreeEnergyMinimizer, PredictiveModel, ActiveInference};
-pub use morphogenesis::{MorphogeneticField, TuringPattern, CognitiveEmbryogenesis};
-pub use collective::{CollectiveConsciousness, HiveMind, DistributedPhi};
-pub use temporal_qualia::{TemporalQualia, SubjectiveTime, TimeCrystal};
-pub use multiple_selves::{MultipleSelvesSystem, SubPersonality, SelfCoherence};
-pub use thermodynamics::{CognitiveThermodynamics, ThoughtEntropy, MaxwellDemon};
-pub use emergence::{EmergenceDetector, CausalEmergence, PhaseTransition};
-pub use black_holes::{CognitiveBlackHole, AttractorState, EscapeDynamics};
+pub use black_holes::{AttractorState, CognitiveBlackHole, EscapeDynamics};
+pub use collective::{CollectiveConsciousness, DistributedPhi, HiveMind};
+pub use dreams::{DreamEngine, DreamReport, DreamState};
+pub use emergence::{CausalEmergence, EmergenceDetector, PhaseTransition};
+pub use free_energy::{ActiveInference, FreeEnergyMinimizer, PredictiveModel};
+pub use morphogenesis::{CognitiveEmbryogenesis, MorphogeneticField, TuringPattern};
+pub use multiple_selves::{MultipleSelvesSystem, SelfCoherence, SubPersonality};
+pub use strange_loops::{SelfReference, StrangeLoop, TangledHierarchy};
+pub use temporal_qualia::{SubjectiveTime, TemporalQualia, TimeCrystal};
+pub use thermodynamics::{CognitiveThermodynamics, MaxwellDemon, ThoughtEntropy};
 
 /// Unified experiment runner for all exotic modules
 pub struct ExoticExperiments {

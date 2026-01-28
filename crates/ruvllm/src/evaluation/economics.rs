@@ -133,7 +133,10 @@ impl LatencyStats {
 
     /// Get max
     pub fn max(&self) -> f64 {
-        self.samples.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        self.samples
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max)
     }
 }
 

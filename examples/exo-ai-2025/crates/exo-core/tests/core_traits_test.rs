@@ -121,13 +121,11 @@ mod filter_tests {
     fn test_filter_construction() {
         // Test Filter type construction
         let filter = Filter {
-            conditions: vec![
-                FilterCondition {
-                    field: "category".to_string(),
-                    operator: FilterOperator::Equal,
-                    value: MetadataValue::String("test".to_string()),
-                },
-            ],
+            conditions: vec![FilterCondition {
+                field: "category".to_string(),
+                operator: FilterOperator::Equal,
+                value: MetadataValue::String("test".to_string()),
+            }],
         };
         assert_eq!(filter.conditions.len(), 1);
     }

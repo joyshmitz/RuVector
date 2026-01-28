@@ -178,26 +178,11 @@ mod tests {
     fn test_hierarchy_levels() {
         let computer = DepthComputer::new(-1.0);
 
-        assert_eq!(
-            computer.classify_level(0.3),
-            HierarchyLevel::Root
-        );
-        assert_eq!(
-            computer.classify_level(0.7),
-            HierarchyLevel::High
-        );
-        assert_eq!(
-            computer.classify_level(1.5),
-            HierarchyLevel::Mid
-        );
-        assert_eq!(
-            computer.classify_level(2.5),
-            HierarchyLevel::Deep
-        );
-        assert_eq!(
-            computer.classify_level(4.0),
-            HierarchyLevel::VeryDeep
-        );
+        assert_eq!(computer.classify_level(0.3), HierarchyLevel::Root);
+        assert_eq!(computer.classify_level(0.7), HierarchyLevel::High);
+        assert_eq!(computer.classify_level(1.5), HierarchyLevel::Mid);
+        assert_eq!(computer.classify_level(2.5), HierarchyLevel::Deep);
+        assert_eq!(computer.classify_level(4.0), HierarchyLevel::VeryDeep);
     }
 
     #[test]

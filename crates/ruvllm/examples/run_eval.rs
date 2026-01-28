@@ -36,8 +36,8 @@
 
 use ruvllm::backends::ModelConfig;
 use ruvllm::evaluation::{
-    AblationMode, EvalConfig, EvalTask, RealEvaluationHarness, RealInferenceConfig,
     swe_bench::{SweBenchConfig, SweBenchLoader},
+    AblationMode, EvalConfig, EvalTask, RealEvaluationHarness, RealInferenceConfig,
 };
 use std::env;
 use std::path::PathBuf;
@@ -321,9 +321,26 @@ fn run_evaluation(config: CliConfig) -> Result<(), Box<dyn std::error::Error>> {
             .map(|m| m.name())
             .collect::<Vec<_>>()
     );
-    println!("  Quality threshold: {:.0}%", eval_config.quality_threshold * 100.0);
-    println!("  SONA: {}", if config.enable_sona { "enabled" } else { "disabled" });
-    println!("  HNSW: {}", if config.enable_hnsw { "enabled" } else { "disabled" });
+    println!(
+        "  Quality threshold: {:.0}%",
+        eval_config.quality_threshold * 100.0
+    );
+    println!(
+        "  SONA: {}",
+        if config.enable_sona {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    println!(
+        "  HNSW: {}",
+        if config.enable_hnsw {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
 
     // Configure inference
     let inference_config = RealInferenceConfig {

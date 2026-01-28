@@ -27,14 +27,14 @@
 //! This recurrence enables O(K) evaluation of degree-K polynomial filters.
 
 mod chebyshev;
+mod clustering;
 mod graph_filter;
 mod wavelets;
-mod clustering;
 
-pub use chebyshev::{ChebyshevPolynomial, ChebyshevExpansion};
-pub use graph_filter::{SpectralFilter, FilterType, GraphFilter};
-pub use wavelets::{GraphWavelet, WaveletScale, SpectralWaveletTransform};
-pub use clustering::{SpectralClustering, ClusteringConfig};
+pub use chebyshev::{ChebyshevExpansion, ChebyshevPolynomial};
+pub use clustering::{ClusteringConfig, SpectralClustering};
+pub use graph_filter::{FilterType, GraphFilter, SpectralFilter};
+pub use wavelets::{GraphWavelet, SpectralWaveletTransform, WaveletScale};
 
 /// Scaled Laplacian for Chebyshev approximation
 /// L_scaled = 2L/λ_max - I (eigenvalues in [-1, 1])
@@ -211,11 +211,7 @@ mod tests {
     #[test]
     fn test_scaled_laplacian() {
         // Simple 3-node path graph: 0 -- 1 -- 2
-        let adj = vec![
-            0.0, 1.0, 0.0,
-            1.0, 0.0, 1.0,
-            0.0, 1.0, 0.0,
-        ];
+        let adj = vec![0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0];
 
         let laplacian = ScaledLaplacian::from_adjacency(&adj, 3);
 

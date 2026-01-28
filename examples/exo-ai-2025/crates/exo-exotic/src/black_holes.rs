@@ -18,8 +18,8 @@
 //! - Clinical psychology (rumination, OCD)
 //! - Physics of black holes as metaphor
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// Cognitive black hole representing an attractor state
@@ -476,7 +476,9 @@ fn rand_probability() -> f64 {
         .unwrap_or(12345) as u64;
 
     // Simple LCG
-    let result = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let result = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (result as f64) / (u64::MAX as f64)
 }
 
@@ -493,11 +495,7 @@ mod tests {
 
     #[test]
     fn test_thought_capture() {
-        let mut bh = CognitiveBlackHole::with_params(
-            vec![0.0; 8],
-            2.0,
-            TrapType::Rumination
-        );
+        let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 2.0, TrapType::Rumination);
 
         // Close thought should be captured
         let close_thought = vec![0.1; 8];
@@ -509,26 +507,21 @@ mod tests {
 
     #[test]
     fn test_thought_orbiting() {
-        let mut bh = CognitiveBlackHole::with_params(
-            vec![0.0; 8],
-            1.0,
-            TrapType::Neutral
-        );
+        let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 1.0, TrapType::Neutral);
 
         // Medium distance thought
         let thought = vec![0.8; 8];
         let result = bh.process_thought(thought);
 
-        assert!(matches!(result, ThoughtResult::Orbiting { .. } | ThoughtResult::Free { .. }));
+        assert!(matches!(
+            result,
+            ThoughtResult::Orbiting { .. } | ThoughtResult::Free { .. }
+        ));
     }
 
     #[test]
     fn test_escape_attempt() {
-        let mut bh = CognitiveBlackHole::with_params(
-            vec![0.0; 8],
-            1.0,
-            TrapType::Anxiety
-        );
+        let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 1.0, TrapType::Anxiety);
 
         // Capture some thoughts
         for _ in 0..3 {
@@ -549,7 +542,7 @@ mod tests {
         let mut bh = CognitiveBlackHole::with_params(
             vec![0.0; 8],
             5.0, // Strong black hole
-            TrapType::Depression
+            TrapType::Depression,
         );
 
         bh.process_thought(vec![0.1; 8]);
@@ -586,7 +579,7 @@ mod tests {
     fn test_tick_decay() {
         let mut bh = CognitiveBlackHole::with_params(
             vec![0.0; 8],
-            2.0,  // Higher strength
+            2.0, // Higher strength
             TrapType::Neutral,
         );
         // Use a close thought that will definitely be captured
@@ -602,11 +595,7 @@ mod tests {
 
     #[test]
     fn test_statistics() {
-        let mut bh = CognitiveBlackHole::with_params(
-            vec![0.0; 8],
-            1.5,
-            TrapType::Obsession
-        );
+        let mut bh = CognitiveBlackHole::with_params(vec![0.0; 8], 1.5, TrapType::Obsession);
 
         bh.process_thought(vec![0.1; 8]);
         bh.attempt_escape(0.5, EscapeMethod::Tunneling);

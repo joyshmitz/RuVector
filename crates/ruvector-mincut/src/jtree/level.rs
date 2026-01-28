@@ -471,10 +471,7 @@ impl BmsspJTreeLevel {
                 for &(next, edge_weight) in neighbors {
                     let next_cost = cost + edge_weight;
 
-                    let is_better = distances
-                        .get(&next)
-                        .map(|&d| next_cost < d)
-                        .unwrap_or(true);
+                    let is_better = distances.get(&next).map(|&d| next_cost < d).unwrap_or(true);
 
                     if is_better {
                         distances.insert(next, next_cost);

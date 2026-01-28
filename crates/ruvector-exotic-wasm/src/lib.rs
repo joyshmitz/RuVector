@@ -127,11 +127,7 @@ pub fn version() -> String {
 /// Get information about available exotic mechanisms
 #[wasm_bindgen]
 pub fn available_mechanisms() -> JsValue {
-    let mechanisms = vec![
-        "NeuralAutonomousOrg",
-        "MorphogeneticNetwork",
-        "TimeCrystal",
-    ];
+    let mechanisms = vec!["NeuralAutonomousOrg", "MorphogeneticNetwork", "TimeCrystal"];
     serde_wasm_bindgen::to_value(&mechanisms).unwrap()
 }
 
@@ -181,7 +177,10 @@ impl ExoticEcosystem {
         let pattern = self.crystal.tick();
 
         // Use pattern to determine which agents should be active
-        let _active_count = pattern.iter().map(|b| b.count_ones() as usize).sum::<usize>();
+        let _active_count = pattern
+            .iter()
+            .map(|b| b.count_ones() as usize)
+            .sum::<usize>();
 
         // NAO tick with synchronized dynamics
         self.nao.tick(0.001);
@@ -266,8 +265,7 @@ impl ExoticEcosystem {
             }
         });
 
-        serde_wasm_bindgen::to_value(&summary)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
+        serde_wasm_bindgen::to_value(&summary).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }
 

@@ -47,13 +47,13 @@ pub mod sheaf;
 pub mod topology;
 
 pub use hyperedge::{Hyperedge, HyperedgeIndex};
-pub use sheaf::{SheafStructure, SheafInconsistency};
-pub use topology::{SimplicialComplex, PersistenceDiagram};
+pub use sheaf::{SheafInconsistency, SheafStructure};
+pub use topology::{PersistenceDiagram, SimplicialComplex};
 
 use dashmap::DashMap;
 use exo_core::{
-    EntityId, Error, HyperedgeId, HyperedgeResult, Relation, SectionId,
-    SheafConsistencyResult, TopologicalQuery,
+    EntityId, Error, HyperedgeId, HyperedgeResult, Relation, SectionId, SheafConsistencyResult,
+    TopologicalQuery,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -212,10 +212,7 @@ impl HypergraphSubstrate {
     ///
     /// Checks if local sections are consistent on their overlaps,
     /// following the sheaf axioms.
-    pub fn check_sheaf_consistency(
-        &self,
-        sections: &[SectionId],
-    ) -> SheafConsistencyResult {
+    pub fn check_sheaf_consistency(&self, sections: &[SectionId]) -> SheafConsistencyResult {
         match &self.sheaf {
             Some(sheaf) => sheaf.check_consistency(sections),
             None => SheafConsistencyResult::NotConfigured,

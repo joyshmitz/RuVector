@@ -22,10 +22,10 @@
 //! - **SIMD-friendly**: Projections are just dot products
 //! - **Statistically consistent**: Converges to true W2 as L → ∞
 
+use super::{OptimalTransport, WassersteinConfig};
+use crate::utils::{argsort, EPS};
 use rand::prelude::*;
 use rand_distr::StandardNormal;
-use crate::utils::{argsort, EPS};
-use super::{OptimalTransport, WassersteinConfig};
 
 /// Sliced Wasserstein distance calculator
 #[derive(Debug, Clone)]
@@ -81,9 +81,8 @@ impl SlicedWasserstein {
 
         (0..self.num_projections)
             .map(|_| {
-                let mut direction: Vec<f64> = (0..dim)
-                    .map(|_| rng.sample(StandardNormal))
-                    .collect();
+                let mut direction: Vec<f64> =
+                    (0..dim).map(|_| rng.sample(StandardNormal)).collect();
 
                 // Normalize to unit vector
                 let norm: f64 = direction.iter().map(|&x| x * x).sum::<f64>().sqrt();
@@ -224,7 +223,12 @@ impl SlicedWasserstein {
     }
 
     /// Compute 1D Wasserstein via quantile interpolation
-    fn wasserstein_1d_quantile(&self, sorted_a: &[f64], sorted_b: &[f64], num_samples: usize) -> f64 {
+    fn wasserstein_1d_quantile(
+        &self,
+        sorted_a: &[f64],
+        sorted_b: &[f64],
+        num_samples: usize,
+    ) -> f64 {
         let mut total = 0.0;
 
         for i in 0..num_samples {
@@ -459,7 +463,10 @@ mod tests {
         ];
 
         // Translate by (1, 1)
-        let target: Vec<Vec<f64>> = source.iter().map(|p| vec![p[0] + 1.0, p[1] + 1.0]).collect();
+        let target: Vec<Vec<f64>> = source
+            .iter()
+            .map(|p| vec![p[0] + 1.0, p[1] + 1.0])
+            .collect();
 
         let dist = sw.distance(&source, &target);
 
@@ -484,7 +491,10 @@ mod tests {
         ];
 
         // Scale by 2
-        let target: Vec<Vec<f64>> = source.iter().map(|p| vec![p[0] * 2.0, p[1] * 2.0]).collect();
+        let target: Vec<Vec<f64>> = source
+            .iter()
+            .map(|p| vec![p[0] * 2.0, p[1] * 2.0])
+            .collect();
 
         let dist = sw.distance(&source, &target);
 

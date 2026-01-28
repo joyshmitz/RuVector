@@ -212,8 +212,7 @@ impl SharedTensor {
         let offset = (self.byte_offset / 4) as u32;
 
         for i in 0..self.len() as u32 {
-            js_sys::Atomics::store(&int_view, offset + i, bits)
-                .expect("Atomics::store failed");
+            js_sys::Atomics::store(&int_view, offset + i, bits).expect("Atomics::store failed");
         }
     }
 
@@ -226,8 +225,7 @@ impl SharedTensor {
         let int_view = Int32Array::new(&self.buffer);
         let offset = (self.byte_offset / 4 + index) as u32;
 
-        let bits =
-            js_sys::Atomics::load(&int_view, offset).expect("Atomics::load failed") as u32;
+        let bits = js_sys::Atomics::load(&int_view, offset).expect("Atomics::load failed") as u32;
         Some(f32::from_bits(bits))
     }
 
@@ -313,8 +311,7 @@ impl SharedBufferManager {
 
     /// Create with a pre-allocated buffer of the given size.
     pub fn with_capacity(capacity_bytes: usize) -> Result<Self, JsValue> {
-        let aligned_capacity =
-            (capacity_bytes + TENSOR_ALIGNMENT - 1) & !(TENSOR_ALIGNMENT - 1);
+        let aligned_capacity = (capacity_bytes + TENSOR_ALIGNMENT - 1) & !(TENSOR_ALIGNMENT - 1);
 
         let buffer = SharedArrayBuffer::new(aligned_capacity as u32);
 
@@ -329,8 +326,7 @@ impl SharedBufferManager {
 
     /// Ensure buffer has at least the given capacity.
     pub fn ensure_capacity(&mut self, min_capacity: usize) -> Result<(), JsValue> {
-        let aligned_capacity =
-            (min_capacity + TENSOR_ALIGNMENT - 1) & !(TENSOR_ALIGNMENT - 1);
+        let aligned_capacity = (min_capacity + TENSOR_ALIGNMENT - 1) & !(TENSOR_ALIGNMENT - 1);
 
         if self.buffer_size >= aligned_capacity {
             return Ok(());
@@ -388,13 +384,15 @@ impl SharedBufferManager {
 
     /// Get an existing tensor by name.
     pub fn get(&self, name: &str, shape: &[usize]) -> Result<SharedTensor, JsValue> {
-        let region = self.regions.get(name).ok_or_else(|| {
-            JsValue::from_str(&format!("Region '{}' not found", name))
-        })?;
+        let region = self
+            .regions
+            .get(name)
+            .ok_or_else(|| JsValue::from_str(&format!("Region '{}' not found", name)))?;
 
-        let buffer = self.buffer.as_ref().ok_or_else(|| {
-            JsValue::from_str("Buffer not initialized")
-        })?;
+        let buffer = self
+            .buffer
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Buffer not initialized"))?;
 
         SharedTensor::from_buffer(buffer.clone(), region.offset, shape)
     }
@@ -507,19 +505,14 @@ impl SharedBarrier {
     ///
     /// Returns the generation number.
     pub fn wait(&self) -> Result<i32, JsValue> {
-        let gen = js_sys::Atomics::load(&self.int_view, 0)
-            .expect("Atomics::load failed");
-        let arrived = js_sys::Atomics::add(&self.int_view, 1, 1)
-            .expect("Atomics::add failed") + 1;
+        let gen = js_sys::Atomics::load(&self.int_view, 0).expect("Atomics::load failed");
+        let arrived = js_sys::Atomics::add(&self.int_view, 1, 1).expect("Atomics::add failed") + 1;
 
         if arrived as usize == self.count {
             // Last to arrive - reset and notify
-            js_sys::Atomics::store(&self.int_view, 1, 0)
-                .expect("Atomics::store failed");
-            js_sys::Atomics::add(&self.int_view, 0, 1)
-                .expect("Atomics::add failed");
-            js_sys::Atomics::notify(&self.int_view, 0)
-                .expect("Atomics::notify failed");
+            js_sys::Atomics::store(&self.int_view, 1, 0).expect("Atomics::store failed");
+            js_sys::Atomics::add(&self.int_view, 0, 1).expect("Atomics::add failed");
+            js_sys::Atomics::notify(&self.int_view, 0).expect("Atomics::notify failed");
         } else {
             // Wait for generation to change
             let _ = js_sys::Atomics::wait(&self.int_view, 0, gen);

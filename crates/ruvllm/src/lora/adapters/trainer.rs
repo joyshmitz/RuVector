@@ -8,9 +8,9 @@
 //! - Dataset generation utilities
 
 use crate::error::{Result, RuvLLMError};
-use crate::lora::adapters::{LoraConfig, AdapterMetadata};
-use crate::lora::micro_lora::{MicroLoRA, AdaptFeedback};
-use crate::lora::training::{TrainingConfig, TrainingPipeline, LearningRateSchedule};
+use crate::lora::adapters::{AdapterMetadata, LoraConfig};
+use crate::lora::micro_lora::{AdaptFeedback, MicroLoRA};
+use crate::lora::training::{LearningRateSchedule, TrainingConfig, TrainingPipeline};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -110,14 +110,11 @@ impl AdapterDataset {
 
     /// Get dataset statistics
     pub fn stats(&self) -> DatasetStats {
-        let avg_quality = self.examples.iter()
-            .map(|e| e.quality)
-            .sum::<f32>() / self.examples.len().max(1) as f32;
+        let avg_quality = self.examples.iter().map(|e| e.quality).sum::<f32>()
+            / self.examples.len().max(1) as f32;
 
         let val_avg_quality = if !self.validation.is_empty() {
-            self.validation.iter()
-                .map(|e| e.quality)
-                .sum::<f32>() / self.validation.len() as f32
+            self.validation.iter().map(|e| e.quality).sum::<f32>() / self.validation.len() as f32
         } else {
             0.0
         };
@@ -254,11 +251,7 @@ impl AdapterTrainer {
     }
 
     /// Train an adapter on a dataset
-    pub fn train(
-        &mut self,
-        lora: &MicroLoRA,
-        dataset: &AdapterDataset,
-    ) -> Result<TrainingResult> {
+    pub fn train(&mut self, lora: &MicroLoRA, dataset: &AdapterDataset) -> Result<TrainingResult> {
         self.pipeline.init_for_lora(lora);
 
         let mut best_loss = f32::MAX;
@@ -280,7 +273,9 @@ impl AdapterTrainer {
                 global_step += 1;
 
                 // Validation
-                if global_step % self.config.validation_interval == 0 && !dataset.validation.is_empty() {
+                if global_step % self.config.validation_interval == 0
+                    && !dataset.validation.is_empty()
+                {
                     let val_loss = self.validate(lora, &dataset.validation)?;
                     eprintln!("  Step {}: val_loss = {:.4}", global_step, val_loss);
 
@@ -414,8 +409,8 @@ impl SyntheticDataGenerator {
 
     /// Generate dataset for a specific task type
     pub fn generate(&self, task_type: &str, num_examples: usize) -> AdapterDataset {
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
 
         let mut rng = StdRng::seed_from_u64(self.seed);
         let mut dataset = AdapterDataset::new(format!("{}_synthetic", task_type), self.feature_dim);
@@ -428,32 +423,30 @@ impl SyntheticDataGenerator {
             let quality = match task_type {
                 "coder" => {
                     // Higher quality for code-like patterns (structured)
-                    let structure_score = input.iter()
+                    let structure_score = input
+                        .iter()
                         .take(self.feature_dim / 4)
                         .map(|x| x.abs())
-                        .sum::<f32>() / (self.feature_dim / 4) as f32;
+                        .sum::<f32>()
+                        / (self.feature_dim / 4) as f32;
                     (0.6 + structure_score * 0.4).min(1.0)
                 }
                 "researcher" => {
                     // Quality based on information density
-                    let density = input.iter()
-                        .map(|x| x.abs())
-                        .sum::<f32>() / self.feature_dim as f32;
+                    let density =
+                        input.iter().map(|x| x.abs()).sum::<f32>() / self.feature_dim as f32;
                     (0.5 + density * 0.5).min(1.0)
                 }
                 "security" => {
                     // High quality for security-critical patterns
-                    let critical_score = input.iter()
-                        .step_by(2)
-                        .map(|x| x.abs())
-                        .sum::<f32>() / (self.feature_dim / 2) as f32;
+                    let critical_score = input.iter().step_by(2).map(|x| x.abs()).sum::<f32>()
+                        / (self.feature_dim / 2) as f32;
                     (0.7 + critical_score * 0.3).min(1.0)
                 }
                 "architect" => {
                     // Quality based on architectural coherence
-                    let coherence = input.windows(2)
-                        .map(|w| (w[0] - w[1]).abs())
-                        .sum::<f32>() / (self.feature_dim - 1) as f32;
+                    let coherence = input.windows(2).map(|w| (w[0] - w[1]).abs()).sum::<f32>()
+                        / (self.feature_dim - 1) as f32;
                     (0.6 + (1.0 - coherence) * 0.4).min(1.0)
                 }
                 "reviewer" => {
@@ -480,11 +473,26 @@ impl SyntheticDataGenerator {
     /// Generate datasets for all task types
     pub fn generate_all(&self, examples_per_task: usize) -> Vec<(String, AdapterDataset)> {
         vec![
-            ("coder".to_string(), self.generate("coder", examples_per_task)),
-            ("researcher".to_string(), self.generate("researcher", examples_per_task)),
-            ("security".to_string(), self.generate("security", examples_per_task)),
-            ("architect".to_string(), self.generate("architect", examples_per_task)),
-            ("reviewer".to_string(), self.generate("reviewer", examples_per_task)),
+            (
+                "coder".to_string(),
+                self.generate("coder", examples_per_task),
+            ),
+            (
+                "researcher".to_string(),
+                self.generate("researcher", examples_per_task),
+            ),
+            (
+                "security".to_string(),
+                self.generate("security", examples_per_task),
+            ),
+            (
+                "architect".to_string(),
+                self.generate("architect", examples_per_task),
+            ),
+            (
+                "reviewer".to_string(),
+                self.generate("reviewer", examples_per_task),
+            ),
         ]
     }
 }
@@ -573,7 +581,12 @@ mod tests {
 
         for (name, dataset) in datasets {
             assert!(dataset.examples.len() > 0);
-            println!("{}: {} train, {} val", name, dataset.examples.len(), dataset.validation.len());
+            println!(
+                "{}: {} train, {} val",
+                name,
+                dataset.examples.len(),
+                dataset.validation.len()
+            );
         }
     }
 }

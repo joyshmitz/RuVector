@@ -174,11 +174,14 @@ impl CoherenceStateMachine {
     fn apply_set_node_state(&mut self, node_id: u64, state: Vec<f32>) -> ApplyResult {
         let truncated_state: Vec<f32> = state.into_iter().take(self.dimension).collect();
 
-        let node = self.node_states.entry(node_id).or_insert_with(|| NodeState {
-            node_id,
-            state: vec![0.0; self.dimension],
-            last_update: 0,
-        });
+        let node = self
+            .node_states
+            .entry(node_id)
+            .or_insert_with(|| NodeState {
+                node_id,
+                state: vec![0.0; self.dimension],
+                last_update: 0,
+            });
 
         node.state = truncated_state;
         node.last_update = self.applied_index;
@@ -192,7 +195,11 @@ impl CoherenceStateMachine {
             total_energy,
             timestamp,
             num_edges: self.edge_energies.len(),
-            num_incoherent: self.incoherent_regions.values().filter(|r| r.active).count(),
+            num_incoherent: self
+                .incoherent_regions
+                .values()
+                .filter(|r| r.active)
+                .count(),
         };
 
         self.checkpoints.push(checkpoint.clone());
@@ -252,7 +259,10 @@ impl CoherenceStateMachine {
 
     /// Get number of incoherent regions
     pub fn num_incoherent_regions(&self) -> usize {
-        self.incoherent_regions.values().filter(|r| r.active).count()
+        self.incoherent_regions
+            .values()
+            .filter(|r| r.active)
+            .count()
     }
 
     /// Get all incoherent node IDs
@@ -456,7 +466,10 @@ mod tests {
         edge.update(1.4);
 
         let trend = edge.trend();
-        assert!(trend > 0.0, "Trend should be positive for increasing energy");
+        assert!(
+            trend > 0.0,
+            "Trend should be positive for increasing energy"
+        );
     }
 
     #[test]

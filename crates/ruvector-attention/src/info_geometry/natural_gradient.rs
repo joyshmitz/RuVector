@@ -3,7 +3,7 @@
 //! Update parameters using the natural gradient: F^{-1} * grad
 //! where F is the Fisher information matrix.
 
-use super::fisher::{FisherMetric, FisherConfig};
+use super::fisher::{FisherConfig, FisherMetric};
 use serde::{Deserialize, Serialize};
 
 /// Natural gradient configuration
@@ -64,12 +64,7 @@ impl NaturalGradient {
 
     /// Compute natural gradient step for general parameters with diagonal Fisher
     /// Fisher diag should be pre-computed from data
-    pub fn step_diagonal(
-        &self,
-        params: &[f32],
-        grads: &[f32],
-        fisher_diag: &[f32],
-    ) -> Vec<f32> {
+    pub fn step_diagonal(&self, params: &[f32], grads: &[f32], fisher_diag: &[f32]) -> Vec<f32> {
         let n = params.len();
         let mut new_params = params.to_vec();
         let eps = self.config.fisher.eps;
@@ -84,11 +79,7 @@ impl NaturalGradient {
 
     /// Compute natural gradient for attention logits
     /// Uses the Fisher metric on the output probability distribution
-    pub fn step_attention_logits(
-        &self,
-        logits: &[f32],
-        grad_logits: &[f32],
-    ) -> Vec<f32> {
+    pub fn step_attention_logits(&self, logits: &[f32], grad_logits: &[f32]) -> Vec<f32> {
         self.step_logits(logits, grad_logits)
     }
 
@@ -129,8 +120,9 @@ mod tests {
 
         assert_eq!(new_logits.len(), 4);
         // Should be different from original
-        assert!((new_logits[0] - logits[0]).abs() > 1e-6 ||
-                (new_logits[1] - logits[1]).abs() > 1e-6);
+        assert!(
+            (new_logits[0] - logits[0]).abs() > 1e-6 || (new_logits[1] - logits[1]).abs() > 1e-6
+        );
     }
 
     #[test]

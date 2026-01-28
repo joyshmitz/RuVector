@@ -161,7 +161,12 @@ pub struct ActionImpact {
 
 impl ActionImpact {
     /// Create a new impact assessment.
-    pub const fn new(cost: f32, reversibility: f32, blast_radius: f32, latency_sensitivity: f32) -> Self {
+    pub const fn new(
+        cost: f32,
+        reversibility: f32,
+        blast_radius: f32,
+        latency_sensitivity: f32,
+    ) -> Self {
         Self {
             cost,
             reversibility,
@@ -209,11 +214,7 @@ impl ActionImpact {
             self.latency_sensitivity,
         ];
 
-        scores
-            .iter()
-            .zip(weights.iter())
-            .map(|(s, w)| s * w)
-            .sum()
+        scores.iter().zip(weights.iter()).map(|(s, w)| s * w).sum()
     }
 
     /// Whether this action should be considered high-risk.
@@ -260,7 +261,11 @@ pub struct ActionMetadata {
 
 impl ActionMetadata {
     /// Create new metadata with required fields.
-    pub fn new(action_type: impl Into<String>, description: impl Into<String>, actor_id: impl Into<String>) -> Self {
+    pub fn new(
+        action_type: impl Into<String>,
+        description: impl Into<String>,
+        actor_id: impl Into<String>,
+    ) -> Self {
         Self {
             id: ActionId::new(),
             action_type: action_type.into(),

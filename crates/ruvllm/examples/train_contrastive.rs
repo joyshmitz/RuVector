@@ -15,16 +15,22 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("╔═══════════════════════════════════════════════════════════════════════════════════╗");
-    println!("║           RuvLTRA Contrastive Fine-Tuning for SOTA Agent Routing                  ║");
-    println!("╚═══════════════════════════════════════════════════════════════════════════════════╝\n");
+    println!(
+        "╔═══════════════════════════════════════════════════════════════════════════════════╗"
+    );
+    println!(
+        "║           RuvLTRA Contrastive Fine-Tuning for SOTA Agent Routing                  ║"
+    );
+    println!(
+        "╚═══════════════════════════════════════════════════════════════════════════════════╝\n"
+    );
 
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
 
-    let mut triplets_path = PathBuf::from(
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-    ).join(".ruvllm/training/ruvltra-finetuned/triplets.jsonl");
+    let mut triplets_path =
+        PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+            .join(".ruvllm/training/ruvltra-finetuned/triplets.jsonl");
 
     let mut epochs = 20usize;
     let mut output_path = PathBuf::from("ruvltra-claude-code-sota.gguf");
@@ -91,7 +97,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check if triplets file exists
     if !triplets_path.exists() {
-        println!("⚠️  Triplets file not found at: {}", triplets_path.display());
+        println!(
+            "⚠️  Triplets file not found at: {}",
+            triplets_path.display()
+        );
         println!();
         println!("To generate training data, run:");
         println!("  node npm/packages/ruvllm/scripts/training/contrastive-finetune.js");
@@ -122,8 +131,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Loading training triplets...");
     let start = Instant::now();
     let triplet_count = trainer.load_triplets(&triplets_path)?;
-    println!("  Loaded {} triplets in {:?}", triplet_count, start.elapsed());
-    println!("  Hard negative ratio: {:.1}%", trainer.hard_negative_ratio() * 100.0);
+    println!(
+        "  Loaded {} triplets in {:?}",
+        triplet_count,
+        start.elapsed()
+    );
+    println!(
+        "  Hard negative ratio: {:.1}%",
+        trainer.hard_negative_ratio() * 100.0
+    );
     println!();
 
     // Train model
@@ -143,8 +159,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Results:");
     println!("  Epochs Completed:     {}", result.epochs_completed);
     println!("  Final Loss:           {:.4}", result.final_loss);
-    println!("  Final Accuracy:       {:.2}%", result.final_accuracy * 100.0);
-    println!("  Best Accuracy:        {:.2}% (epoch {})", result.best_accuracy * 100.0, result.best_epoch);
+    println!(
+        "  Final Accuracy:       {:.2}%",
+        result.final_accuracy * 100.0
+    );
+    println!(
+        "  Best Accuracy:        {:.2}% (epoch {})",
+        result.best_accuracy * 100.0,
+        result.best_epoch
+    );
     println!("  Training Time:        {:?}", training_time);
     println!("  Output Model:         {}", result.output_path.display());
     println!();
@@ -158,14 +181,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("═══════════════════════════════════════════════════════════════════════════════════");
     println!("                              SOTA ACHIEVEMENT");
-    println!("═══════════════════════════════════════════════════════════════════════════════════\n");
+    println!(
+        "═══════════════════════════════════════════════════════════════════════════════════\n"
+    );
 
     println!("┌───────────────────────────────┬────────────┬────────────┐");
     println!("│ Metric                        │   Before   │   After    │");
     println!("├───────────────────────────────┼────────────┼────────────┤");
-    println!("│ Embedding-only Accuracy       │   45.0%    │   {:.1}%   │", result.final_accuracy * 100.0);
+    println!(
+        "│ Embedding-only Accuracy       │   45.0%    │   {:.1}%   │",
+        result.final_accuracy * 100.0
+    );
     println!("│ Hybrid Routing Accuracy       │  100.0%    │  100.0%    │");
-    println!("│ Hard Negative Accuracy        │    N/A     │   {:.1}%   │", result.best_accuracy * 90.0);
+    println!(
+        "│ Hard Negative Accuracy        │    N/A     │   {:.1}%   │",
+        result.best_accuracy * 90.0
+    );
     println!("│ Agent Types Supported         │     13     │     13     │");
     println!("└───────────────────────────────┴────────────┴────────────┘");
     println!();
@@ -176,9 +207,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     println!("Next steps:");
-    println!("  1. Convert to GGUF: llama-quantize {} {}",
-             output_path.with_extension("bin").display(),
-             output_path.display());
+    println!(
+        "  1. Convert to GGUF: llama-quantize {} {}",
+        output_path.with_extension("bin").display(),
+        output_path.display()
+    );
     println!("  2. Benchmark: node scripts/hybrid-model-compare.js");
     println!("  3. Publish: ./scripts/huggingface/publish.sh");
     println!();
@@ -238,9 +271,12 @@ impl ContrastiveTrainer {
         })
     }
 
-    fn load_triplets(&mut self, path: &std::path::Path) -> Result<usize, Box<dyn std::error::Error>> {
-        use std::io::{BufRead, BufReader};
+    fn load_triplets(
+        &mut self,
+        path: &std::path::Path,
+    ) -> Result<usize, Box<dyn std::error::Error>> {
         use std::fs::File;
+        use std::io::{BufRead, BufReader};
 
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -311,9 +347,13 @@ impl ContrastiveTrainer {
         })
     }
 
-    fn export_stats(&self, result: &TrainingResult, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-        use std::io::Write;
+    fn export_stats(
+        &self,
+        result: &TrainingResult,
+        path: &std::path::Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         use std::fs::File;
+        use std::io::Write;
 
         let stats = serde_json::json!({
             "epochs_completed": result.epochs_completed,
@@ -338,8 +378,8 @@ impl ContrastiveTrainer {
 
 /// Generate synthetic triplets for demonstration
 fn generate_synthetic_triplets(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::Write;
     use std::fs::{self, File};
+    use std::io::Write;
 
     // Create parent directories
     if let Some(parent) = path.parent() {

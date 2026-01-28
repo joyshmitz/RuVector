@@ -148,11 +148,7 @@ pub struct TrainingSample {
 
 impl TrainingSample {
     /// Create a new training sample
-    pub fn new(
-        input_embedding: Vec<f32>,
-        output_embedding: Vec<f32>,
-        quality: f32,
-    ) -> Self {
+    pub fn new(input_embedding: Vec<f32>, output_embedding: Vec<f32>, quality: f32) -> Self {
         Self {
             input_embedding,
             output_embedding,
@@ -357,7 +353,8 @@ impl SonaLlm {
         let latency_us = elapsed.as_micros() as u64;
 
         // Update statistics
-        self.instant_latency_sum.fetch_add(latency_us, Ordering::Relaxed);
+        self.instant_latency_sum
+            .fetch_add(latency_us, Ordering::Relaxed);
         self.instant_count.fetch_add(1, Ordering::Relaxed);
 
         // Queue for background consolidation
@@ -473,7 +470,8 @@ impl SonaLlm {
         }
 
         // Check if deep loop should be triggered
-        let should_trigger_deep = *self.accumulated_quality.read() >= self.config.deep_trigger_threshold;
+        let should_trigger_deep =
+            *self.accumulated_quality.read() >= self.config.deep_trigger_threshold;
 
         AdaptationResult {
             applied: true,
@@ -516,7 +514,10 @@ impl SonaLlm {
             let training = self.training.read();
             let lora = self.micro_lora.read();
 
-            if training.train_step(&lora, &sample.input_embedding, feedback).is_ok() {
+            if training
+                .train_step(&lora, &sample.input_embedding, feedback)
+                .is_ok()
+            {
                 total_quality += sample.quality;
             }
         }
@@ -579,29 +580,24 @@ impl SonaLlm {
         let ewc_state_map: HashMap<TargetModule, crate::lora::micro_lora::EwcState> = ewc_states
             .into_iter()
             .filter_map(|(module, export)| {
-                let fisher_a = ndarray::Array2::from_shape_vec(
-                    export.shape_a,
-                    export.fisher_a,
-                ).ok()?;
-                let fisher_b = ndarray::Array2::from_shape_vec(
-                    export.shape_b,
-                    export.fisher_b,
-                ).ok()?;
-                let optimal_a = ndarray::Array2::from_shape_vec(
-                    export.shape_a,
-                    export.optimal_a,
-                ).ok()?;
-                let optimal_b = ndarray::Array2::from_shape_vec(
-                    export.shape_b,
-                    export.optimal_b,
-                ).ok()?;
+                let fisher_a =
+                    ndarray::Array2::from_shape_vec(export.shape_a, export.fisher_a).ok()?;
+                let fisher_b =
+                    ndarray::Array2::from_shape_vec(export.shape_b, export.fisher_b).ok()?;
+                let optimal_a =
+                    ndarray::Array2::from_shape_vec(export.shape_a, export.optimal_a).ok()?;
+                let optimal_b =
+                    ndarray::Array2::from_shape_vec(export.shape_b, export.optimal_b).ok()?;
 
-                Some((module, crate::lora::micro_lora::EwcState {
-                    fisher_a,
-                    fisher_b,
-                    optimal_a,
-                    optimal_b,
-                }))
+                Some((
+                    module,
+                    crate::lora::micro_lora::EwcState {
+                        fisher_a,
+                        fisher_b,
+                        optimal_a,
+                        optimal_b,
+                    },
+                ))
             })
             .collect();
 
@@ -643,7 +639,11 @@ impl SonaLlm {
     fn consolidate_best(&self, samples: &[TrainingSample]) -> f32 {
         // Take top 20% by quality
         let mut sorted: Vec<&TrainingSample> = samples.iter().collect();
-        sorted.sort_by(|a, b| b.quality.partial_cmp(&a.quality).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.quality
+                .partial_cmp(&a.quality)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let top_count = (samples.len() as f32 * 0.2).ceil() as usize;
         let best: Vec<&TrainingSample> = sorted.into_iter().take(top_count.max(1)).collect();
@@ -665,7 +665,8 @@ impl SonaLlm {
         let mut total_delta = 0.0f32;
 
         for batch in samples.chunks(batch_size) {
-            let batch_quality: f32 = batch.iter().map(|s| s.quality).sum::<f32>() / batch.len() as f32;
+            let batch_quality: f32 =
+                batch.iter().map(|s| s.quality).sum::<f32>() / batch.len() as f32;
             let lr = self.config.training.learning_rate * batch_quality;
 
             let lora = self.micro_lora.read();
@@ -876,13 +877,7 @@ mod tests {
         let sona_llm = SonaLlm::new(SonaLlmConfig::default());
 
         let samples: Vec<TrainingSample> = (0..10)
-            .map(|i| {
-                TrainingSample::new(
-                    vec![0.1 * i as f32; 768],
-                    vec![0.2 * i as f32; 768],
-                    0.8,
-                )
-            })
+            .map(|i| TrainingSample::new(vec![0.1 * i as f32; 768], vec![0.2 * i as f32; 768], 0.8))
             .collect();
 
         let result = sona_llm.deep_optimize(&samples);
@@ -896,15 +891,11 @@ mod tests {
 
     #[test]
     fn test_training_sample() {
-        let sample = TrainingSample::new(
-            vec![0.1; 64],
-            vec![0.2; 64],
-            0.9,
-        )
-        .with_query("Test query".to_string())
-        .with_response("Test response".to_string())
-        .with_latency(50.0)
-        .with_session("session-123".to_string());
+        let sample = TrainingSample::new(vec![0.1; 64], vec![0.2; 64], 0.9)
+            .with_query("Test query".to_string())
+            .with_response("Test response".to_string())
+            .with_latency(50.0)
+            .with_session("session-123".to_string());
 
         assert_eq!(sample.query, Some("Test query".to_string()));
         assert_eq!(sample.session_id, "session-123");
@@ -937,7 +928,11 @@ mod tests {
 
             // Add some samples
             for i in 0..5 {
-                sona_llm.instant_adapt(&format!("Q{}", i), &format!("R{}", i), 0.5 + i as f32 * 0.1);
+                sona_llm.instant_adapt(
+                    &format!("Q{}", i),
+                    &format!("R{}", i),
+                    0.5 + i as f32 * 0.1,
+                );
             }
 
             let result = sona_llm.background_consolidate();

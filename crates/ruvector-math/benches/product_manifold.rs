@@ -33,13 +33,9 @@ fn bench_product_manifold_distance(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(dim as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new(*name, dim),
-            &(&x, &y),
-            |b, (px, py)| {
-                b.iter(|| manifold.distance(black_box(px), black_box(py)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new(*name, dim), &(&x, &y), |b, (px, py)| {
+            b.iter(|| manifold.distance(black_box(px), black_box(py)));
+        });
     }
 
     group.finish();

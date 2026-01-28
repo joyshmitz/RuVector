@@ -271,7 +271,10 @@ pub struct MemoryEntry {
 /// Provider of memory coherence checks.
 pub trait MemoryCoherenceProvider {
     /// Add a memory entry with coherence checking.
-    fn add_with_coherence(&mut self, entry: MemoryEntry) -> RuvllmIntegrationResult<MemoryAddResult>;
+    fn add_with_coherence(
+        &mut self,
+        entry: MemoryEntry,
+    ) -> RuvllmIntegrationResult<MemoryAddResult>;
 
     /// Check if adding an entry would cause incoherence.
     fn check_coherence(&self, entry: &MemoryEntry) -> RuvllmIntegrationResult<f32>;

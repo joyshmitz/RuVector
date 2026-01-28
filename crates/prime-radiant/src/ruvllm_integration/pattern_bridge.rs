@@ -61,8 +61,8 @@
 //! - ADR-CE-018: Pattern-to-Restriction Bridge
 //! - ADR-014: Coherence Engine Architecture
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 // Import learned_rho types when feature is enabled
@@ -582,7 +582,10 @@ impl PatternToRestrictionBridge {
     /// This registers the learned restriction maps with the graph so they
     /// can be used in coherence computations.
     #[cfg(feature = "learned-rho")]
-    pub fn export_to_prime_radiant(&mut self, graph: &mut SheafGraph) -> BridgeResult<ExportResult> {
+    pub fn export_to_prime_radiant(
+        &mut self,
+        graph: &mut SheafGraph,
+    ) -> BridgeResult<ExportResult> {
         use crate::substrate::RestrictionMap;
 
         let mut exported_maps = Vec::new();
@@ -609,7 +612,10 @@ impl PatternToRestrictionBridge {
 
     /// Export learned maps to a SheafGraph (stub when learned-rho disabled).
     #[cfg(not(feature = "learned-rho"))]
-    pub fn export_to_prime_radiant(&mut self, graph: &mut SheafGraph) -> BridgeResult<ExportResult> {
+    pub fn export_to_prime_radiant(
+        &mut self,
+        graph: &mut SheafGraph,
+    ) -> BridgeResult<ExportResult> {
         let exported_categories: Vec<String> = self.restriction_maps.keys().cloned().collect();
         self.stats.exports += 1;
 
@@ -638,9 +644,10 @@ impl PatternToRestrictionBridge {
     #[cfg(feature = "learned-rho")]
     pub fn consolidate(&mut self) -> BridgeResult<()> {
         for entry in self.restriction_maps.values_mut() {
-            entry.map.consolidate().map_err(|e| {
-                BridgeError::TrainingError(format!("consolidation failed: {}", e))
-            })?;
+            entry
+                .map
+                .consolidate()
+                .map_err(|e| BridgeError::TrainingError(format!("consolidation failed: {}", e)))?;
         }
         Ok(())
     }
@@ -688,9 +695,8 @@ impl PatternToRestrictionBridge {
                 ..Default::default()
             };
 
-            let map = LearnedRestrictionMap::new(rho_config).map_err(|e| {
-                BridgeError::ConfigError(format!("failed to create map: {}", e))
-            })?;
+            let map = LearnedRestrictionMap::new(rho_config)
+                .map_err(|e| BridgeError::ConfigError(format!("failed to create map: {}", e)))?;
 
             self.restriction_maps.insert(
                 category.to_string(),
@@ -754,8 +760,7 @@ impl PatternToRestrictionBridge {
 
                 // Update rolling average loss
                 let n = self.stats.training_steps as f32;
-                self.stats.avg_loss =
-                    self.stats.avg_loss * ((n - 1.0) / n) + metrics.loss / n;
+                self.stats.avg_loss = self.stats.avg_loss * ((n - 1.0) / n) + metrics.loss / n;
             }
         }
 
@@ -910,7 +915,10 @@ mod tests {
 
     impl PatternProvider for MockPatternProvider {
         fn get_pattern(&self, pattern_id: &str) -> Option<PatternData> {
-            self.patterns.iter().find(|p| p.pattern_id == pattern_id).cloned()
+            self.patterns
+                .iter()
+                .find(|p| p.pattern_id == pattern_id)
+                .cloned()
         }
 
         fn get_patterns_by_category(&self, category: &str) -> Vec<PatternData> {

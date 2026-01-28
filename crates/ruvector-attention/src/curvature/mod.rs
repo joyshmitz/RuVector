@@ -9,13 +9,15 @@
 //! 3. **Per-Head Mixing**: Low-rank learned weights per head
 //! 4. **Quantization-Friendly**: Different precision for each component
 
-mod tangent_space;
-mod fused_attention;
 mod component_quantizer;
+mod fused_attention;
+mod tangent_space;
 
-pub use tangent_space::{TangentSpaceMapper, TangentSpaceConfig};
-pub use fused_attention::{MixedCurvatureCache, MixedCurvatureFusedAttention, FusedCurvatureConfig};
 pub use component_quantizer::{ComponentQuantizer, QuantizationConfig, QuantizedVector};
+pub use fused_attention::{
+    FusedCurvatureConfig, MixedCurvatureCache, MixedCurvatureFusedAttention,
+};
+pub use tangent_space::{TangentSpaceConfig, TangentSpaceMapper};
 
 #[cfg(test)]
 mod tests {

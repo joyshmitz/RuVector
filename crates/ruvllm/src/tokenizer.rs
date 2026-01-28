@@ -132,14 +132,23 @@ impl ChatTemplate {
             ChatTemplate::Llama3
         } else if model_lower.contains("llama-2") || model_lower.contains("llama2") {
             ChatTemplate::Llama2
-        } else if model_lower.contains("mistral") || model_lower.contains("mixtral") || model_lower.contains("codestral") {
+        } else if model_lower.contains("mistral")
+            || model_lower.contains("mixtral")
+            || model_lower.contains("codestral")
+        {
             ChatTemplate::Mistral
         } else if model_lower.contains("qwen") {
             ChatTemplate::Qwen
-        } else if model_lower.contains("phi-3") || model_lower.contains("phi3") || model_lower.contains("phi") {
+        } else if model_lower.contains("phi-3")
+            || model_lower.contains("phi3")
+            || model_lower.contains("phi")
+        {
             // Phi-3 and Phi use the same template format
             ChatTemplate::Phi
-        } else if model_lower.contains("gemma-2") || model_lower.contains("gemma2") || model_lower.contains("gemma") {
+        } else if model_lower.contains("gemma-2")
+            || model_lower.contains("gemma2")
+            || model_lower.contains("gemma")
+        {
             // Gemma-2 and Gemma use the same template format
             ChatTemplate::Gemma
         } else {
@@ -587,17 +596,19 @@ mod candle_impl {
         ///
         /// Vector of token IDs
         pub fn encode(&self, text: &str) -> Result<Vec<u32>> {
-            let encoding = self.inner.encode(text, false).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Encoding failed: {}", e))
-            })?;
+            let encoding = self
+                .inner
+                .encode(text, false)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Encoding failed: {}", e)))?;
             Ok(encoding.get_ids().to_vec())
         }
 
         /// Encode text with special tokens
         pub fn encode_with_special_tokens(&self, text: &str) -> Result<Vec<u32>> {
-            let encoding = self.inner.encode(text, true).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Encoding failed: {}", e))
-            })?;
+            let encoding = self
+                .inner
+                .encode(text, true)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Encoding failed: {}", e)))?;
             Ok(encoding.get_ids().to_vec())
         }
 
@@ -611,16 +622,16 @@ mod candle_impl {
         ///
         /// Decoded text string
         pub fn decode(&self, tokens: &[u32]) -> Result<String> {
-            self.inner.decode(tokens, true).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Decoding failed: {}", e))
-            })
+            self.inner
+                .decode(tokens, true)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Decoding failed: {}", e)))
         }
 
         /// Decode without skipping special tokens
         pub fn decode_with_special_tokens(&self, tokens: &[u32]) -> Result<String> {
-            self.inner.decode(tokens, false).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Decoding failed: {}", e))
-            })
+            self.inner
+                .decode(tokens, false)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Decoding failed: {}", e)))
         }
 
         /// Decode a single token for streaming output
@@ -655,9 +666,10 @@ mod candle_impl {
             }
 
             // Get the raw bytes for this token
-            let token_text = self.inner.decode(&[token], false).map_err(|e| {
-                RuvLLMError::Tokenization(format!("Stream decode failed: {}", e))
-            })?;
+            let token_text = self
+                .inner
+                .decode(&[token], false)
+                .map_err(|e| RuvLLMError::Tokenization(format!("Stream decode failed: {}", e)))?;
 
             // Check for replacement character (invalid UTF-8 indicator)
             if token_text.contains('\u{FFFD}') {
@@ -694,7 +706,9 @@ mod candle_impl {
                 // Clean text, output directly
                 // But first check if we have buffered bytes
                 if !self.stream_buffer.bytes.is_empty() {
-                    self.stream_buffer.bytes.extend_from_slice(token_text.as_bytes());
+                    self.stream_buffer
+                        .bytes
+                        .extend_from_slice(token_text.as_bytes());
                     match std::str::from_utf8(&self.stream_buffer.bytes) {
                         Ok(s) => {
                             let result = s.to_string();
@@ -703,7 +717,8 @@ mod candle_impl {
                         }
                         Err(_) => {
                             // Something went wrong, output what we have
-                            let lossy = String::from_utf8_lossy(&self.stream_buffer.bytes).to_string();
+                            let lossy =
+                                String::from_utf8_lossy(&self.stream_buffer.bytes).to_string();
                             self.stream_buffer.bytes.clear();
                             Ok(Some(lossy))
                         }
@@ -755,9 +770,7 @@ mod candle_impl {
             let template = self
                 .chat_template
                 .as_ref()
-                .ok_or_else(|| {
-                    RuvLLMError::Config("No chat template configured".to_string())
-                })?;
+                .ok_or_else(|| RuvLLMError::Config("No chat template configured".to_string()))?;
 
             Ok(template.format(messages))
         }
@@ -824,7 +837,10 @@ mod candle_impl {
 
         /// Batch decode multiple token sequences
         pub fn decode_batch(&self, token_sequences: &[Vec<u32>]) -> Result<Vec<String>> {
-            token_sequences.iter().map(|tokens| self.decode(tokens)).collect()
+            token_sequences
+                .iter()
+                .map(|tokens| self.decode(tokens))
+                .collect()
         }
     }
 
@@ -914,9 +930,10 @@ mod stub_impl {
         pub fn reset_stream(&mut self) {}
 
         pub fn apply_chat_template(&self, messages: &[ChatMessage]) -> Result<String> {
-            let template = self.chat_template.as_ref().ok_or_else(|| {
-                RuvLLMError::Config("No chat template configured".to_string())
-            })?;
+            let template = self
+                .chat_template
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::Config("No chat template configured".to_string()))?;
             Ok(template.format(messages))
         }
 
@@ -960,7 +977,7 @@ pub use stub_impl::RuvTokenizer;
 // Tokenizer Trait Implementation (for LlmBackend compatibility)
 // ============================================================================
 
-use crate::backends::{Tokenizer, SpecialTokens};
+use crate::backends::{SpecialTokens, Tokenizer};
 
 #[cfg(feature = "candle")]
 impl Tokenizer for RuvTokenizer {
@@ -1089,10 +1106,7 @@ mod tests {
 
     #[test]
     fn test_mistral_template() {
-        let messages = vec![
-            ChatMessage::system("Be concise."),
-            ChatMessage::user("Hi"),
-        ];
+        let messages = vec![ChatMessage::system("Be concise."), ChatMessage::user("Hi")];
 
         let formatted = ChatTemplate::Mistral.format(&messages);
 
@@ -1144,12 +1158,10 @@ mod tests {
 
     #[test]
     fn test_custom_template() {
-        let template = ChatTemplate::Custom("System: {system}\nUser: {user}\nAssistant:".to_string());
+        let template =
+            ChatTemplate::Custom("System: {system}\nUser: {user}\nAssistant:".to_string());
 
-        let messages = vec![
-            ChatMessage::system("Be brief."),
-            ChatMessage::user("Hello"),
-        ];
+        let messages = vec![ChatMessage::system("Be brief."), ChatMessage::user("Hello")];
 
         let formatted = template.format(&messages);
 

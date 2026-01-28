@@ -159,7 +159,13 @@ impl ProductManifoldConfig {
     }
 
     /// Get slice ranges for each component
-    pub fn component_ranges(&self) -> (std::ops::Range<usize>, std::ops::Range<usize>, std::ops::Range<usize>) {
+    pub fn component_ranges(
+        &self,
+    ) -> (
+        std::ops::Range<usize>,
+        std::ops::Range<usize>,
+        std::ops::Range<usize>,
+    ) {
         let e_end = self.euclidean_dim;
         let h_end = e_end + self.hyperbolic_dim;
         let s_end = h_end + self.spherical_dim;

@@ -258,129 +258,192 @@ pub mod types;
 
 // Re-export core types for convenience
 pub use types::{
+    ActorId,
+    ApproverId,
+    EdgeId,
+    GraphId,
+    Hash,
+    LineageId,
+    NamespaceId,
     // Identifiers
-    NodeId, EdgeId, GraphId, ScopeId, NamespaceId,
-    PolicyBundleId, WitnessId, LineageId, ActorId, ApproverId,
+    NodeId,
+    PolicyBundleId,
+    ScopeId,
     // Primitives
-    Timestamp, Hash, Version,
+    Timestamp,
+    Version,
+    WitnessId,
 };
 
-pub use error::{
-    CoherenceError, SubstrateError, GovernanceError, ExecutionError, StorageError,
-};
+pub use error::{CoherenceError, ExecutionError, GovernanceError, StorageError, SubstrateError};
 
 // Re-export security types
 pub use security::{
-    GraphLimits, ResourceLimits, SecurityConfig,
-    InputValidator, PathValidator, StateValidator, ValidationError, ValidationResult,
+    GraphLimits, InputValidator, PathValidator, ResourceLimits, SecurityConfig, StateValidator,
+    ValidationError, ValidationResult,
 };
 
 pub use events::DomainEvent;
 
 // Re-export substrate types
 pub use substrate::{
-    SheafGraph, SheafNode, SheafEdge, RestrictionMap,
-    SheafSubgraph, NodeMetadata,
+    NodeMetadata, RestrictionMap, SheafEdge, SheafGraph, SheafNode, SheafSubgraph,
 };
 
 // Re-export coherence types
 pub use coherence::{
-    CoherenceEngine, CoherenceEnergy, CoherenceConfig,
-    ResidualCache, EnergyHistory,
+    CoherenceConfig, CoherenceEnergy, CoherenceEngine, EnergyHistory, ResidualCache,
 };
 
 // Re-export cohomology types
 pub use cohomology::{
-    // Simplex and simplicial complex
-    Simplex, SimplexId, SimplicialComplex, Chain, Cochain,
-    // Sheaf types
-    Sheaf, Stalk, SheafSection, LocalSection, SheafBuilder,
+    Activation,
+    BettiNumbers,
+    Chain,
+    Coboundary,
+    Cochain,
     // Cocycle and coboundary
-    Cocycle, CocycleBuilder, Coboundary,
+    Cocycle,
+    CocycleBuilder,
+    CohomologyComputer,
+    CohomologyConfig,
     // Cohomology groups
-    CohomologyGroup, CohomologyComputer, CohomologyConfig, BettiNumbers,
-    // Laplacian
-    SheafLaplacian, LaplacianConfig, LaplacianSpectrum, HarmonicRepresentative,
+    CohomologyGroup,
+    CohomologyPooling,
+    DiffusionResult,
+    HarmonicRepresentative,
+    LaplacianConfig,
+    LaplacianSpectrum,
+    LocalSection,
+    Obstruction,
     // Obstruction detection
-    ObstructionDetector, Obstruction, ObstructionSeverity, ObstructionReport,
+    ObstructionDetector,
+    ObstructionIndicator,
+    ObstructionReport,
+    ObstructionSeverity,
+    PoolingMethod,
+    // Sheaf types
+    Sheaf,
+    SheafBuilder,
+    SheafConvolution,
     // Diffusion
-    SheafDiffusion, SheafDiffusionConfig, DiffusionResult, ObstructionIndicator,
+    SheafDiffusion,
+    SheafDiffusionConfig,
+    // Laplacian
+    SheafLaplacian,
+    SheafNeuralConfig,
     // Neural network layers
-    SheafNeuralLayer, SheafNeuralConfig, SheafConvolution, CohomologyPooling,
-    PoolingMethod, Activation,
+    SheafNeuralLayer,
+    SheafSection,
+    // Simplex and simplicial complex
+    Simplex,
+    SimplexId,
+    SimplicialComplex,
+    Stalk,
 };
 
 // Re-export governance types
 pub use governance::{
-    // Policy types
-    PolicyBundle, PolicyBundleBuilder, PolicyBundleRef, PolicyBundleStatus,
-    ThresholdConfig, EscalationRule, ApprovalSignature, ApproverId as GovApproverId,
-    PolicyError,
-    // Witness types (governance's own witness format)
-    WitnessRecord as GovWitnessRecord, WitnessId as GovWitnessId,
-    WitnessChainError, WitnessError,
-    // Lineage types
-    LineageRecord, LineageId as GovLineageId, Operation, EntityRef, LineageError,
-    // Repository traits
-    PolicyRepository, WitnessRepository, LineageRepository,
-    // Common types
-    Hash as GovHash, Timestamp as GovTimestamp, Version as GovVersion,
+    ApprovalSignature,
+    ApproverId as GovApproverId,
+    EntityRef,
+    EscalationRule,
     // Top-level error
     GovernanceError as GovError,
+    // Common types
+    Hash as GovHash,
+    LineageError,
+    LineageId as GovLineageId,
+    // Lineage types
+    LineageRecord,
+    LineageRepository,
+    Operation,
+    // Policy types
+    PolicyBundle,
+    PolicyBundleBuilder,
+    PolicyBundleRef,
+    PolicyBundleStatus,
+    PolicyError,
+    // Repository traits
+    PolicyRepository,
+    ThresholdConfig,
+    Timestamp as GovTimestamp,
+    Version as GovVersion,
+    WitnessChainError,
+    WitnessError,
+    WitnessId as GovWitnessId,
+    // Witness types (governance's own witness format)
+    WitnessRecord as GovWitnessRecord,
+    WitnessRepository,
 };
 
 // Re-export execution types (coherence gate and compute ladder)
 pub use execution::{
-    // Gate and ladder
-    CoherenceGate, GateDecision, ComputeLane, EnergySnapshot,
-    LaneThresholds, EscalationReason,
     // Actions
-    Action, ActionExecutor, ActionId, ActionImpact, ActionMetadata, ActionResult,
-    ExecutionContext, ExecutionResult, ExecutorConfig, ExecutorStats,
-    // Witness (execution's witness format - aliased to avoid conflict with types::WitnessId)
-    WitnessRecord as ExecWitnessRecord, WitnessId as ExecWitnessId,
+    Action,
+    ActionExecutor,
+    ActionId,
+    ActionImpact,
+    ActionMetadata,
+    ActionResult,
+    // Gate and ladder
+    CoherenceGate,
+    ComputeLane,
+    EnergySnapshot,
+    EscalationReason,
+    ExecutionContext,
+    ExecutionResult,
+    ExecutorConfig,
+    ExecutorStats,
+    GateDecision,
+    LaneThresholds,
     PolicyBundleRef as ExecutionPolicyRef,
     // Scope
     ScopeId as ExecutionScopeId,
+    WitnessId as ExecWitnessId,
+    // Witness (execution's witness format - aliased to avoid conflict with types::WitnessId)
+    WitnessRecord as ExecWitnessRecord,
 };
 
 // Conditional re-exports based on features
 
 #[cfg(feature = "tiles")]
-pub use tiles::{CoherenceFabric, FabricReport, TileAdapter, ShardMap};
+pub use tiles::{CoherenceFabric, FabricReport, ShardMap, TileAdapter};
 
 #[cfg(feature = "sona")]
-pub use sona_tuning::{SonaThresholdTuner, ThresholdAdjustment, ThresholdConfig as SonaThresholdConfig};
+pub use sona_tuning::{
+    SonaThresholdTuner, ThresholdAdjustment, ThresholdConfig as SonaThresholdConfig,
+};
 
 #[cfg(feature = "neural-gate")]
 pub use neural_gate::{NeuralCoherenceGate, NeuralDecision, WitnessEncoding};
 
 #[cfg(feature = "learned-rho")]
-pub use learned_rho::{LearnedRestrictionMap, TrainingBatch, RestrictionMapConfig};
+pub use learned_rho::{LearnedRestrictionMap, RestrictionMapConfig, TrainingBatch};
 
 #[cfg(feature = "hyperbolic")]
 pub use hyperbolic::{
-    HyperbolicCoherence, HyperbolicCoherenceConfig, HyperbolicAdapter,
-    DepthComputer, HierarchyLevel, HyperbolicEnergy, WeightedResidual,
+    DepthComputer, HierarchyLevel, HyperbolicAdapter, HyperbolicCoherence,
+    HyperbolicCoherenceConfig, HyperbolicEnergy, WeightedResidual,
 };
 
 #[cfg(feature = "mincut")]
 pub use mincut::{
-    IncoherenceIsolator, MinCutAdapter, MinCutConfig,
-    IsolationRegion, IsolationResult, IsolationMetrics,
+    IncoherenceIsolator, IsolationMetrics, IsolationRegion, IsolationResult, MinCutAdapter,
+    MinCutConfig,
 };
 
 #[cfg(feature = "attention")]
 pub use attention::{
-    AttentionCoherence, AttentionCoherenceConfig, AttentionAdapter,
-    TopologyGate, TopologyGateResult, MoEResidualProcessor, ExpertRouting,
-    DiffusionSmoothing, SmoothedEnergy, WeightedEdgeResidual, AttentionEnergyAnalysis,
+    AttentionAdapter, AttentionCoherence, AttentionCoherenceConfig, AttentionEnergyAnalysis,
+    DiffusionSmoothing, ExpertRouting, MoEResidualProcessor, SmoothedEnergy, TopologyGate,
+    TopologyGateResult, WeightedEdgeResidual,
 };
 
 #[cfg(feature = "distributed")]
 pub use distributed::{
-    DistributedCoherence, DistributedCoherenceConfig, RaftAdapter,
-    CoherenceStateMachine, ClusterStatus, CoherenceStatus, NodeRole,
+    ClusterStatus, CoherenceStateMachine, CoherenceStatus, DistributedCoherence,
+    DistributedCoherenceConfig, NodeRole, RaftAdapter,
 };
 
 #[cfg(feature = "ruvllm")]
@@ -390,28 +453,46 @@ pub use ruvllm_integration::{
 
 #[cfg(feature = "gpu")]
 pub use gpu::{
-    // Device management
-    GpuDevice, GpuDeviceInfo, GpuDeviceOptions,
-    // Buffer management
-    GpuBuffer, GpuBufferManager, GpuBufferPool, BufferUsage, BufferUsageFlags, BufferKey,
+    BindingDesc,
+    BindingType,
+    BufferKey,
+    BufferUsage,
+    BufferUsageFlags,
+    ComputeEnergyKernel,
     // Pipeline management
-    ComputePipeline, PipelineCache, BindingDesc, BindingType,
-    // Dispatch and synchronization
-    GpuDispatcher, DispatchConfig, DispatchBuilder,
-    // GPU coherence engine
-    GpuCoherenceEngine, GpuConfig, GpuCapabilities, GpuCoherenceEnergy,
+    ComputePipeline,
     // Kernel types
-    ComputeResidualsKernel, ComputeEnergyKernel, SheafAttentionKernel, TokenRoutingKernel,
+    ComputeResidualsKernel,
+    DispatchBuilder,
+    DispatchConfig,
+    // Buffer management
+    GpuBuffer,
+    GpuBufferManager,
+    GpuBufferPool,
+    GpuCapabilities,
+    GpuCoherenceEnergy,
+    // GPU coherence engine
+    GpuCoherenceEngine,
+    GpuConfig,
+    // Device management
+    GpuDevice,
+    GpuDeviceInfo,
+    GpuDeviceOptions,
+    // Dispatch and synchronization
+    GpuDispatcher,
     // Errors
-    GpuError, GpuResult,
+    GpuError,
+    GpuResult,
+    PipelineCache,
+    SheafAttentionKernel,
+    TokenRoutingKernel,
 };
 
 #[cfg(feature = "simd")]
 pub use simd::{
-    SimdWidth, SimdContext, best_simd_width,
-    dot_product_simd, norm_squared_simd, subtract_simd, scale_simd,
-    matmul_simd, matvec_simd,
-    batch_residuals_simd, weighted_energy_sum_simd, batch_lane_assignment_simd,
+    batch_lane_assignment_simd, batch_residuals_simd, best_simd_width, dot_product_simd,
+    matmul_simd, matvec_simd, norm_squared_simd, scale_simd, subtract_simd,
+    weighted_energy_sum_simd, SimdContext, SimdWidth,
 };
 
 // ============================================================================
@@ -421,35 +502,52 @@ pub use simd::{
 /// Convenient imports for common use cases
 pub mod prelude {
     pub use crate::{
-        // Core types
-        NodeId, EdgeId, GraphId, ScopeId,
-        Timestamp, Hash, Version,
-
-        // Substrate
-        SheafGraph, SheafNode, SheafEdge, RestrictionMap,
+        CoherenceEnergy,
 
         // Coherence
-        CoherenceEngine, CoherenceEnergy,
-
-        // Cohomology
-        SheafLaplacian, SheafDiffusion, ObstructionDetector,
-        CohomologyGroup, CohomologyComputer, SheafNeuralLayer,
-
-        // Governance
-        PolicyBundle, ThresholdConfig,
-        GovWitnessRecord as WitnessRecord, // Re-export governance witness as default
-
-        // Execution
-        CoherenceGate, GateDecision, ComputeLane,
-
-        // Security
-        InputValidator, SecurityConfig,
-
+        CoherenceEngine,
         // Errors
-        CoherenceError, ValidationError,
+        CoherenceError,
+        // Execution
+        CoherenceGate,
+        CohomologyComputer,
+        CohomologyGroup,
+        ComputeLane,
 
         // Events
         DomainEvent,
+        EdgeId,
+        GateDecision,
+        GovWitnessRecord as WitnessRecord, // Re-export governance witness as default
+
+        GraphId,
+        Hash,
+        // Security
+        InputValidator,
+        // Core types
+        NodeId,
+        ObstructionDetector,
+        // Governance
+        PolicyBundle,
+        RestrictionMap,
+
+        ScopeId,
+        SecurityConfig,
+
+        SheafDiffusion,
+        SheafEdge,
+        // Substrate
+        SheafGraph,
+        // Cohomology
+        SheafLaplacian,
+        SheafNeuralLayer,
+
+        SheafNode,
+        ThresholdConfig,
+        Timestamp,
+        ValidationError,
+
+        Version,
     };
 }
 

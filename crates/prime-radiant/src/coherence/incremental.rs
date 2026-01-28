@@ -172,11 +172,15 @@ impl UpdateEvent {
     /// Check if this event affects the given edge
     pub fn affects_edge(&self, edge_id: &str) -> bool {
         match self {
-            UpdateEvent::NodeUpdated { affected_edges, .. } => affected_edges.contains(&edge_id.to_string()),
+            UpdateEvent::NodeUpdated { affected_edges, .. } => {
+                affected_edges.contains(&edge_id.to_string())
+            }
             UpdateEvent::EdgeAdded { edge_id: eid, .. } => eid == edge_id,
             UpdateEvent::EdgeRemoved { edge_id: eid, .. } => eid == edge_id,
             UpdateEvent::NodeAdded { .. } => false,
-            UpdateEvent::NodeRemoved { removed_edges, .. } => removed_edges.contains(&edge_id.to_string()),
+            UpdateEvent::NodeRemoved { removed_edges, .. } => {
+                removed_edges.contains(&edge_id.to_string())
+            }
         }
     }
 }
@@ -558,15 +562,13 @@ impl<'a> IncrementalEngine<'a> {
 
         // Update cache
         for (edge_id, edge_energy) in new_energies {
-            self.cache.update_edge(
-                edge_id,
-                edge_energy.energy,
-                edge_energy.residual,
-            );
+            self.cache
+                .update_edge(edge_id, edge_energy.energy, edge_energy.residual);
         }
 
         // Update fingerprint
-        self.cache.set_fingerprint(self.engine.current_fingerprint());
+        self.cache
+            .set_fingerprint(self.engine.current_fingerprint());
 
         self.cache.total_energy()
     }

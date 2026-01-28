@@ -49,8 +49,8 @@ mod encoding;
 mod error;
 mod gate;
 
-pub use config::{NeuralGateConfig, HysteresisConfig, WorkspaceConfig, OscillatorConfig};
-pub use decision::{NeuralDecision, DecisionConfidence, DecisionTrigger};
-pub use encoding::{WitnessEncoding, HypervectorOps};
+pub use config::{HysteresisConfig, NeuralGateConfig, OscillatorConfig, WorkspaceConfig};
+pub use decision::{DecisionConfidence, DecisionTrigger, NeuralDecision};
+pub use encoding::{HypervectorOps, WitnessEncoding};
 pub use error::{NeuralGateError, NeuralGateResult};
-pub use gate::{NeuralCoherenceGate, GateState};
+pub use gate::{GateState, NeuralCoherenceGate};

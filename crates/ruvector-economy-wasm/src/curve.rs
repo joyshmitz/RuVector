@@ -164,10 +164,9 @@ pub fn get_tier_name(network_compute_hours: f64) -> String {
 #[wasm_bindgen]
 pub fn get_tiers_json() -> String {
     let tiers = ContributionCurve::get_tiers();
-    let tier_objs: Vec<_> = tiers.iter()
-        .map(|(hours, mult)| {
-            format!(r#"{{"hours":{},"multiplier":{:.1}}}"#, hours, mult)
-        })
+    let tier_objs: Vec<_> = tiers
+        .iter()
+        .map(|(hours, mult)| format!(r#"{{"hours":{},"multiplier":{:.1}}}"#, hours, mult))
         .collect();
 
     format!("[{}]", tier_objs.join(","))
@@ -180,7 +179,11 @@ mod tests {
     #[test]
     fn test_genesis_multiplier() {
         let mult = ContributionCurve::current_multiplier(0.0);
-        assert!((mult - 10.0).abs() < 0.01, "Genesis should give 10x, got {}", mult);
+        assert!(
+            (mult - 10.0).abs() < 0.01,
+            "Genesis should give 10x, got {}",
+            mult
+        );
     }
 
     #[test]
@@ -188,7 +191,11 @@ mod tests {
         // At decay constant, e^(-1) ~= 0.368
         // So multiplier = 1 + 9 * 0.368 = 4.31
         let mult = ContributionCurve::current_multiplier(1_000_000.0);
-        assert!(mult > 4.0 && mult < 4.5, "At decay constant should be ~4.3x, got {}", mult);
+        assert!(
+            mult > 4.0 && mult < 4.5,
+            "At decay constant should be ~4.3x, got {}",
+            mult
+        );
     }
 
     #[test]
@@ -200,14 +207,22 @@ mod tests {
     #[test]
     fn test_multiplier_never_below_one() {
         let mult = ContributionCurve::current_multiplier(100_000_000.0);
-        assert!(mult >= 1.0, "Multiplier should never go below 1, got {}", mult);
+        assert!(
+            mult >= 1.0,
+            "Multiplier should never go below 1, got {}",
+            mult
+        );
     }
 
     #[test]
     fn test_calculate_reward() {
         let base = 100;
         let reward = ContributionCurve::calculate_reward(base, 0.0);
-        assert_eq!(reward, 1000, "Genesis 100 base should give 1000, got {}", reward);
+        assert_eq!(
+            reward, 1000,
+            "Genesis 100 base should give 1000, got {}",
+            reward
+        );
     }
 
     #[test]

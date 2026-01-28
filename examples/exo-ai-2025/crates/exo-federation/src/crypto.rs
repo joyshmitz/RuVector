@@ -15,13 +15,13 @@
 //!
 //! See /docs/SECURITY.md for comprehensive threat model and security architecture.
 
+use crate::{FederationError, Result};
 use serde::{Deserialize, Serialize};
-use crate::{Result, FederationError};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // Re-export for convenience
 pub use pqcrypto_kyber::kyber1024;
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret as PqSharedSecret, Ciphertext};
+use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret as PqSharedSecret};
 
 /// Post-quantum cryptographic keypair
 ///
@@ -109,23 +109,23 @@ impl PostQuantumKeypair {
     pub fn encapsulate(public_key: &[u8]) -> Result<(SharedSecret, Vec<u8>)> {
         // Validate public key size (Kyber1024 = 1568 bytes)
         if public_key.len() != 1568 {
-            return Err(FederationError::CryptoError(
-                format!("Invalid public key size: expected 1568 bytes, got {}", public_key.len())
-            ));
+            return Err(FederationError::CryptoError(format!(
+                "Invalid public key size: expected 1568 bytes, got {}",
+                public_key.len()
+            )));
         }
 
         // Parse public key
-        let pk = kyber1024::PublicKey::from_bytes(public_key)
-            .map_err(|e| FederationError::CryptoError(
-                format!("Failed to parse Kyber public key: {:?}", e)
-            ))?;
+        let pk = kyber1024::PublicKey::from_bytes(public_key).map_err(|e| {
+            FederationError::CryptoError(format!("Failed to parse Kyber public key: {:?}", e))
+        })?;
 
         // Perform KEM encapsulation
         let (shared_secret, ciphertext) = kyber1024::encapsulate(&pk);
 
         Ok((
             SharedSecret(SecretBytes(shared_secret.as_bytes().to_vec())),
-            ciphertext.as_bytes().to_vec()
+            ciphertext.as_bytes().to_vec(),
         ))
     }
 
@@ -152,22 +152,21 @@ impl PostQuantumKeypair {
     pub fn decapsulate(&self, ciphertext: &[u8]) -> Result<SharedSecret> {
         // Validate ciphertext size
         if ciphertext.len() != 1568 {
-            return Err(FederationError::CryptoError(
-                format!("Invalid ciphertext size: expected 1568 bytes, got {}", ciphertext.len())
-            ));
+            return Err(FederationError::CryptoError(format!(
+                "Invalid ciphertext size: expected 1568 bytes, got {}",
+                ciphertext.len()
+            )));
         }
 
         // Parse secret key
-        let sk = kyber1024::SecretKey::from_bytes(&self.secret.0)
-            .map_err(|e| FederationError::CryptoError(
-                format!("Failed to parse secret key: {:?}", e)
-            ))?;
+        let sk = kyber1024::SecretKey::from_bytes(&self.secret.0).map_err(|e| {
+            FederationError::CryptoError(format!("Failed to parse secret key: {:?}", e))
+        })?;
 
         // Parse ciphertext
-        let ct = kyber1024::Ciphertext::from_bytes(ciphertext)
-            .map_err(|e| FederationError::CryptoError(
-                format!("Failed to parse Kyber ciphertext: {:?}", e)
-            ))?;
+        let ct = kyber1024::Ciphertext::from_bytes(ciphertext).map_err(|e| {
+            FederationError::CryptoError(format!("Failed to parse Kyber ciphertext: {:?}", e))
+        })?;
 
         // Perform KEM decapsulation
         let shared_secret = kyber1024::decapsulate(&ct, &sk);
@@ -228,21 +227,19 @@ impl SharedSecret {
 
         // HKDF-Extract: PRK = HMAC-SHA256(salt=zeros, ikm=shared_secret)
         let salt = [0u8; 32]; // Zero salt is acceptable for Kyber output
-        let mut extract_hmac = HmacSha256::new_from_slice(&salt)
-            .expect("HMAC-SHA256 accepts any key size");
-        extract_hmac.update(&self.0.0);
+        let mut extract_hmac =
+            HmacSha256::new_from_slice(&salt).expect("HMAC-SHA256 accepts any key size");
+        extract_hmac.update(&self.0 .0);
         let prk = extract_hmac.finalize().into_bytes();
 
         // HKDF-Expand for encryption key
-        let mut enc_hmac = HmacSha256::new_from_slice(&prk)
-            .expect("PRK is valid HMAC key");
+        let mut enc_hmac = HmacSha256::new_from_slice(&prk).expect("PRK is valid HMAC key");
         enc_hmac.update(b"encryption");
         enc_hmac.update(&[1u8]); // Counter = 1
         let encrypt_key = enc_hmac.finalize().into_bytes().to_vec();
 
         // HKDF-Expand for MAC key
-        let mut mac_hmac = HmacSha256::new_from_slice(&prk)
-            .expect("PRK is valid HMAC key");
+        let mut mac_hmac = HmacSha256::new_from_slice(&prk).expect("PRK is valid HMAC key");
         mac_hmac.update(b"mac");
         mac_hmac.update(&[1u8]); // Counter = 1
         let mac_key = mac_hmac.finalize().into_bytes().to_vec();
@@ -289,7 +286,7 @@ impl Clone for EncryptedChannel {
             encrypt_key: self.encrypt_key.clone(),
             mac_key: self.mac_key.clone(),
             counter: std::sync::atomic::AtomicU32::new(
-                self.counter.load(std::sync::atomic::Ordering::SeqCst)
+                self.counter.load(std::sync::atomic::Ordering::SeqCst),
             ),
         }
     }
@@ -343,22 +340,26 @@ impl EncryptedChannel {
         };
 
         // Create cipher instance
-        let key_array: [u8; 32] = self.encrypt_key.as_slice().try_into()
+        let key_array: [u8; 32] = self
+            .encrypt_key
+            .as_slice()
+            .try_into()
             .map_err(|_| FederationError::CryptoError("Invalid key size".into()))?;
         let cipher = ChaCha20Poly1305::new(&key_array.into());
 
         // Generate unique nonce: [random: 8 bytes][counter: 4 bytes]
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[0..8].copy_from_slice(&rand::random::<[u8; 8]>());
-        let counter = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let counter = self
+            .counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         nonce_bytes[8..12].copy_from_slice(&counter.to_le_bytes());
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt with AEAD
-        let ciphertext = cipher.encrypt(nonce, plaintext)
-            .map_err(|e| FederationError::CryptoError(
-                format!("ChaCha20-Poly1305 encryption failed: {}", e)
-            ))?;
+        let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|e| {
+            FederationError::CryptoError(format!("ChaCha20-Poly1305 encryption failed: {}", e))
+        })?;
 
         // Prepend nonce to ciphertext (needed for decryption)
         let mut result = nonce_bytes.to_vec();
@@ -396,9 +397,10 @@ impl EncryptedChannel {
 
         // Validate minimum size: nonce(12) + tag(16) = 28 bytes
         if ciphertext.len() < 28 {
-            return Err(FederationError::CryptoError(
-                format!("Ciphertext too short: {} bytes (minimum 28)", ciphertext.len())
-            ));
+            return Err(FederationError::CryptoError(format!(
+                "Ciphertext too short: {} bytes (minimum 28)",
+                ciphertext.len()
+            )));
         }
 
         // Extract nonce and ciphertext
@@ -406,15 +408,20 @@ impl EncryptedChannel {
         let nonce = Nonce::from_slice(nonce_bytes);
 
         // Create cipher instance
-        let key_array: [u8; 32] = self.encrypt_key.as_slice().try_into()
+        let key_array: [u8; 32] = self
+            .encrypt_key
+            .as_slice()
+            .try_into()
             .map_err(|_| FederationError::CryptoError("Invalid key size".into()))?;
         let cipher = ChaCha20Poly1305::new(&key_array.into());
 
         // Decrypt with AEAD (authentication happens here)
-        let plaintext = cipher.decrypt(nonce, ct)
-            .map_err(|e| FederationError::CryptoError(
-                format!("ChaCha20-Poly1305 decryption failed (tampering?): {}", e)
-            ))?;
+        let plaintext = cipher.decrypt(nonce, ct).map_err(|e| {
+            FederationError::CryptoError(format!(
+                "ChaCha20-Poly1305 decryption failed (tampering?): {}",
+                e
+            ))
+        })?;
 
         Ok(plaintext)
     }
@@ -563,7 +570,10 @@ mod tests {
 
         // Decryption should fail due to authentication
         let result = channel.decrypt(&ciphertext);
-        assert!(result.is_err(), "Tampered ciphertext should fail authentication");
+        assert!(
+            result.is_err(),
+            "Tampered ciphertext should fail authentication"
+        );
     }
 
     #[test]

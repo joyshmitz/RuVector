@@ -699,7 +699,9 @@ pub fn flash_attention_v2(
 
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        flash_attention_v2_neon_impl(query, key, value, head_dim, kv_len, scale, causal, block_size)
+        flash_attention_v2_neon_impl(
+            query, key, value, head_dim, kv_len, scale, causal, block_size,
+        )
     }
 
     #[cfg(not(target_arch = "aarch64"))]
@@ -717,7 +719,11 @@ pub fn flash_attention_auto(
     scale: f32,
     causal: bool,
 ) -> Vec<f32> {
-    let head_dim = if !query.is_empty() { query.len() } else { return vec![]; };
+    let head_dim = if !query.is_empty() {
+        query.len()
+    } else {
+        return vec![];
+    };
     let kv_len = key.len() / head_dim;
     let block_size = select_block_size(kv_len, head_dim);
     flash_attention_v2(query, key, value, scale, causal, block_size)
@@ -776,7 +782,9 @@ pub fn flash_attention_into(
     {
         // SAFETY: bounds checks done above, head_dim > 0, kv_len > 0
         unsafe {
-            flash_attention_v2_neon_into(query, key, value, head_dim, kv_len, scale, causal, block_size, output);
+            flash_attention_v2_neon_into(
+                query, key, value, head_dim, kv_len, scale, causal, block_size, output,
+            );
         }
         return;
     }
@@ -837,7 +845,7 @@ pub fn flash_attention_with_scratch(
         // SAFETY: bounds checks done above, head_dim > 0, kv_len > 0
         unsafe {
             flash_attention_v2_neon_with_scratch(
-                query, key, value, head_dim, kv_len, scale, block_size, scratch, output
+                query, key, value, head_dim, kv_len, scale, block_size, scratch, output,
             );
         }
         return;
@@ -1107,8 +1115,8 @@ unsafe fn flash_attention_v2_neon_impl(
     let v_ptr = value.as_ptr();
 
     // Flash Attention 2 state: m (max), l (sum of exp), O (output accumulator)
-    let mut m = f32::NEG_INFINITY;  // Running max
-    let mut l = 0.0f32;              // Running sum of exp(scores - m)
+    let mut m = f32::NEG_INFINITY; // Running max
+    let mut l = 0.0f32; // Running sum of exp(scores - m)
     let mut output = vec![0.0f32; head_dim];
     let out_ptr = output.as_mut_ptr();
 
@@ -1324,7 +1332,12 @@ unsafe fn rescale_output_8x(out_ptr: *mut f32, len: usize, factor: f32) {
 /// Fused softmax-matmul operation with 8x unrolling
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
-unsafe fn accumulate_weighted_value_8x(out_ptr: *mut f32, v_ptr: *const f32, len: usize, weight: f32) {
+unsafe fn accumulate_weighted_value_8x(
+    out_ptr: *mut f32,
+    v_ptr: *const f32,
+    len: usize,
+    weight: f32,
+) {
     let weight_vec = vdupq_n_f32(weight);
     let chunks_32 = len / 32;
     let mut idx = 0usize;
@@ -1839,8 +1852,13 @@ pub unsafe fn softmax_neon(x: &mut [f32], len: usize) {
         let sixth = vdupq_n_f32(1.0 / 6.0);
         let x2 = vmulq_f32(shifted, shifted);
         let x3 = vmulq_f32(x2, shifted);
-        let exp_approx =
-            vaddq_f32(one, vaddq_f32(shifted, vaddq_f32(vmulq_f32(x2, half), vmulq_f32(x3, sixth))));
+        let exp_approx = vaddq_f32(
+            one,
+            vaddq_f32(
+                shifted,
+                vaddq_f32(vmulq_f32(x2, half), vmulq_f32(x3, sixth)),
+            ),
+        );
         // For numerical stability, use actual exp for large values
         let exp_val = vdupq_n_f32(
             (vgetq_lane_f32(shifted, 0)).exp()

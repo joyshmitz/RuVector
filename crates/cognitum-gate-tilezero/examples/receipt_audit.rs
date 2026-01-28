@@ -61,7 +61,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display receipt summary
     println!("\nReceipts:");
     println!("{:-<60}", "");
-    println!("{:<10} {:<15} {:<12} {:<20}", "Seq", "Action", "Decision", "Hash (first 8)");
+    println!(
+        "{:<10} {:<15} {:<12} {:<20}",
+        "Seq", "Action", "Decision", "Hash (first 8)"
+    );
     println!("{:-<60}", "");
 
     for seq in 0..actions.len() as u64 {
@@ -84,7 +87,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nExporting audit log...");
 
     let audit_json = tilezero.export_receipts_json().await?;
-    let filename = format!("audit_log_{}.json",
+    let filename = format!(
+        "audit_log_{}.json",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

@@ -3,7 +3,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rand::prelude::*;
 use rand_distr::StandardNormal;
-use ruvector_math::optimal_transport::{SlicedWasserstein, SinkhornSolver, OptimalTransport};
+use ruvector_math::optimal_transport::{OptimalTransport, SinkhornSolver, SlicedWasserstein};
 
 fn generate_points(n: usize, dim: usize, seed: u64) -> Vec<Vec<f64>> {
     let mut rng = StdRng::seed_from_u64(seed);

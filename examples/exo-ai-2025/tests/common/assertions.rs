@@ -44,11 +44,7 @@ pub fn assert_scores_descending(scores: &[f32]) {
 pub fn assert_causal_order(results: &[String], expected_order: &[String]) {
     // TODO: Implement once CausalResult type exists
     // Verify results respect causal dependencies
-    assert_eq!(
-        results.len(),
-        expected_order.len(),
-        "Result count mismatch"
-    );
+    assert_eq!(results.len(), expected_order.len(), "Result count mismatch");
 }
 
 /// Assert CRDT states are convergent

@@ -16,8 +16,8 @@ use crate::lora::micro_lora::{MicroLoRA, MicroLoraConfig, TargetModule};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub mod trainer;
 pub mod merge;
+pub mod trainer;
 
 /// Pre-defined task-specific adapter configurations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,11 @@ impl RuvLtraAdapters {
                 rank: 8,
                 alpha: 16.0,
                 dropout: 0.1,
-                target_modules: vec![TargetModule::QProj, TargetModule::KProj, TargetModule::VProj],
+                target_modules: vec![
+                    TargetModule::QProj,
+                    TargetModule::KProj,
+                    TargetModule::VProj,
+                ],
                 description: "Information analysis and synthesis adapter".to_string(),
                 domain_tags: vec![
                     "analysis".to_string(),
@@ -162,8 +166,18 @@ impl RuvLtraAdapters {
         let domain = domain.to_lowercase();
         let mut configs = Vec::new();
 
-        for config in [&self.coder, &self.researcher, &self.security, &self.architect, &self.reviewer] {
-            if config.domain_tags.iter().any(|tag| tag.to_lowercase().contains(&domain)) {
+        for config in [
+            &self.coder,
+            &self.researcher,
+            &self.security,
+            &self.architect,
+            &self.reviewer,
+        ] {
+            if config
+                .domain_tags
+                .iter()
+                .any(|tag| tag.to_lowercase().contains(&domain))
+            {
                 configs.push(config);
             }
         }
@@ -173,7 +187,8 @@ impl RuvLtraAdapters {
 
     /// Create MicroLoRA instance from adapter name
     pub fn create_lora(&self, name: &str, hidden_dim: usize) -> Result<MicroLoRA> {
-        let config = self.get(name)
+        let config = self
+            .get(name)
             .ok_or_else(|| RuvLLMError::Config(format!("Unknown adapter: {}", name)))?;
 
         config.to_micro_lora_config(hidden_dim).map(MicroLoRA::new)

@@ -332,10 +332,7 @@ impl SimulationTreeExplorer {
 
     /// Explore all simulation branches up to max_depth
     /// Returns hotspots (high-Φ configurations)
-    pub fn explore(
-        &self,
-        initial_state: &[Vec<f64>],
-    ) -> Vec<(Vec<Vec<f64>>, f64)> {
+    pub fn explore(&self, initial_state: &[Vec<f64>]) -> Vec<(Vec<Vec<f64>>, f64)> {
         let mut hotspots = Vec::new();
         self.explore_recursive(initial_state, 0, 1.0, &mut hotspots);
 
@@ -366,7 +363,8 @@ impl SimulationTreeExplorer {
 
         // Recurse on high-potential branches
         for (i, &phi) in phi_values.iter().enumerate() {
-            if phi > phi_parent * 0.9 { // Only explore if Φ competitive
+            if phi > phi_parent * 0.9 {
+                // Only explore if Φ competitive
                 let mut new_state = state.to_vec();
                 // Apply perturbation
                 for (row_idx, row) in perturbations[i].iter().enumerate() {
@@ -474,10 +472,7 @@ mod tests {
             vec![1.0, 0.0, 0.0],
         ];
 
-        let perturbations = vec![
-            vec![vec![0.1; 3]; 3],
-            vec![vec![0.05; 3]; 3],
-        ];
+        let perturbations = vec![vec![vec![0.1; 3]; 3], vec![vec![0.05; 3]; 3]];
 
         let results = brancher.evaluate_branches(&base, &perturbations);
         assert_eq!(results.len(), 2);

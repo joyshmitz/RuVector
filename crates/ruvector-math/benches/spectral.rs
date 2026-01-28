@@ -1,7 +1,7 @@
 //! Benchmarks for spectral methods
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ruvector_math::spectral::{ChebyshevPolynomial, ChebyshevExpansion};
+use ruvector_math::spectral::{ChebyshevExpansion, ChebyshevPolynomial};
 
 fn bench_chebyshev_eval(c: &mut Criterion) {
     let mut group = c.benchmark_group("chebyshev_eval");

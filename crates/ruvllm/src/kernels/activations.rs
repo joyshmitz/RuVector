@@ -693,10 +693,7 @@ mod tests {
         let mut x = vec![0.0, 1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 3.0];
 
         // Expected values: x * sigmoid(x) = x / (1 + exp(-x))
-        let expected: Vec<f32> = x
-            .iter()
-            .map(|&v: &f32| v / (1.0 + (-v).exp()))
-            .collect();
+        let expected: Vec<f32> = x.iter().map(|&v: &f32| v / (1.0 + (-v).exp())).collect();
 
         silu(&mut x);
 
@@ -787,7 +784,12 @@ mod tests {
         for (i, (&orig, &result)) in original.iter().zip(x.iter()).enumerate() {
             // GELU(x) > 0 for x > 0
             if orig > 1.0 {
-                assert!(result > 0.0, "GELU({}) should be positive, got {}", orig, result);
+                assert!(
+                    result > 0.0,
+                    "GELU({}) should be positive, got {}",
+                    orig,
+                    result
+                );
             }
             // GELU(x) ~ x for large positive x
             if orig > 3.0 {
@@ -865,7 +867,11 @@ mod tests {
 
         // Sum should be 1.0
         let sum: f32 = x.iter().sum();
-        assert!(approx_eq(sum, 1.0, EPSILON), "Softmax sum should be 1.0, got {}", sum);
+        assert!(
+            approx_eq(sum, 1.0, EPSILON),
+            "Softmax sum should be 1.0, got {}",
+            sum
+        );
 
         // All values should be positive
         assert!(x.iter().all(|&v| v > 0.0));
@@ -896,7 +902,11 @@ mod tests {
         softmax(&mut x);
 
         let sum: f32 = x.iter().sum();
-        assert!(approx_eq(sum, 1.0, EPSILON), "Softmax sum should be 1.0, got {}", sum);
+        assert!(
+            approx_eq(sum, 1.0, EPSILON),
+            "Softmax sum should be 1.0, got {}",
+            sum
+        );
         assert!(x.iter().all(|&v| v.is_finite()), "Values should be finite");
     }
 
@@ -1003,7 +1013,10 @@ mod tests {
     fn test_single_element() {
         let mut x = vec![2.0];
         softmax(&mut x);
-        assert!(approx_eq(x[0], 1.0, EPSILON), "Softmax of single element should be 1.0");
+        assert!(
+            approx_eq(x[0], 1.0, EPSILON),
+            "Softmax of single element should be 1.0"
+        );
     }
 
     #[test]

@@ -298,7 +298,11 @@ pub fn compute_topk(logits: &[i16], k: usize) -> Vec<(u16, i16)> {
         // Full sort for small arrays
         let mut indexed: Vec<(usize, i16)> = logits.iter().cloned().enumerate().collect();
         indexed.sort_by(|a, b| b.1.cmp(&a.1));
-        indexed.into_iter().take(k).map(|(i, v)| (i as u16, v)).collect()
+        indexed
+            .into_iter()
+            .take(k)
+            .map(|(i, v)| (i as u16, v))
+            .collect()
     }
 }
 
@@ -345,7 +349,14 @@ pub fn build_witness(
     latency_ns: u32,
     gate_decision: crate::types::GateDecision,
 ) -> crate::types::WitnessLog {
-    crate::types::WitnessLog::new(model_hash, quant_hash, backend, cycles, latency_ns, gate_decision)
+    crate::types::WitnessLog::new(
+        model_hash,
+        quant_hash,
+        backend,
+        cycles,
+        latency_ns,
+        gate_decision,
+    )
 }
 
 /// Command types for daemon protocol

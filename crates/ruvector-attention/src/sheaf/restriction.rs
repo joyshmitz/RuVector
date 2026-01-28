@@ -106,9 +106,9 @@ impl RestrictionMap {
 
     /// Create from configuration
     pub fn from_config(config: RestrictionMapConfig) -> Self {
-        let scale = config.init_scale.unwrap_or_else(|| {
-            (2.0 / (config.input_dim + config.output_dim) as f32).sqrt()
-        });
+        let scale = config
+            .init_scale
+            .unwrap_or_else(|| (2.0 / (config.input_dim + config.output_dim) as f32).sqrt());
 
         // Deterministic pseudo-random initialization
         let mut seed = 42u64;

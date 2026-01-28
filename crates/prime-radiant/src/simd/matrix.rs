@@ -507,8 +507,12 @@ mod tests {
         // Verify transpose property
         for i in 0..m {
             for j in 0..n {
-                assert!(approx_eq(a[i * n + j], b[j * m + i]),
-                    "mismatch at ({}, {})", i, j);
+                assert!(
+                    approx_eq(a[i * n + j], b[j * m + i]),
+                    "mismatch at ({}, {})",
+                    i,
+                    j
+                );
             }
         }
     }
@@ -564,8 +568,13 @@ mod tests {
 
         // Allow slightly more tolerance for larger matrices due to accumulation
         for i in 0..m * n {
-            assert!((c_simd[i] - c_scalar[i]).abs() < 0.01,
-                "mismatch at {}: {} vs {}", i, c_simd[i], c_scalar[i]);
+            assert!(
+                (c_simd[i] - c_scalar[i]).abs() < 0.01,
+                "mismatch at {}: {} vs {}",
+                i,
+                c_simd[i],
+                c_scalar[i]
+            );
         }
     }
 }

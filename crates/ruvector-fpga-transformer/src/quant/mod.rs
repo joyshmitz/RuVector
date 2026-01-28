@@ -2,13 +2,13 @@
 //!
 //! Explicit, reproducible quantization for weights and activations.
 
-pub mod qformat;
-pub mod lut;
 pub mod calib;
+pub mod lut;
+pub mod qformat;
 
-pub use qformat::{quantize_i8, quantize_i16, dequantize_i8, dequantize_i16};
-pub use lut::{softmax_lut, exp_lut, log_lut};
-pub use calib::{CalibrationData, calibrate_model};
+pub use calib::{calibrate_model, CalibrationData};
+pub use lut::{exp_lut, log_lut, softmax_lut};
+pub use qformat::{dequantize_i16, dequantize_i8, quantize_i16, quantize_i8};
 
 use crate::types::QuantSpec;
 
@@ -67,11 +67,9 @@ pub fn q15_dot(a: &[Q15], b: &[Q15]) -> i32 {
 /// Saturating fixed-point dot product (prevents overflow for large vectors)
 #[inline]
 pub fn q15_dot_saturating(a: &[Q15], b: &[Q15]) -> i32 {
-    a.iter()
-        .zip(b.iter())
-        .fold(0i32, |acc, (&x, &y)| {
-            acc.saturating_add((x as i32).saturating_mul(y as i32))
-        })
+    a.iter().zip(b.iter()).fold(0i32, |acc, (&x, &y)| {
+        acc.saturating_add((x as i32).saturating_mul(y as i32))
+    })
 }
 
 /// Fixed-point dot product normalized to Q15

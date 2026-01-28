@@ -1,8 +1,6 @@
 //! Node.js-compatible type definitions
 
-use exo_core::{
-    Metadata, MetadataValue, Pattern, PatternId, SearchResult, SubstrateTime,
-};
+use exo_core::{Metadata, MetadataValue, Pattern, PatternId, SearchResult, SubstrateTime};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::collections::HashMap;
@@ -51,11 +49,7 @@ impl TryFrom<JsPattern> for Pattern {
             .antecedents
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|s| {
-                uuid::Uuid::parse_str(&s)
-                    .ok()
-                    .map(|uuid| PatternId(uuid))
-            })
+            .filter_map(|s| uuid::Uuid::parse_str(&s).ok().map(|uuid| PatternId(uuid)))
             .collect();
 
         Ok(Pattern {

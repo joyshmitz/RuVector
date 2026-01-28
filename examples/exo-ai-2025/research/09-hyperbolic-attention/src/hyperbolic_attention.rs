@@ -12,7 +12,7 @@
 //! - SIMD-optimized batch operations
 
 use crate::poincare_embedding::{
-    poincare_distance, mobius_add, clip_to_ball, exponential_map, logarithmic_map,
+    clip_to_ball, exponential_map, logarithmic_map, mobius_add, poincare_distance,
 };
 
 /// Hyperbolic attention configuration
@@ -180,11 +180,7 @@ impl HyperbolicAttention {
 /// Formula: ⊕ᵢ (wᵢ ⊗ vᵢ)
 ///
 /// where ⊗ is hyperbolic scalar multiplication
-pub fn hyperbolic_weighted_sum(
-    vectors: &[Vec<f32>],
-    weights: &[f32],
-    curvature: f32,
-) -> Vec<f32> {
+pub fn hyperbolic_weighted_sum(vectors: &[Vec<f32>], weights: &[f32], curvature: f32) -> Vec<f32> {
     assert_eq!(vectors.len(), weights.len());
 
     if vectors.is_empty() {
@@ -394,11 +390,7 @@ mod tests {
 
     #[test]
     fn test_hyperbolic_weighted_sum() {
-        let vectors = vec![
-            vec![0.1, 0.1],
-            vec![0.2, 0.1],
-            vec![0.1, 0.2],
-        ];
+        let vectors = vec![vec![0.1, 0.1], vec![0.2, 0.1], vec![0.1, 0.2]];
         let weights = vec![0.5, 0.3, 0.2];
         let k = 1.0;
 
@@ -415,14 +407,8 @@ mod tests {
         let attention = HyperbolicAttention::new(config);
 
         let queries = vec![vec![0.1, 0.1, 0.0, 0.0]];
-        let keys = vec![
-            vec![0.1, 0.0, 0.1, 0.0],
-            vec![0.0, 0.1, 0.0, 0.1],
-        ];
-        let values = vec![
-            vec![0.2, 0.1, 0.0, 0.0],
-            vec![0.1, 0.2, 0.0, 0.0],
-        ];
+        let keys = vec![vec![0.1, 0.0, 0.1, 0.0], vec![0.0, 0.1, 0.0, 0.1]];
+        let values = vec![vec![0.2, 0.1, 0.0, 0.0], vec![0.1, 0.2, 0.0, 0.0]];
 
         let output = attention.forward(&queries, &keys, &values);
 
@@ -438,10 +424,7 @@ mod tests {
         let config = HyperbolicAttentionConfig::new(8, 2, 1.0);
         let attention = MultiHeadHyperbolicAttention::new(config);
 
-        let inputs = vec![
-            vec![0.1; 8],
-            vec![0.2; 8],
-        ];
+        let inputs = vec![vec![0.1; 8], vec![0.2; 8]];
 
         let output = attention.forward(&inputs, &inputs, &inputs);
 
@@ -454,10 +437,7 @@ mod tests {
         let config = HyperbolicAttentionConfig::new(4, 1, 1.0);
         let layer = HyperbolicSelfAttentionLayer::new(config);
 
-        let inputs = vec![
-            vec![0.1, 0.1, 0.0, 0.0],
-            vec![0.2, 0.1, 0.1, 0.0],
-        ];
+        let inputs = vec![vec![0.1, 0.1, 0.0, 0.0], vec![0.2, 0.1, 0.1, 0.0]];
 
         let output = layer.forward(&inputs);
 

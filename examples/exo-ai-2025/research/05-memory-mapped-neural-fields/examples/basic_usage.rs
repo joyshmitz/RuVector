@@ -18,7 +18,10 @@ fn main() -> Result<()> {
 
     let config = dpnc.config();
     println!("\nConfiguration:");
-    println!("  Virtual size: {} TB", config.virtual_size / (1024_u64.pow(4) as usize));
+    println!(
+        "  Virtual size: {} TB",
+        config.virtual_size / (1024_u64.pow(4) as usize)
+    );
     println!("  Page size: {} MB", config.page_size / (1024 * 1024));
     println!("  L1 DRAM: {} GB", config.l1_capacity / (1024_u64.pow(3)));
     println!("  L2 CXL: {} GB", config.l2_capacity / (1024_u64.pow(3)));
@@ -41,7 +44,11 @@ fn main() -> Result<()> {
         let result = dpnc.query(concept)?;
         let elapsed = start.elapsed();
 
-        println!("✓ {} μs (result size: {})", elapsed.as_micros(), result.len());
+        println!(
+            "✓ {} μs (result size: {})",
+            elapsed.as_micros(),
+            result.len()
+        );
     }
 
     println!("\n=== System Statistics ===\n");
@@ -49,19 +56,24 @@ fn main() -> Result<()> {
     let stats = dpnc.stats();
 
     println!("Storage:");
-    println!("  Virtual size: {} GB", stats.storage.virtual_size / (1024_u64.pow(3) as usize));
+    println!(
+        "  Virtual size: {} GB",
+        stats.storage.virtual_size / (1024_u64.pow(3) as usize)
+    );
     println!("  Total pages: {}", stats.storage.total_pages);
     println!("  Dirty pages: {}", stats.storage.dirty_pages);
     println!("  Total accesses: {}", stats.storage.total_accesses);
     println!("  Avg latency: {} μs", stats.storage.avg_latency_us);
 
     println!("\nMemory Tiers:");
-    println!("  L1 DRAM: {}/{} GB ({:.1}% util)",
+    println!(
+        "  L1 DRAM: {}/{} GB ({:.1}% util)",
         stats.memory.l1.used_bytes / (1024_u64.pow(3)),
         stats.memory.l1.total_capacity / (1024_u64.pow(3)),
         stats.memory.l1.utilization * 100.0,
     );
-    println!("  L2 CXL: {}/{} GB ({:.1}% util)",
+    println!(
+        "  L2 CXL: {}/{} GB ({:.1}% util)",
         stats.memory.l2.used_bytes / (1024_u64.pow(3)),
         stats.memory.l2.total_capacity / (1024_u64.pow(3)),
         stats.memory.l2.utilization * 100.0,
@@ -70,10 +82,16 @@ fn main() -> Result<()> {
     println!("\nNetwork:");
     println!("  Total layers: {}", stats.network.total_layers);
     println!("  Hot layers: {}", stats.network.hot_layers);
-    println!("  Memory usage: {} MB", stats.network.total_memory / (1024 * 1024));
+    println!(
+        "  Memory usage: {} MB",
+        stats.network.total_memory / (1024 * 1024)
+    );
 
     println!("\nPrefetcher:");
-    println!("  ML accuracy: {:.1}%", stats.prefetcher.ml_accuracy * 100.0);
+    println!(
+        "  ML accuracy: {:.1}%",
+        stats.prefetcher.ml_accuracy * 100.0
+    );
     println!("  Queue size: {}", stats.prefetcher.queue_size);
     println!("  History size: {}", stats.prefetcher.history_size);
 

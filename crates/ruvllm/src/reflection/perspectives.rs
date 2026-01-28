@@ -134,11 +134,7 @@ pub struct CritiqueIssue {
 
 impl CritiqueIssue {
     /// Create a new critique issue
-    pub fn new(
-        description: impl Into<String>,
-        severity: f32,
-        category: IssueCategory,
-    ) -> Self {
+    pub fn new(description: impl Into<String>, severity: f32, category: IssueCategory) -> Self {
         Self {
             severity: severity.clamp(0.0, 1.0),
             description: description.into(),
@@ -232,11 +228,27 @@ impl CorrectnessChecker {
             ("error[", "Compiler error present", IssueCategory::Syntax),
             ("Error:", "Runtime error present", IssueCategory::Logic),
             ("panic!", "Panic in code", IssueCategory::Logic),
-            ("unwrap()", "Potential panic from unwrap", IssueCategory::Logic),
-            ("expect()", "Potential panic from expect", IssueCategory::Logic),
+            (
+                "unwrap()",
+                "Potential panic from unwrap",
+                IssueCategory::Logic,
+            ),
+            (
+                "expect()",
+                "Potential panic from expect",
+                IssueCategory::Logic,
+            ),
             ("todo!()", "Unimplemented todo", IssueCategory::Missing),
-            ("unimplemented!()", "Unimplemented code", IssueCategory::Missing),
-            ("unreachable!()", "Unreachable code marker", IssueCategory::Logic),
+            (
+                "unimplemented!()",
+                "Unimplemented code",
+                IssueCategory::Missing,
+            ),
+            (
+                "unreachable!()",
+                "Unreachable code marker",
+                IssueCategory::Logic,
+            ),
         ];
 
         for (pattern, description, category) in error_patterns {
@@ -245,7 +257,11 @@ impl CorrectnessChecker {
                 issues.push(
                     CritiqueIssue::new(
                         format!("{} ({} occurrence(s))", description, count),
-                        if category == IssueCategory::Logic { 0.8 } else { 0.5 },
+                        if category == IssueCategory::Logic {
+                            0.8
+                        } else {
+                            0.5
+                        },
                         category,
                     )
                     .suggest(format!("Address or remove {}", pattern)),
@@ -259,7 +275,10 @@ impl CorrectnessChecker {
         if open_parens != close_parens {
             issues.push(
                 CritiqueIssue::new(
-                    format!("Unbalanced parentheses: {} open, {} close", open_parens, close_parens),
+                    format!(
+                        "Unbalanced parentheses: {} open, {} close",
+                        open_parens, close_parens
+                    ),
                     0.7,
                     IssueCategory::Syntax,
                 )
@@ -272,7 +291,10 @@ impl CorrectnessChecker {
         if open_braces != close_braces {
             issues.push(
                 CritiqueIssue::new(
-                    format!("Unbalanced braces: {} open, {} close", open_braces, close_braces),
+                    format!(
+                        "Unbalanced braces: {} open, {} close",
+                        open_braces, close_braces
+                    ),
                     0.7,
                     IssueCategory::Syntax,
                 )
@@ -305,12 +327,8 @@ impl CorrectnessChecker {
             // Simple heuristic: function with just {}
             if output.contains("{ }") || output.contains("{}") {
                 issues.push(
-                    CritiqueIssue::new(
-                        "Empty function body detected",
-                        0.4,
-                        IssueCategory::Missing,
-                    )
-                    .suggest("Implement function body or add todo!()"),
+                    CritiqueIssue::new("Empty function body detected", 0.4, IssueCategory::Missing)
+                        .suggest("Implement function body or add todo!()"),
                 );
             }
         }
@@ -318,12 +336,8 @@ impl CorrectnessChecker {
         // Check for hardcoded values that might be problematic
         if output.contains("localhost") || output.contains("127.0.0.1") {
             issues.push(
-                CritiqueIssue::new(
-                    "Hardcoded localhost/IP address",
-                    0.3,
-                    IssueCategory::Style,
-                )
-                .suggest("Consider using configuration or environment variables"),
+                CritiqueIssue::new("Hardcoded localhost/IP address", 0.3, IssueCategory::Style)
+                    .suggest("Consider using configuration or environment variables"),
             );
         }
 
@@ -346,8 +360,9 @@ impl Perspective for CorrectnessChecker {
         let start = std::time::Instant::now();
 
         if output.is_empty() {
-            return CritiqueResult::fail(self.name(), 0.0, "Empty output")
-                .with_issue(CritiqueIssue::new("No output provided", 1.0, IssueCategory::Missing));
+            return CritiqueResult::fail(self.name(), 0.0, "Empty output").with_issue(
+                CritiqueIssue::new("No output provided", 1.0, IssueCategory::Missing),
+            );
         }
 
         let mut issues = Vec::new();
@@ -381,10 +396,7 @@ impl Perspective for CorrectnessChecker {
                 issues.iter().filter(|i| i.severity < 0.5).count()
             )
         } else {
-            format!(
-                "Found {} issue(s) affecting correctness",
-                issues.len()
-            )
+            format!("Found {} issue(s) affecting correctness", issues.len())
         };
 
         let mut result = if passed {
@@ -435,8 +447,18 @@ impl CompletenessChecker {
 
         // Look for action verbs
         let action_words = [
-            "implement", "create", "add", "build", "write", "define",
-            "include", "support", "handle", "return", "take", "accept",
+            "implement",
+            "create",
+            "add",
+            "build",
+            "write",
+            "define",
+            "include",
+            "support",
+            "handle",
+            "return",
+            "take",
+            "accept",
         ];
 
         for word in action_words {
@@ -471,9 +493,9 @@ impl CompletenessChecker {
             let req_lower = req.to_lowercase();
 
             // Simple keyword matching for requirement fulfillment
-            let is_met = req_lower.split_whitespace().any(|word| {
-                word.len() > 3 && output_lower.contains(word)
-            });
+            let is_met = req_lower
+                .split_whitespace()
+                .any(|word| word.len() > 3 && output_lower.contains(word));
 
             if !is_met {
                 issues.push(
@@ -538,7 +560,11 @@ impl Perspective for CompletenessChecker {
 
         if output.is_empty() {
             return CritiqueResult::fail(self.name(), 0.0, "Empty output - nothing completed")
-                .with_issue(CritiqueIssue::new("No output provided", 1.0, IssueCategory::Missing));
+                .with_issue(CritiqueIssue::new(
+                    "No output provided",
+                    1.0,
+                    IssueCategory::Missing,
+                ));
         }
 
         let mut issues = Vec::new();
@@ -721,7 +747,10 @@ impl ConsistencyChecker {
         let pub_count = output.matches("pub fn").count();
         let priv_count = output.matches("fn ").count() - pub_count;
 
-        if pub_count > 0 && priv_count > 0 && (pub_count as f32 / (pub_count + priv_count) as f32) < 0.3 {
+        if pub_count > 0
+            && priv_count > 0
+            && (pub_count as f32 / (pub_count + priv_count) as f32) < 0.3
+        {
             // This is actually fine, just noting it
         }
 
@@ -744,8 +773,13 @@ impl Perspective for ConsistencyChecker {
         let start = std::time::Instant::now();
 
         if output.is_empty() {
-            return CritiqueResult::fail(self.name(), 0.0, "Empty output")
-                .with_issue(CritiqueIssue::new("No output to check consistency", 1.0, IssueCategory::Missing));
+            return CritiqueResult::fail(self.name(), 0.0, "Empty output").with_issue(
+                CritiqueIssue::new(
+                    "No output to check consistency",
+                    1.0,
+                    IssueCategory::Missing,
+                ),
+            );
         }
 
         let mut issues = Vec::new();
@@ -761,7 +795,10 @@ impl Perspective for ConsistencyChecker {
         issues.extend(self.check_internal_consistency(output));
 
         // Identify strengths
-        if !issues.iter().any(|i| i.category == IssueCategory::Inconsistent) {
+        if !issues
+            .iter()
+            .any(|i| i.category == IssueCategory::Inconsistent)
+        {
             strengths.push("Consistent coding style".to_string());
         }
         if output.contains("use std::") || output.contains("use crate::") {
@@ -906,8 +943,7 @@ mod tests {
 
     #[test]
     fn test_critique_result_builders() {
-        let pass = CritiqueResult::pass("test", 0.8, "Good job")
-            .with_strength("Clean code");
+        let pass = CritiqueResult::pass("test", 0.8, "Good job").with_strength("Clean code");
         assert!(pass.passed);
         assert!(!pass.strengths.is_empty());
 
@@ -979,7 +1015,10 @@ mod tests {
         let output = "fn example() { // TODO: implement }";
 
         let result = checker.critique(output, &context);
-        assert!(result.issues.iter().any(|i| i.category == IssueCategory::Missing));
+        assert!(result
+            .issues
+            .iter()
+            .any(|i| i.category == IssueCategory::Missing));
     }
 
     #[test]
@@ -1005,7 +1044,10 @@ mod tests {
         let output = "fn test() {\n    line1\n  line2\n\tline3\n}";
 
         let result = checker.critique(output, &context);
-        assert!(result.issues.iter().any(|i| i.category == IssueCategory::Style));
+        assert!(result
+            .issues
+            .iter()
+            .any(|i| i.category == IssueCategory::Style));
     }
 
     #[test]

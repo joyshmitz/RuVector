@@ -65,33 +65,33 @@ pub mod ruvltra_medium;
 
 // Re-export RuvLTRA-Small types
 pub use ruvltra::{
+    AneDispatcher,
+    AneOptimization,
+    MemoryLayout,
+    QuantizationType,
+    RuvLtraAttention,
     // Configuration
     RuvLtraConfig,
-    AneOptimization,
-    QuantizationType,
-    MemoryLayout,
+    RuvLtraDecoderLayer,
+    RuvLtraMLP,
     // Model components
     RuvLtraModel,
-    RuvLtraAttention,
-    RuvLtraMLP,
-    RuvLtraDecoderLayer,
     // Utilities
     RuvLtraModelInfo,
-    AneDispatcher,
 };
 
 // Re-export RuvLTRA-Medium types
 pub use ruvltra_medium::{
+    RuvLtraMediumAttention,
     // Configuration
     RuvLtraMediumConfig,
-    RuvLtraMediumVariant,
-    RuvLtraMediumQuant,
-    SonaHookConfig,
+    RuvLtraMediumDecoderLayer,
+    RuvLtraMediumMLP,
     // Model components
     RuvLtraMediumModel,
-    RuvLtraMediumAttention,
-    RuvLtraMediumMLP,
-    RuvLtraMediumDecoderLayer,
     // Utilities
     RuvLtraMediumModelInfo,
+    RuvLtraMediumQuant,
+    RuvLtraMediumVariant,
+    SonaHookConfig,
 };

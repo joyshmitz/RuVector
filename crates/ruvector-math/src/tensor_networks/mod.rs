@@ -21,15 +21,15 @@
 //! - Attention mechanism compression
 //! - Scientific computing
 
+mod contraction;
+mod cp_decomposition;
 mod tensor_train;
 mod tucker;
-mod cp_decomposition;
-mod contraction;
 
-pub use tensor_train::{TensorTrain, TTCore, TensorTrainConfig};
-pub use tucker::{TuckerDecomposition, TuckerConfig};
-pub use cp_decomposition::{CPDecomposition, CPConfig};
-pub use contraction::{TensorNetwork, TensorNode, NetworkContraction};
+pub use contraction::{NetworkContraction, TensorNetwork, TensorNode};
+pub use cp_decomposition::{CPConfig, CPDecomposition};
+pub use tensor_train::{TTCore, TensorTrain, TensorTrainConfig};
+pub use tucker::{TuckerConfig, TuckerDecomposition};
 
 /// Dense tensor for input/output
 #[derive(Debug, Clone)]
@@ -51,13 +51,19 @@ impl DenseTensor {
     /// Create zeros tensor
     pub fn zeros(shape: Vec<usize>) -> Self {
         let size: usize = shape.iter().product();
-        Self { data: vec![0.0; size], shape }
+        Self {
+            data: vec![0.0; size],
+            shape,
+        }
     }
 
     /// Create ones tensor
     pub fn ones(shape: Vec<usize>) -> Self {
         let size: usize = shape.iter().product();
-        Self { data: vec![1.0; size], shape }
+        Self {
+            data: vec![1.0; size],
+            shape,
+        }
     }
 
     /// Create random tensor
@@ -111,7 +117,10 @@ impl DenseTensor {
     pub fn reshape(&self, new_shape: Vec<usize>) -> Self {
         let new_size: usize = new_shape.iter().product();
         assert_eq!(self.data.len(), new_size, "New shape must have same size");
-        Self { data: self.data.clone(), shape: new_shape }
+        Self {
+            data: self.data.clone(),
+            shape: new_shape,
+        }
     }
 }
 

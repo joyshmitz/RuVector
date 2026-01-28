@@ -27,8 +27,8 @@
 //! - `RUVLLM_MODELS_DIR`: Default cache directory for downloaded models
 
 use ruvllm::hub::{
-    RuvLtraRegistry, ModelDownloader, ModelUploader, DownloadConfig, UploadConfig,
-    ModelMetadata, default_cache_dir, get_hf_token,
+    default_cache_dir, get_hf_token, DownloadConfig, ModelDownloader, ModelMetadata, ModelUploader,
+    RuvLtraRegistry, UploadConfig,
 };
 use std::env;
 use std::path::PathBuf;
@@ -98,7 +98,10 @@ fn cmd_pull(args: &[String]) {
 
     println!("📥 Pulling model: {}", model_info.name);
     println!("   Repository: {}", model_info.repo);
-    println!("   Size: {:.1} GB", model_info.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0));
+    println!(
+        "   Size: {:.1} GB",
+        model_info.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+    );
     println!("   Quantization: {:?}", model_info.quantization);
     println!();
 
@@ -125,7 +128,10 @@ fn cmd_pull(args: &[String]) {
             println!("   Saved to: {}", path.display());
             println!();
             println!("   Minimum RAM: {:.1} GB", model_info.hardware.min_ram_gb);
-            println!("   Recommended RAM: {:.1} GB", model_info.hardware.recommended_ram_gb);
+            println!(
+                "   Recommended RAM: {:.1} GB",
+                model_info.hardware.recommended_ram_gb
+            );
 
             if model_info.hardware.supports_ane {
                 println!("   Apple Neural Engine: ✓");
@@ -241,7 +247,10 @@ fn cmd_push(args: &[String]) {
     println!("📤 Pushing model to HuggingFace Hub");
     println!("   Local path: {}", model_path.display());
     println!("   Repository: {}", repo_id);
-    println!("   Visibility: {}", if private { "Private" } else { "Public" });
+    println!(
+        "   Visibility: {}",
+        if private { "Private" } else { "Public" }
+    );
     println!();
 
     // Create metadata
@@ -284,8 +293,10 @@ fn cmd_list(_args: &[String]) {
 
     // Base models
     println!("Base Models:");
-    println!("{:<20} {:>8}  {:>6}  {:>8}  {:<40}",
-             "ID", "SIZE", "PARAMS", "QUANT", "DESCRIPTION");
+    println!(
+        "{:<20} {:>8}  {:>6}  {:>8}  {:<40}",
+        "ID", "SIZE", "PARAMS", "QUANT", "DESCRIPTION"
+    );
     println!("{}", "=".repeat(90));
 
     for model in registry.list_base_models() {
@@ -300,7 +311,8 @@ fn cmd_list(_args: &[String]) {
     }
 
     // Adapters
-    let adapters = registry.list_all()
+    let adapters = registry
+        .list_all()
         .into_iter()
         .filter(|m| m.is_adapter)
         .collect::<Vec<_>>();
@@ -356,18 +368,51 @@ fn cmd_info(args: &[String]) {
     println!("  Architecture: {}", model.id);
     println!("  Quantization: {:?}", model.quantization);
     println!("  Context:      {} tokens", model.context_length);
-    println!("  File Size:    {:.2} GB", model.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0));
+    println!(
+        "  File Size:    {:.2} GB",
+        model.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+    );
     println!();
     println!("Hardware Requirements:");
     println!("  Min RAM:      {:.1} GB", model.hardware.min_ram_gb);
-    println!("  Rec RAM:      {:.1} GB", model.hardware.recommended_ram_gb);
-    println!("  ANE Support:  {}", if model.hardware.supports_ane { "✓" } else { "✗" });
-    println!("  Metal GPU:    {}", if model.hardware.supports_metal { "✓" } else { "✗" });
-    println!("  CUDA:         {}", if model.hardware.supports_cuda { "✓" } else { "✗" });
+    println!(
+        "  Rec RAM:      {:.1} GB",
+        model.hardware.recommended_ram_gb
+    );
+    println!(
+        "  ANE Support:  {}",
+        if model.hardware.supports_ane {
+            "✓"
+        } else {
+            "✗"
+        }
+    );
+    println!(
+        "  Metal GPU:    {}",
+        if model.hardware.supports_metal {
+            "✓"
+        } else {
+            "✗"
+        }
+    );
+    println!(
+        "  CUDA:         {}",
+        if model.hardware.supports_cuda {
+            "✓"
+        } else {
+            "✗"
+        }
+    );
     println!();
     println!("Features:");
-    println!("  SONA Weights: {}", if model.has_sona_weights { "✓" } else { "✗" });
-    println!("  LoRA Adapter: {}", if model.is_adapter { "✓" } else { "✗" });
+    println!(
+        "  SONA Weights: {}",
+        if model.has_sona_weights { "✓" } else { "✗" }
+    );
+    println!(
+        "  LoRA Adapter: {}",
+        if model.is_adapter { "✓" } else { "✗" }
+    );
 
     if let Some(base) = &model.base_model {
         println!("  Base Model:   {}", base);
@@ -379,7 +424,10 @@ fn cmd_info(args: &[String]) {
 
     println!();
     println!("Download with:");
-    println!("  cargo run -p ruvllm --example hub_cli -- pull {}", model_id);
+    println!(
+        "  cargo run -p ruvllm --example hub_cli -- pull {}",
+        model_id
+    );
 
     // Estimate download time
     let time_10mbps = model.estimate_download_time(10.0);

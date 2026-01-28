@@ -113,8 +113,12 @@ impl HotBuffer {
 
             for head in 0..self.config.num_heads {
                 let offset = oldest_pos * self.config.head_dim;
-                ek.extend_from_slice(&self.keys[layer][head][offset..offset + self.config.head_dim]);
-                ev.extend_from_slice(&self.values[layer][head][offset..offset + self.config.head_dim]);
+                ek.extend_from_slice(
+                    &self.keys[layer][head][offset..offset + self.config.head_dim],
+                );
+                ev.extend_from_slice(
+                    &self.values[layer][head][offset..offset + self.config.head_dim],
+                );
             }
 
             evicted_key = Some(ek);
@@ -209,7 +213,9 @@ impl HotBuffer {
         for head in 0..self.config.num_heads {
             let offset = oldest_pos * self.config.head_dim;
             key.extend_from_slice(&self.keys[layer][head][offset..offset + self.config.head_dim]);
-            value.extend_from_slice(&self.values[layer][head][offset..offset + self.config.head_dim]);
+            value.extend_from_slice(
+                &self.values[layer][head][offset..offset + self.config.head_dim],
+            );
         }
 
         self.len[layer] -= 1;
@@ -231,7 +237,9 @@ impl HotBuffer {
 
         if self.len[layer] < self.config.capacity {
             // Not wrapped yet, just return from start
-            result.extend_from_slice(&self.keys[layer][head][..self.len[layer] * self.config.head_dim]);
+            result.extend_from_slice(
+                &self.keys[layer][head][..self.len[layer] * self.config.head_dim],
+            );
         } else {
             // Wrapped: read from write_pos to end, then from start to write_pos
             let start = self.write_pos[layer] * self.config.head_dim;
@@ -258,7 +266,9 @@ impl HotBuffer {
         let mut result = Vec::with_capacity(self.len[layer] * self.config.head_dim);
 
         if self.len[layer] < self.config.capacity {
-            result.extend_from_slice(&self.values[layer][head][..self.len[layer] * self.config.head_dim]);
+            result.extend_from_slice(
+                &self.values[layer][head][..self.len[layer] * self.config.head_dim],
+            );
         } else {
             let start = self.write_pos[layer] * self.config.head_dim;
             let total_size = self.config.capacity * self.config.head_dim;
@@ -369,7 +379,12 @@ mod tests {
         // Push 3 different keys
         for i in 0..3 {
             let val = i as f32;
-            buffer.push_head(0, 0, &[val, val + 1.0, val + 2.0, val + 3.0], &[val * 10.0; 4]);
+            buffer.push_head(
+                0,
+                0,
+                &[val, val + 1.0, val + 2.0, val + 3.0],
+                &[val * 10.0; 4],
+            );
             buffer.advance(0);
         }
 

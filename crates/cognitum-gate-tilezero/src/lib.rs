@@ -13,7 +13,10 @@ pub mod permit;
 pub mod receipt;
 pub mod supergraph;
 
-pub use decision::{DecisionFilter, DecisionOutcome, EvidenceDecision, GateDecision, GateThresholds, ThreeFilterDecision};
+pub use decision::{
+    DecisionFilter, DecisionOutcome, EvidenceDecision, GateDecision, GateThresholds,
+    ThreeFilterDecision,
+};
 pub use evidence::{AggregatedEvidence, EvidenceFilter};
 pub use merge::{MergeStrategy, MergedReport, ReportMerger, WorkerReport};
 pub use permit::{PermitState, PermitToken, TokenDecodeError, Verifier, VerifyError};

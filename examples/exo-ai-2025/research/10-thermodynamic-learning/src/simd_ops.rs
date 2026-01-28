@@ -18,10 +18,7 @@ pub fn simd_dot_product(a: &[f64], b: &[f64]) -> f64 {
     assert_eq!(a.len(), b.len());
 
     // Rust compiler auto-vectorizes this pattern with -O3
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| x * y)
-        .sum()
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
 /// SIMD-accelerated L2 norm squared
@@ -29,9 +26,7 @@ pub fn simd_dot_product(a: &[f64], b: &[f64]) -> f64 {
 /// Computes sum(x[i]^2) for energy calculations
 #[inline]
 pub fn simd_norm_squared(x: &[f64]) -> f64 {
-    x.iter()
-        .map(|v| v * v)
-        .sum()
+    x.iter().map(|v| v * v).sum()
 }
 
 /// SIMD-accelerated weighted sum
@@ -41,10 +36,7 @@ pub fn simd_norm_squared(x: &[f64]) -> f64 {
 pub fn simd_weighted_sum(weights: &[f64], values: &[f64]) -> f64 {
     assert_eq!(weights.len(), values.len());
 
-    weights.iter()
-        .zip(values.iter())
-        .map(|(w, v)| w * v)
-        .sum()
+    weights.iter().zip(values.iter()).map(|(w, v)| w * v).sum()
 }
 
 /// SIMD-accelerated element-wise operations
@@ -111,9 +103,7 @@ pub mod energy {
     /// Computes E = 0.5 * ||x||^2 for multiple vectors
     #[inline]
     pub fn batch_quadratic_energy(states: &[Vec<f64>]) -> Vec<f64> {
-        states.iter()
-            .map(|s| 0.5 * simd_norm_squared(s))
-            .collect()
+        states.iter().map(|s| 0.5 * simd_norm_squared(s)).collect()
     }
 
     /// Fast entropy calculation: H = -sum(p * log(p))
@@ -121,8 +111,9 @@ pub mod energy {
     /// Uses SIMD-friendly pattern for probability distributions
     #[inline]
     pub fn entropy(probabilities: &[f64]) -> f64 {
-        probabilities.iter()
-            .filter(|&&p| p > 1e-10)  // Avoid log(0)
+        probabilities
+            .iter()
+            .filter(|&&p| p > 1e-10) // Avoid log(0)
             .map(|&p| -p * p.ln())
             .sum()
     }
@@ -146,11 +137,7 @@ pub mod gradient {
 
     /// Fast gradient step: params[i] -= learning_rate * gradient[i]
     #[inline]
-    pub fn gradient_descent_step(
-        params: &mut [f64],
-        gradient: &[f64],
-        learning_rate: f64
-    ) {
+    pub fn gradient_descent_step(params: &mut [f64], gradient: &[f64], learning_rate: f64) {
         assert_eq!(params.len(), gradient.len());
 
         for i in 0..params.len() {
@@ -233,9 +220,11 @@ pub mod bench_utils {
     /// Generate random matrix for benchmarking
     pub fn random_matrix(rows: usize, cols: usize) -> Vec<Vec<f64>> {
         (0..rows)
-            .map(|i| (0..cols)
-                .map(|j| ((i * cols + j) as f64 * 0.1).sin())
-                .collect())
+            .map(|i| {
+                (0..cols)
+                    .map(|j| ((i * cols + j) as f64 * 0.1).sin())
+                    .collect()
+            })
             .collect()
     }
 }

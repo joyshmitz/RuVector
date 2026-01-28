@@ -1,8 +1,8 @@
 //! Basic usage example for the sparse inference engine
 
+use ndarray::Array2;
 use ruvector_sparse_inference::backend::get_backend;
 use ruvector_sparse_inference::sparse::ActivationType;
-use ndarray::Array2;
 
 fn main() {
     // Get the best available backend for this platform
@@ -40,12 +40,10 @@ fn main() {
     let matrix = Array2::from_shape_vec(
         (4, 4),
         vec![
-            1.0, 0.0, 2.0, 0.0,
-            0.0, 3.0, 0.0, 4.0,
-            5.0, 0.0, 6.0, 0.0,
-            0.0, 7.0, 0.0, 8.0,
+            1.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 4.0, 5.0, 0.0, 6.0, 0.0, 0.0, 7.0, 0.0, 8.0,
         ],
-    ).unwrap();
+    )
+    .unwrap();
     let input = vec![1.0, 2.0, 3.0, 4.0];
 
     // Only compute rows 0 and 2 (sparse computation)
@@ -60,7 +58,11 @@ fn main() {
 
     // Example 5: Different activation functions
     println!("\n=== Activation Functions ===");
-    for activation in [ActivationType::Relu, ActivationType::Gelu, ActivationType::Silu] {
+    for activation in [
+        ActivationType::Relu,
+        ActivationType::Gelu,
+        ActivationType::Silu,
+    ] {
         let mut data = vec![-1.0, 0.0, 1.0, 2.0];
         backend.activation(&mut data, activation);
         println!("{:?}: {:?}", activation, data);

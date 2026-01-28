@@ -207,43 +207,64 @@ pub use reasoning_bank::{
     RoutingRecommendation, Trajectory, TrajectoryStep, Verdict,
 };
 pub use task_classifier::{ClassificationResult, TaskClassifier, TaskType};
-pub use task_generator::{
-    seed_rng, GeneratedTask, TaskCategory, TaskComplexity, TaskGenerator,
-};
+pub use task_generator::{seed_rng, GeneratedTask, TaskCategory, TaskComplexity, TaskGenerator};
 
 // Hooks Integration exports (NEW v2.3)
 pub use hooks_integration::{
-    HooksIntegration, HooksConfig,
-    PreTaskInput, PreTaskResult, PostTaskInput, PostTaskResult,
-    PreEditInput, PreEditResult, PostEditInput, PostEditResult,
-    SessionState, SessionEndResult, SessionMetrics,
-    PatternMatch, QualityAssessment, LearningMetrics,
+    HooksConfig, HooksIntegration, LearningMetrics, PatternMatch, PostEditInput, PostEditResult,
+    PostTaskInput, PostTaskResult, PreEditInput, PreEditResult, PreTaskInput, PreTaskResult,
+    QualityAssessment, SessionEndResult, SessionMetrics, SessionState,
 };
 
 // Claude API Integration exports (NEW)
 pub use claude_integration::{
-    // Core types
-    ClaudeModel, MessageRole, ContentBlock, Message, ClaudeRequest, ClaudeResponse, UsageStats,
-    // Streaming
-    StreamToken, StreamEvent, QualityMonitor, ResponseStreamer, StreamStats,
-    // Context management
-    ContextWindow, ContextManager,
+    AgentContext,
+    AgentCoordinator,
     // Multi-agent coordination
-    AgentState, AgentContext, WorkflowStep, WorkflowResult, StepResult,
-    AgentCoordinator, CoordinatorStats,
+    AgentState,
+    // Core types
+    ClaudeModel,
+    ClaudeRequest,
+    ClaudeResponse,
+    ContentBlock,
+    ContextManager,
+    // Context management
+    ContextWindow,
+    CoordinatorStats,
     // Cost and latency tracking
-    CostEstimator, LatencyTracker, LatencySample, LatencyStats,
+    CostEstimator,
+    LatencySample,
+    LatencyStats,
+    LatencyTracker,
+    Message,
+    MessageRole,
+    QualityMonitor,
+    ResponseStreamer,
+    StepResult,
+    StreamEvent,
+    StreamStats,
+    // Streaming
+    StreamToken,
+    UsageStats,
+    WorkflowResult,
+    WorkflowStep,
 };
 
 // Model Router exports (NEW)
 pub use model_router::{
+    AnalyzerStats,
     // Complexity analysis
-    ComplexityFactors, ComplexityWeights, ComplexityScore,
-    TaskComplexityAnalyzer, AnalyzerStats,
-    // Model selection
-    SelectionCriteria, ModelRoutingDecision, ModelSelector, SelectorStats,
+    ComplexityFactors,
+    ComplexityScore,
+    ComplexityWeights,
     // Integrated router
     ModelRouter,
+    ModelRoutingDecision,
+    ModelSelector,
+    // Model selection
+    SelectionCriteria,
+    SelectorStats,
+    TaskComplexityAnalyzer,
 };
 
 /// Claude Flow agent types supported by RuvLTRA routing
@@ -307,16 +328,87 @@ impl ClaudeFlowAgent {
     /// Get typical task keywords for this agent
     pub fn keywords(&self) -> &'static [&'static str] {
         match self {
-            Self::Coder => &["implement", "code", "write", "create", "build", "develop", "function", "class"],
-            Self::Researcher => &["research", "analyze", "investigate", "explore", "find", "search", "understand"],
-            Self::Tester => &["test", "verify", "validate", "check", "assert", "coverage", "unit", "integration"],
-            Self::Reviewer => &["review", "audit", "inspect", "quality", "lint", "style", "best practice"],
-            Self::Architect => &["design", "architecture", "structure", "pattern", "system", "scalable", "modular"],
-            Self::SecurityAuditor => &["security", "vulnerability", "cve", "injection", "auth", "encrypt", "safe"],
-            Self::PerformanceEngineer => &["performance", "optimize", "speed", "memory", "benchmark", "profile", "latency"],
-            Self::MlDeveloper => &["model", "train", "neural", "ml", "ai", "embedding", "inference", "tensor"],
-            Self::BackendDev => &["api", "endpoint", "database", "server", "rest", "graphql", "query"],
-            Self::CicdEngineer => &["ci", "cd", "pipeline", "deploy", "workflow", "action", "build", "release"],
+            Self::Coder => &[
+                "implement",
+                "code",
+                "write",
+                "create",
+                "build",
+                "develop",
+                "function",
+                "class",
+            ],
+            Self::Researcher => &[
+                "research",
+                "analyze",
+                "investigate",
+                "explore",
+                "find",
+                "search",
+                "understand",
+            ],
+            Self::Tester => &[
+                "test",
+                "verify",
+                "validate",
+                "check",
+                "assert",
+                "coverage",
+                "unit",
+                "integration",
+            ],
+            Self::Reviewer => &[
+                "review",
+                "audit",
+                "inspect",
+                "quality",
+                "lint",
+                "style",
+                "best practice",
+            ],
+            Self::Architect => &[
+                "design",
+                "architecture",
+                "structure",
+                "pattern",
+                "system",
+                "scalable",
+                "modular",
+            ],
+            Self::SecurityAuditor => &[
+                "security",
+                "vulnerability",
+                "cve",
+                "injection",
+                "auth",
+                "encrypt",
+                "safe",
+            ],
+            Self::PerformanceEngineer => &[
+                "performance",
+                "optimize",
+                "speed",
+                "memory",
+                "benchmark",
+                "profile",
+                "latency",
+            ],
+            Self::MlDeveloper => &[
+                "model",
+                "train",
+                "neural",
+                "ml",
+                "ai",
+                "embedding",
+                "inference",
+                "tensor",
+            ],
+            Self::BackendDev => &[
+                "api", "endpoint", "database", "server", "rest", "graphql", "query",
+            ],
+            Self::CicdEngineer => &[
+                "ci", "cd", "pipeline", "deploy", "workflow", "action", "build", "release",
+            ],
         }
     }
 }

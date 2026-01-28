@@ -27,7 +27,7 @@ const EPS: f32 = 1e-10;
 #[derive(Clone, Debug)]
 pub struct PoincarePoint {
     pub coords: Vec<f32>,
-    pub curvature: f32,  // K parameter (positive)
+    pub curvature: f32, // K parameter (positive)
 }
 
 impl PoincarePoint {
@@ -201,9 +201,7 @@ pub fn mobius_add(x: &[f32], y: &[f32], curvature: f32) -> Vec<f32> {
     // Vectorized computation
     x.iter()
         .zip(y.iter())
-        .map(|(&xi, &yi)| {
-            (numerator_x_coef * xi + numerator_y_coef * yi) / denominator
-        })
+        .map(|(&xi, &yi)| (numerator_x_coef * xi + numerator_y_coef * yi) / denominator)
         .collect()
 }
 
@@ -226,11 +224,7 @@ pub fn poincare_distance(x: &[f32], y: &[f32], curvature: f32) -> f32 {
 ///
 /// Returns all pairwise distances between query and database points.
 /// Uses SIMD for each distance calculation.
-pub fn batch_poincare_distances(
-    query: &[f32],
-    database: &[Vec<f32>],
-    curvature: f32,
-) -> Vec<f32> {
+pub fn batch_poincare_distances(query: &[f32], database: &[Vec<f32>], curvature: f32) -> Vec<f32> {
     database
         .iter()
         .map(|point| poincare_distance(query, point, curvature))
@@ -413,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_clip_to_ball() {
-        let v = vec![2.0, 2.0];  // Outside unit ball
+        let v = vec![2.0, 2.0]; // Outside unit ball
         let k = 1.0;
 
         let clipped = clip_to_ball(&v, k);
@@ -425,11 +419,7 @@ mod tests {
     #[test]
     fn test_batch_distances() {
         let query = vec![0.0, 0.0];
-        let database = vec![
-            vec![0.1, 0.0],
-            vec![0.2, 0.0],
-            vec![0.3, 0.0],
-        ];
+        let database = vec![vec![0.1, 0.0], vec![0.2, 0.0], vec![0.3, 0.0]];
         let k = 1.0;
 
         let distances = batch_poincare_distances(&query, &database, k);

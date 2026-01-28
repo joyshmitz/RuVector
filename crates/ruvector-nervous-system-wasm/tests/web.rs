@@ -44,11 +44,18 @@ fn test_btsp_one_shot_learning() {
     let pattern = vec![0.1; 50];
     let target = 0.8;
 
-    layer.one_shot_associate(&pattern, target).expect("Should learn");
+    layer
+        .one_shot_associate(&pattern, target)
+        .expect("Should learn");
 
     let output = layer.forward(&pattern).expect("Should compute forward");
     // One-shot learning should get close to target
-    assert!((output - target).abs() < 0.5, "Output: {}, Target: {}", output, target);
+    assert!(
+        (output - target).abs() < 0.5,
+        "Output: {}, Target: {}",
+        output,
+        target
+    );
 }
 
 #[wasm_bindgen_test]
@@ -116,7 +123,11 @@ fn test_hdc_similarity_bounds() {
     let b = Hypervector::random();
 
     let sim = a.similarity(&b);
-    assert!(sim >= -1.0 && sim <= 1.0, "Similarity out of bounds: {}", sim);
+    assert!(
+        sim >= -1.0 && sim <= 1.0,
+        "Similarity out of bounds: {}",
+        sim
+    );
 }
 
 #[wasm_bindgen_test]
@@ -201,7 +212,9 @@ fn test_kwta_sparse_activations() {
     let kwta = KWTALayer::new(10, 3).expect("Should create K-WTA");
 
     let inputs: Vec<f32> = (0..10).map(|i| i as f32).collect();
-    let sparse = kwta.sparse_activations(&inputs).expect("Should create sparse");
+    let sparse = kwta
+        .sparse_activations(&inputs)
+        .expect("Should create sparse");
 
     assert_eq!(sparse.length(), 10);
 
@@ -279,7 +292,10 @@ fn test_workspace_item_decay() {
     let mut item = WorkspaceItem::with_decay(&[1.0], 0.8, 1, 0, 0.9, 1000);
 
     item.apply_decay(1.0);
-    assert!((item.salience() - 0.72).abs() < 0.01, "Salience should decay");
+    assert!(
+        (item.salience() - 0.72).abs() < 0.01,
+        "Salience should decay"
+    );
 }
 
 // ============================================================================

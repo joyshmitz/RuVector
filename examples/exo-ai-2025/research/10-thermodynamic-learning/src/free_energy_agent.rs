@@ -171,7 +171,7 @@ impl GenerativeModel {
 pub struct RecognitionModel {
     /// Parameters of q(x|s)
     pub mean_params: Vec<Vec<f64>>, // s -> mean(x)
-    pub var_params: Vec<f64>,       // variance(x)
+    pub var_params: Vec<f64>, // variance(x)
 }
 
 impl RecognitionModel {
@@ -350,7 +350,8 @@ impl FreeEnergyAgent {
                 let ll_minus = self.generative.likelihood.log_likelihood(s, &x);
 
                 let gradient = (ll_plus - ll_minus) / (2.0 * eps);
-                self.generative.likelihood.weight_matrix[i][j] = original + self.learning_rate * gradient;
+                self.generative.likelihood.weight_matrix[i][j] =
+                    original + self.learning_rate * gradient;
             }
         }
     }
@@ -440,10 +441,7 @@ mod tests {
 
     #[test]
     fn test_likelihood() {
-        let likelihood = Likelihood::new(
-            vec![vec![1.0, 0.5], vec![0.5, 1.0]],
-            vec![0.1, 0.1],
-        );
+        let likelihood = Likelihood::new(vec![vec![1.0, 0.5], vec![0.5, 1.0]], vec![0.1, 0.1]);
 
         let x = vec![1.0, -1.0];
         let predicted = likelihood.predict(&x);
@@ -543,6 +541,10 @@ pub fn example_free_energy_tracking() {
         println!("Action: {:?}\n", action);
     }
 
-    println!("Final free energy: {:.6}",
-        loop_executor.agent.free_energy_kl(&observations.last().unwrap()));
+    println!(
+        "Final free energy: {:.6}",
+        loop_executor
+            .agent
+            .free_energy_kl(&observations.last().unwrap())
+    );
 }

@@ -3,9 +3,9 @@
 //! This module provides buffer abstractions for GPU memory management
 //! in the browser WebGPU environment.
 
-use wasm_bindgen::prelude::*;
 use js_sys::{Float32Array, Uint8Array};
 use std::cell::RefCell;
+use wasm_bindgen::prelude::*;
 
 /// Buffer usage flags
 #[wasm_bindgen]
@@ -99,50 +99,86 @@ impl GpuBufferUsage {
     /// - QUERY_RESOLVE = 0x0200
     pub fn to_u32(&self) -> u32 {
         let mut flags = 0u32;
-        if self.map_read { flags |= 0x0001; }
-        if self.map_write { flags |= 0x0002; }
-        if self.copy_src { flags |= 0x0004; }
-        if self.copy_dst { flags |= 0x0008; }
-        if self.uniform { flags |= 0x0040; }
-        if self.storage { flags |= 0x0080; }
+        if self.map_read {
+            flags |= 0x0001;
+        }
+        if self.map_write {
+            flags |= 0x0002;
+        }
+        if self.copy_src {
+            flags |= 0x0004;
+        }
+        if self.copy_dst {
+            flags |= 0x0008;
+        }
+        if self.uniform {
+            flags |= 0x0040;
+        }
+        if self.storage {
+            flags |= 0x0080;
+        }
         flags
     }
 
     #[wasm_bindgen(getter, js_name = mapRead)]
-    pub fn get_map_read(&self) -> bool { self.map_read }
+    pub fn get_map_read(&self) -> bool {
+        self.map_read
+    }
 
     #[wasm_bindgen(setter, js_name = mapRead)]
-    pub fn set_map_read(&mut self, value: bool) { self.map_read = value; }
+    pub fn set_map_read(&mut self, value: bool) {
+        self.map_read = value;
+    }
 
     #[wasm_bindgen(getter, js_name = mapWrite)]
-    pub fn get_map_write(&self) -> bool { self.map_write }
+    pub fn get_map_write(&self) -> bool {
+        self.map_write
+    }
 
     #[wasm_bindgen(setter, js_name = mapWrite)]
-    pub fn set_map_write(&mut self, value: bool) { self.map_write = value; }
+    pub fn set_map_write(&mut self, value: bool) {
+        self.map_write = value;
+    }
 
     #[wasm_bindgen(getter, js_name = copySrc)]
-    pub fn get_copy_src(&self) -> bool { self.copy_src }
+    pub fn get_copy_src(&self) -> bool {
+        self.copy_src
+    }
 
     #[wasm_bindgen(setter, js_name = copySrc)]
-    pub fn set_copy_src(&mut self, value: bool) { self.copy_src = value; }
+    pub fn set_copy_src(&mut self, value: bool) {
+        self.copy_src = value;
+    }
 
     #[wasm_bindgen(getter, js_name = copyDst)]
-    pub fn get_copy_dst(&self) -> bool { self.copy_dst }
+    pub fn get_copy_dst(&self) -> bool {
+        self.copy_dst
+    }
 
     #[wasm_bindgen(setter, js_name = copyDst)]
-    pub fn set_copy_dst(&mut self, value: bool) { self.copy_dst = value; }
+    pub fn set_copy_dst(&mut self, value: bool) {
+        self.copy_dst = value;
+    }
 
     #[wasm_bindgen(getter, js_name = isStorage)]
-    pub fn get_storage(&self) -> bool { self.storage }
+    pub fn get_storage(&self) -> bool {
+        self.storage
+    }
 
     #[wasm_bindgen(setter, js_name = isStorage)]
-    pub fn set_storage(&mut self, value: bool) { self.storage = value; }
+    pub fn set_storage(&mut self, value: bool) {
+        self.storage = value;
+    }
 
     #[wasm_bindgen(getter, js_name = isUniform)]
-    pub fn get_uniform(&self) -> bool { self.uniform }
+    pub fn get_uniform(&self) -> bool {
+        self.uniform
+    }
 
     #[wasm_bindgen(setter, js_name = isUniform)]
-    pub fn set_uniform(&mut self, value: bool) { self.uniform = value; }
+    pub fn set_uniform(&mut self, value: bool) {
+        self.uniform = value;
+    }
 }
 
 /// GPU buffer handle
@@ -217,16 +253,17 @@ impl GpuBuffer {
         usage: GpuBufferUsage,
         label: Option<String>,
     ) -> Self {
-        Self { buffer, size, usage, label }
+        Self {
+            buffer,
+            size,
+            usage,
+            label,
+        }
     }
 
     /// Create a new GPU buffer (non-wasm32 placeholder)
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn new(
-        size: usize,
-        usage: GpuBufferUsage,
-        label: Option<String>,
-    ) -> Self {
+    pub(crate) fn new(size: usize, usage: GpuBufferUsage, label: Option<String>) -> Self {
         Self {
             buffer: vec![0u8; size],
             size,

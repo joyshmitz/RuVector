@@ -1,8 +1,8 @@
 // Automatic Emergence Detection and Scale Selection
 // Implements NeuralRG-inspired methods for optimal coarse-graining
 
-use crate::coarse_graining::Partition;
 use crate::causal_hierarchy::{CausalHierarchy, ConsciousnessLevel};
+use crate::coarse_graining::Partition;
 
 /// Result of emergence detection analysis
 #[derive(Debug, Clone)]
@@ -78,7 +78,8 @@ pub fn detect_emergence(
 
     // Find scale with maximum EI
     let micro_ei = ei_progression[0];
-    let (emergent_scale, &max_ei) = ei_progression.iter()
+    let (emergent_scale, &max_ei) = ei_progression
+        .iter()
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
         .unwrap();
@@ -125,11 +126,8 @@ pub fn assess_consciousness(
     threshold: f32,
 ) -> ConsciousnessReport {
     // Build causal hierarchy with full metrics
-    let hierarchy = CausalHierarchy::from_time_series(
-        data,
-        branching_factor,
-        use_optimal_partition
-    );
+    let hierarchy =
+        CausalHierarchy::from_time_series(data, branching_factor, use_optimal_partition);
 
     // Extract key metrics at conscious scale
     let conscious_scale = hierarchy.metrics.optimal_scale;
@@ -138,10 +136,30 @@ pub fn assess_consciousness(
     let is_conscious = hierarchy.is_conscious(threshold);
     let has_circular_causation = hierarchy.has_circular_causation();
 
-    let ei = hierarchy.metrics.ei.get(conscious_scale).copied().unwrap_or(0.0);
-    let phi = hierarchy.metrics.phi.get(conscious_scale).copied().unwrap_or(0.0);
-    let te_up = hierarchy.metrics.te_up.get(conscious_scale).copied().unwrap_or(0.0);
-    let te_down = hierarchy.metrics.te_down.get(conscious_scale).copied().unwrap_or(0.0);
+    let ei = hierarchy
+        .metrics
+        .ei
+        .get(conscious_scale)
+        .copied()
+        .unwrap_or(0.0);
+    let phi = hierarchy
+        .metrics
+        .phi
+        .get(conscious_scale)
+        .copied()
+        .unwrap_or(0.0);
+    let te_up = hierarchy
+        .metrics
+        .te_up
+        .get(conscious_scale)
+        .copied()
+        .unwrap_or(0.0);
+    let te_down = hierarchy
+        .metrics
+        .te_down
+        .get(conscious_scale)
+        .copied()
+        .unwrap_or(0.0);
 
     // Run emergence detection
     let emergence = detect_emergence(data, branching_factor, 0.5);
@@ -174,7 +192,8 @@ pub fn compare_consciousness_states(
     branching_factor: usize,
     threshold: f32,
 ) -> Vec<ConsciousnessReport> {
-    datasets.iter()
+    datasets
+        .iter()
         .map(|data| assess_consciousness(data, branching_factor, false, threshold))
         .collect()
 }
@@ -203,10 +222,14 @@ pub fn find_optimal_scale(
         ScaleOptimizationCriterion::MaxEmergence => {
             // Compute EI gain relative to micro-level
             let micro_ei = hierarchy.metrics.ei.first().copied().unwrap_or(0.0);
-            let gains: Vec<f32> = hierarchy.metrics.ei.iter()
+            let gains: Vec<f32> = hierarchy
+                .metrics
+                .ei
+                .iter()
                 .map(|&ei| ei - micro_ei)
                 .collect();
-            let (scale, &max_gain) = gains.iter()
+            let (scale, &max_gain) = gains
+                .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .unwrap_or((0, &0.0));
@@ -214,7 +237,8 @@ pub fn find_optimal_scale(
         }
     };
 
-    values.iter()
+    values
+        .iter()
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
         .map(|(idx, &val)| (idx, val))
@@ -260,7 +284,7 @@ impl ConsciousnessMonitor {
             &self.buffer,
             self.branching_factor,
             false, // Use fast sequential partitioning for real-time
-            self.threshold
+            self.threshold,
         );
 
         self.last_report = Some(report.clone());
@@ -272,7 +296,8 @@ impl ConsciousnessMonitor {
     }
 
     pub fn is_conscious(&self) -> bool {
-        self.last_report.as_ref()
+        self.last_report
+            .as_ref()
             .map(|r| r.is_conscious)
             .unwrap_or(false)
     }
@@ -374,12 +399,8 @@ pub mod export {
     }
 
     /// Exports time series as CSV
-    pub fn time_series_to_csv(
-        results: &[(usize, ConsciousnessReport)]
-    ) -> String {
-        let mut csv = String::from(
-            "time,score,level,ei,phi,te_up,te_down,emergent_scale\n"
-        );
+    pub fn time_series_to_csv(results: &[(usize, ConsciousnessReport)]) -> String {
+        let mut csv = String::from("time,score,level,ei,phi,te_up,te_down,emergent_scale\n");
 
         for (t, report) in results {
             csv.push_str(&format!(
@@ -405,22 +426,24 @@ mod tests {
 
     fn generate_synthetic_conscious_data(n: usize) -> Vec<f32> {
         // Multi-scale oscillations simulate hierarchical structure
-        (0..n).map(|t| {
-            let t_f = t as f32;
-            // Low frequency (macro)
-            0.5 * (t_f * 0.01).sin() +
+        (0..n)
+            .map(|t| {
+                let t_f = t as f32;
+                // Low frequency (macro)
+                0.5 * (t_f * 0.01).sin() +
             // Medium frequency
             0.3 * (t_f * 0.05).cos() +
             // High frequency (micro)
             0.2 * (t_f * 0.2).sin()
-        }).collect()
+            })
+            .collect()
     }
 
     fn generate_synthetic_unconscious_data(n: usize) -> Vec<f32> {
         // Random noise - no hierarchical structure
-        (0..n).map(|t| {
-            ((t * 12345 + 67890) % 1000) as f32 / 1000.0
-        }).collect()
+        (0..n)
+            .map(|t| ((t * 12345 + 67890) % 1000) as f32 / 1000.0)
+            .collect()
     }
 
     #[test]
@@ -440,7 +463,10 @@ mod tests {
 
         // Should detect some level of organization
         assert!(report.score >= 0.0);
-        assert_eq!(report.emergence.ei_progression.len(), report.ei_progression_len());
+        assert_eq!(
+            report.emergence.ei_progression.len(),
+            report.ei_progression_len()
+        );
     }
 
     #[test]

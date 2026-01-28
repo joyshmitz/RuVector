@@ -2,9 +2,9 @@
 // Conflict-Free Replicated Data Type for Consciousness State
 // Implements OR-Set, LWW-Register, and custom Phenomenal CRDTs
 
-use std::collections::{HashMap, HashSet};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 
 /// Agent identifier
 pub type AgentId = u64;
@@ -112,8 +112,14 @@ impl QualiaSet {
 
     /// Add a quale (with unique element ID)
     pub fn add(&mut self, quale: Quale, agent_id: AgentId, timestamp: Timestamp) {
-        let elem_id = ElementId { agent_id, timestamp };
-        self.elements.entry(quale).or_insert_with(HashSet::new).insert(elem_id);
+        let elem_id = ElementId {
+            agent_id,
+            timestamp,
+        };
+        self.elements
+            .entry(quale)
+            .or_insert_with(HashSet::new)
+            .insert(elem_id);
     }
 
     /// Remove a quale (marks for removal, actual removal on merge)
@@ -407,13 +413,15 @@ impl ConsciousnessState {
 
     /// Add quale to phenomenal content
     pub fn add_quale(&mut self, quale: Quale) {
-        self.qualia_content.add(quale, self.agent_id, self.timestamp);
+        self.qualia_content
+            .add(quale, self.agent_id, self.timestamp);
         self.timestamp += 1;
     }
 
     /// Set attention focus
     pub fn set_attention(&mut self, quale: Quale) {
-        self.attention_focus.set(quale, self.agent_id, self.timestamp);
+        self.attention_focus
+            .set(quale, self.agent_id, self.timestamp);
         self.timestamp += 1;
     }
 

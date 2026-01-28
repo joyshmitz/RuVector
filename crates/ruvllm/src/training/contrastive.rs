@@ -196,8 +196,8 @@ impl ContrastiveTrainer {
             if line.trim().is_empty() {
                 continue;
             }
-            let triplet: TrainingTriplet =
-                serde_json::from_str(&line).map_err(|e| format!("Failed to parse triplet: {}", e))?;
+            let triplet: TrainingTriplet = serde_json::from_str(&line)
+                .map_err(|e| format!("Failed to parse triplet: {}", e))?;
             self.triplets.push(triplet);
         }
 
@@ -221,13 +221,20 @@ impl ContrastiveTrainer {
 
     /// Compute triplet loss
     #[cfg(feature = "candle")]
-    fn triplet_loss(&self, anchor: &Tensor, positive: &Tensor, negative: &Tensor) -> CandleResult<Tensor> {
+    fn triplet_loss(
+        &self,
+        anchor: &Tensor,
+        positive: &Tensor,
+        negative: &Tensor,
+    ) -> CandleResult<Tensor> {
         // L = max(0, margin + d(a,p) - d(a,n))
         // where d is cosine distance = 1 - cosine_similarity
 
         let anchor_norm = anchor.broadcast_div(&anchor.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
-        let positive_norm = positive.broadcast_div(&positive.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
-        let negative_norm = negative.broadcast_div(&negative.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
+        let positive_norm =
+            positive.broadcast_div(&positive.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
+        let negative_norm =
+            negative.broadcast_div(&negative.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
 
         let pos_sim = (&anchor_norm * &positive_norm)?.sum(D::Minus1)?;
         let neg_sim = (&anchor_norm * &negative_norm)?.sum(D::Minus1)?;
@@ -245,21 +252,31 @@ impl ContrastiveTrainer {
 
     /// Compute InfoNCE loss
     #[cfg(feature = "candle")]
-    fn infonce_loss(&self, anchor: &Tensor, positive: &Tensor, negatives: &[Tensor]) -> CandleResult<Tensor> {
+    fn infonce_loss(
+        &self,
+        anchor: &Tensor,
+        positive: &Tensor,
+        negatives: &[Tensor],
+    ) -> CandleResult<Tensor> {
         let inv_temp = 1.0 / self.config.temperature as f64;
 
         // Normalize embeddings
         let anchor_norm = anchor.broadcast_div(&anchor.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
-        let positive_norm = positive.broadcast_div(&positive.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
+        let positive_norm =
+            positive.broadcast_div(&positive.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
 
         // Positive similarity (multiply by 1/temp instead of dividing)
-        let pos_sim = (&anchor_norm * &positive_norm)?.sum(D::Minus1)?.affine(inv_temp, 0.0)?;
+        let pos_sim = (&anchor_norm * &positive_norm)?
+            .sum(D::Minus1)?
+            .affine(inv_temp, 0.0)?;
 
         // Negative similarities
         let mut all_sims = vec![pos_sim.clone()];
         for neg in negatives {
             let neg_norm = neg.broadcast_div(&neg.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?)?;
-            let neg_sim = (&anchor_norm * &neg_norm)?.sum(D::Minus1)?.affine(inv_temp, 0.0)?;
+            let neg_sim = (&anchor_norm * &neg_norm)?
+                .sum(D::Minus1)?
+                .affine(inv_temp, 0.0)?;
             all_sims.push(neg_sim);
         }
 
@@ -289,8 +306,12 @@ impl ContrastiveTrainer {
 
         // Create projection layer for fine-tuning
         let vb = VarBuilder::from_varmap(&self.var_map, DType::F32, &self.device);
-        let projection = linear(self.config.embedding_dim, self.config.embedding_dim, vb.pp("projection"))
-            .map_err(|e| format!("Failed to create projection layer: {}", e))?;
+        let projection = linear(
+            self.config.embedding_dim,
+            self.config.embedding_dim,
+            vb.pp("projection"),
+        )
+        .map_err(|e| format!("Failed to create projection layer: {}", e))?;
 
         // Setup optimizer
         let params = self.var_map.all_vars();
@@ -345,18 +366,23 @@ impl ContrastiveTrainer {
                     .map_err(|e| format!("Failed to create negative tensor: {}", e))?;
 
                 // Apply projection
-                let anchor_proj = projection.forward(&anchor)
+                let anchor_proj = projection
+                    .forward(&anchor)
                     .map_err(|e| format!("Forward pass failed: {}", e))?;
-                let positive_proj = projection.forward(&positive)
+                let positive_proj = projection
+                    .forward(&positive)
                     .map_err(|e| format!("Forward pass failed: {}", e))?;
-                let negative_proj = projection.forward(&negative)
+                let negative_proj = projection
+                    .forward(&negative)
                     .map_err(|e| format!("Forward pass failed: {}", e))?;
 
                 // Compute losses
-                let triplet_loss = self.triplet_loss(&anchor_proj, &positive_proj, &negative_proj)
+                let triplet_loss = self
+                    .triplet_loss(&anchor_proj, &positive_proj, &negative_proj)
                     .map_err(|e| format!("Triplet loss failed: {}", e))?;
 
-                let infonce_loss = self.infonce_loss(&anchor_proj, &positive_proj, &[negative_proj.clone()])
+                let infonce_loss = self
+                    .infonce_loss(&anchor_proj, &positive_proj, &[negative_proj.clone()])
                     .map_err(|e| format!("InfoNCE loss failed: {}", e))?;
 
                 // Combined loss
@@ -364,13 +390,16 @@ impl ContrastiveTrainer {
                     .map_err(|e| format!("Loss combination failed: {}", e))?;
 
                 // Backward pass
-                optimizer.backward_step(&total_loss)
+                optimizer
+                    .backward_step(&total_loss)
                     .map_err(|e| format!("Backward step failed: {}", e))?;
 
                 // Track statistics
-                let triplet_val: f32 = triplet_loss.to_vec0()
+                let triplet_val: f32 = triplet_loss
+                    .to_vec0()
                     .map_err(|e| format!("Failed to get loss value: {}", e))?;
-                let infonce_val: f32 = infonce_loss.to_vec0()
+                let infonce_val: f32 = infonce_loss
+                    .to_vec0()
                     .map_err(|e| format!("Failed to get loss value: {}", e))?;
 
                 total_triplet_loss += triplet_val as f64;
@@ -504,12 +533,16 @@ impl ContrastiveTrainer {
     }
 
     /// Export training statistics
-    pub fn export_stats<P: AsRef<Path>>(&self, result: &TrainingResult, path: P) -> Result<(), String> {
+    pub fn export_stats<P: AsRef<Path>>(
+        &self,
+        result: &TrainingResult,
+        path: P,
+    ) -> Result<(), String> {
         let json = serde_json::to_string_pretty(result)
             .map_err(|e| format!("Failed to serialize stats: {}", e))?;
 
-        let mut file = File::create(path)
-            .map_err(|e| format!("Failed to create stats file: {}", e))?;
+        let mut file =
+            File::create(path).map_err(|e| format!("Failed to create stats file: {}", e))?;
         file.write_all(json.as_bytes())
             .map_err(|e| format!("Failed to write stats: {}", e))?;
 
@@ -548,7 +581,11 @@ mod tests {
     #[test]
     fn test_load_triplets() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, r#"{{"anchor":"test task","positive":"coder","negative":"tester","is_hard":true}}"#).unwrap();
+        writeln!(
+            file,
+            r#"{{"anchor":"test task","positive":"coder","negative":"tester","is_hard":true}}"#
+        )
+        .unwrap();
         writeln!(file, r#"{{"anchor":"another task","positive":"researcher","negative":"coder","is_hard":false}}"#).unwrap();
 
         let config = ContrastiveConfig::default();
@@ -562,9 +599,21 @@ mod tests {
     #[test]
     fn test_hard_negative_ratio() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, r#"{{"anchor":"t1","positive":"coder","negative":"tester","is_hard":true}}"#).unwrap();
-        writeln!(file, r#"{{"anchor":"t2","positive":"coder","negative":"tester","is_hard":true}}"#).unwrap();
-        writeln!(file, r#"{{"anchor":"t3","positive":"coder","negative":"tester","is_hard":false}}"#).unwrap();
+        writeln!(
+            file,
+            r#"{{"anchor":"t1","positive":"coder","negative":"tester","is_hard":true}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"anchor":"t2","positive":"coder","negative":"tester","is_hard":true}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"anchor":"t3","positive":"coder","negative":"tester","is_hard":false}}"#
+        )
+        .unwrap();
 
         let config = ContrastiveConfig::default();
         let mut trainer = ContrastiveTrainer::new(config).unwrap();

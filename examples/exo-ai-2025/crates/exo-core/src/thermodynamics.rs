@@ -311,21 +311,43 @@ impl std::fmt::Display for EfficiencyReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "=== Thermodynamic Efficiency Report ===")?;
         writeln!(f, "Temperature: {:.1}K", self.temperature_kelvin)?;
-        writeln!(f, "Landauer limit: {:.2e} J/bit", self.landauer_limit_per_bit)?;
+        writeln!(
+            f,
+            "Landauer limit: {:.2e} J/bit",
+            self.landauer_limit_per_bit
+        )?;
         writeln!(f)?;
         writeln!(f, "Operations tracked: {}", self.total_operations)?;
         writeln!(f, "Total bit erasures: {}", self.total_bit_erasures)?;
         writeln!(f)?;
-        writeln!(f, "Theoretical minimum: {:.2e} J ({:.2e} eV)",
-            self.landauer_minimum_joules, self.landauer_minimum_ev)?;
-        writeln!(f, "Estimated actual:   {:.2e} J", self.estimated_actual_joules)?;
-        writeln!(f, "Efficiency ratio:   {:.0}× above Landauer", self.efficiency_ratio)?;
+        writeln!(
+            f,
+            "Theoretical minimum: {:.2e} J ({:.2e} eV)",
+            self.landauer_minimum_joules, self.landauer_minimum_ev
+        )?;
+        writeln!(
+            f,
+            "Estimated actual:   {:.2e} J",
+            self.estimated_actual_joules
+        )?;
+        writeln!(
+            f,
+            "Efficiency ratio:   {:.0}× above Landauer",
+            self.efficiency_ratio
+        )?;
         writeln!(f)?;
         writeln!(f, "Reversible computing potential:")?;
-        writeln!(f, "  - Savings: {:.2e} J ({:.1}%)",
+        writeln!(
+            f,
+            "  - Savings: {:.2e} J ({:.1}%)",
             self.reversible_savings_potential,
-            (self.reversible_savings_potential / self.estimated_actual_joules) * 100.0)?;
-        writeln!(f, "  - Improvement factor: {:.0}×", self.reversible_improvement_factor)?;
+            (self.reversible_savings_potential / self.estimated_actual_joules) * 100.0
+        )?;
+        writeln!(
+            f,
+            "  - Improvement factor: {:.0}×",
+            self.reversible_improvement_factor
+        )?;
         Ok(())
     }
 }
@@ -384,8 +406,7 @@ mod tests {
 
     #[test]
     fn test_efficiency_report() {
-        let tracker = ThermodynamicTracker::room_temperature()
-            .with_technology_multiplier(1000.0);
+        let tracker = ThermodynamicTracker::room_temperature().with_technology_multiplier(1000.0);
 
         tracker.record_operation(Operation::BitErasure { count: 1_000_000 });
 

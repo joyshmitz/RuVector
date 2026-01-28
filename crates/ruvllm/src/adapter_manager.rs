@@ -175,12 +175,15 @@ impl LoraAdapter {
 
     /// Increment reference count
     pub fn inc_ref(&self) {
-        self.ref_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.ref_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Decrement reference count, returns true if count reached zero
     pub fn dec_ref(&self) -> bool {
-        self.ref_count.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1
+        self.ref_count
+            .fetch_sub(1, std::sync::atomic::Ordering::SeqCst)
+            == 1
     }
 
     /// Get current reference count
@@ -257,14 +260,17 @@ impl AdapterManager {
             last_accessed: chrono::Utc::now(),
         });
 
-        self.current_memory.fetch_add(memory_needed, std::sync::atomic::Ordering::SeqCst);
+        self.current_memory
+            .fetch_add(memory_needed, std::sync::atomic::Ordering::SeqCst);
 
         Ok(id)
     }
 
     /// Ensure there's enough memory for a new adapter
     fn ensure_memory(&self, needed: usize) -> Result<()> {
-        let current = self.current_memory.load(std::sync::atomic::Ordering::SeqCst);
+        let current = self
+            .current_memory
+            .load(std::sync::atomic::Ordering::SeqCst);
 
         if current + needed <= self.max_memory_bytes {
             return Ok(());
@@ -289,7 +295,8 @@ impl AdapterManager {
 
                     cache.remove(0);
                     freed += size;
-                    self.current_memory.fetch_sub(size, std::sync::atomic::Ordering::SeqCst);
+                    self.current_memory
+                        .fetch_sub(size, std::sync::atomic::Ordering::SeqCst);
                 } else {
                     // Adapter is in use, move to end
                     let entry = cache.remove(0);
@@ -300,7 +307,7 @@ impl AdapterManager {
 
         if freed < needed {
             return Err(RuvLLMError::OutOfMemory(
-                "Cannot free enough memory for new adapter".to_string()
+                "Cannot free enough memory for new adapter".to_string(),
             ));
         }
 
@@ -334,34 +341,37 @@ impl AdapterManager {
             let mut cache = self.cache.write();
             cache.retain(|e| e.adapter.id != *id);
 
-            self.current_memory.fetch_sub(
-                adapter.memory_bytes(),
-                std::sync::atomic::Ordering::SeqCst
-            );
+            self.current_memory
+                .fetch_sub(adapter.memory_bytes(), std::sync::atomic::Ordering::SeqCst);
         }
         Ok(())
     }
 
     /// List all loaded adapters
     pub fn list(&self) -> Vec<AdapterInfo> {
-        self.adapters.iter().map(|entry| {
-            let adapter = entry.value();
-            AdapterInfo {
-                id: adapter.id,
-                name: adapter.config.name.clone(),
-                rank: adapter.config.rank,
-                version: adapter.version,
-                memory_bytes: adapter.memory_bytes(),
-                ref_count: adapter.ref_count(),
-            }
-        }).collect()
+        self.adapters
+            .iter()
+            .map(|entry| {
+                let adapter = entry.value();
+                AdapterInfo {
+                    id: adapter.id,
+                    name: adapter.config.name.clone(),
+                    rank: adapter.config.rank,
+                    version: adapter.version,
+                    memory_bytes: adapter.memory_bytes(),
+                    ref_count: adapter.ref_count(),
+                }
+            })
+            .collect()
     }
 
     /// Get memory statistics
     pub fn memory_stats(&self) -> AdapterMemoryStats {
         AdapterMemoryStats {
             total_budget: self.max_memory_bytes,
-            used_bytes: self.current_memory.load(std::sync::atomic::Ordering::SeqCst),
+            used_bytes: self
+                .current_memory
+                .load(std::sync::atomic::Ordering::SeqCst),
             adapter_count: self.adapters.len(),
             max_adapters: self.max_loaded,
         }

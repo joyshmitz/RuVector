@@ -404,7 +404,10 @@ impl Delta {
 // Compile-time size assertions
 const _: () = assert!(size_of::<EdgeAdd>() == 8, "EdgeAdd must be 8 bytes");
 const _: () = assert!(size_of::<EdgeRemove>() == 8, "EdgeRemove must be 8 bytes");
-const _: () = assert!(size_of::<WeightUpdate>() == 8, "WeightUpdate must be 8 bytes");
+const _: () = assert!(
+    size_of::<WeightUpdate>() == 8,
+    "WeightUpdate must be 8 bytes"
+);
 const _: () = assert!(size_of::<Observation>() == 8, "Observation must be 8 bytes");
 const _: () = assert!(size_of::<Delta>() == 16, "Delta must be 16 bytes");
 

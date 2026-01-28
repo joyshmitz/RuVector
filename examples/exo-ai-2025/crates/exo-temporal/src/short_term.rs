@@ -1,6 +1,6 @@
 //! Short-term volatile memory buffer
 
-use crate::types::{TemporalPattern, PatternId};
+use crate::types::{PatternId, TemporalPattern};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::VecDeque;
@@ -201,7 +201,8 @@ mod tests {
     fn test_short_term_buffer() {
         let buffer = ShortTermBuffer::default();
 
-        let temporal_pattern = TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
+        let temporal_pattern =
+            TemporalPattern::from_embedding(vec![1.0, 2.0, 3.0], Metadata::new());
         let id = temporal_pattern.pattern.id;
 
         buffer.insert(temporal_pattern);

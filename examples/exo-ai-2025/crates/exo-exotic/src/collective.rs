@@ -17,11 +17,11 @@
 //! - Swarm intelligence (ant colonies, bee hives)
 //! - Global Workspace Theory (Baars)
 
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-use dashmap::DashMap;
 
 /// Collective consciousness spanning multiple substrates
 #[derive(Debug)]
@@ -197,7 +197,9 @@ impl CollectiveConsciousness {
         }
 
         // Compute local Φ for each substrate (collect state first to avoid borrow issues)
-        let local_phis: Vec<f64> = self.substrates.iter()
+        let local_phis: Vec<f64> = self
+            .substrates
+            .iter()
             .map(|s| {
                 let entropy = self.compute_entropy(&s.state);
                 let integration = s.activity * s.capacity;
@@ -214,7 +216,9 @@ impl CollectiveConsciousness {
         let integration = self.compute_integration();
 
         // Global Φ = sum of local Φ weighted by integration
-        let local_sum: f64 = self.substrates.iter()
+        let local_sum: f64 = self
+            .substrates
+            .iter()
             .map(|s| s.local_phi * s.activity)
             .sum();
 
@@ -237,7 +241,8 @@ impl CollectiveConsciousness {
         }
 
         let normalized: Vec<f64> = state.iter().map(|x| x.abs() / sum).collect();
-        -normalized.iter()
+        -normalized
+            .iter()
             .filter(|&&p| p > 1e-10)
             .map(|&p| p * p.ln())
             .sum::<f64>()
@@ -252,21 +257,23 @@ impl CollectiveConsciousness {
         let max_connections = self.substrates.len() * (self.substrates.len() - 1);
         let connection_density = self.connections.len() as f64 / max_connections as f64;
 
-        let avg_strength: f64 = self.connections.iter()
-            .map(|c| c.strength)
-            .sum::<f64>() / self.connections.len() as f64;
+        let avg_strength: f64 = self.connections.iter().map(|c| c.strength).sum::<f64>()
+            / self.connections.len() as f64;
 
         (connection_density * avg_strength).min(1.0)
     }
 
     /// Share memory item across collective
     pub fn share_memory(&self, key: &str, content: Vec<f64>, owner: Uuid) {
-        self.shared_memory.insert(key.to_string(), SharedMemoryItem {
-            content,
-            owner,
-            access_count: 0,
-            importance: 0.5,
-        });
+        self.shared_memory.insert(
+            key.to_string(),
+            SharedMemoryItem {
+                content,
+                owner,
+                access_count: 0,
+                importance: 0.5,
+            },
+        );
     }
 
     /// Access shared memory
@@ -297,7 +304,9 @@ impl CollectiveConsciousness {
 
     /// Propagate state through network
     pub fn propagate(&mut self) {
-        let substrate_map: HashMap<Uuid, usize> = self.substrates.iter()
+        let substrate_map: HashMap<Uuid, usize> = self
+            .substrates
+            .iter()
             .enumerate()
             .map(|(i, s)| (s.id, i))
             .collect();
@@ -309,9 +318,7 @@ impl CollectiveConsciousness {
                 (substrate_map.get(&conn.from), substrate_map.get(&conn.to))
             {
                 let from_state = &self.substrates[from_idx].state;
-                let influence: Vec<f64> = from_state.iter()
-                    .map(|&v| v * conn.strength)
-                    .collect();
+                let influence: Vec<f64> = from_state.iter().map(|&v| v * conn.strength).collect();
                 updates.push((to_idx, influence));
             }
         }
@@ -341,8 +348,7 @@ impl CollectiveConsciousness {
         let avg_activity = if self.substrates.is_empty() {
             0.0
         } else {
-            self.substrates.iter().map(|s| s.activity).sum::<f64>()
-                / self.substrates.len() as f64
+            self.substrates.iter().map(|s| s.activity).sum::<f64>() / self.substrates.len() as f64
         };
 
         CollectiveHealth {
@@ -406,12 +412,14 @@ impl HiveMind {
                 return None;
             }
 
-            let avg_vote: f64 = decision.votes.values().sum::<f64>()
-                / decision.votes.len() as f64;
+            let avg_vote: f64 = decision.votes.values().sum::<f64>() / decision.votes.len() as f64;
 
-            decision.consensus_level = decision.votes.values()
+            decision.consensus_level = decision
+                .votes
+                .values()
                 .map(|&v| 1.0 - (v - avg_vote).abs())
-                .sum::<f64>() / decision.votes.len() as f64;
+                .sum::<f64>()
+                / decision.votes.len() as f64;
 
             let result = avg_vote > 0.0 && decision.consensus_level >= self.consensus_threshold;
             decision.result = Some(result);
@@ -576,7 +584,7 @@ mod tests {
         // Connect all pairs
         let ids: Vec<Uuid> = collective.substrates.iter().map(|s| s.id).collect();
         for i in 0..ids.len() {
-            for j in i+1..ids.len() {
+            for j in i + 1..ids.len() {
                 collective.connect(ids[i], ids[j], 0.5, true);
             }
         }

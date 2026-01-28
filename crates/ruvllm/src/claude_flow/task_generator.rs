@@ -234,15 +234,53 @@ impl GeneratedTask {
     /// Extract keywords from description
     fn extract_keywords(description: &str) -> Vec<String> {
         let keywords_set = [
-            "implement", "create", "build", "fix", "refactor", "optimize",
-            "research", "analyze", "investigate", "explore", "understand",
-            "test", "verify", "validate", "coverage", "unit", "integration",
-            "review", "audit", "inspect", "quality", "security",
-            "design", "architecture", "structure", "pattern", "scalable",
-            "performance", "benchmark", "profile", "memory", "latency",
-            "train", "model", "neural", "embedding", "inference",
-            "deploy", "ci", "cd", "pipeline", "workflow",
-            "api", "endpoint", "database", "server", "rest",
+            "implement",
+            "create",
+            "build",
+            "fix",
+            "refactor",
+            "optimize",
+            "research",
+            "analyze",
+            "investigate",
+            "explore",
+            "understand",
+            "test",
+            "verify",
+            "validate",
+            "coverage",
+            "unit",
+            "integration",
+            "review",
+            "audit",
+            "inspect",
+            "quality",
+            "security",
+            "design",
+            "architecture",
+            "structure",
+            "pattern",
+            "scalable",
+            "performance",
+            "benchmark",
+            "profile",
+            "memory",
+            "latency",
+            "train",
+            "model",
+            "neural",
+            "embedding",
+            "inference",
+            "deploy",
+            "ci",
+            "cd",
+            "pipeline",
+            "workflow",
+            "api",
+            "endpoint",
+            "database",
+            "server",
+            "rest",
         ];
 
         let lower = description.to_lowercase();
@@ -297,17 +335,40 @@ impl TaskGenerator {
         Self {
             templates: Self::build_templates(),
             technologies: vec![
-                "Rust", "TypeScript", "Python", "Go", "JavaScript",
-                "React", "Node.js", "PostgreSQL", "Redis", "MongoDB",
+                "Rust",
+                "TypeScript",
+                "Python",
+                "Go",
+                "JavaScript",
+                "React",
+                "Node.js",
+                "PostgreSQL",
+                "Redis",
+                "MongoDB",
             ],
             components: vec![
-                "user service", "authentication module", "API gateway",
-                "payment processor", "notification system", "data pipeline",
-                "caching layer", "rate limiter", "search engine", "analytics service",
+                "user service",
+                "authentication module",
+                "API gateway",
+                "payment processor",
+                "notification system",
+                "data pipeline",
+                "caching layer",
+                "rate limiter",
+                "search engine",
+                "analytics service",
             ],
             frameworks: vec![
-                "actix-web", "tokio", "express", "fastapi", "gin",
-                "next.js", "django", "spring", "axum", "rocket",
+                "actix-web",
+                "tokio",
+                "express",
+                "fastapi",
+                "gin",
+                "next.js",
+                "django",
+                "spring",
+                "axum",
+                "rocket",
             ],
             tasks_generated: 0,
         }
@@ -332,7 +393,12 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "create a {} for the {}",
                     placeholders: vec![
-                        &["REST endpoint", "data model", "service class", "helper module"],
+                        &[
+                            "REST endpoint",
+                            "data model",
+                            "service class",
+                            "helper module",
+                        ],
                         &["user service", "payment system", "notification service"],
                     ],
                     complexity: TaskComplexity::Moderate,
@@ -357,7 +423,12 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "fix the {} bug in the {}",
                     placeholders: vec![
-                        &["memory leak", "race condition", "null pointer", "off-by-one"],
+                        &[
+                            "memory leak",
+                            "race condition",
+                            "null pointer",
+                            "off-by-one",
+                        ],
                         &["connection pool", "request handler", "cache manager"],
                     ],
                     complexity: TaskComplexity::Moderate,
@@ -381,14 +452,24 @@ impl TaskGenerator {
                     template: "research best practices for {} in {}",
                     placeholders: vec![
                         &["authentication", "caching", "logging", "monitoring"],
-                        &["microservices", "serverless", "monolith", "distributed systems"],
+                        &[
+                            "microservices",
+                            "serverless",
+                            "monolith",
+                            "distributed systems",
+                        ],
                     ],
                     complexity: TaskComplexity::Simple,
                 },
                 TaskTemplate {
                     template: "analyze the {} patterns in the codebase",
                     placeholders: vec![
-                        &["error handling", "dependency injection", "state management", "API design"],
+                        &[
+                            "error handling",
+                            "dependency injection",
+                            "state management",
+                            "API design",
+                        ],
                         &[],
                     ],
                     complexity: TaskComplexity::Moderate,
@@ -396,8 +477,16 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "investigate {} for implementing {}",
                     placeholders: vec![
-                        &["different approaches", "trade-offs", "performance implications"],
-                        &["real-time notifications", "event sourcing", "data replication"],
+                        &[
+                            "different approaches",
+                            "trade-offs",
+                            "performance implications",
+                        ],
+                        &[
+                            "real-time notifications",
+                            "event sourcing",
+                            "data replication",
+                        ],
                     ],
                     complexity: TaskComplexity::Complex,
                 },
@@ -405,8 +494,16 @@ impl TaskGenerator {
                     template: "explore {} architectures for {} with {} requirements",
                     placeholders: vec![
                         &["event-driven", "CQRS", "hexagonal", "microkernel"],
-                        &["high-throughput systems", "low-latency applications", "scalable platforms"],
-                        &["strict consistency", "eventual consistency", "partition tolerance"],
+                        &[
+                            "high-throughput systems",
+                            "low-latency applications",
+                            "scalable platforms",
+                        ],
+                        &[
+                            "strict consistency",
+                            "eventual consistency",
+                            "partition tolerance",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -419,10 +516,7 @@ impl TaskGenerator {
             vec![
                 TaskTemplate {
                     template: "review the {} for code quality",
-                    placeholders: vec![
-                        &["pull request", "module", "function", "class"],
-                        &[],
-                    ],
+                    placeholders: vec![&["pull request", "module", "function", "class"], &[]],
                     complexity: TaskComplexity::Simple,
                 },
                 TaskTemplate {
@@ -444,9 +538,21 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "conduct comprehensive code review of {} focusing on {} and {}",
                     placeholders: vec![
-                        &["the entire service", "the core domain", "the infrastructure layer"],
-                        &["architectural consistency", "security vulnerabilities", "performance bottlenecks"],
-                        &["test coverage", "documentation completeness", "error handling robustness"],
+                        &[
+                            "the entire service",
+                            "the core domain",
+                            "the infrastructure layer",
+                        ],
+                        &[
+                            "architectural consistency",
+                            "security vulnerabilities",
+                            "performance bottlenecks",
+                        ],
+                        &[
+                            "test coverage",
+                            "documentation completeness",
+                            "error handling robustness",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -486,9 +592,21 @@ impl TaskGenerator {
                     template: "design {} architecture for {} handling {} with {} guarantees",
                     placeholders: vec![
                         &["distributed", "event-driven", "stream processing"],
-                        &["real-time analytics", "transaction processing", "IoT data ingestion"],
-                        &["millions of events per second", "petabytes of data", "global users"],
-                        &["exactly-once delivery", "strong consistency", "sub-millisecond latency"],
+                        &[
+                            "real-time analytics",
+                            "transaction processing",
+                            "IoT data ingestion",
+                        ],
+                        &[
+                            "millions of events per second",
+                            "petabytes of data",
+                            "global users",
+                        ],
+                        &[
+                            "exactly-once delivery",
+                            "strong consistency",
+                            "sub-millisecond latency",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -528,9 +646,21 @@ impl TaskGenerator {
                     template: "design {} test suite for {} including {} and {} scenarios",
                     placeholders: vec![
                         &["chaos engineering", "load", "stress", "security"],
-                        &["the distributed system", "the microservices platform", "the data pipeline"],
-                        &["failure injection", "network partitions", "resource exhaustion"],
-                        &["recovery verification", "data integrity checks", "SLA validation"],
+                        &[
+                            "the distributed system",
+                            "the microservices platform",
+                            "the data pipeline",
+                        ],
+                        &[
+                            "failure injection",
+                            "network partitions",
+                            "resource exhaustion",
+                        ],
+                        &[
+                            "recovery verification",
+                            "data integrity checks",
+                            "SLA validation",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -561,7 +691,11 @@ impl TaskGenerator {
                     template: "perform {} security analysis of {} focusing on {}",
                     placeholders: vec![
                         &["comprehensive", "penetration", "threat modeling"],
-                        &["the authentication system", "the payment processing", "the data storage"],
+                        &[
+                            "the authentication system",
+                            "the payment processing",
+                            "the data storage",
+                        ],
                         &["OWASP Top 10", "zero-trust principles", "data protection"],
                     ],
                     complexity: TaskComplexity::Complex,
@@ -570,7 +704,11 @@ impl TaskGenerator {
                     template: "design {} security architecture for {} with {} and {} compliance",
                     placeholders: vec![
                         &["defense-in-depth", "zero-trust", "secure-by-design"],
-                        &["the enterprise platform", "the financial system", "the healthcare application"],
+                        &[
+                            "the enterprise platform",
+                            "the financial system",
+                            "the healthcare application",
+                        ],
                         &["SOC2", "HIPAA", "PCI-DSS"],
                         &["GDPR", "ISO 27001", "FedRAMP"],
                     ],
@@ -611,9 +749,21 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "optimize {} for {} achieving {} with {} constraints",
                     placeholders: vec![
-                        &["the distributed cache", "the message processing", "the ML inference"],
-                        &["ultra-low latency", "maximum throughput", "optimal resource utilization"],
-                        &["sub-millisecond p99", "millions of ops/sec", "linear scaling"],
+                        &[
+                            "the distributed cache",
+                            "the message processing",
+                            "the ML inference",
+                        ],
+                        &[
+                            "ultra-low latency",
+                            "maximum throughput",
+                            "optimal resource utilization",
+                        ],
+                        &[
+                            "sub-millisecond p99",
+                            "millions of ops/sec",
+                            "linear scaling",
+                        ],
                         &["memory limits", "cost constraints", "hardware restrictions"],
                     ],
                     complexity: TaskComplexity::Expert,
@@ -628,7 +778,11 @@ impl TaskGenerator {
                 TaskTemplate {
                     template: "implement {} for the {} model",
                     placeholders: vec![
-                        &["data preprocessing", "feature extraction", "evaluation metrics"],
+                        &[
+                            "data preprocessing",
+                            "feature extraction",
+                            "evaluation metrics",
+                        ],
                         &["classification", "regression", "embedding"],
                     ],
                     complexity: TaskComplexity::Simple,
@@ -637,7 +791,11 @@ impl TaskGenerator {
                     template: "train a {} model for {}",
                     placeholders: vec![
                         &["neural network", "transformer", "ensemble"],
-                        &["text classification", "entity extraction", "sentiment analysis"],
+                        &[
+                            "text classification",
+                            "entity extraction",
+                            "sentiment analysis",
+                        ],
                     ],
                     complexity: TaskComplexity::Moderate,
                 },
@@ -654,7 +812,11 @@ impl TaskGenerator {
                     template: "design {} ML pipeline for {} with {} and {}",
                     placeholders: vec![
                         &["end-to-end", "continuous learning", "multi-model"],
-                        &["recommendation system", "fraud detection", "personalization engine"],
+                        &[
+                            "recommendation system",
+                            "fraud detection",
+                            "personalization engine",
+                        ],
                         &["online learning", "A/B testing", "feature store"],
                         &["model versioning", "drift detection", "explainability"],
                     ],
@@ -697,9 +859,21 @@ impl TaskGenerator {
                     template: "design {} infrastructure for {} with {} and {}",
                     placeholders: vec![
                         &["GitOps", "platform engineering", "self-service"],
-                        &["multi-cloud deployment", "global distribution", "hybrid cloud"],
-                        &["infrastructure as code", "policy as code", "security as code"],
-                        &["observability", "cost optimization", "compliance automation"],
+                        &[
+                            "multi-cloud deployment",
+                            "global distribution",
+                            "hybrid cloud",
+                        ],
+                        &[
+                            "infrastructure as code",
+                            "policy as code",
+                            "security as code",
+                        ],
+                        &[
+                            "observability",
+                            "cost optimization",
+                            "compliance automation",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -712,10 +886,7 @@ impl TaskGenerator {
             vec![
                 TaskTemplate {
                     template: "document the {} API",
-                    placeholders: vec![
-                        &["REST", "GraphQL", "gRPC"],
-                        &[],
-                    ],
+                    placeholders: vec![&["REST", "GraphQL", "gRPC"], &[]],
                     complexity: TaskComplexity::Simple,
                 },
                 TaskTemplate {
@@ -739,9 +910,17 @@ impl TaskGenerator {
                     template: "create comprehensive {} documentation for {} including {} and {}",
                     placeholders: vec![
                         &["technical", "architectural", "operational"],
-                        &["the entire platform", "the distributed system", "the ML pipeline"],
+                        &[
+                            "the entire platform",
+                            "the distributed system",
+                            "the ML pipeline",
+                        ],
                         &["ADRs", "runbooks", "disaster recovery plans"],
-                        &["capacity planning guides", "security protocols", "compliance procedures"],
+                        &[
+                            "capacity planning guides",
+                            "security protocols",
+                            "compliance procedures",
+                        ],
                     ],
                     complexity: TaskComplexity::Expert,
                 },
@@ -752,7 +931,11 @@ impl TaskGenerator {
     }
 
     /// Generate a task for a category and complexity
-    pub fn generate(&mut self, category: TaskCategory, complexity: TaskComplexity) -> GeneratedTask {
+    pub fn generate(
+        &mut self,
+        category: TaskCategory,
+        complexity: TaskComplexity,
+    ) -> GeneratedTask {
         self.tasks_generated += 1;
 
         let templates = self.templates.get(&category).unwrap();
@@ -777,7 +960,11 @@ impl TaskGenerator {
     }
 
     /// Generate a task for a specific agent
-    pub fn generate_for_agent(&mut self, agent: ClaudeFlowAgent, complexity: TaskComplexity) -> GeneratedTask {
+    pub fn generate_for_agent(
+        &mut self,
+        agent: ClaudeFlowAgent,
+        complexity: TaskComplexity,
+    ) -> GeneratedTask {
         let category = TaskCategory::from_agent(agent);
         let mut task = self.generate(category, complexity);
         task.expected_agent = agent;
@@ -785,7 +972,11 @@ impl TaskGenerator {
     }
 
     /// Generate a batch of tasks
-    pub fn generate_batch(&mut self, count: usize, category: Option<TaskCategory>) -> Vec<GeneratedTask> {
+    pub fn generate_batch(
+        &mut self,
+        count: usize,
+        category: Option<TaskCategory>,
+    ) -> Vec<GeneratedTask> {
         (0..count)
             .map(|_| {
                 let cat = category.unwrap_or_else(TaskCategory::random);
@@ -829,7 +1020,8 @@ impl TaskGenerator {
 
         // Add variation with technology/component names
         if rand_simple() > 0.5 && result.contains("the ") {
-            let component = self.components[(rand_simple() * self.components.len() as f32) as usize];
+            let component =
+                self.components[(rand_simple() * self.components.len() as f32) as usize];
             result = result.replace("the service", &format!("the {}", component));
         }
 
@@ -857,7 +1049,9 @@ fn rand_simple() -> f32 {
 
     STATE.with(|state| {
         let mut s = state.borrow_mut();
-        *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (*s >> 33) as f32 / u32::MAX as f32
     })
 }
@@ -904,7 +1098,8 @@ mod tests {
     #[test]
     fn test_generate_for_agent() {
         let mut generator = TaskGenerator::new();
-        let task = generator.generate_for_agent(ClaudeFlowAgent::Researcher, TaskComplexity::Moderate);
+        let task =
+            generator.generate_for_agent(ClaudeFlowAgent::Researcher, TaskComplexity::Moderate);
 
         assert_eq!(task.expected_agent, ClaudeFlowAgent::Researcher);
         assert_eq!(task.category, TaskCategory::Research);
@@ -945,16 +1140,31 @@ mod tests {
 
     #[test]
     fn test_category_from_agent() {
-        assert_eq!(TaskCategory::from_agent(ClaudeFlowAgent::Coder), TaskCategory::Coding);
-        assert_eq!(TaskCategory::from_agent(ClaudeFlowAgent::Researcher), TaskCategory::Research);
-        assert_eq!(TaskCategory::from_agent(ClaudeFlowAgent::SecurityAuditor), TaskCategory::Security);
+        assert_eq!(
+            TaskCategory::from_agent(ClaudeFlowAgent::Coder),
+            TaskCategory::Coding
+        );
+        assert_eq!(
+            TaskCategory::from_agent(ClaudeFlowAgent::Researcher),
+            TaskCategory::Research
+        );
+        assert_eq!(
+            TaskCategory::from_agent(ClaudeFlowAgent::SecurityAuditor),
+            TaskCategory::Security
+        );
     }
 
     #[test]
     fn test_primary_agent() {
         assert_eq!(TaskCategory::Coding.primary_agent(), ClaudeFlowAgent::Coder);
-        assert_eq!(TaskCategory::Testing.primary_agent(), ClaudeFlowAgent::Tester);
-        assert_eq!(TaskCategory::Security.primary_agent(), ClaudeFlowAgent::SecurityAuditor);
+        assert_eq!(
+            TaskCategory::Testing.primary_agent(),
+            ClaudeFlowAgent::Tester
+        );
+        assert_eq!(
+            TaskCategory::Security.primary_agent(),
+            ClaudeFlowAgent::SecurityAuditor
+        );
     }
 
     #[test]

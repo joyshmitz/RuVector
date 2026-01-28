@@ -9,10 +9,9 @@ use metal::{
 use std::sync::Arc;
 
 use super::{
-    AttentionParams, GemmParams, MetalPipelines, NormParams, RopeParams,
-    FusedAttentionParams, FusedNormParams, Int4GemvParams, RopeAttentionParams,
-    YarnAttentionParams, PagedAttentionParams, SwiGLUParams,
-    shader_source, tile_sizes,
+    shader_source, tile_sizes, AttentionParams, FusedAttentionParams, FusedNormParams, GemmParams,
+    Int4GemvParams, MetalPipelines, NormParams, PagedAttentionParams, RopeAttentionParams,
+    RopeParams, SwiGLUParams, YarnAttentionParams,
 };
 use crate::error::{Result, RuvLLMError};
 use crate::kernels::AttentionConfig;
@@ -187,7 +186,12 @@ impl MetalContext {
         if a.len() != m * k || b.len() != k * n {
             return Err(RuvLLMError::InvalidOperation(format!(
                 "GEMM dimension mismatch: A[{}] != {}x{}, B[{}] != {}x{}",
-                a.len(), m, k, b.len(), k, n
+                a.len(),
+                m,
+                k,
+                b.len(),
+                k,
+                n
             )));
         }
 
@@ -234,18 +238,16 @@ impl MetalContext {
     /// GEMM operation with FP32
     ///
     /// Computes C = A @ B using FP32 precision.
-    pub fn gemm_f32(
-        &self,
-        a: &[f32],
-        b: &[f32],
-        m: usize,
-        n: usize,
-        k: usize,
-    ) -> Result<Vec<f32>> {
+    pub fn gemm_f32(&self, a: &[f32], b: &[f32], m: usize, n: usize, k: usize) -> Result<Vec<f32>> {
         if a.len() != m * k || b.len() != k * n {
             return Err(RuvLLMError::InvalidOperation(format!(
                 "GEMM dimension mismatch: A[{}] != {}x{}, B[{}] != {}x{}",
-                a.len(), m, k, b.len(), k, n
+                a.len(),
+                m,
+                k,
+                b.len(),
+                k,
+                n
             )));
         }
 
@@ -273,11 +275,7 @@ impl MetalContext {
         let tiles_n = (n + tile_sizes::GEMM_TILE_N - 1) / tile_sizes::GEMM_TILE_N;
 
         let threadgroup_size = MTLSize::new(16, 16, 1);
-        let grid_size = MTLSize::new(
-            (tiles_m * 16) as u64,
-            (tiles_n * 16) as u64,
-            1,
-        );
+        let grid_size = MTLSize::new((tiles_m * 16) as u64, (tiles_n * 16) as u64, 1);
 
         encoder.dispatch_threads(grid_size, threadgroup_size);
         encoder.end_encoding();
@@ -401,11 +399,7 @@ impl MetalContext {
 
         // One thread per head dimension element
         let threadgroup_size = MTLSize::new(head_dim as u64, 1, 1);
-        let grid_size = MTLSize::new(
-            head_dim as u64,
-            num_heads as u64,
-            batch_size as u64,
-        );
+        let grid_size = MTLSize::new(head_dim as u64, num_heads as u64, batch_size as u64);
 
         encoder.dispatch_threads(grid_size, threadgroup_size);
         encoder.end_encoding();
@@ -453,7 +447,12 @@ impl MetalContext {
         if a.len() != m * k || b.len() != k * n {
             return Err(RuvLLMError::InvalidOperation(format!(
                 "GEMM dimension mismatch: A[{}] != {}x{}, B[{}] != {}x{}",
-                a.len(), m, k, b.len(), k, n
+                a.len(),
+                m,
+                k,
+                b.len(),
+                k,
+                n
             )));
         }
 
@@ -532,9 +531,8 @@ impl MetalContext {
             return Ok(vec![0.0; query.len()]);
         }
 
-        let params = FusedAttentionParams::new(
-            num_heads, num_kv_heads, head_dim, seq_len, kv_len, causal
-        );
+        let params =
+            FusedAttentionParams::new(num_heads, num_kv_heads, head_dim, seq_len, kv_len, causal);
         let output_size = seq_len * num_heads * head_dim;
 
         // Create Metal buffers
@@ -556,7 +554,8 @@ impl MetalContext {
         encoder.set_buffer(4, Some(&params_buffer), 0);
 
         // Flash Attention 2 grid: one threadgroup per head per query block
-        let q_blocks = (seq_len + tile_sizes::FLASH_ATTENTION_BLOCK - 1) / tile_sizes::FLASH_ATTENTION_BLOCK;
+        let q_blocks =
+            (seq_len + tile_sizes::FLASH_ATTENTION_BLOCK - 1) / tile_sizes::FLASH_ATTENTION_BLOCK;
         let threadgroup_size = MTLSize::new(tile_sizes::FLASH_ATTENTION_BLOCK as u64, 1, 1);
         let grid_size = MTLSize::new(
             tile_sizes::FLASH_ATTENTION_BLOCK as u64,
@@ -584,17 +583,22 @@ impl MetalContext {
         bias: &[f32],
         eps: f32,
     ) -> Result<()> {
-        let pipeline = self.pipelines.fused_layernorm_residual.as_ref()
-            .ok_or_else(|| RuvLLMError::Backend(
-                "Fused LayerNorm+Residual not available on this device".to_string()
-            ))?;
+        let pipeline = self
+            .pipelines
+            .fused_layernorm_residual
+            .as_ref()
+            .ok_or_else(|| {
+                RuvLLMError::Backend(
+                    "Fused LayerNorm+Residual not available on this device".to_string(),
+                )
+            })?;
 
         let hidden_size = weight.len();
         let batch_size = x.len() / hidden_size;
 
         if x.len() != batch_size * hidden_size || residual.len() != x.len() {
             return Err(RuvLLMError::InvalidOperation(
-                "Fused LayerNorm dimension mismatch".to_string()
+                "Fused LayerNorm dimension mismatch".to_string(),
             ));
         }
 
@@ -645,17 +649,22 @@ impl MetalContext {
         weight: &[f32],
         eps: f32,
     ) -> Result<()> {
-        let pipeline = self.pipelines.fused_rmsnorm_residual.as_ref()
-            .ok_or_else(|| RuvLLMError::Backend(
-                "Fused RMSNorm+Residual not available on this device".to_string()
-            ))?;
+        let pipeline = self
+            .pipelines
+            .fused_rmsnorm_residual
+            .as_ref()
+            .ok_or_else(|| {
+                RuvLLMError::Backend(
+                    "Fused RMSNorm+Residual not available on this device".to_string(),
+                )
+            })?;
 
         let hidden_size = weight.len();
         let batch_size = x.len() / hidden_size;
 
         if x.len() != batch_size * hidden_size || residual.len() != x.len() {
             return Err(RuvLLMError::InvalidOperation(
-                "Fused RMSNorm dimension mismatch".to_string()
+                "Fused RMSNorm dimension mismatch".to_string(),
             ));
         }
 
@@ -697,19 +706,14 @@ impl MetalContext {
     /// Fused SwiGLU activation
     ///
     /// Computes: output = Swish(gate) * up in a single kernel
-    pub fn fused_swiglu(
-        &self,
-        gate: &[f32],
-        up: &[f32],
-    ) -> Result<Vec<f32>> {
-        let pipeline = self.pipelines.fused_swiglu.as_ref()
-            .ok_or_else(|| RuvLLMError::Backend(
-                "Fused SwiGLU not available on this device".to_string()
-            ))?;
+    pub fn fused_swiglu(&self, gate: &[f32], up: &[f32]) -> Result<Vec<f32>> {
+        let pipeline = self.pipelines.fused_swiglu.as_ref().ok_or_else(|| {
+            RuvLLMError::Backend("Fused SwiGLU not available on this device".to_string())
+        })?;
 
         if gate.len() != up.len() {
             return Err(RuvLLMError::InvalidOperation(
-                "SwiGLU dimension mismatch".to_string()
+                "SwiGLU dimension mismatch".to_string(),
             ));
         }
 
@@ -752,26 +756,30 @@ impl MetalContext {
     /// 4x memory reduction compared to FP16.
     pub fn int4_gemv(
         &self,
-        weights_int4: &[u8],  // Packed INT4 weights (2 values per byte)
-        scales: &[f32],       // Per-group scale factors
-        zeros: &[f32],        // Per-group zero points
-        input: &[f32],        // Input vector
-        m: usize,             // Output dimension
-        n: usize,             // Input dimension
-        group_size: usize,    // Quantization group size
+        weights_int4: &[u8], // Packed INT4 weights (2 values per byte)
+        scales: &[f32],      // Per-group scale factors
+        zeros: &[f32],       // Per-group zero points
+        input: &[f32],       // Input vector
+        m: usize,            // Output dimension
+        n: usize,            // Input dimension
+        group_size: usize,   // Quantization group size
     ) -> Result<Vec<f32>> {
         // Prefer SIMD-optimized version if available
-        let pipeline = self.pipelines.int4_gemv_simd.as_ref()
+        let pipeline = self
+            .pipelines
+            .int4_gemv_simd
+            .as_ref()
             .or(self.pipelines.int4_gemv.as_ref())
-            .ok_or_else(|| RuvLLMError::Backend(
-                "INT4 GEMV not available on this device".to_string()
-            ))?;
+            .ok_or_else(|| {
+                RuvLLMError::Backend("INT4 GEMV not available on this device".to_string())
+            })?;
 
         let expected_weights = (m * n + 1) / 2; // 2 values per byte
         if weights_int4.len() != expected_weights {
             return Err(RuvLLMError::InvalidOperation(format!(
                 "INT4 weight size mismatch: expected {} bytes, got {}",
-                expected_weights, weights_int4.len()
+                expected_weights,
+                weights_int4.len()
             )));
         }
 
@@ -837,7 +845,15 @@ impl MetalContext {
                 let mut k = key.to_vec();
                 self.apply_rope(&mut q, position_offset, num_heads, head_dim, rope_theta)?;
                 self.apply_rope(&mut k, position_offset, num_kv_heads, head_dim, rope_theta)?;
-                return self.fused_attention(&q, &k, value, num_heads, num_kv_heads, head_dim, causal);
+                return self.fused_attention(
+                    &q,
+                    &k,
+                    value,
+                    num_heads,
+                    num_kv_heads,
+                    head_dim,
+                    causal,
+                );
             }
         };
 
@@ -849,8 +865,14 @@ impl MetalContext {
         }
 
         let params = RopeAttentionParams::new(
-            num_heads, num_kv_heads, head_dim, seq_len, kv_len,
-            position_offset, rope_theta, causal
+            num_heads,
+            num_kv_heads,
+            head_dim,
+            seq_len,
+            kv_len,
+            position_offset,
+            rope_theta,
+            causal,
         );
         let output_size = seq_len * num_heads * head_dim;
 
@@ -902,10 +924,9 @@ impl MetalContext {
         target_max_position: usize,
         causal: bool,
     ) -> Result<Vec<f32>> {
-        let pipeline = self.pipelines.yarn_attention.as_ref()
-            .ok_or_else(|| RuvLLMError::Backend(
-                "YaRN attention not available on this device".to_string()
-            ))?;
+        let pipeline = self.pipelines.yarn_attention.as_ref().ok_or_else(|| {
+            RuvLLMError::Backend("YaRN attention not available on this device".to_string())
+        })?;
 
         let seq_len = query.len() / (num_heads * head_dim);
         let kv_len = key.len() / (num_kv_heads * head_dim);
@@ -915,8 +936,16 @@ impl MetalContext {
         }
 
         let params = YarnAttentionParams::new(
-            num_heads, num_kv_heads, head_dim, seq_len, kv_len,
-            position_offset, rope_theta, original_max_position, target_max_position, causal
+            num_heads,
+            num_kv_heads,
+            head_dim,
+            seq_len,
+            kv_len,
+            position_offset,
+            rope_theta,
+            original_max_position,
+            target_max_position,
+            causal,
         );
         let output_size = seq_len * num_heads * head_dim;
 
@@ -952,10 +981,9 @@ impl MetalContext {
 
     /// Create a Metal buffer with specified size
     fn create_buffer(&self, size: usize) -> Result<Buffer> {
-        Ok(self.device.new_buffer(
-            size as u64,
-            MTLResourceOptions::StorageModeShared,
-        ))
+        Ok(self
+            .device
+            .new_buffer(size as u64, MTLResourceOptions::StorageModeShared))
     }
 
     /// Create a Metal buffer with data
@@ -1003,7 +1031,11 @@ mod tests {
 
         let config = MetalConfig::default();
         let ctx = MetalContext::new(config);
-        assert!(ctx.is_ok(), "Failed to create Metal context: {:?}", ctx.err());
+        assert!(
+            ctx.is_ok(),
+            "Failed to create Metal context: {:?}",
+            ctx.err()
+        );
     }
 
     #[test]

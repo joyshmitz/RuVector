@@ -113,8 +113,8 @@ impl EvalReport {
         let cost_delta =
             target.economics.cost_per_accepted_patch - baseline.economics.cost_per_accepted_patch;
 
-        let latency_delta = target.economics.latency.end_to_end.p95()
-            - baseline.economics.latency.end_to_end.p95();
+        let latency_delta =
+            target.economics.latency.end_to_end.p95() - baseline.economics.latency.end_to_end.p95();
 
         // Simple significance check (would use proper stats in production)
         let is_significant = success_delta.abs() > 0.05;
@@ -149,7 +149,10 @@ impl EvalReport {
             "- Quality threshold: {:.0}%\n",
             self.config.quality_threshold * 100.0
         ));
-        md.push_str(&format!("- Cost target: ${:.2}\n\n", self.config.cost_target));
+        md.push_str(&format!(
+            "- Cost target: ${:.2}\n\n",
+            self.config.cost_target
+        ));
 
         // Leaderboard
         md.push_str("## Results Leaderboard\n\n");
@@ -219,13 +222,9 @@ impl EvalReport {
 
         // Recommendations
         md.push_str("\n## Recommendations\n\n");
-        md.push_str(
-            "1. Use Full mode (Retrieval + Adapters + SONA) for maximum accuracy\n",
-        );
+        md.push_str("1. Use Full mode (Retrieval + Adapters + SONA) for maximum accuracy\n");
         md.push_str("2. Use Retrieval Only mode for cost-sensitive deployments\n");
-        md.push_str(
-            "3. Monitor p95 latency under load - consider batching for high throughput\n",
-        );
+        md.push_str("3. Monitor p95 latency under load - consider batching for high throughput\n");
 
         md
     }

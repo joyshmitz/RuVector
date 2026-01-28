@@ -134,9 +134,7 @@ impl CompressedHeader {
 
     fn from_bytes(bytes: &[u8]) -> Result<(Self, usize)> {
         if bytes.len() < 15 {
-            return Err(DeltaError::DecompressionError(
-                "Header too small".into(),
-            ));
+            return Err(DeltaError::DecompressionError("Header too small".into()));
         }
 
         let magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
@@ -167,8 +165,8 @@ impl CompressedHeader {
                 ));
             }
             let cs = u64::from_le_bytes([
-                bytes[15], bytes[16], bytes[17], bytes[18],
-                bytes[19], bytes[20], bytes[21], bytes[22],
+                bytes[15], bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21],
+                bytes[22],
             ]);
             (Some(cs), 23)
         } else {
@@ -216,9 +214,7 @@ impl DeltaCompressor {
         let encoded = self.encoding.encode(delta)?;
 
         // Check if compression is worthwhile
-        if encoded.len() < self.config.min_size
-            || self.config.codec == CompressionCodec::None
-        {
+        if encoded.len() < self.config.min_size || self.config.codec == CompressionCodec::None {
             // Return uncompressed with header
             let header = CompressedHeader {
                 codec: CompressionCodec::None,

@@ -64,38 +64,34 @@
 //! bank.consolidate()?;
 //! ```
 
-pub mod trajectory;
-pub mod pattern_store;
-pub mod verdicts;
 pub mod consolidation;
 pub mod distillation;
+pub mod pattern_store;
+pub mod trajectory;
+pub mod verdicts;
 
 // Re-exports for convenience
-pub use trajectory::{
-    Trajectory, TrajectoryStep, TrajectoryRecorder, TrajectoryId,
-    TrajectoryMetadata, StepOutcome,
-};
-pub use pattern_store::{
-    PatternStore, Pattern, PatternCategory, PatternStoreConfig,
-    PatternSearchResult, PatternStats,
-};
-pub use verdicts::{
-    Verdict, RootCause, VerdictAnalyzer, VerdictAnalysis,
-    FailurePattern, RecoveryStrategy,
-};
 pub use consolidation::{
-    PatternConsolidator, ConsolidationConfig, ConsolidationResult,
-    FisherInformation, ImportanceScore,
+    ConsolidationConfig, ConsolidationResult, FisherInformation, ImportanceScore,
+    PatternConsolidator,
 };
 pub use distillation::{
-    MemoryDistiller, DistillationConfig, DistillationResult,
-    CompressedTrajectory, KeyLesson,
+    CompressedTrajectory, DistillationConfig, DistillationResult, KeyLesson, MemoryDistiller,
+};
+pub use pattern_store::{
+    Pattern, PatternCategory, PatternSearchResult, PatternStats, PatternStore, PatternStoreConfig,
+};
+pub use trajectory::{
+    StepOutcome, Trajectory, TrajectoryId, TrajectoryMetadata, TrajectoryRecorder, TrajectoryStep,
+};
+pub use verdicts::{
+    FailurePattern, RecoveryStrategy, RootCause, Verdict, VerdictAnalysis, VerdictAnalyzer,
 };
 
 use crate::error::Result;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 /// Configuration for the ReasoningBank
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -235,8 +231,7 @@ impl ReasoningBank {
 
             // Update rolling average quality
             let n = stats.total_trajectories as f32;
-            stats.avg_quality = stats.avg_quality * ((n - 1.0) / n)
-                + trajectory.quality / n;
+            stats.avg_quality = stats.avg_quality * ((n - 1.0) / n) + trajectory.quality / n;
         }
 
         // Store trajectory

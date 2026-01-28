@@ -48,46 +48,31 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-pub mod poincare_embedding;
-pub mod lorentz_model;
-pub mod hyperbolic_attention;
 pub mod curvature_adaptation;
+pub mod hyperbolic_attention;
+pub mod lorentz_model;
+pub mod poincare_embedding;
 
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::poincare_embedding::{
+        batch_poincare_distances, exponential_map, logarithmic_map, mobius_add, poincare_distance,
         PoincarePoint,
-        mobius_add,
-        poincare_distance,
-        exponential_map,
-        logarithmic_map,
-        batch_poincare_distances,
     };
 
     pub use crate::lorentz_model::{
+        lorentz_distance, lorentz_exp, lorentz_log, lorentz_to_poincare, poincare_to_lorentz,
         LorentzPoint,
-        lorentz_distance,
-        lorentz_exp,
-        lorentz_log,
-        poincare_to_lorentz,
-        lorentz_to_poincare,
     };
 
     pub use crate::hyperbolic_attention::{
-        HyperbolicAttentionConfig,
-        HyperbolicAttention,
-        MultiHeadHyperbolicAttention,
-        HyperbolicSelfAttentionLayer,
-        hyperbolic_weighted_sum,
-        hyperbolic_scalar_mul,
+        hyperbolic_scalar_mul, hyperbolic_weighted_sum, HyperbolicAttention,
+        HyperbolicAttentionConfig, HyperbolicSelfAttentionLayer, MultiHeadHyperbolicAttention,
     };
 
     pub use crate::curvature_adaptation::{
-        LearnableCurvature,
-        MultiCurvature,
-        CoupledCurvatureOptimizer,
-        CurvatureRegularization,
-        AdaptiveCurvatureSelector,
+        AdaptiveCurvatureSelector, CoupledCurvatureOptimizer, CurvatureRegularization,
+        LearnableCurvature, MultiCurvature,
     };
 }
 
@@ -233,10 +218,7 @@ mod integration_tests {
     fn test_transformer_block() {
         let block = HyperbolicTransformerBlock::new(4, 1, 1.0);
 
-        let inputs = vec![
-            vec![0.1, 0.1, 0.0, 0.0],
-            vec![0.2, 0.1, 0.1, 0.0],
-        ];
+        let inputs = vec![vec![0.1, 0.1, 0.0, 0.0], vec![0.2, 0.1, 0.1, 0.0]];
 
         let outputs = block.forward(&inputs);
 
@@ -247,10 +229,7 @@ mod integration_tests {
     fn test_hyperbolic_encoder() {
         let encoder = HyperbolicEncoder::new(2, 4, 1, 1.0);
 
-        let inputs = vec![
-            vec![0.1; 4],
-            vec![0.2; 4],
-        ];
+        let inputs = vec![vec![0.1; 4], vec![0.2; 4]];
 
         let encoded = encoder.encode(&inputs);
 

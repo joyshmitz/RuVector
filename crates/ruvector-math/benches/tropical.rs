@@ -2,7 +2,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rand::prelude::*;
-use ruvector_math::tropical::{TropicalMatrix, MinPlusMatrix};
+use ruvector_math::tropical::{MinPlusMatrix, TropicalMatrix};
 
 fn generate_tropical_matrix(n: usize, seed: u64) -> TropicalMatrix {
     let mut rng = StdRng::seed_from_u64(seed);
@@ -41,13 +41,9 @@ fn bench_tropical_matmul(c: &mut Criterion) {
         let a = generate_tropical_matrix(n, 42);
         let b = generate_tropical_matrix(n, 43);
 
-        group.bench_with_input(
-            BenchmarkId::new("size", n),
-            &(&a, &b),
-            |bench, (a, b)| {
-                bench.iter(|| a.mul(black_box(b)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("size", n), &(&a, &b), |bench, (a, b)| {
+            bench.iter(|| a.mul(black_box(b)));
+        });
     }
 
     group.finish();

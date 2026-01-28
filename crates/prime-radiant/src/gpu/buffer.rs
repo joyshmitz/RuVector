@@ -610,7 +610,12 @@ impl GpuBuffer {
     }
 
     /// Create a new storage buffer with initial data (for dispatch compatibility)
-    pub fn new_storage<T: Pod>(device: &Device, queue: &Queue, data: &[T], read_write: bool) -> GpuResult<Self> {
+    pub fn new_storage<T: Pod>(
+        device: &Device,
+        queue: &Queue,
+        data: &[T],
+        read_write: bool,
+    ) -> GpuResult<Self> {
         let usage = if read_write {
             BufferUsage::Residuals
         } else {
@@ -620,7 +625,11 @@ impl GpuBuffer {
     }
 
     /// Create a new uninitialized storage buffer
-    pub fn new_storage_uninit<T: Pod>(device: &Device, count: usize, read_write: bool) -> GpuResult<Self> {
+    pub fn new_storage_uninit<T: Pod>(
+        device: &Device,
+        count: usize,
+        read_write: bool,
+    ) -> GpuResult<Self> {
         let size = count * std::mem::size_of::<T>();
         let usage = if read_write {
             BufferUsage::Residuals
@@ -632,7 +641,13 @@ impl GpuBuffer {
 
     /// Create a new uniform buffer with data
     pub fn new_uniform<T: Pod>(device: &Device, queue: &Queue, data: &T) -> GpuResult<Self> {
-        Self::new_with_data(device, queue, std::slice::from_ref(data), BufferUsage::Uniforms, "uniform_buffer")
+        Self::new_with_data(
+            device,
+            queue,
+            std::slice::from_ref(data),
+            BufferUsage::Uniforms,
+            "uniform_buffer",
+        )
     }
 }
 

@@ -29,9 +29,9 @@
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
 
-use crate::error::{Result, RuvLLMError};
 use super::quantization::GgufQuantType;
 use super::tensors::TensorInfo;
+use crate::error::{Result, RuvLLMError};
 
 // ============================================================================
 // Header Structure
@@ -222,7 +222,10 @@ impl TryFrom<u32> for GgufValueType {
             10 => Ok(Self::U64),
             11 => Ok(Self::I64),
             12 => Ok(Self::F64),
-            _ => Err(RuvLLMError::Model(format!("Unknown GGUF value type: {}", value))),
+            _ => Err(RuvLLMError::Model(format!(
+                "Unknown GGUF value type: {}",
+                value
+            ))),
         }
     }
 }
@@ -460,9 +463,7 @@ fn read_string<R: Read>(reader: &mut R) -> Result<String> {
     let mut buf = vec![0u8; len];
     reader.read_exact(&mut buf).map_err(read_err)?;
 
-    String::from_utf8(buf).map_err(|e| {
-        RuvLLMError::Model(format!("Invalid UTF-8 string: {}", e))
-    })
+    String::from_utf8(buf).map_err(|e| RuvLLMError::Model(format!("Invalid UTF-8 string: {}", e)))
 }
 
 fn read_err(e: std::io::Error) -> RuvLLMError {

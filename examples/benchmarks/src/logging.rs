@@ -120,10 +120,7 @@ impl BenchmarkLogger {
             fs::create_dir_all(parent)?;
         }
 
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         Ok(Self {
             path,
@@ -410,7 +407,9 @@ mod tests {
         let mut logger = BenchmarkLogger::new(path.to_str().unwrap()).unwrap();
 
         logger
-            .log_temporal("bench-1", "puzzle-1", 5, true, true, 10, 2, 100, 3, true, false)
+            .log_temporal(
+                "bench-1", "puzzle-1", 5, true, true, 10, 2, 100, 3, true, false,
+            )
             .unwrap();
 
         logger.flush().unwrap();

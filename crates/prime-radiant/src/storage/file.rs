@@ -8,7 +8,7 @@
 //! All identifiers used in file paths are sanitized to prevent path traversal attacks.
 //! Only alphanumeric characters, dashes, underscores, and dots are allowed.
 
-use super::{GraphStorage, GovernanceStorage, StorageConfig, StorageError};
+use super::{GovernanceStorage, GraphStorage, StorageConfig, StorageError};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -105,13 +105,34 @@ pub struct WalEntry {
 /// WAL operation types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WalOperation {
-    StoreNode { node_id: String, state: Vec<f32> },
-    DeleteNode { node_id: String },
-    StoreEdge { source: String, target: String, weight: f32 },
-    DeleteEdge { source: String, target: String },
-    StorePolicy { policy_id: String, data: Vec<u8> },
-    StoreWitness { witness_id: String, data: Vec<u8> },
-    StoreLineage { lineage_id: String, data: Vec<u8> },
+    StoreNode {
+        node_id: String,
+        state: Vec<f32>,
+    },
+    DeleteNode {
+        node_id: String,
+    },
+    StoreEdge {
+        source: String,
+        target: String,
+        weight: f32,
+    },
+    DeleteEdge {
+        source: String,
+        target: String,
+    },
+    StorePolicy {
+        policy_id: String,
+        data: Vec<u8>,
+    },
+    StoreWitness {
+        witness_id: String,
+        data: Vec<u8>,
+    },
+    StoreLineage {
+        lineage_id: String,
+        data: Vec<u8>,
+    },
 }
 
 impl WalEntry {
@@ -168,7 +189,11 @@ impl FileStorage {
         Self::with_options(root, StorageFormat::Bincode, true)
     }
 
-    pub fn with_options(root: impl AsRef<Path>, format: StorageFormat, wal_enabled: bool) -> Result<Self, StorageError> {
+    pub fn with_options(
+        root: impl AsRef<Path>,
+        format: StorageFormat,
+        wal_enabled: bool,
+    ) -> Result<Self, StorageError> {
         let root = root.as_ref().to_path_buf();
         for dir in ["nodes", "edges", "policies", "witnesses", "lineages", "wal"] {
             fs::create_dir_all(root.join(dir))?;
@@ -203,7 +228,11 @@ impl FileStorage {
     }
 
     pub fn from_config(config: &StorageConfig) -> Result<Self, StorageError> {
-        Self::with_options(&config.graph_path, StorageFormat::Bincode, config.enable_wal)
+        Self::with_options(
+            &config.graph_path,
+            StorageFormat::Bincode,
+            config.enable_wal,
+        )
     }
 
     fn open_wal_file(&self) -> Result<(), StorageError> {
@@ -215,8 +244,14 @@ impl FileStorage {
     }
 
     fn write_wal(&self, operation: WalOperation) -> Result<u64, StorageError> {
-        if !self.wal_enabled { return Ok(0); }
-        let seq = { let mut g = self.wal_sequence.lock(); *g += 1; *g };
+        if !self.wal_enabled {
+            return Ok(0);
+        }
+        let seq = {
+            let mut g = self.wal_sequence.lock();
+            *g += 1;
+            *g
+        };
         let entry = WalEntry::new(seq, operation);
         let bytes = bincode::serde::encode_to_vec(&entry, bincode::config::standard())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -229,7 +264,9 @@ impl FileStorage {
     }
 
     fn commit_wal(&self, _seq: u64) -> Result<(), StorageError> {
-        if let Some(ref mut wal) = *self.wal_file.lock() { wal.flush()?; }
+        if let Some(ref mut wal) = *self.wal_file.lock() {
+            wal.flush()?;
+        }
         Ok(())
     }
 
@@ -242,17 +279,26 @@ impl FileStorage {
                 let mut reader = BufReader::new(File::open(&path)?);
                 loop {
                     let mut len_bytes = [0u8; 4];
-                    if reader.read_exact(&mut len_bytes).is_err() { break; }
+                    if reader.read_exact(&mut len_bytes).is_err() {
+                        break;
+                    }
                     let mut buf = vec![0u8; u32::from_le_bytes(len_bytes) as usize];
                     reader.read_exact(&mut buf)?;
-                    if let Ok((e, _)) = bincode::serde::decode_from_slice::<WalEntry, _>(&buf, bincode::config::standard()) {
-                        if e.verify() && !e.committed { entries.push(e); }
+                    if let Ok((e, _)) = bincode::serde::decode_from_slice::<WalEntry, _>(
+                        &buf,
+                        bincode::config::standard(),
+                    ) {
+                        if e.verify() && !e.committed {
+                            entries.push(e);
+                        }
                     }
                 }
             }
         }
         entries.sort_by_key(|e| e.sequence);
-        for e in entries { self.apply_wal_operation(&e.operation)?; }
+        for e in entries {
+            self.apply_wal_operation(&e.operation)?;
+        }
         Ok(())
     }
 
@@ -260,23 +306,39 @@ impl FileStorage {
         match op {
             WalOperation::StoreNode { node_id, state } => {
                 self.write_node_file(node_id, state)?;
-                self.node_cache.write().insert(node_id.clone(), state.clone());
+                self.node_cache
+                    .write()
+                    .insert(node_id.clone(), state.clone());
             }
             WalOperation::DeleteNode { node_id } => {
                 self.delete_node_file(node_id)?;
                 self.node_cache.write().remove(node_id);
             }
-            WalOperation::StoreEdge { source, target, weight } => {
+            WalOperation::StoreEdge {
+                source,
+                target,
+                weight,
+            } => {
                 self.write_edge_file(source, target, *weight)?;
-                self.edge_cache.write().insert((source.clone(), target.clone()), *weight);
+                self.edge_cache
+                    .write()
+                    .insert((source.clone(), target.clone()), *weight);
             }
             WalOperation::DeleteEdge { source, target } => {
                 self.delete_edge_file(source, target)?;
-                self.edge_cache.write().remove(&(source.clone(), target.clone()));
+                self.edge_cache
+                    .write()
+                    .remove(&(source.clone(), target.clone()));
             }
-            WalOperation::StorePolicy { policy_id, data } => { self.write_data_file("policies", policy_id, data)?; }
-            WalOperation::StoreWitness { witness_id, data } => { self.write_data_file("witnesses", witness_id, data)?; }
-            WalOperation::StoreLineage { lineage_id, data } => { self.write_data_file("lineages", lineage_id, data)?; }
+            WalOperation::StorePolicy { policy_id, data } => {
+                self.write_data_file("policies", policy_id, data)?;
+            }
+            WalOperation::StoreWitness { witness_id, data } => {
+                self.write_data_file("witnesses", witness_id, data)?;
+            }
+            WalOperation::StoreLineage { lineage_id, data } => {
+                self.write_data_file("lineages", lineage_id, data)?;
+            }
         }
         Ok(())
     }
@@ -301,10 +363,16 @@ impl FileStorage {
                     let parts: Vec<&str> = stem.splitn(2, '_').collect();
                     if parts.len() == 2 {
                         if let Ok(weight) = self.read_edge_file(parts[0], parts[1]) {
-                            self.edge_cache.write().insert((parts[0].to_string(), parts[1].to_string()), weight);
+                            self.edge_cache
+                                .write()
+                                .insert((parts[0].to_string(), parts[1].to_string()), weight);
                             let mut adj = self.adjacency_cache.write();
-                            adj.entry(parts[0].to_string()).or_default().insert(parts[1].to_string());
-                            adj.entry(parts[1].to_string()).or_default().insert(parts[0].to_string());
+                            adj.entry(parts[0].to_string())
+                                .or_default()
+                                .insert(parts[1].to_string());
+                            adj.entry(parts[1].to_string())
+                                .or_default()
+                                .insert(parts[0].to_string());
                         }
                     }
                 }
@@ -317,9 +385,11 @@ impl FileStorage {
         let path = self.node_path(node_id);
         let mut writer = BufWriter::new(File::create(&path)?);
         match self.format {
-            StorageFormat::Json => serde_json::to_writer(&mut writer, state).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            StorageFormat::Json => serde_json::to_writer(&mut writer, state)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?,
             StorageFormat::Bincode => {
-                let bytes = bincode::serde::encode_to_vec(state, bincode::config::standard()).map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let bytes = bincode::serde::encode_to_vec(state, bincode::config::standard())
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 writer.write_all(&bytes)?;
             }
         }
@@ -330,11 +400,14 @@ impl FileStorage {
     fn read_node_file(&self, node_id: &str) -> Result<Vec<f32>, StorageError> {
         let mut reader = BufReader::new(File::open(self.node_path(node_id))?);
         match self.format {
-            StorageFormat::Json => serde_json::from_reader(reader).map_err(|e| StorageError::Serialization(e.to_string())),
+            StorageFormat::Json => serde_json::from_reader(reader)
+                .map_err(|e| StorageError::Serialization(e.to_string())),
             StorageFormat::Bincode => {
                 let mut bytes = Vec::new();
                 reader.read_to_end(&mut bytes)?;
-                let (result, _) = bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let (result, _) =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(result)
             }
         }
@@ -342,13 +415,19 @@ impl FileStorage {
 
     fn delete_node_file(&self, node_id: &str) -> Result<(), StorageError> {
         let path = self.node_path(node_id);
-        if path.exists() { fs::remove_file(&path)?; }
+        if path.exists() {
+            fs::remove_file(&path)?;
+        }
         Ok(())
     }
 
     fn node_path(&self, node_id: &str) -> PathBuf {
         // Note: Caller must validate node_id first using validate_path_id()
-        let ext = if self.format == StorageFormat::Json { "json" } else { "bin" };
+        let ext = if self.format == StorageFormat::Json {
+            "json"
+        } else {
+            "bin"
+        };
         self.root.join("nodes").join(format!("{}.{}", node_id, ext))
     }
 
@@ -361,9 +440,11 @@ impl FileStorage {
     fn write_edge_file(&self, source: &str, target: &str, weight: f32) -> Result<(), StorageError> {
         let mut writer = BufWriter::new(File::create(self.edge_path(source, target))?);
         match self.format {
-            StorageFormat::Json => serde_json::to_writer(&mut writer, &weight).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            StorageFormat::Json => serde_json::to_writer(&mut writer, &weight)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?,
             StorageFormat::Bincode => {
-                let bytes = bincode::serde::encode_to_vec(&weight, bincode::config::standard()).map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let bytes = bincode::serde::encode_to_vec(&weight, bincode::config::standard())
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 writer.write_all(&bytes)?;
             }
         }
@@ -374,11 +455,14 @@ impl FileStorage {
     fn read_edge_file(&self, source: &str, target: &str) -> Result<f32, StorageError> {
         let mut reader = BufReader::new(File::open(self.edge_path(source, target))?);
         match self.format {
-            StorageFormat::Json => serde_json::from_reader(reader).map_err(|e| StorageError::Serialization(e.to_string())),
+            StorageFormat::Json => serde_json::from_reader(reader)
+                .map_err(|e| StorageError::Serialization(e.to_string())),
             StorageFormat::Bincode => {
                 let mut bytes = Vec::new();
                 reader.read_to_end(&mut bytes)?;
-                let (result, _) = bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let (result, _) =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(result)
             }
         }
@@ -386,14 +470,22 @@ impl FileStorage {
 
     fn delete_edge_file(&self, source: &str, target: &str) -> Result<(), StorageError> {
         let path = self.edge_path(source, target);
-        if path.exists() { fs::remove_file(&path)?; }
+        if path.exists() {
+            fs::remove_file(&path)?;
+        }
         Ok(())
     }
 
     fn edge_path(&self, source: &str, target: &str) -> PathBuf {
         // Note: Caller must validate source and target first using validate_path_id()
-        let ext = if self.format == StorageFormat::Json { "json" } else { "bin" };
-        self.root.join("edges").join(format!("{}_{}.{}", source, target, ext))
+        let ext = if self.format == StorageFormat::Json {
+            "json"
+        } else {
+            "bin"
+        };
+        self.root
+            .join("edges")
+            .join(format!("{}_{}.{}", source, target, ext))
     }
 
     /// Validate edge identifiers and return the safe path
@@ -426,8 +518,11 @@ impl FileStorage {
         let mut metadata = self.metadata.write();
         metadata.modified_at = chrono::Utc::now().timestamp_millis();
         metadata.last_wal_sequence = *self.wal_sequence.lock();
-        serde_json::to_writer_pretty(BufWriter::new(File::create(self.root.join("metadata.json"))?), &*metadata)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        serde_json::to_writer_pretty(
+            BufWriter::new(File::create(self.root.join("metadata.json"))?),
+            &*metadata,
+        )
+        .map_err(|e| StorageError::Serialization(e.to_string()))?;
         Ok(())
     }
 
@@ -439,7 +534,9 @@ impl FileStorage {
         Ok(())
     }
 
-    pub fn compact_wal(&self) -> Result<(), StorageError> { self.save_metadata() }
+    pub fn compact_wal(&self) -> Result<(), StorageError> {
+        self.save_metadata()
+    }
 
     #[must_use]
     pub fn stats(&self) -> StorageStats {
@@ -457,11 +554,15 @@ impl FileStorage {
     }
 
     fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-        if a.len() != b.len() || a.is_empty() { return 0.0; }
+        if a.len() != b.len() || a.is_empty() {
+            return 0.0;
+        }
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 { return 0.0; }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            return 0.0;
+        }
         dot / (norm_a * norm_b)
     }
 }
@@ -479,17 +580,27 @@ pub struct StorageStats {
 }
 
 impl Drop for FileStorage {
-    fn drop(&mut self) { let _ = self.sync(); }
+    fn drop(&mut self) {
+        let _ = self.sync();
+    }
 }
 
 impl GraphStorage for FileStorage {
     fn store_node(&self, node_id: &str, state: &[f32]) -> Result<(), StorageError> {
         // Validate node_id to prevent path traversal
         validate_path_id(node_id)?;
-        let seq = self.write_wal(WalOperation::StoreNode { node_id: node_id.to_string(), state: state.to_vec() })?;
+        let seq = self.write_wal(WalOperation::StoreNode {
+            node_id: node_id.to_string(),
+            state: state.to_vec(),
+        })?;
         self.write_node_file(node_id, state)?;
-        self.node_cache.write().insert(node_id.to_string(), state.to_vec());
-        { let mut m = self.metadata.write(); m.node_count = self.node_cache.read().len() as u64; }
+        self.node_cache
+            .write()
+            .insert(node_id.to_string(), state.to_vec());
+        {
+            let mut m = self.metadata.write();
+            m.node_count = self.node_cache.read().len() as u64;
+        }
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
         Ok(())
@@ -498,9 +609,16 @@ impl GraphStorage for FileStorage {
     fn get_node(&self, node_id: &str) -> Result<Option<Vec<f32>>, StorageError> {
         // Validate node_id to prevent path traversal
         validate_path_id(node_id)?;
-        if let Some(state) = self.node_cache.read().get(node_id) { return Ok(Some(state.clone())); }
+        if let Some(state) = self.node_cache.read().get(node_id) {
+            return Ok(Some(state.clone()));
+        }
         match self.read_node_file(node_id) {
-            Ok(state) => { self.node_cache.write().insert(node_id.to_string(), state.clone()); Ok(Some(state)) }
+            Ok(state) => {
+                self.node_cache
+                    .write()
+                    .insert(node_id.to_string(), state.clone());
+                Ok(Some(state))
+            }
             Err(StorageError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
         }
@@ -510,11 +628,28 @@ impl GraphStorage for FileStorage {
         // Validate identifiers to prevent path traversal
         validate_path_id(source)?;
         validate_path_id(target)?;
-        let seq = self.write_wal(WalOperation::StoreEdge { source: source.to_string(), target: target.to_string(), weight })?;
+        let seq = self.write_wal(WalOperation::StoreEdge {
+            source: source.to_string(),
+            target: target.to_string(),
+            weight,
+        })?;
         self.write_edge_file(source, target, weight)?;
-        self.edge_cache.write().insert((source.to_string(), target.to_string()), weight);
-        { let mut adj = self.adjacency_cache.write(); adj.entry(source.to_string()).or_default().insert(target.to_string()); adj.entry(target.to_string()).or_default().insert(source.to_string()); }
-        { let mut m = self.metadata.write(); m.edge_count = self.edge_cache.read().len() as u64; }
+        self.edge_cache
+            .write()
+            .insert((source.to_string(), target.to_string()), weight);
+        {
+            let mut adj = self.adjacency_cache.write();
+            adj.entry(source.to_string())
+                .or_default()
+                .insert(target.to_string());
+            adj.entry(target.to_string())
+                .or_default()
+                .insert(source.to_string());
+        }
+        {
+            let mut m = self.metadata.write();
+            m.edge_count = self.edge_cache.read().len() as u64;
+        }
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
         Ok(())
@@ -524,20 +659,41 @@ impl GraphStorage for FileStorage {
         // Validate identifiers to prevent path traversal
         validate_path_id(source)?;
         validate_path_id(target)?;
-        let seq = self.write_wal(WalOperation::DeleteEdge { source: source.to_string(), target: target.to_string() })?;
+        let seq = self.write_wal(WalOperation::DeleteEdge {
+            source: source.to_string(),
+            target: target.to_string(),
+        })?;
         self.delete_edge_file(source, target)?;
-        self.edge_cache.write().remove(&(source.to_string(), target.to_string()));
-        { let mut adj = self.adjacency_cache.write(); if let Some(n) = adj.get_mut(source) { n.remove(target); } if let Some(n) = adj.get_mut(target) { n.remove(source); } }
-        { let mut m = self.metadata.write(); m.edge_count = self.edge_cache.read().len() as u64; }
+        self.edge_cache
+            .write()
+            .remove(&(source.to_string(), target.to_string()));
+        {
+            let mut adj = self.adjacency_cache.write();
+            if let Some(n) = adj.get_mut(source) {
+                n.remove(target);
+            }
+            if let Some(n) = adj.get_mut(target) {
+                n.remove(source);
+            }
+        }
+        {
+            let mut m = self.metadata.write();
+            m.edge_count = self.edge_cache.read().len() as u64;
+        }
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
         Ok(())
     }
 
     fn find_similar(&self, query: &[f32], k: usize) -> Result<Vec<(String, f32)>, StorageError> {
-        if query.is_empty() { return Ok(Vec::new()); }
+        if query.is_empty() {
+            return Ok(Vec::new());
+        }
         let nodes = self.node_cache.read();
-        let mut sims: Vec<_> = nodes.iter().map(|(id, s)| (id.clone(), Self::cosine_similarity(query, s))).collect();
+        let mut sims: Vec<_> = nodes
+            .iter()
+            .map(|(id, s)| (id.clone(), Self::cosine_similarity(query, s)))
+            .collect();
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         sims.truncate(k);
         Ok(sims)
@@ -547,7 +703,10 @@ impl GraphStorage for FileStorage {
 impl GovernanceStorage for FileStorage {
     fn store_policy(&self, bundle: &[u8]) -> Result<String, StorageError> {
         let id = Uuid::new_v4().to_string();
-        let seq = self.write_wal(WalOperation::StorePolicy { policy_id: id.clone(), data: bundle.to_vec() })?;
+        let seq = self.write_wal(WalOperation::StorePolicy {
+            policy_id: id.clone(),
+            data: bundle.to_vec(),
+        })?;
         self.write_data_file("policies", &id, bundle)?;
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
@@ -564,7 +723,10 @@ impl GovernanceStorage for FileStorage {
 
     fn store_witness(&self, witness: &[u8]) -> Result<String, StorageError> {
         let id = Uuid::new_v4().to_string();
-        let seq = self.write_wal(WalOperation::StoreWitness { witness_id: id.clone(), data: witness.to_vec() })?;
+        let seq = self.write_wal(WalOperation::StoreWitness {
+            witness_id: id.clone(),
+            data: witness.to_vec(),
+        })?;
         self.write_data_file("witnesses", &id, witness)?;
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
@@ -579,7 +741,10 @@ impl GovernanceStorage for FileStorage {
                 let path = entry?.path();
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     if let Ok(data) = self.read_data_file("witnesses", stem) {
-                        if data.windows(action_id.len()).any(|w| w == action_id.as_bytes()) {
+                        if data
+                            .windows(action_id.len())
+                            .any(|w| w == action_id.as_bytes())
+                        {
                             results.push(data);
                         }
                     }
@@ -591,7 +756,10 @@ impl GovernanceStorage for FileStorage {
 
     fn store_lineage(&self, lineage: &[u8]) -> Result<String, StorageError> {
         let id = Uuid::new_v4().to_string();
-        let seq = self.write_wal(WalOperation::StoreLineage { lineage_id: id.clone(), data: lineage.to_vec() })?;
+        let seq = self.write_wal(WalOperation::StoreLineage {
+            lineage_id: id.clone(),
+            data: lineage.to_vec(),
+        })?;
         self.write_data_file("lineages", &id, lineage)?;
         self.commit_wal(seq)?;
         *self.cache_dirty.write() = true;
@@ -626,7 +794,8 @@ mod tests {
     #[test]
     fn test_storage_format_json() {
         let temp_dir = TempDir::new().unwrap();
-        let storage = FileStorage::with_options(temp_dir.path(), StorageFormat::Json, false).unwrap();
+        let storage =
+            FileStorage::with_options(temp_dir.path(), StorageFormat::Json, false).unwrap();
         storage.store_node("json-node", &[1.0, 2.0]).unwrap();
         let state = storage.get_node("json-node").unwrap();
         assert_eq!(state.unwrap(), vec![1.0, 2.0]);

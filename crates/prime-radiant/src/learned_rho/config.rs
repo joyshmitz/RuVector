@@ -130,7 +130,13 @@ impl Activation {
     pub fn apply(&self, x: f32) -> f32 {
         match self {
             Self::ReLU => x.max(0.0),
-            Self::LeakyReLU => if x > 0.0 { x } else { 0.01 * x },
+            Self::LeakyReLU => {
+                if x > 0.0 {
+                    x
+                } else {
+                    0.01 * x
+                }
+            }
             Self::GELU => {
                 // Approximation: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
                 0.5 * x * (1.0 + ((0.7978845608 * (x + 0.044715 * x.powi(3))).tanh()))
@@ -144,12 +150,25 @@ impl Activation {
     /// Apply the derivative of the activation function.
     pub fn derivative(&self, x: f32) -> f32 {
         match self {
-            Self::ReLU => if x > 0.0 { 1.0 } else { 0.0 },
-            Self::LeakyReLU => if x > 0.0 { 1.0 } else { 0.01 },
+            Self::ReLU => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::LeakyReLU => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.01
+                }
+            }
             Self::GELU => {
                 // Approximation of GELU derivative
                 let t = (0.7978845608 * (x + 0.044715 * x.powi(3))).tanh();
-                0.5 * (1.0 + t) + 0.5 * x * (1.0 - t * t) * 0.7978845608 * (1.0 + 3.0 * 0.044715 * x * x)
+                0.5 * (1.0 + t)
+                    + 0.5 * x * (1.0 - t * t) * 0.7978845608 * (1.0 + 3.0 * 0.044715 * x * x)
             }
             Self::Tanh => 1.0 - x.tanh().powi(2),
             Self::Sigmoid => {
@@ -303,7 +322,9 @@ impl SchedulerConfig {
             SchedulerType::CosineAnnealing { t_max, eta_min } => {
                 let t = (step % t_max) as f32;
                 let t_max = *t_max as f32;
-                *eta_min + (self.initial_lr - eta_min) * (1.0 + (std::f32::consts::PI * t / t_max).cos()) / 2.0
+                *eta_min
+                    + (self.initial_lr - eta_min) * (1.0 + (std::f32::consts::PI * t / t_max).cos())
+                        / 2.0
             }
         }
     }

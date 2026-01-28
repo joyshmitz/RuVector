@@ -196,7 +196,11 @@ impl std::fmt::Display for MetricsSummary {
         writeln!(f, "  Avg query time: {:.2} us", self.avg_query_time_us)?;
         writeln!(f, "  Max isolation size: {}", self.max_isolation_size)?;
         writeln!(f, "  Updates per build: {:.2}", self.updates_per_build)?;
-        writeln!(f, "  Isolation efficiency: {:.4}", self.isolation_efficiency)
+        writeln!(
+            f,
+            "  Isolation efficiency: {:.4}",
+            self.isolation_efficiency
+        )
     }
 }
 

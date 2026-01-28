@@ -229,6 +229,9 @@ mod tests {
 
         // Large delta -> FullReconnect
         let large = VectorDelta::from_dense(vec![10.0, 10.0, 10.0]);
-        assert_eq!(select_strategy(&large, &config), UpdateStrategy::FullReconnect);
+        assert_eq!(
+            select_strategy(&large, &config),
+            UpdateStrategy::FullReconnect
+        );
     }
 }

@@ -117,7 +117,10 @@ impl SpectralClustering {
         let fiedler = self.compute_fiedler(laplacian);
 
         // Partition by sign
-        let assignments: Vec<usize> = fiedler.iter().map(|&v| if v >= 0.0 { 0 } else { 1 }).collect();
+        let assignments: Vec<usize> = fiedler
+            .iter()
+            .map(|&v| if v >= 0.0 { 0 } else { 1 })
+            .collect();
 
         ClusteringResult {
             assignments,
@@ -138,7 +141,8 @@ impl SpectralClustering {
             .map(|i| {
                 (0..n)
                     .map(|j| {
-                        let x = ((j * 2654435769 + i * 1103515245 + self.config.seed as usize) as f64
+                        let x = ((j * 2654435769 + i * 1103515245 + self.config.seed as usize)
+                            as f64
                             / 4294967296.0)
                             * 2.0
                             - 1.0;

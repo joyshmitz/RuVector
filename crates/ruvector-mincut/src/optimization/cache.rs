@@ -103,7 +103,10 @@ impl CacheKey {
         if source <= target {
             Self { source, target }
         } else {
-            Self { source: target, target: source }
+            Self {
+                source: target,
+                target: source,
+            }
         }
     }
 }
@@ -270,7 +273,8 @@ impl PathDistanceCache {
         let mut cache = self.cache.write().unwrap();
         let mut lru = self.lru_order.write().unwrap();
 
-        let keys_to_remove: Vec<CacheKey> = cache.keys()
+        let keys_to_remove: Vec<CacheKey> = cache
+            .keys()
             .filter(|k| k.source == vertex || k.target == vertex)
             .copied()
             .collect();
@@ -356,7 +360,8 @@ impl PathDistanceCache {
         }
 
         // Generate hints for hot sources
-        source_freq.into_iter()
+        source_freq
+            .into_iter()
             .filter(|(_, targets)| targets.len() > 2)
             .map(|(source, targets)| {
                 let confidence = (targets.len() as f64 / history.len() as f64).min(1.0);
@@ -372,9 +377,7 @@ impl PathDistanceCache {
     /// Get predicted queries for prefetching
     pub fn get_predicted_queries(&self) -> Vec<(VertexId, VertexId)> {
         let pred = self.predicted_queries.read().unwrap();
-        pred.iter()
-            .map(|key| (key.source, key.target))
-            .collect()
+        pred.iter().map(|key| (key.source, key.target)).collect()
     }
 
     /// Get cache statistics
@@ -451,11 +454,7 @@ mod tests {
     fn test_batch_insert() {
         let cache = PathDistanceCache::new();
 
-        let entries = vec![
-            (1, 2, 1.0),
-            (2, 3, 2.0),
-            (3, 4, 3.0),
-        ];
+        let entries = vec![(1, 2, 1.0), (2, 3, 2.0), (3, 4, 3.0)];
 
         cache.insert_batch(&entries);
 

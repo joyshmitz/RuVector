@@ -30,6 +30,12 @@ fn debug_exp_log() {
     println!("Original y: {:?}", y);
 
     for (i, (orig, recon)) in y.iter().zip(&y_reconstructed).enumerate() {
-        println!("  y[{}]: {} vs {} (diff: {})", i, orig, recon, (orig - recon).abs());
+        println!(
+            "  y[{}]: {} vs {} (diff: {})",
+            i,
+            orig,
+            recon,
+            (orig - recon).abs()
+        );
     }
 }

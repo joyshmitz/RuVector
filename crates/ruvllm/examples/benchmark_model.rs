@@ -170,7 +170,10 @@ impl BenchmarkResults {
         results: Vec<GenerationResult>,
     ) -> Self {
         let throughputs: Vec<f64> = results.iter().map(|r| r.tokens_per_second()).collect();
-        let ttfts: Vec<f64> = results.iter().map(|r| r.time_to_first_token.as_secs_f64() * 1000.0).collect();
+        let ttfts: Vec<f64> = results
+            .iter()
+            .map(|r| r.time_to_first_token.as_secs_f64() * 1000.0)
+            .collect();
 
         // Collect all token latencies
         let mut all_latencies: Vec<f64> = results
@@ -190,7 +193,10 @@ impl BenchmarkResults {
             throughput_median: median(&throughputs),
             throughput_std: std_dev(&throughputs),
             throughput_min: throughputs.iter().cloned().fold(f64::INFINITY, f64::min),
-            throughput_max: throughputs.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+            throughput_max: throughputs
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max),
 
             ttft_mean: mean(&ttfts),
             ttft_median: median(&ttfts),
@@ -269,7 +275,9 @@ impl BenchmarkResults {
             self.latency_p50,
             self.latency_p95,
             self.latency_p99,
-            self.peak_memory_bytes.map(|m| m.to_string()).unwrap_or_else(|| "null".to_string()),
+            self.peak_memory_bytes
+                .map(|m| m.to_string())
+                .unwrap_or_else(|| "null".to_string()),
         );
         println!("{}", json);
     }
@@ -280,7 +288,10 @@ fn main() {
 
     // Validate model path
     if !config.model_path.exists() {
-        eprintln!("Error: Model file not found: {}", config.model_path.display());
+        eprintln!(
+            "Error: Model file not found: {}",
+            config.model_path.display()
+        );
         eprintln!();
         eprintln!("Download a test model with:");
         eprintln!("  cargo run -p ruvllm --example download_test_model -- --model tinyllama");
@@ -430,8 +441,11 @@ fn run_benchmark(config: &BenchmarkConfig, model_size: u64) -> BenchmarkResults 
 }
 
 #[cfg(feature = "candle")]
-fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<BenchmarkResults, String> {
-    use ruvllm::{CandleBackend, LlmBackend, GenerateParams, ModelConfig};
+fn run_real_benchmark(
+    config: &BenchmarkConfig,
+    model_size: u64,
+) -> Result<BenchmarkResults, String> {
+    use ruvllm::{CandleBackend, GenerateParams, LlmBackend, ModelConfig};
     use std::time::Instant;
 
     if !config.json_output {
@@ -439,10 +453,12 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
     }
 
     // Create backend and load model
-    let mut backend = CandleBackend::new().map_err(|e| format!("Failed to create backend: {}", e))?;
+    let mut backend =
+        CandleBackend::new().map_err(|e| format!("Failed to create backend: {}", e))?;
 
     let model_config = ModelConfig::default();
-    backend.load_gguf(&config.model_path, &model_config)
+    backend
+        .load_gguf(&config.model_path, &model_config)
         .map_err(|e| format!("Failed to load GGUF model: {}", e))?;
 
     // Load tokenizer from same directory as model
@@ -452,10 +468,14 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
             if !config.json_output {
                 println!("Loading tokenizer from: {:?}", tokenizer_path);
             }
-            backend.load_tokenizer(&tokenizer_path)
+            backend
+                .load_tokenizer(&tokenizer_path)
                 .map_err(|e| format!("Failed to load tokenizer: {}", e))?;
         } else {
-            return Err(format!("Tokenizer not found at {:?}. Download it from HuggingFace.", tokenizer_path));
+            return Err(format!(
+                "Tokenizer not found at {:?}. Download it from HuggingFace.",
+                tokenizer_path
+            ));
         }
     }
 
@@ -484,7 +504,10 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
 
     // Warmup phase
     if !config.json_output {
-        println!("Running warmup ({} iterations)...", config.warmup_iterations);
+        println!(
+            "Running warmup ({} iterations)...",
+            config.warmup_iterations
+        );
     }
 
     for i in 0..config.warmup_iterations {
@@ -501,7 +524,10 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
                     tokens_generated,
                     total_duration,
                     time_to_first_token: first_token_time.elapsed(),
-                    token_latencies: vec![total_duration / tokens_generated as u32; tokens_generated],
+                    token_latencies: vec![
+                        total_duration / tokens_generated as u32;
+                        tokens_generated
+                    ],
                 };
 
                 if !config.json_output {
@@ -515,7 +541,12 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
             }
             Err(e) => {
                 if !config.json_output {
-                    println!("  Warmup {}/{}: Error - {}", i + 1, config.warmup_iterations, e);
+                    println!(
+                        "  Warmup {}/{}: Error - {}",
+                        i + 1,
+                        config.warmup_iterations,
+                        e
+                    );
                 }
             }
         }
@@ -524,7 +555,10 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
     // Benchmark phase
     if !config.json_output {
         println!();
-        println!("Running benchmark ({} iterations)...", config.benchmark_iterations);
+        println!(
+            "Running benchmark ({} iterations)...",
+            config.benchmark_iterations
+        );
     }
 
     for i in 0..config.benchmark_iterations {
@@ -541,7 +575,10 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
                     tokens_generated,
                     total_duration,
                     time_to_first_token: first_token_time.elapsed(),
-                    token_latencies: vec![total_duration / tokens_generated as u32; tokens_generated],
+                    token_latencies: vec![
+                        total_duration / tokens_generated as u32;
+                        tokens_generated
+                    ],
                 };
 
                 if !config.json_output && (config.verbose || i % 5 == 0) {
@@ -557,7 +594,12 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
             }
             Err(e) => {
                 if !config.json_output {
-                    println!("  Iteration {}/{}: Error - {}", i + 1, config.benchmark_iterations, e);
+                    println!(
+                        "  Iteration {}/{}: Error - {}",
+                        i + 1,
+                        config.benchmark_iterations,
+                        e
+                    );
                 }
             }
         }
@@ -579,7 +621,11 @@ fn run_real_benchmark(config: &BenchmarkConfig, model_size: u64) -> Result<Bench
         }
     }
 
-    Ok(BenchmarkResults::from_results(config, model_size, all_results))
+    Ok(BenchmarkResults::from_results(
+        config,
+        model_size,
+        all_results,
+    ))
 }
 
 fn run_simulated_benchmark(config: &BenchmarkConfig, model_size: u64) -> BenchmarkResults {
@@ -592,7 +638,10 @@ fn run_simulated_benchmark(config: &BenchmarkConfig, model_size: u64) -> Benchma
 
     // Warmup phase
     if !config.json_output {
-        println!("Running warmup ({} iterations)...", config.warmup_iterations);
+        println!(
+            "Running warmup ({} iterations)...",
+            config.warmup_iterations
+        );
     }
 
     for i in 0..config.warmup_iterations {
@@ -610,7 +659,10 @@ fn run_simulated_benchmark(config: &BenchmarkConfig, model_size: u64) -> Benchma
     // Benchmark phase
     if !config.json_output {
         println!();
-        println!("Running benchmark ({} iterations)...", config.benchmark_iterations);
+        println!(
+            "Running benchmark ({} iterations)...",
+            config.benchmark_iterations
+        );
     }
 
     for i in 0..config.benchmark_iterations {

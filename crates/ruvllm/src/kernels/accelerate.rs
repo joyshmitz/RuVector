@@ -230,14 +230,40 @@ pub fn gemv_accelerate(
     n: usize,
     layout: MatrixLayout,
 ) {
-    debug_assert_eq!(a.len(), m * n, "Matrix A size mismatch: expected {}, got {}", m * n, a.len());
-    debug_assert_eq!(x.len(), n, "Vector x size mismatch: expected {}, got {}", n, x.len());
-    debug_assert_eq!(y.len(), m, "Vector y size mismatch: expected {}, got {}", m, y.len());
+    debug_assert_eq!(
+        a.len(),
+        m * n,
+        "Matrix A size mismatch: expected {}, got {}",
+        m * n,
+        a.len()
+    );
+    debug_assert_eq!(
+        x.len(),
+        n,
+        "Vector x size mismatch: expected {}, got {}",
+        n,
+        x.len()
+    );
+    debug_assert_eq!(
+        y.len(),
+        m,
+        "Vector y size mismatch: expected {}, got {}",
+        m,
+        y.len()
+    );
 
     // SECURITY FIX (H-005): Bounds check before i32 cast to prevent overflow
     // BLAS uses i32 for dimensions, so we must ensure values fit
-    assert!(m <= i32::MAX as usize, "Matrix dimension m={} exceeds i32::MAX for BLAS", m);
-    assert!(n <= i32::MAX as usize, "Matrix dimension n={} exceeds i32::MAX for BLAS", n);
+    assert!(
+        m <= i32::MAX as usize,
+        "Matrix dimension m={} exceeds i32::MAX for BLAS",
+        m
+    );
+    assert!(
+        n <= i32::MAX as usize,
+        "Matrix dimension n={} exceeds i32::MAX for BLAS",
+        n
+    );
 
     unsafe {
         gemv_accelerate_unchecked(a, x, y, m, n, layout);
@@ -277,14 +303,14 @@ pub unsafe fn gemv_accelerate_unchecked(
         trans,
         m as i32,
         n as i32,
-        1.0,             // alpha = 1
+        1.0, // alpha = 1
         a.as_ptr(),
         lda,
         x.as_ptr(),
-        1,               // incx = 1
-        0.0,             // beta = 0 (overwrite y)
+        1,   // incx = 1
+        0.0, // beta = 0 (overwrite y)
         y.as_mut_ptr(),
-        1,               // incy = 1
+        1, // incy = 1
     );
 }
 
@@ -313,8 +339,16 @@ pub fn gemv_transpose_accelerate(
     debug_assert_eq!(y.len(), n); // Note: y length is n for transpose
 
     // SECURITY FIX (H-005): Bounds check before i32 cast to prevent overflow
-    assert!(m <= i32::MAX as usize, "Matrix dimension m={} exceeds i32::MAX for BLAS", m);
-    assert!(n <= i32::MAX as usize, "Matrix dimension n={} exceeds i32::MAX for BLAS", n);
+    assert!(
+        m <= i32::MAX as usize,
+        "Matrix dimension m={} exceeds i32::MAX for BLAS",
+        m
+    );
+    assert!(
+        n <= i32::MAX as usize,
+        "Matrix dimension n={} exceeds i32::MAX for BLAS",
+        n
+    );
 
     unsafe {
         let order = CblasOrder::from(layout) as i32;
@@ -373,8 +407,16 @@ pub fn gemv_scaled_accelerate(
     debug_assert_eq!(y.len(), m);
 
     // SECURITY FIX (H-005): Bounds check before i32 cast to prevent overflow
-    assert!(m <= i32::MAX as usize, "Matrix dimension m={} exceeds i32::MAX for BLAS", m);
-    assert!(n <= i32::MAX as usize, "Matrix dimension n={} exceeds i32::MAX for BLAS", n);
+    assert!(
+        m <= i32::MAX as usize,
+        "Matrix dimension m={} exceeds i32::MAX for BLAS",
+        m
+    );
+    assert!(
+        n <= i32::MAX as usize,
+        "Matrix dimension n={} exceeds i32::MAX for BLAS",
+        n
+    );
 
     unsafe {
         let order = CblasOrder::from(layout) as i32;
@@ -418,22 +460,27 @@ pub fn gemv_scaled_accelerate(
 /// * `k` - Number of columns in A, rows in B
 /// * `n` - Number of columns in B and C
 #[cfg(all(target_os = "macos", feature = "accelerate"))]
-pub fn gemm_accelerate(
-    a: &[f32],
-    b: &[f32],
-    c: &mut [f32],
-    m: usize,
-    k: usize,
-    n: usize,
-) {
+pub fn gemm_accelerate(a: &[f32], b: &[f32], c: &mut [f32], m: usize, k: usize, n: usize) {
     debug_assert_eq!(a.len(), m * k);
     debug_assert_eq!(b.len(), k * n);
     debug_assert_eq!(c.len(), m * n);
 
     // SECURITY FIX (H-005): Bounds check before i32 cast to prevent overflow
-    assert!(m <= i32::MAX as usize, "Matrix dimension m={} exceeds i32::MAX for BLAS", m);
-    assert!(k <= i32::MAX as usize, "Matrix dimension k={} exceeds i32::MAX for BLAS", k);
-    assert!(n <= i32::MAX as usize, "Matrix dimension n={} exceeds i32::MAX for BLAS", n);
+    assert!(
+        m <= i32::MAX as usize,
+        "Matrix dimension m={} exceeds i32::MAX for BLAS",
+        m
+    );
+    assert!(
+        k <= i32::MAX as usize,
+        "Matrix dimension k={} exceeds i32::MAX for BLAS",
+        k
+    );
+    assert!(
+        n <= i32::MAX as usize,
+        "Matrix dimension n={} exceeds i32::MAX for BLAS",
+        n
+    );
 
     unsafe {
         cblas_sgemm(
@@ -443,14 +490,14 @@ pub fn gemm_accelerate(
             m as i32,
             n as i32,
             k as i32,
-            1.0,             // alpha
+            1.0, // alpha
             a.as_ptr(),
-            k as i32,        // lda
+            k as i32, // lda
             b.as_ptr(),
-            n as i32,        // ldb
-            0.0,             // beta
+            n as i32, // ldb
+            0.0,      // beta
             c.as_mut_ptr(),
-            n as i32,        // ldc
+            n as i32, // ldc
         );
     }
 }
@@ -543,14 +590,7 @@ pub fn gemv_scaled_accelerate(
 }
 
 #[cfg(not(all(target_os = "macos", feature = "accelerate")))]
-pub fn gemm_accelerate(
-    _a: &[f32],
-    _b: &[f32],
-    _c: &mut [f32],
-    _m: usize,
-    _k: usize,
-    _n: usize,
-) {
+pub fn gemm_accelerate(_a: &[f32], _b: &[f32], _c: &mut [f32], _m: usize, _k: usize, _n: usize) {
     panic!("Accelerate framework is only available on macOS with 'accelerate' feature enabled");
 }
 

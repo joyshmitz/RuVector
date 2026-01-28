@@ -131,7 +131,11 @@ impl ScopeEnergy {
 
         let (max_edge_energy, hotspot_edge) = edge_energies
             .iter()
-            .max_by(|a, b| a.energy.partial_cmp(&b.energy).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.energy
+                    .partial_cmp(&b.energy)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|e| (e.energy, Some(e.edge_id.clone())))
             .unwrap_or((0.0, None));
 
@@ -289,7 +293,11 @@ impl CoherenceEnergy {
     /// Identify the top-k hotspots (highest energy edges)
     pub fn hotspots(&self, k: usize) -> Vec<HotspotInfo> {
         let mut sorted: Vec<_> = self.edge_energies.values().collect();
-        sorted.sort_by(|a, b| b.energy.partial_cmp(&a.energy).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.energy
+                .partial_cmp(&a.energy)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         sorted
             .into_iter()
@@ -347,8 +355,8 @@ impl CoherenceEnergy {
         let mean = self.average_edge_energy();
 
         // Compute standard deviation
-        let variance: f32 = energies.iter().map(|e| (e - mean).powi(2)).sum::<f32>()
-            / energies.len() as f32;
+        let variance: f32 =
+            energies.iter().map(|e| (e - mean).powi(2)).sum::<f32>() / energies.len() as f32;
         let std_dev = variance.sqrt();
 
         // Compute median
@@ -385,10 +393,7 @@ impl CoherenceEnergy {
                 .cloned()
                 .unwrap_or_else(|| "default".to_string());
 
-            scope_groups
-                .entry(scope_id)
-                .or_default()
-                .push(edge_energy);
+            scope_groups.entry(scope_id).or_default().push(edge_energy);
         }
 
         // Create scope energies
@@ -538,13 +543,21 @@ pub fn compute_residual(projected_source: &[f32], projected_target: &[f32]) -> V
 
 /// Compute residual into pre-allocated buffer (zero allocation)
 #[inline]
-pub fn compute_residual_into(projected_source: &[f32], projected_target: &[f32], result: &mut [f32]) {
+pub fn compute_residual_into(
+    projected_source: &[f32],
+    projected_target: &[f32],
+    result: &mut [f32],
+) {
     debug_assert_eq!(
         projected_source.len(),
         projected_target.len(),
         "Projected vectors must have same dimension"
     );
-    debug_assert_eq!(result.len(), projected_source.len(), "Result buffer size mismatch");
+    debug_assert_eq!(
+        result.len(),
+        projected_source.len(),
+        "Result buffer size mismatch"
+    );
 
     // Unrolled loop for better vectorization
     let len = projected_source.len();

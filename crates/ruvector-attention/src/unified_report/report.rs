@@ -1,9 +1,9 @@
 //! Unified Geometry Report Builder
 
 use super::metrics::{MetricType, MetricValue};
-use crate::topology::WindowCoherence;
 use crate::info_bottleneck::KLDivergence;
 use crate::pde_attention::GraphLaplacian;
+use crate::topology::WindowCoherence;
 use serde::{Deserialize, Serialize};
 
 /// Report configuration
@@ -133,12 +133,33 @@ impl ReportBuilder {
             MetricValue::new(MetricType::OTDistance, ot_mean, 0.0, 10.0, 5.0, 8.0),
             MetricValue::new(MetricType::TopologyCoherence, coherence, 0.0, 1.0, 0.3, 0.1),
             MetricValue::new(MetricType::IBKL, ib_kl, 0.0, 100.0, 50.0, 80.0),
-            MetricValue::new(MetricType::DiffusionEnergy, diffusion_energy, 0.0, 100.0, 50.0, 80.0),
-            MetricValue::new(MetricType::AttentionEntropy, entropy, 0.0, (n as f32).ln().max(1.0), 0.5, 0.2),
+            MetricValue::new(
+                MetricType::DiffusionEnergy,
+                diffusion_energy,
+                0.0,
+                100.0,
+                50.0,
+                80.0,
+            ),
+            MetricValue::new(
+                MetricType::AttentionEntropy,
+                entropy,
+                0.0,
+                (n as f32).ln().max(1.0),
+                0.5,
+                0.2,
+            ),
         ];
 
         if let Some(h0) = h0_sum {
-            metrics.push(MetricValue::new(MetricType::H0Persistence, h0, 0.0, 100.0, 50.0, 80.0));
+            metrics.push(MetricValue::new(
+                MetricType::H0Persistence,
+                h0,
+                0.0,
+                100.0,
+                50.0,
+                80.0,
+            ));
         }
 
         // Compute health score
@@ -175,9 +196,7 @@ impl ReportBuilder {
             .collect();
 
         // Project query
-        let q_projs: Vec<f32> = projections.iter()
-            .map(|p| Self::dot(query, p))
-            .collect();
+        let q_projs: Vec<f32> = projections.iter().map(|p| Self::dot(query, p)).collect();
 
         // Mean absolute distance over keys
         let mut total = 0.0f32;
@@ -200,7 +219,10 @@ impl ReportBuilder {
         let coherence = WindowCoherence::compute(
             keys,
             self.config.knn_k,
-            &[CoherenceMetric::BoundaryMass, CoherenceMetric::SimilarityVariance],
+            &[
+                CoherenceMetric::BoundaryMass,
+                CoherenceMetric::SimilarityVariance,
+            ],
         );
 
         coherence.score
@@ -279,12 +301,14 @@ impl ReportBuilder {
         }
 
         // Initial logits
-        let x: Vec<f32> = keys.iter()
-            .map(|k| Self::dot(query, k))
-            .collect();
+        let x: Vec<f32> = keys.iter().map(|k| Self::dot(query, k)).collect();
 
         // Build Laplacian
-        let lap = GraphLaplacian::from_keys(keys, self.config.diffusion_sigma, LaplacianType::Unnormalized);
+        let lap = GraphLaplacian::from_keys(
+            keys,
+            self.config.diffusion_sigma,
+            LaplacianType::Unnormalized,
+        );
 
         // Energy = x^T L x
         let lx = lap.apply(&x);
@@ -436,9 +460,7 @@ mod tests {
         let builder = ReportBuilder::new(ReportConfig::default());
 
         let query = vec![1.0f32; 16];
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32 * 0.1; 16])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32 * 0.1; 16]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let report = builder.build(&query, &keys_refs, None, None, None);
@@ -461,11 +483,7 @@ mod tests {
         let builder = ReportBuilder::new(ReportConfig::default());
 
         let query = vec![1.0f32; 8];
-        let keys: Vec<Vec<f32>> = vec![
-            vec![1.0; 8],
-            vec![0.9; 8],
-            vec![0.1; 8],
-        ];
+        let keys: Vec<Vec<f32>> = vec![vec![1.0; 8], vec![0.9; 8], vec![0.1; 8]];
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let weights = vec![0.6, 0.3, 0.1];
 

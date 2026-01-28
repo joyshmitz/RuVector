@@ -59,7 +59,7 @@ pub mod simd_ops;
 pub mod novel_algorithms;
 
 // Re-export commonly used items
-pub use landauer_learning::{LandauerOptimizer, ThermodynamicState, constants};
 pub use equilibrium_propagation::EnergyBasedNetwork;
 pub use free_energy_agent::FreeEnergyAgent;
+pub use landauer_learning::{constants, LandauerOptimizer, ThermodynamicState};
 pub use reversible_neural::ReversibleNetwork;

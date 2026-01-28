@@ -30,14 +30,16 @@
 //! pipeline.save_checkpoint("./checkpoints/claude_flow_v1.bin")?;
 //! ```
 
-use super::task_generator::{TaskGenerator, GeneratedTask, TaskCategory, TaskComplexity};
+use super::task_generator::{GeneratedTask, TaskCategory, TaskComplexity, TaskGenerator};
 use super::{ClaudeFlowAgent, ClaudeFlowTask};
 use crate::sona::{
-    SonaConfig, SonaIntegration, Trajectory, RuvLtraPretrainConfig, RuvLtraPretrainer,
-    PretrainSample, SeedingResult, RoutingPretrainResult,
+    PretrainSample, RoutingPretrainResult, RuvLtraPretrainConfig, RuvLtraPretrainer, SeedingResult,
+    SonaConfig, SonaIntegration, Trajectory,
 };
 use parking_lot::RwLock;
-use ruvector_sona::{EwcConfig, EwcPlusPlus, LearnedPattern, PatternConfig, ReasoningBank, SonaEngine};
+use ruvector_sona::{
+    EwcConfig, EwcPlusPlus, LearnedPattern, PatternConfig, ReasoningBank, SonaEngine,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -58,7 +60,12 @@ pub enum Phase {
 }
 
 /// Static array of all phases for zero-allocation access
-static ALL_PHASES: [Phase; 4] = [Phase::Bootstrap, Phase::Synthetic, Phase::Reinforce, Phase::Consolidate];
+static ALL_PHASES: [Phase; 4] = [
+    Phase::Bootstrap,
+    Phase::Synthetic,
+    Phase::Reinforce,
+    Phase::Consolidate,
+];
 
 impl Phase {
     /// Get all phases in order
@@ -533,7 +540,8 @@ impl ProgressTracker {
 
     /// Record patterns for phase
     pub fn record_patterns(&mut self, phase: Phase, count: usize) {
-        self.patterns_per_phase.insert(phase.name().to_string(), count);
+        self.patterns_per_phase
+            .insert(phase.name().to_string(), count);
     }
 }
 
@@ -677,7 +685,8 @@ impl PretrainPipeline {
         };
 
         let pretrainer = RuvLtraPretrainer::new(pretrain_config);
-        let curriculum = CurriculumScheduler::new(config.curriculum_stages, config.samples_per_stage);
+        let curriculum =
+            CurriculumScheduler::new(config.curriculum_stages, config.samples_per_stage);
         let quality_gate = QualityGate::new(config.quality_threshold);
 
         Self {
@@ -706,7 +715,8 @@ impl PretrainPipeline {
             phase_results.push(phase_result);
 
             // Update overall progress
-            self.progress.set_overall_progress((phase_idx + 1) as f32 / total_phases as f32);
+            self.progress
+                .set_overall_progress((phase_idx + 1) as f32 / total_phases as f32);
 
             // Save checkpoint if enabled
             if self.config.enable_checkpoints {
@@ -738,7 +748,10 @@ impl PretrainPipeline {
                 quality_per_stage: (0..self.config.curriculum_stages)
                     .map(|s| self.curriculum.stage_avg_quality(s))
                     .collect(),
-                samples_per_stage: vec![self.config.samples_per_stage; self.config.curriculum_stages],
+                samples_per_stage: vec![
+                    self.config.samples_per_stage;
+                    self.config.curriculum_stages
+                ],
             })
         } else {
             None
@@ -836,7 +849,12 @@ impl PretrainPipeline {
                 }
 
                 self.samples_processed += 1;
-                self.progress.update(Phase::Bootstrap, samples_count, self.config.samples_per_phase as u64, total_quality / samples_count.max(1) as f32);
+                self.progress.update(
+                    Phase::Bootstrap,
+                    samples_count,
+                    self.config.samples_per_phase as u64,
+                    total_quality / samples_count.max(1) as f32,
+                );
             }
         }
 
@@ -847,7 +865,8 @@ impl PretrainPipeline {
             0.0
         };
 
-        self.progress.record_patterns(Phase::Bootstrap, patterns_learned);
+        self.progress
+            .record_patterns(Phase::Bootstrap, patterns_learned);
 
         Ok((samples_count, patterns_learned, avg_quality))
     }
@@ -922,8 +941,7 @@ impl PretrainPipeline {
                 {
                     let _ = self.save_checkpoint(&format!(
                         "{}/checkpoint_synthetic_{}.bin",
-                        self.config.checkpoint_dir,
-                        self.samples_processed
+                        self.config.checkpoint_dir, self.samples_processed
                     ));
                 }
 
@@ -945,7 +963,8 @@ impl PretrainPipeline {
             0.0
         };
 
-        self.progress.record_patterns(Phase::Synthetic, result.patterns_learned);
+        self.progress
+            .record_patterns(Phase::Synthetic, result.patterns_learned);
 
         Ok((samples_count, result.patterns_learned, avg_quality))
     }
@@ -1006,7 +1025,11 @@ impl PretrainPipeline {
             }
 
             if self.config.verbose {
-                println!("  Replay {} complete, quality: {:.3}", replay_idx + 1, total_quality / samples_count.max(1) as f32);
+                println!(
+                    "  Replay {} complete, quality: {:.3}",
+                    replay_idx + 1,
+                    total_quality / samples_count.max(1) as f32
+                );
             }
         }
 
@@ -1016,7 +1039,8 @@ impl PretrainPipeline {
             0.0
         };
 
-        self.progress.record_patterns(Phase::Reinforce, patterns_learned);
+        self.progress
+            .record_patterns(Phase::Reinforce, patterns_learned);
 
         Ok((samples_count, patterns_learned, avg_quality))
     }
@@ -1066,7 +1090,8 @@ impl PretrainPipeline {
             patterns.len() as u64,
             avg_quality,
         );
-        self.progress.record_patterns(Phase::Consolidate, consolidated_count);
+        self.progress
+            .record_patterns(Phase::Consolidate, consolidated_count);
 
         Ok((consolidated_count as u64, consolidated_count, avg_quality))
     }

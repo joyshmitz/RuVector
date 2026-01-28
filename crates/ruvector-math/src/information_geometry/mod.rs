@@ -22,9 +22,9 @@
 //! - Pascanu & Bengio (2013): Natural Gradient Works Efficiently in Learning
 
 mod fisher;
-mod natural_gradient;
 mod kfac;
+mod natural_gradient;
 
 pub use fisher::FisherInformation;
-pub use natural_gradient::NaturalGradient;
 pub use kfac::KFACApproximation;
+pub use natural_gradient::NaturalGradient;

@@ -323,7 +323,9 @@ mod tests {
         coherence.insert_node(2, vec![0.5, 0.5, 0.5, 0.5]).unwrap();
 
         let residual = vec![0.1, 0.1, 0.1, 0.1];
-        let weighted = coherence.weighted_edge_energy(1, 2, &residual, 1.0).unwrap();
+        let weighted = coherence
+            .weighted_edge_energy(1, 2, &residual, 1.0)
+            .unwrap();
 
         assert!(weighted.weighted_energy > 0.0);
         assert!(weighted.depth_weight > 1.0); // Should have depth scaling
@@ -338,14 +340,19 @@ mod tests {
         };
         let mut coherence = HyperbolicCoherence::new(config);
 
-        coherence.insert_node(1, vec![0.05, 0.05, 0.05, 0.05]).unwrap();
+        coherence
+            .insert_node(1, vec![0.05, 0.05, 0.05, 0.05])
+            .unwrap();
         coherence.insert_node(2, vec![0.7, 0.7, 0.0, 0.0]).unwrap();
 
         let level1 = coherence.hierarchy_level(1).unwrap();
         let level2 = coherence.hierarchy_level(2).unwrap();
 
         // Node 1 should be at higher level (closer to root)
-        assert!(matches!(level1, HierarchyLevel::Root | HierarchyLevel::High));
+        assert!(matches!(
+            level1,
+            HierarchyLevel::Root | HierarchyLevel::High
+        ));
         // Node 2 should be deeper
         assert!(matches!(
             level2,

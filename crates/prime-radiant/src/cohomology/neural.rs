@@ -5,8 +5,8 @@
 
 use super::laplacian::{LaplacianConfig, SheafLaplacian};
 use super::sheaf::{Sheaf, SheafSection};
-use crate::substrate::SheafGraph;
 use crate::substrate::NodeId;
+use crate::substrate::SheafGraph;
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -36,7 +36,13 @@ impl Activation {
         match self {
             Activation::Identity => x,
             Activation::ReLU => x.max(0.0),
-            Activation::LeakyReLU(alpha) => if x > 0.0 { x } else { alpha * x },
+            Activation::LeakyReLU(alpha) => {
+                if x > 0.0 {
+                    x
+                } else {
+                    alpha * x
+                }
+            }
             Activation::Sigmoid => 1.0 / (1.0 + (-x).exp()),
             Activation::Tanh => x.tanh(),
             Activation::GELU => {
@@ -65,8 +71,20 @@ impl Activation {
     pub fn derivative(&self, x: f64) -> f64 {
         match self {
             Activation::Identity => 1.0,
-            Activation::ReLU => if x > 0.0 { 1.0 } else { 0.0 },
-            Activation::LeakyReLU(alpha) => if x > 0.0 { 1.0 } else { *alpha },
+            Activation::ReLU => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Activation::LeakyReLU(alpha) => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    *alpha
+                }
+            }
             Activation::Sigmoid => {
                 let s = self.apply(x);
                 s * (1.0 - s)
@@ -143,10 +161,9 @@ impl SheafNeuralLayer {
         let scale = (2.0 / (config.input_dim + config.output_dim) as f64).sqrt();
 
         // Initialize weights with Xavier
-        let weights = Array2::from_shape_fn(
-            (config.output_dim, config.input_dim),
-            |_| rand::random::<f64>() * scale - scale / 2.0,
-        );
+        let weights = Array2::from_shape_fn((config.output_dim, config.input_dim), |_| {
+            rand::random::<f64>() * scale - scale / 2.0
+        });
 
         let bias = Array1::zeros(config.output_dim);
 
@@ -159,7 +176,11 @@ impl SheafNeuralLayer {
     }
 
     /// Create with specific weights
-    pub fn with_weights(config: SheafNeuralConfig, weights: Array2<f64>, bias: Array1<f64>) -> Self {
+    pub fn with_weights(
+        config: SheafNeuralConfig,
+        weights: Array2<f64>,
+        bias: Array1<f64>,
+    ) -> Self {
         assert_eq!(weights.nrows(), config.output_dim);
         assert_eq!(weights.ncols(), config.input_dim);
         assert_eq!(bias.len(), config.output_dim);
@@ -293,14 +314,12 @@ impl SheafConvolution {
     pub fn new(input_dim: usize, output_dim: usize) -> Self {
         let scale = (2.0 / (input_dim + output_dim) as f64).sqrt();
 
-        let self_weight = Array2::from_shape_fn(
-            (output_dim, input_dim),
-            |_| rand::random::<f64>() * scale - scale / 2.0,
-        );
-        let neighbor_weight = Array2::from_shape_fn(
-            (output_dim, input_dim),
-            |_| rand::random::<f64>() * scale - scale / 2.0,
-        );
+        let self_weight = Array2::from_shape_fn((output_dim, input_dim), |_| {
+            rand::random::<f64>() * scale - scale / 2.0
+        });
+        let neighbor_weight = Array2::from_shape_fn((output_dim, input_dim), |_| {
+            rand::random::<f64>() * scale - scale / 2.0
+        });
         let bias = Array1::zeros(output_dim);
 
         Self {
@@ -428,7 +447,12 @@ impl CohomologyPooling {
             return Array1::zeros(0);
         }
 
-        let dim = section.sections.values().next().map(|v| v.len()).unwrap_or(0);
+        let dim = section
+            .sections
+            .values()
+            .next()
+            .map(|v| v.len())
+            .unwrap_or(0);
 
         match self.method {
             PoolingMethod::Mean => {
@@ -477,10 +501,13 @@ impl CohomologyPooling {
             }
             PoolingMethod::TopK(k) => {
                 // Select top k nodes by L2 norm
-                let mut node_norms: Vec<_> = section.sections.iter()
+                let mut node_norms: Vec<_> = section
+                    .sections
+                    .iter()
                     .map(|(id, vec)| (*id, vec.iter().map(|x| x * x).sum::<f64>()))
                     .collect();
-                node_norms.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                node_norms
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 let mut sum = Array1::zeros(dim);
                 for (node_id, _) in node_norms.into_iter().take(k) {
@@ -601,12 +628,8 @@ mod tests {
     fn test_pooling() {
         let graph = SheafGraph::new();
 
-        let node1 = SheafNodeBuilder::new()
-            .state_from_slice(&[1.0])
-            .build();
-        let node2 = SheafNodeBuilder::new()
-            .state_from_slice(&[3.0])
-            .build();
+        let node1 = SheafNodeBuilder::new().state_from_slice(&[1.0]).build();
+        let node2 = SheafNodeBuilder::new().state_from_slice(&[3.0]).build();
 
         let id1 = graph.add_node(node1);
         let id2 = graph.add_node(node2);

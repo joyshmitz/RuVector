@@ -221,7 +221,12 @@ impl JsonSchemaValidator {
     }
 
     /// Validate a value against a type specification
-    fn validate_type(&self, value: &JsonValue, expected_type: &str, path: &str) -> ValidationResult {
+    fn validate_type(
+        &self,
+        value: &JsonValue,
+        expected_type: &str,
+        path: &str,
+    ) -> ValidationResult {
         let mut result = ValidationResult::default();
         result.checks_performed = 1;
 
@@ -245,7 +250,11 @@ impl JsonSchemaValidator {
             result.errors.push(ValidationError {
                 error_type: ValidationErrorType::TypeMismatch,
                 path: path.to_string(),
-                message: format!("Expected type '{}', got '{}'", expected_type, value_type_name(value)),
+                message: format!(
+                    "Expected type '{}', got '{}'",
+                    expected_type,
+                    value_type_name(value)
+                ),
                 expected: Some(expected_type.to_string()),
                 actual: Some(value_type_name(value).to_string()),
             });
@@ -282,7 +291,11 @@ impl JsonSchemaValidator {
                     };
 
                     if let Some(prop_value) = obj.get(key) {
-                        result.merge(self.validate_against_schema(prop_value, prop_schema, &prop_path));
+                        result.merge(self.validate_against_schema(
+                            prop_value,
+                            prop_schema,
+                            &prop_path,
+                        ));
                     }
                 }
 
@@ -500,7 +513,11 @@ impl SchemaValidator for RangeValidator {
 
         // Check minimum
         if let Some(min) = self.min {
-            let min_ok = if self.exclusive_min { value > min } else { value >= min };
+            let min_ok = if self.exclusive_min {
+                value > min
+            } else {
+                value >= min
+            };
             if !min_ok {
                 result.is_valid = false;
                 result.errors.push(ValidationError {
@@ -509,10 +526,18 @@ impl SchemaValidator for RangeValidator {
                     message: format!(
                         "Value {} is {} minimum {}",
                         value,
-                        if self.exclusive_min { "not greater than" } else { "less than" },
+                        if self.exclusive_min {
+                            "not greater than"
+                        } else {
+                            "less than"
+                        },
                         min
                     ),
-                    expected: Some(format!("{} {}", if self.exclusive_min { ">" } else { ">=" }, min)),
+                    expected: Some(format!(
+                        "{} {}",
+                        if self.exclusive_min { ">" } else { ">=" },
+                        min
+                    )),
                     actual: Some(value.to_string()),
                 });
             }
@@ -520,7 +545,11 @@ impl SchemaValidator for RangeValidator {
 
         // Check maximum
         if let Some(max) = self.max {
-            let max_ok = if self.exclusive_max { value < max } else { value <= max };
+            let max_ok = if self.exclusive_max {
+                value < max
+            } else {
+                value <= max
+            };
             if !max_ok {
                 result.is_valid = false;
                 result.errors.push(ValidationError {
@@ -529,10 +558,18 @@ impl SchemaValidator for RangeValidator {
                     message: format!(
                         "Value {} is {} maximum {}",
                         value,
-                        if self.exclusive_max { "not less than" } else { "greater than" },
+                        if self.exclusive_max {
+                            "not less than"
+                        } else {
+                            "greater than"
+                        },
                         max
                     ),
-                    expected: Some(format!("{} {}", if self.exclusive_max { "<" } else { "<=" }, max)),
+                    expected: Some(format!(
+                        "{} {}",
+                        if self.exclusive_max { "<" } else { "<=" },
+                        max
+                    )),
                     actual: Some(value.to_string()),
                 });
             }
@@ -615,11 +652,11 @@ impl FormatValidator {
                 !local.is_empty()
                     && !domain.is_empty()
                     && domain.contains('.')
-                    && domain.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-')
+                    && domain
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
             }
-            "url" => {
-                value.starts_with("http://") || value.starts_with("https://")
-            }
+            "url" => value.starts_with("http://") || value.starts_with("https://"),
             "uuid" => {
                 // UUID format: 8-4-4-4-12 hex digits
                 let parts: Vec<&str> = value.split('-').collect();
@@ -629,7 +666,9 @@ impl FormatValidator {
                     && parts[2].len() == 4
                     && parts[3].len() == 4
                     && parts[4].len() == 12
-                    && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_hexdigit()))
+                    && parts
+                        .iter()
+                        .all(|p| p.chars().all(|c| c.is_ascii_hexdigit()))
             }
             "date" => {
                 // ISO 8601 date: YYYY-MM-DD
@@ -860,9 +899,7 @@ mod tests {
 
     #[test]
     fn test_exclusive_range() {
-        let validator = RangeValidator::new()
-            .min_exclusive(0.0)
-            .max_exclusive(10.0);
+        let validator = RangeValidator::new().min_exclusive(0.0).max_exclusive(10.0);
 
         assert!(validator.validate(&json!(5)).is_valid);
         assert!(!validator.validate(&json!(0)).is_valid);
@@ -881,7 +918,11 @@ mod tests {
     fn test_format_validator_uuid() {
         let validator = FormatValidator::uuid();
 
-        assert!(validator.validate(&json!("550e8400-e29b-41d4-a716-446655440000")).is_valid);
+        assert!(
+            validator
+                .validate(&json!("550e8400-e29b-41d4-a716-446655440000"))
+                .is_valid
+        );
         assert!(!validator.validate(&json!("not-a-uuid")).is_valid);
     }
 
@@ -941,10 +982,8 @@ mod tests {
 
     #[test]
     fn test_from_fields() {
-        let validator = JsonSchemaValidator::from_fields(&[
-            ("name", "string"),
-            ("count", "integer"),
-        ]);
+        let validator =
+            JsonSchemaValidator::from_fields(&[("name", "string"), ("count", "integer")]);
 
         let valid = json!({ "name": "test", "count": 5 });
         assert!(validator.validate(&valid).is_valid);

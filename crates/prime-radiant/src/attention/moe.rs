@@ -347,7 +347,8 @@ mod tests {
         let inputs: Vec<Vec<f32>> = (0..10).map(|i| vec![0.1 * (i + 1) as f32; 8]).collect();
         let context = vec![0.1f32; 8];
 
-        let routings: Vec<ExpertRouting> = inputs.iter().map(|inp| moe.route(inp, &context)).collect();
+        let routings: Vec<ExpertRouting> =
+            inputs.iter().map(|inp| moe.route(inp, &context)).collect();
 
         let usage = moe.expert_usage(&routings);
 

@@ -1,8 +1,8 @@
 // Lazy Activation Evaluation for Neural Networks
 // Only loads weights from storage when actually needed for computation
 
-use std::sync::Arc;
 use crate::mmap_neural_field::MmapNeuralField;
+use std::sync::Arc;
 
 /// Activation state for neural network layers
 #[derive(Clone, Debug)]
@@ -88,8 +88,9 @@ impl LazyLayer {
     fn ensure_weights_hot(&mut self) -> std::io::Result<()> {
         if !self.weights.is_hot() {
             let (addr, size) = match self.weights {
-                ActivationState::Cold { addr, size }
-                | ActivationState::Warm { addr, size } => (addr, size),
+                ActivationState::Cold { addr, size } | ActivationState::Warm { addr, size } => {
+                    (addr, size)
+                }
                 ActivationState::Hot { .. } => return Ok(()),
             };
 
@@ -107,8 +108,9 @@ impl LazyLayer {
     fn ensure_bias_hot(&mut self) -> std::io::Result<()> {
         if !self.bias.is_hot() {
             let (addr, size) = match self.bias {
-                ActivationState::Cold { addr, size }
-                | ActivationState::Warm { addr, size } => (addr, size),
+                ActivationState::Cold { addr, size } | ActivationState::Warm { addr, size } => {
+                    (addr, size)
+                }
                 ActivationState::Hot { .. } => return Ok(()),
             };
 
@@ -127,11 +129,7 @@ impl LazyLayer {
     /// # Returns
     /// Output activations (length = output_dim)
     pub fn forward(&mut self, input: &[f32]) -> std::io::Result<Vec<f32>> {
-        assert_eq!(
-            input.len(),
-            self.input_dim,
-            "Input dimension mismatch"
-        );
+        assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
 
         // Demand-page weights into memory
         self.ensure_weights_hot()?;
@@ -233,8 +231,8 @@ impl LazyLayer {
     pub fn evict(&mut self) {
         let (weights_addr, weights_size) = match self.weights {
             ActivationState::Hot { .. } => {
-                if let ActivationState::Cold { addr, size }
-                | ActivationState::Warm { addr, size } = self.weights
+                if let ActivationState::Cold { addr, size } | ActivationState::Warm { addr, size } =
+                    self.weights
                 {
                     (addr, size)
                 } else {
@@ -247,8 +245,8 @@ impl LazyLayer {
 
         let (bias_addr, bias_size) = match self.bias {
             ActivationState::Hot { .. } => {
-                if let ActivationState::Cold { addr, size }
-                | ActivationState::Warm { addr, size } = self.bias
+                if let ActivationState::Cold { addr, size } | ActivationState::Warm { addr, size } =
+                    self.bias
                 {
                     (addr, size)
                 } else {
@@ -377,7 +375,8 @@ impl LazyNetwork {
 
         if total_memory > self.max_memory {
             // Collect layer indices and ages
-            let mut layer_ages: Vec<_> = self.layers
+            let mut layer_ages: Vec<_> = self
+                .layers
                 .iter()
                 .enumerate()
                 .map(|(i, l)| (i, l.age()))
@@ -435,9 +434,7 @@ mod tests {
     #[test]
     fn test_lazy_layer() {
         let temp = NamedTempFile::new().unwrap();
-        let storage = Arc::new(
-            MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap(),
-        );
+        let storage = Arc::new(MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap());
 
         // Write some test weights
         let weights = vec![1.0f32; 100]; // 10x10 matrix
@@ -467,9 +464,7 @@ mod tests {
     #[test]
     fn test_lazy_network() {
         let temp = NamedTempFile::new().unwrap();
-        let storage = Arc::new(
-            MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap(),
-        );
+        let storage = Arc::new(MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap());
 
         // Create 3-layer network: 10 -> 20 -> 10 -> 5
         let mut network = LazyNetwork::new(storage.clone(), 10 * 1024); // 10 KB limit
@@ -504,9 +499,7 @@ mod tests {
     #[test]
     fn test_eviction() {
         let temp = NamedTempFile::new().unwrap();
-        let storage = Arc::new(
-            MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap(),
-        );
+        let storage = Arc::new(MmapNeuralField::new(temp.path(), 1024 * 1024, Some(4096)).unwrap());
 
         let weights = vec![1.0f32; 100];
         let bias = vec![0.5f32; 10];

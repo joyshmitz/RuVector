@@ -10,8 +10,8 @@ use crate::error::{Result, RuvLLMError};
 use crate::kv_cache::CacheQuantization;
 use crate::session::Session;
 use chrono::{DateTime, Utc};
-use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
 use ruvector_core::types::DbOptions;
+use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -111,7 +111,10 @@ impl SessionState {
         Self {
             session_id: session.id.clone(),
             user_id: session.user_id.clone(),
-            context_embedding: session.context_embedding.clone().unwrap_or_else(|| vec![0.0; 768]),
+            context_embedding: session
+                .context_embedding
+                .clone()
+                .unwrap_or_else(|| vec![0.0; 768]),
             kv_cache_ref: KvCacheReference::default(),
             active_adapter: session.active_adapter.map(|id| id.to_string()),
             turn_count: session.turn_count,
@@ -136,28 +139,36 @@ impl SessionIndex {
         options.storage_path = storage_path.to_string();
         options.dimensions = embedding_dim;
 
-        let db = AgenticDB::new(options)
-            .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
+        let db = AgenticDB::new(options).map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
-        Ok(Self {
-            db,
-            embedding_dim,
-        })
+        Ok(Self { db, embedding_dim })
     }
 
     /// Store a session state
     pub fn store(&self, state: &SessionState) -> Result<()> {
         // Create metadata
         let mut metadata = HashMap::new();
-        metadata.insert("session_id".to_string(), serde_json::json!(state.session_id));
+        metadata.insert(
+            "session_id".to_string(),
+            serde_json::json!(state.session_id),
+        );
 
         if let Some(ref user_id) = state.user_id {
             metadata.insert("user_id".to_string(), serde_json::json!(user_id));
         }
 
-        metadata.insert("turn_count".to_string(), serde_json::json!(state.turn_count));
-        metadata.insert("last_active".to_string(), serde_json::json!(state.last_active.to_rfc3339()));
-        metadata.insert("kv_cache_ref".to_string(), serde_json::to_value(&state.kv_cache_ref).unwrap_or_default());
+        metadata.insert(
+            "turn_count".to_string(),
+            serde_json::json!(state.turn_count),
+        );
+        metadata.insert(
+            "last_active".to_string(),
+            serde_json::json!(state.last_active.to_rfc3339()),
+        );
+        metadata.insert(
+            "kv_cache_ref".to_string(),
+            serde_json::to_value(&state.kv_cache_ref).unwrap_or_default(),
+        );
 
         if let Some(ref adapter) = state.active_adapter {
             metadata.insert("active_adapter".to_string(), serde_json::json!(adapter));
@@ -175,14 +186,19 @@ impl SessionIndex {
         };
 
         // Store in Ruvector
-        self.db.insert(vector_entry)
+        self.db
+            .insert(vector_entry)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         Ok(())
     }
 
     /// Search sessions by context similarity
-    pub fn search_by_context(&self, context_embedding: &[f32], limit: usize) -> Result<Vec<SessionState>> {
+    pub fn search_by_context(
+        &self,
+        context_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<SessionState>> {
         let query = SearchQuery {
             vector: context_embedding.to_vec(),
             k: limit,
@@ -190,13 +206,17 @@ impl SessionIndex {
             ef_search: None,
         };
 
-        let results = self.db.search(query)
+        let results = self
+            .db
+            .search(query)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         let mut states = Vec::with_capacity(results.len());
         for result in results {
             if let Some(metadata) = &result.metadata {
-                if let Some(state) = self.state_from_metadata(&result.id, context_embedding, metadata) {
+                if let Some(state) =
+                    self.state_from_metadata(&result.id, context_embedding, metadata)
+                {
                     states.push(state);
                 }
             }
@@ -207,7 +227,8 @@ impl SessionIndex {
 
     /// Delete session state
     pub fn delete(&self, session_id: &str) -> Result<()> {
-        self.db.delete(session_id)
+        self.db
+            .delete(session_id)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
         Ok(())
     }
@@ -221,25 +242,30 @@ impl SessionIndex {
     ) -> Option<SessionState> {
         let session_id = metadata.get("session_id")?.as_str()?.to_string();
 
-        let user_id = metadata.get("user_id")
+        let user_id = metadata
+            .get("user_id")
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        let turn_count = metadata.get("turn_count")
+        let turn_count = metadata
+            .get("turn_count")
             .and_then(|v| v.as_u64())
             .unwrap_or(0) as u32;
 
-        let last_active = metadata.get("last_active")
+        let last_active = metadata
+            .get("last_active")
             .and_then(|v| v.as_str())
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or_else(Utc::now);
 
-        let kv_cache_ref: KvCacheReference = metadata.get("kv_cache_ref")
+        let kv_cache_ref: KvCacheReference = metadata
+            .get("kv_cache_ref")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
 
-        let active_adapter = metadata.get("active_adapter")
+        let active_adapter = metadata
+            .get("active_adapter")
             .and_then(|v| v.as_str())
             .map(String::from);
 

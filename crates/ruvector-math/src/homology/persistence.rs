@@ -2,7 +2,7 @@
 //!
 //! Compute birth-death pairs from a filtration using the standard algorithm.
 
-use super::{Filtration, Simplex, BettiNumbers};
+use super::{BettiNumbers, Filtration, Simplex};
 use std::collections::{HashMap, HashSet};
 
 /// Birth-death pair in persistence diagram
@@ -205,7 +205,11 @@ impl PersistentHomology {
         // Initialize
         self.columns = Vec::with_capacity(n);
         self.birth_times = filtration.simplices.iter().map(|fs| fs.birth).collect();
-        self.dimensions = filtration.simplices.iter().map(|fs| fs.simplex.dim()).collect();
+        self.dimensions = filtration
+            .simplices
+            .iter()
+            .map(|fs| fs.simplex.dim())
+            .collect();
 
         // Build boundary matrix columns
         for fs in &filtration.simplices {
@@ -256,7 +260,9 @@ impl PersistentHomology {
 
     /// Get pivot (largest index) of column
     fn get_pivot(&self, col: usize) -> Option<usize> {
-        self.columns[col].as_ref().and_then(|c| c.iter().max().copied())
+        self.columns[col]
+            .as_ref()
+            .and_then(|c| c.iter().max().copied())
     }
 
     /// Add column src to column dst (XOR / mod 2)

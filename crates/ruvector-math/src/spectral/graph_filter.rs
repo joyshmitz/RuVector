@@ -207,7 +207,11 @@ impl GraphFilter {
     /// Compute filter energy: x^T h(L) x
     pub fn energy(&self, signal: &[f64]) -> f64 {
         let filtered = self.apply(signal);
-        signal.iter().zip(filtered.iter()).map(|(&x, &y)| x * y).sum()
+        signal
+            .iter()
+            .zip(filtered.iter())
+            .map(|(&x, &y)| x * y)
+            .sum()
     }
 
     /// Get estimated spectral range
@@ -253,11 +257,7 @@ mod tests {
 
     fn simple_graph() -> (Vec<f64>, usize) {
         // Triangle graph: complete K_3
-        let adj = vec![
-            0.0, 1.0, 1.0,
-            1.0, 0.0, 1.0,
-            1.0, 1.0, 0.0,
-        ];
+        let adj = vec![0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0];
         (adj, 3)
     }
 

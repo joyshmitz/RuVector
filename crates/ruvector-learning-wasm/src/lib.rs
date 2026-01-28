@@ -37,7 +37,7 @@ mod lora;
 mod operator_scope;
 mod trajectory;
 
-pub use lora::{LoRAPair, LoRAConfig, MicroLoRAEngine};
+pub use lora::{LoRAConfig, LoRAPair, MicroLoRAEngine};
 pub use operator_scope::{OperatorScope, ScopedLoRA};
 pub use trajectory::{Trajectory, TrajectoryBuffer, TrajectoryStats};
 

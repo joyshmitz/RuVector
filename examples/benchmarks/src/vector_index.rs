@@ -31,12 +31,18 @@ pub struct DenseVec {
 impl DenseVec {
     /// Create a new dense vector from values
     pub fn new(values: Vec<f32>) -> Self {
-        Self { values, cached_norm: None }
+        Self {
+            values,
+            cached_norm: None,
+        }
     }
 
     /// Create a new dense vector with precomputed norm
     pub fn with_norm(values: Vec<f32>, norm: f32) -> Self {
-        Self { values, cached_norm: Some(norm) }
+        Self {
+            values,
+            cached_norm: Some(norm),
+        }
     }
 
     /// Create a zero vector of given dimension
@@ -540,7 +546,11 @@ impl VectorIndex {
             let s = q.cosine(v)?;
             push_topk(&mut best, *id, s, top_k);
         }
-        best.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        best.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(best)
     }
 
@@ -580,7 +590,11 @@ impl VectorIndex {
             let s = q.cosine(v)?;
             push_topk(&mut best, id, s, top_k);
         }
-        best.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        best.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(best)
     }
 
@@ -612,13 +626,15 @@ impl VectorIndex {
         // Parallel scoring
         let mut scores: Vec<ScoredId> = active
             .par_iter()
-            .filter_map(|(id, v)| {
-                q.cosine(v).ok().map(|s| ScoredId::new(*id, s))
-            })
+            .filter_map(|(id, v)| q.cosine(v).ok().map(|s| ScoredId::new(*id, s)))
             .collect();
 
         // Sort and truncate
-        scores.par_sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scores.par_sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scores.truncate(top_k);
         Ok(scores)
     }
@@ -675,12 +691,11 @@ impl VectorIndex {
         }
 
         // SIMD-optimized centroid scoring using parallel iterator
-        let centroid_scores: Vec<(usize, f32)> = state.centroids
+        let centroid_scores: Vec<(usize, f32)> = state
+            .centroids
             .par_iter()
             .enumerate()
-            .filter_map(|(i, c)| {
-                q.cosine(c).ok().map(|score| (i, score))
-            })
+            .filter_map(|(i, c)| q.cosine(c).ok().map(|score| (i, score)))
             .collect();
 
         // Sort by score descending
@@ -712,7 +727,11 @@ impl VectorIndex {
 
         // If not enough candidates, probe more clusters
         if all_candidates.len() < min_candidates && _probed < max_probes {
-            for &(cluster_idx, _) in sorted_scores.iter().skip(initial_probes).take(max_probes - initial_probes) {
+            for &(cluster_idx, _) in sorted_scores
+                .iter()
+                .skip(initial_probes)
+                .take(max_probes - initial_probes)
+            {
                 if cluster_idx < state.lists.len() {
                     for &id in &state.lists[cluster_idx] {
                         if !self.deleted.contains(&id) {
@@ -732,7 +751,11 @@ impl VectorIndex {
         }
 
         // Sort and return top-k
-        all_candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all_candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         all_candidates.truncate(top_k);
         Ok(all_candidates)
     }
@@ -780,15 +803,19 @@ impl VectorIndex {
         let best: Vec<ScoredId> = candidates
             .par_iter()
             .filter_map(|id| {
-                self.vectors.get(id).and_then(|v| {
-                    q.cosine(v).ok().map(|s| ScoredId::new(*id, s))
-                })
+                self.vectors
+                    .get(id)
+                    .and_then(|v| q.cosine(v).ok().map(|s| ScoredId::new(*id, s)))
             })
             .collect();
 
         // Sort and truncate
         let mut sorted = best;
-        sorted.par_sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.par_sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.truncate(top_k);
         Ok(sorted)
     }
@@ -803,7 +830,8 @@ impl VectorIndex {
     /// Load index from file
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let bytes = fs::read(path)?;
-        let (idx, _): (Self, _) = bincode::serde::decode_from_slice(&bytes, bincode::config::standard())?;
+        let (idx, _): (Self, _) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard())?;
         Ok(idx)
     }
 
@@ -815,7 +843,11 @@ impl VectorIndex {
             active_vectors: self.len(),
             deleted_vectors: self.deleted.len(),
             ivf_enabled: self.ivf.enabled,
-            ivf_clusters: self.ivf_state.as_ref().map(|s| s.centroids.len()).unwrap_or(0),
+            ivf_clusters: self
+                .ivf_state
+                .as_ref()
+                .map(|s| s.centroids.len())
+                .unwrap_or(0),
             gate_enabled: self.gate.enabled,
             gate_min_score: self.gate.min_score,
         }
@@ -896,9 +928,7 @@ fn kmeans(points: &[DenseVec], k: usize, iters: usize) -> Result<Vec<DenseVec>> 
 
     // Iterate
     for _ in 0..iters {
-        let mut sums: Vec<DenseVec> = (0..centroids.len())
-            .map(|_| DenseVec::zeros(dim))
-            .collect();
+        let mut sums: Vec<DenseVec> = (0..centroids.len()).map(|_| DenseVec::zeros(dim)).collect();
         let mut counts: Vec<usize> = vec![0; centroids.len()];
 
         // Assign points to centroids

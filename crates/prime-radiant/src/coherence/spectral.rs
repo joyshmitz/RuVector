@@ -59,8 +59,8 @@ impl Default for SpectralConfig {
         Self {
             num_eigenvalues: 10,
             history_size: 100,
-            drift_threshold: 0.1,    // 10% relative change
-            severe_threshold: 0.25,  // 25% relative change
+            drift_threshold: 0.1,   // 10% relative change
+            severe_threshold: 0.25, // 25% relative change
             min_samples: 3,
             smoothing_alpha: 0.3,
         }
@@ -301,7 +301,8 @@ impl SpectralAnalyzer {
         // Compute average pairwise distance
         let mut total_distance = 0.0;
         for i in 0..recent.len() - 1 {
-            total_distance += self.spectral_distance(&recent[i].eigenvalues, &recent[i + 1].eigenvalues);
+            total_distance +=
+                self.spectral_distance(&recent[i].eigenvalues, &recent[i + 1].eigenvalues);
         }
 
         Some(total_distance / window as f32)
@@ -391,7 +392,9 @@ impl SpectralAnalyzer {
     fn classify_severity(&self, distance: f32, connectivity_change: f32) -> DriftSeverity {
         let is_connectivity_loss = connectivity_change < -self.config.drift_threshold;
 
-        if distance > self.config.severe_threshold * 2.0 || (is_connectivity_loss && distance > self.config.severe_threshold) {
+        if distance > self.config.severe_threshold * 2.0
+            || (is_connectivity_loss && distance > self.config.severe_threshold)
+        {
             DriftSeverity::Critical
         } else if distance > self.config.severe_threshold {
             DriftSeverity::Severe
@@ -595,11 +598,7 @@ pub fn compute_eigenvalues(laplacian: &[Vec<f32>], k: usize) -> Vec<f32> {
 
     // Compute eigenvalues
     let eigen = SymmetricEigen::new(matrix);
-    let mut eigenvalues: Vec<f32> = eigen
-        .eigenvalues
-        .iter()
-        .map(|&x| x as f32)
-        .collect();
+    let mut eigenvalues: Vec<f32> = eigen.eigenvalues.iter().map(|&x| x as f32).collect();
 
     // Sort and take top k
     eigenvalues.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

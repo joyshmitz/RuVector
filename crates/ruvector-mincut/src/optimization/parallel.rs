@@ -111,7 +111,8 @@ impl WorkStealingScheduler {
         // Sort by priority (ascending)
         queue.sort_by_key(|w| w.priority);
 
-        self.total_work.fetch_add(estimated_work as u64, Ordering::Relaxed);
+        self.total_work
+            .fetch_add(estimated_work as u64, Ordering::Relaxed);
     }
 
     /// Submit multiple work items
@@ -119,7 +120,8 @@ impl WorkStealingScheduler {
         let mut queue = self.work_queue.write().unwrap();
 
         for item in items {
-            self.total_work.fetch_add(item.estimated_work as u64, Ordering::Relaxed);
+            self.total_work
+                .fetch_add(item.estimated_work as u64, Ordering::Relaxed);
             queue.push(item);
         }
 
@@ -249,7 +251,8 @@ impl ParallelLevelUpdater {
 
     /// Reset global minimum
     pub fn reset_min(&self) {
-        self.global_min.store(f64::INFINITY.to_bits(), Ordering::Release);
+        self.global_min
+            .store(f64::INFINITY.to_bits(), Ordering::Release);
         self.best_level.store(usize::MAX, Ordering::Release);
     }
 
@@ -263,7 +266,8 @@ impl ParallelLevelUpdater {
 
         if size < self.config.min_parallel_size {
             // Sequential processing for small workloads
-            return levels.iter()
+            return levels
+                .iter()
                 .map(|&level| {
                     let result = process_fn.clone()(level);
                     self.try_update_min(result.cut_value, level);
@@ -273,7 +277,8 @@ impl ParallelLevelUpdater {
         }
 
         // Parallel processing with Rayon
-        levels.par_iter()
+        levels
+            .par_iter()
             .map(|&level| {
                 let result = process_fn.clone()(level);
                 self.try_update_min(result.cut_value, level);
@@ -288,7 +293,8 @@ impl ParallelLevelUpdater {
     where
         F: FnMut(usize) -> LevelUpdateResult + Clone,
     {
-        levels.iter()
+        levels
+            .iter()
             .map(|&level| {
                 let result = process_fn.clone()(level);
                 self.try_update_min(result.cut_value, level);
@@ -299,13 +305,18 @@ impl ParallelLevelUpdater {
 
     /// Process work items with work-stealing
     #[cfg(feature = "rayon")]
-    pub fn process_with_stealing<F>(&self, work_items: Vec<WorkItem>, process_fn: F) -> Vec<LevelUpdateResult>
+    pub fn process_with_stealing<F>(
+        &self,
+        work_items: Vec<WorkItem>,
+        process_fn: F,
+    ) -> Vec<LevelUpdateResult>
     where
         F: Fn(&WorkItem) -> LevelUpdateResult + Send + Sync,
     {
         if work_items.len() < self.config.min_parallel_size {
             // Sequential
-            return work_items.iter()
+            return work_items
+                .iter()
                 .map(|item| {
                     let result = process_fn(item);
                     self.try_update_min(result.cut_value, item.level);
@@ -315,7 +326,8 @@ impl ParallelLevelUpdater {
         }
 
         // Parallel with work-stealing
-        work_items.par_iter()
+        work_items
+            .par_iter()
             .map(|item| {
                 let result = process_fn(item);
                 self.try_update_min(result.cut_value, item.level);
@@ -326,11 +338,16 @@ impl ParallelLevelUpdater {
 
     /// Process work items (scalar fallback)
     #[cfg(not(feature = "rayon"))]
-    pub fn process_with_stealing<F>(&self, work_items: Vec<WorkItem>, process_fn: F) -> Vec<LevelUpdateResult>
+    pub fn process_with_stealing<F>(
+        &self,
+        work_items: Vec<WorkItem>,
+        process_fn: F,
+    ) -> Vec<LevelUpdateResult>
     where
         F: Fn(&WorkItem) -> LevelUpdateResult,
     {
-        work_items.iter()
+        work_items
+            .iter()
             .map(|item| {
                 let result = process_fn(item);
                 self.try_update_min(result.cut_value, item.level);
@@ -341,11 +358,7 @@ impl ParallelLevelUpdater {
 
     /// Batch vertex processing within a level
     #[cfg(feature = "rayon")]
-    pub fn process_vertices_parallel<F, R>(
-        &self,
-        vertices: &[VertexId],
-        process_fn: F,
-    ) -> Vec<R>
+    pub fn process_vertices_parallel<F, R>(&self, vertices: &[VertexId], process_fn: F) -> Vec<R>
     where
         F: Fn(VertexId) -> R + Send + Sync,
         R: Send,
@@ -359,11 +372,7 @@ impl ParallelLevelUpdater {
 
     /// Batch vertex processing (scalar fallback)
     #[cfg(not(feature = "rayon"))]
-    pub fn process_vertices_parallel<F, R>(
-        &self,
-        vertices: &[VertexId],
-        process_fn: F,
-    ) -> Vec<R>
+    pub fn process_vertices_parallel<F, R>(&self, vertices: &[VertexId], process_fn: F) -> Vec<R>
     where
         F: Fn(VertexId) -> R,
     {
@@ -385,12 +394,14 @@ impl ParallelLevelUpdater {
         R: Send + Clone,
     {
         if items.len() < self.config.min_parallel_size {
-            return items.iter()
+            return items
+                .iter()
                 .map(|item| map_fn(item))
                 .fold(identity.clone(), reduce_fn);
         }
 
-        items.par_iter()
+        items
+            .par_iter()
             .map(|item| map_fn(item))
             .reduce(|| identity.clone(), reduce_fn)
     }
@@ -408,7 +419,8 @@ impl ParallelLevelUpdater {
         F: Fn(&T) -> R,
         R: Clone,
     {
-        items.iter()
+        items
+            .iter()
             .map(|item| map_fn(item))
             .fold(identity, reduce_fn)
     }
@@ -441,11 +453,14 @@ impl ParallelCutOps {
             return Self::boundary_size_sequential(partition, adjacency);
         }
 
-        partition_vec.par_iter()
+        partition_vec
+            .par_iter()
             .map(|&v| {
-                adjacency.get(&v)
+                adjacency
+                    .get(&v)
                     .map(|neighbors| {
-                        neighbors.iter()
+                        neighbors
+                            .iter()
                             .filter(|(n, _)| !partition.contains(n))
                             .map(|(_, w)| w)
                             .sum::<f64>()
@@ -469,11 +484,14 @@ impl ParallelCutOps {
         partition: &HashSet<VertexId>,
         adjacency: &HashMap<VertexId, Vec<(VertexId, f64)>>,
     ) -> f64 {
-        partition.iter()
+        partition
+            .iter()
             .map(|&v| {
-                adjacency.get(&v)
+                adjacency
+                    .get(&v)
                     .map(|neighbors| {
-                        neighbors.iter()
+                        neighbors
+                            .iter()
                             .filter(|(n, _)| !partition.contains(n))
                             .map(|(_, w)| w)
                             .sum::<f64>()
@@ -493,7 +511,8 @@ impl ParallelCutOps {
             return Self::min_degree_vertex_sequential(vertices, adjacency);
         }
 
-        vertices.par_iter()
+        vertices
+            .par_iter()
             .map(|&v| {
                 let degree = adjacency.get(&v).map(|n| n.len()).unwrap_or(0);
                 (v, degree)
@@ -516,7 +535,8 @@ impl ParallelCutOps {
         vertices: &[VertexId],
         adjacency: &HashMap<VertexId, Vec<(VertexId, f64)>>,
     ) -> Option<(VertexId, usize)> {
-        vertices.iter()
+        vertices
+            .iter()
             .map(|&v| {
                 let degree = adjacency.get(&v).map(|n| n.len()).unwrap_or(0);
                 (v, degree)
@@ -580,13 +600,11 @@ mod tests {
 
         let levels = vec![0, 1, 2, 3, 4];
 
-        let results = updater.process_parallel(&levels, |level| {
-            LevelUpdateResult {
-                level,
-                cut_value: level as f64 * 2.0,
-                partition: HashSet::new(),
-                time_us: 0,
-            }
+        let results = updater.process_parallel(&levels, |level| LevelUpdateResult {
+            level,
+            cut_value: level as f64 * 2.0,
+            partition: HashSet::new(),
+            time_us: 0,
         });
 
         assert_eq!(results.len(), 5);
@@ -620,7 +638,8 @@ mod tests {
         adjacency.insert(3, vec![(1, 1.0), (4, 1.0)]);
         adjacency.insert(4, vec![(1, 1.0), (3, 1.0)]);
 
-        let (min_v, min_deg) = ParallelCutOps::min_degree_vertex_sequential(&vertices, &adjacency).unwrap();
+        let (min_v, min_deg) =
+            ParallelCutOps::min_degree_vertex_sequential(&vertices, &adjacency).unwrap();
 
         assert_eq!(min_v, 2);
         assert_eq!(min_deg, 1);
@@ -647,9 +666,24 @@ mod tests {
         let scheduler = WorkStealingScheduler::new();
 
         let items = vec![
-            WorkItem { level: 0, vertices: vec![], priority: 2, estimated_work: 100 },
-            WorkItem { level: 1, vertices: vec![], priority: 0, estimated_work: 50 },
-            WorkItem { level: 2, vertices: vec![], priority: 1, estimated_work: 75 },
+            WorkItem {
+                level: 0,
+                vertices: vec![],
+                priority: 2,
+                estimated_work: 100,
+            },
+            WorkItem {
+                level: 1,
+                vertices: vec![],
+                priority: 0,
+                estimated_work: 50,
+            },
+            WorkItem {
+                level: 2,
+                vertices: vec![],
+                priority: 1,
+                estimated_work: 75,
+            },
         ];
 
         scheduler.submit_batch(items);

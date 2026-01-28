@@ -18,8 +18,8 @@
 //! - Synergistic information theory
 //! - Anderson's "More is Different"
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// System for detecting emergent properties
@@ -169,7 +169,11 @@ impl EmergenceDetector {
     }
 
     /// Configure coarse-graining
-    pub fn set_coarse_graining(&mut self, groupings: Vec<Vec<usize>>, aggregation: AggregationType) {
+    pub fn set_coarse_graining(
+        &mut self,
+        groupings: Vec<Vec<usize>>,
+        aggregation: AggregationType,
+    ) {
         self.coarse_grainer = CoarseGrainer {
             groupings,
             aggregation,
@@ -190,7 +194,8 @@ impl EmergenceDetector {
         let normalized: Vec<f64> = state.iter().map(|x| x.abs() / sum).collect();
 
         // Shannon entropy
-        -normalized.iter()
+        -normalized
+            .iter()
             .filter(|&&p| p > 1e-10)
             .map(|&p| p * p.ln())
             .sum::<f64>()
@@ -203,9 +208,12 @@ impl EmergenceDetector {
 
         // Order parameter: average alignment/correlation
         let mean: f64 = self.macro_state.iter().sum::<f64>() / self.macro_state.len() as f64;
-        let variance: f64 = self.macro_state.iter()
+        let variance: f64 = self
+            .macro_state
+            .iter()
             .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / self.macro_state.len() as f64;
+            .sum::<f64>()
+            / self.macro_state.len() as f64;
 
         // Low variance = high order
         1.0 / (1.0 + variance)
@@ -268,9 +276,10 @@ impl EmergenceDetector {
 
     fn record_property(&mut self, name: &str, score: f64, level: usize, description: &str) {
         // Check if already recorded recently
-        let recent = self.emergent_properties.iter().any(|p| {
-            p.name == name && p.level == level
-        });
+        let recent = self
+            .emergent_properties
+            .iter()
+            .any(|p| p.name == name && p.level == level);
 
         if !recent {
             self.emergent_properties.push(EmergentProperty {
@@ -336,7 +345,10 @@ impl CoarseGrainer {
 
     /// Create with specific groupings
     pub fn with_groupings(groupings: Vec<Vec<usize>>, aggregation: AggregationType) -> Self {
-        Self { groupings, aggregation }
+        Self {
+            groupings,
+            aggregation,
+        }
     }
 
     /// Coarsen a micro state to macro state
@@ -346,9 +358,11 @@ impl CoarseGrainer {
             return self.default_coarsen(micro);
         }
 
-        self.groupings.iter()
+        self.groupings
+            .iter()
             .map(|group| {
-                let values: Vec<f64> = group.iter()
+                let values: Vec<f64> = group
+                    .iter()
                     .filter_map(|&i| micro.get(i).copied())
                     .collect();
                 self.aggregate(&values)
@@ -357,7 +371,8 @@ impl CoarseGrainer {
     }
 
     fn default_coarsen(&self, micro: &[f64]) -> Vec<f64> {
-        micro.chunks(2)
+        micro
+            .chunks(2)
             .map(|chunk| chunk.iter().sum::<f64>() / chunk.len() as f64)
             .collect()
     }
@@ -371,13 +386,15 @@ impl CoarseGrainer {
             AggregationType::Mean => values.iter().sum::<f64>() / values.len() as f64,
             AggregationType::Majority => {
                 let positive = values.iter().filter(|&&v| v > 0.0).count();
-                if positive > values.len() / 2 { 1.0 } else { -1.0 }
+                if positive > values.len() / 2 {
+                    1.0
+                } else {
+                    -1.0
+                }
             }
             AggregationType::Max => values.iter().cloned().fold(f64::MIN, f64::max),
             AggregationType::WeightedSum(weights) => {
-                values.iter().zip(weights.iter())
-                    .map(|(v, w)| v * w)
-                    .sum()
+                values.iter().zip(weights.iter()).map(|(v, w)| v * w).sum()
             }
         }
     }
@@ -472,9 +489,8 @@ impl PhaseTransitionDetector {
         if self.order_parameter.len() >= self.window_size {
             let window = &self.order_parameter[self.order_parameter.len() - self.window_size..];
             let mean: f64 = window.iter().sum::<f64>() / window.len() as f64;
-            let variance: f64 = window.iter()
-                .map(|x| (x - mean).powi(2))
-                .sum::<f64>() / window.len() as f64;
+            let variance: f64 =
+                window.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / window.len() as f64;
             self.susceptibility.push(variance);
 
             // Detect transition (spike in susceptibility)

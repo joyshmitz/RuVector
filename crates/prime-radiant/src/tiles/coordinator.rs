@@ -42,7 +42,10 @@ pub struct ShardMap {
 impl ShardMap {
     /// Create a new shard map.
     pub fn new(hash_seed: u64, num_shards: u16) -> Self {
-        Self { hash_seed, num_shards }
+        Self {
+            hash_seed,
+            num_shards,
+        }
     }
 
     /// Create with default configuration.
@@ -168,10 +171,7 @@ impl TileCoordinator {
     ///
     /// This combines the witness fragments into a global witness that represents
     /// the coherence state across all tiles.
-    pub fn aggregate_witnesses(
-        &mut self,
-        tiles: &[TileAdapter],
-    ) -> TilesResult<AggregatedWitness> {
+    pub fn aggregate_witnesses(&mut self, tiles: &[TileAdapter]) -> TilesResult<AggregatedWitness> {
         if tiles.is_empty() {
             return Ok(AggregatedWitness::empty());
         }
@@ -338,7 +338,10 @@ mod tests {
 
         // Check reasonable distribution (each tile should have some nodes)
         let non_empty = tile_counts.iter().filter(|&&c| c > 0).count();
-        assert!(non_empty > 200, "Distribution too sparse: {non_empty} tiles used");
+        assert!(
+            non_empty > 200,
+            "Distribution too sparse: {non_empty} tiles used"
+        );
     }
 
     #[test]

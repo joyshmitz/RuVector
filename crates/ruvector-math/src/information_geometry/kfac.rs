@@ -72,11 +72,7 @@ impl KFACLayer {
     /// # Arguments
     /// * `activations` - Pre-activation inputs, shape [batch, input_dim]
     /// * `gradients` - Post-activation gradients, shape [batch, output_dim]
-    pub fn update(
-        &mut self,
-        activations: &[Vec<f64>],
-        gradients: &[Vec<f64>],
-    ) -> Result<()> {
+    pub fn update(&mut self, activations: &[Vec<f64>], gradients: &[Vec<f64>]) -> Result<()> {
         if activations.is_empty() || gradients.is_empty() {
             return Err(MathError::empty_input("batch"));
         }

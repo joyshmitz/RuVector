@@ -287,18 +287,14 @@ fn bench_throughput_ops_per_second(c: &mut Criterion) {
         let (a, b) = generate_vectors(dim);
 
         // Report throughput in operations/second
-        group.bench_with_input(
-            BenchmarkId::new("euclidean_ops", dim),
-            &dim,
-            |bench, _| {
-                bench.iter(|| {
-                    // Perform 100 operations per iteration
-                    for _ in 0..100 {
-                        euclidean_distance_simd(black_box(&a), black_box(&b));
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("euclidean_ops", dim), &dim, |bench, _| {
+            bench.iter(|| {
+                // Perform 100 operations per iteration
+                for _ in 0..100 {
+                    euclidean_distance_simd(black_box(&a), black_box(&b));
+                }
+            });
+        });
 
         group.bench_with_input(
             BenchmarkId::new("dot_product_ops", dim),

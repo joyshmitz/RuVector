@@ -6,8 +6,8 @@
 //!
 //! This is the foundational structure for cohomology computation.
 
-use crate::substrate::{RestrictionMap, SheafGraph};
 use crate::substrate::NodeId;
+use crate::substrate::{RestrictionMap, SheafGraph};
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -222,7 +222,12 @@ impl Sheaf {
     }
 
     /// Apply restriction map from source to target
-    pub fn restrict(&self, source: NodeId, target: NodeId, value: &Array1<f64>) -> Option<Array1<f64>> {
+    pub fn restrict(
+        &self,
+        source: NodeId,
+        target: NodeId,
+        value: &Array1<f64>,
+    ) -> Option<Array1<f64>> {
         self.restriction_maps
             .get(&(source, target))
             .map(|rho| rho(value))
@@ -338,9 +343,8 @@ impl SheafBuilder {
         target: NodeId,
         indices: Vec<usize>,
     ) -> Self {
-        let proj_fn: RestrictionFn = Arc::new(move |v: &Array1<f64>| {
-            Array1::from_iter(indices.iter().map(|&i| v[i]))
-        });
+        let proj_fn: RestrictionFn =
+            Arc::new(move |v: &Array1<f64>| Array1::from_iter(indices.iter().map(|&i| v[i])));
         self.sheaf.add_restriction(source, target, proj_fn);
         self
     }

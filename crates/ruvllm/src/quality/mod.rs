@@ -93,7 +93,7 @@ pub use coherence::{
     LogicalFlowResult, SemanticConsistencyResult,
 };
 pub use diversity::{
-    DiversityAnalyzer, DiversityConfig, DiversityResult, DiversificationSuggestion,
+    DiversificationSuggestion, DiversityAnalyzer, DiversityConfig, DiversityResult,
     ModeCollapseResult,
 };
 pub use metrics::{

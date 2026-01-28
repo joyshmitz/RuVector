@@ -8,8 +8,8 @@
 //! 4. **Quantum-Inspired Landauer Learning**: Coherence-based optimization
 //! 5. **Heat Engine Neural Networks**: Extract work from temperature gradients
 
-use std::f64::consts::LN_2;
 use crate::landauer_learning::constants;
+use std::f64::consts::LN_2;
 
 /// Novel Discovery 1: Entropy-Regularized Learning
 ///
@@ -136,7 +136,8 @@ impl FluctuationTheoremOptimizer {
             return 1.0;
         }
 
-        let window = &self.energy_history[self.energy_history.len().saturating_sub(self.window_size)..];
+        let window =
+            &self.energy_history[self.energy_history.len().saturating_sub(self.window_size)..];
 
         let positive = window.iter().filter(|&&e| e > 0.0).count() as f64;
         let negative = window.iter().filter(|&&e| e < 0.0).count() as f64;
@@ -161,9 +162,8 @@ impl FluctuationTheoremOptimizer {
 
         // Compute energy fluctuation variance
         let mean: f64 = window.iter().sum::<f64>() / window.len() as f64;
-        let variance: f64 = window.iter()
-            .map(|e| (e - mean).powi(2))
-            .sum::<f64>() / window.len() as f64;
+        let variance: f64 =
+            window.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / window.len() as f64;
 
         // Ideal variance ∝ kT (equipartition theorem)
         let ideal_variance = constants::BOLTZMANN * self.temperature;
@@ -182,11 +182,7 @@ impl FluctuationTheoremOptimizer {
     }
 
     /// Perform optimization step
-    pub fn step(
-        &mut self,
-        params: &mut [f64],
-        gradient: &[f64],
-    ) -> f64 {
+    pub fn step(&mut self, params: &mut [f64], gradient: &[f64]) -> f64 {
         assert_eq!(params.len(), gradient.len());
 
         // Compute energy before step
@@ -236,7 +232,7 @@ impl ThermodynamicMetaLearner {
     pub fn new(temperature: f64, meta_dim: usize) -> Self {
         Self {
             temperature,
-            meta_params: vec![0.1; meta_dim],  // Initialize meta-parameters
+            meta_params: vec![0.1; meta_dim], // Initialize meta-parameters
             meta_lr: 0.001,
             total_cost: 0.0,
         }
@@ -250,18 +246,11 @@ impl ThermodynamicMetaLearner {
     }
 
     /// Learn on a task and return thermodynamic cost
-    pub fn task_step(
-        &mut self,
-        task_id: usize,
-        params: &mut [f64],
-        gradient: &[f64],
-    ) -> f64 {
+    pub fn task_step(&mut self, task_id: usize, params: &mut [f64], gradient: &[f64]) -> f64 {
         let lr = self.generate_learning_rate(task_id);
 
         // Compute energy dissipated (proportional to ||update||^2)
-        let update_norm_sq: f64 = gradient.iter()
-            .map(|g| (lr * g).powi(2))
-            .sum();
+        let update_norm_sq: f64 = gradient.iter().map(|g| (lr * g).powi(2)).sum();
 
         let energy_dissipated = constants::BOLTZMANN * self.temperature * update_norm_sq;
         let entropy_produced = energy_dissipated / self.temperature;
@@ -366,7 +355,8 @@ impl QuantumInspiredOptimizer {
         }
 
         // Apply update
-        let update_norm_sq: f64 = collapsed_gradient.iter()
+        let update_norm_sq: f64 = collapsed_gradient
+            .iter()
             .map(|g| (self.learning_rate * g).powi(2))
             .sum();
 
@@ -521,7 +511,7 @@ mod tests {
         let carnot = engine.carnot_efficiency();
         assert!(carnot > 0.0);
         assert!(carnot < 1.0);
-        assert!((carnot - 0.25).abs() < 0.01);  // 1 - 300/400 = 0.25
+        assert!((carnot - 0.25).abs() < 0.01); // 1 - 300/400 = 0.25
     }
 
     #[test]

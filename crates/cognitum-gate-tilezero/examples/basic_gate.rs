@@ -23,8 +23,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("TileZero initialized with thresholds:");
     println!("  Min cut: {}", tilezero.thresholds().min_cut);
     println!("  Max shift: {}", tilezero.thresholds().max_shift);
-    println!("  Deny threshold (tau_deny): {}", tilezero.thresholds().tau_deny);
-    println!("  Permit threshold (tau_permit): {}", tilezero.thresholds().tau_permit);
+    println!(
+        "  Deny threshold (tau_deny): {}",
+        tilezero.thresholds().tau_deny
+    );
+    println!(
+        "  Permit threshold (tau_permit): {}",
+        tilezero.thresholds().tau_permit
+    );
     println!();
 
     // Create an action context

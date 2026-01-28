@@ -130,14 +130,9 @@ pub use utils::{error, log, now_ms, set_panic_hook, warn, Timer};
 
 // Re-export workers module
 pub use workers::{
+    cross_origin_isolated, detect_capability_level, feature_summary, is_atomics_available,
+    is_shared_array_buffer_available, optimal_worker_count, supports_parallel_inference,
     ParallelInference,
-    is_shared_array_buffer_available,
-    is_atomics_available,
-    cross_origin_isolated,
-    optimal_worker_count,
-    feature_summary,
-    detect_capability_level,
-    supports_parallel_inference,
 };
 
 // Re-export WebGPU module when enabled

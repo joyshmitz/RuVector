@@ -15,13 +15,13 @@
 //! - Projections P: 8-16
 //! - Centroids M: 16-32
 
-mod sliced_wasserstein;
-mod centroid_ot;
 mod cached_projections;
+mod centroid_ot;
+mod sliced_wasserstein;
 
-pub use sliced_wasserstein::{SlicedWassersteinAttention, SlicedWassersteinConfig};
-pub use centroid_ot::{CentroidCache, CentroidOTAttention, CentroidOTConfig};
 pub use cached_projections::{ProjectionCache, WindowCache};
+pub use centroid_ot::{CentroidCache, CentroidOTAttention, CentroidOTConfig};
+pub use sliced_wasserstein::{SlicedWassersteinAttention, SlicedWassersteinConfig};
 
 #[cfg(test)]
 mod tests {

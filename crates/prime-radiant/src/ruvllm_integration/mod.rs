@@ -94,94 +94,118 @@ pub mod adr_references {
 // PUBLIC RE-EXPORTS
 // ============================================================================
 
-pub use adapter::{
-    RuvLlmAdapter, AdapterConfig as LlmAdapterConfig, AdapterStats,
-};
+pub use adapter::{AdapterConfig as LlmAdapterConfig, AdapterStats, RuvLlmAdapter};
 
 pub use bridge::{
-    PolicyBridge, PolicyBridgeConfig, PolicySyncResult,
-    SonaBridge, SonaBridgeConfig, LearningFeedback,
+    LearningFeedback, PolicyBridge, PolicyBridgeConfig, PolicySyncResult, SonaBridge,
+    SonaBridgeConfig,
 };
 
 pub use config::{
-    LlmCoherenceConfig, GatingMode, ResponsePolicy,
-    CoherenceThresholds, HallucinationPolicy,
+    CoherenceThresholds, GatingMode, HallucinationPolicy, LlmCoherenceConfig, ResponsePolicy,
 };
 
-pub use error::{
-    RuvLlmIntegrationError, Result,
-};
+pub use error::{Result, RuvLlmIntegrationError};
 
 pub use gate::{
-    LlmCoherenceGate, LlmGateDecision, LlmGateReason,
-    ResponseCoherence, CoherenceAnalysis,
+    CoherenceAnalysis, LlmCoherenceGate, LlmGateDecision, LlmGateReason, ResponseCoherence,
 };
 
 pub use witness::{
-    WitnessAdapter, WitnessAdapterConfig, UnifiedWitnessEntry,
-    WitnessCorrelation, CorrelationId,
+    CorrelationId, UnifiedWitnessEntry, WitnessAdapter, WitnessAdapterConfig, WitnessCorrelation,
 };
 
 pub use witness_log::{
-    // Core unified witness log types
-    UnifiedWitnessLog, GenerationWitness, GenerationWitnessId,
+    CoherenceWitnessSummary,
+    GenerationWitness,
+    GenerationWitnessId,
     // Witness summaries
-    InferenceWitnessSummary, CoherenceWitnessSummary,
-    // Query and statistics
-    WitnessQuery, UnifiedWitnessStats,
+    InferenceWitnessSummary,
     // Errors
     UnifiedWitnessError,
+    // Core unified witness log types
+    UnifiedWitnessLog,
+    UnifiedWitnessStats,
+    // Query and statistics
+    WitnessQuery,
 };
 
-pub use confidence::{
-    CoherenceConfidence, ConfidenceLevel, ConfidenceScore, EnergyContributor,
-};
+pub use confidence::{CoherenceConfidence, ConfidenceLevel, ConfidenceScore, EnergyContributor};
 
 pub use coherence_validator::{
+    EdgeWeights,
     // Core validator
-    SheafCoherenceValidator, ValidatorConfig,
+    SheafCoherenceValidator,
     // Context and weights
-    ValidationContext, EdgeWeights,
+    ValidationContext,
+    ValidationError,
     // Results
-    ValidationResult, ValidationError,
+    ValidationResult,
     // Witness
-    ValidationWitness, WitnessDecision,
+    ValidationWitness,
+    ValidatorConfig,
+    WitnessDecision,
 };
 
 pub use memory_layer::{
-    // Core types
-    MemoryCoherenceLayer, MemoryCoherenceConfig, MemoryCoherenceError,
-    Result as MemoryResult,
-    // Memory types
-    MemoryType, MemoryEdgeType, MemoryEntry, MemoryId, CoherenceResult,
     // Traits
-    AgenticMemory, WorkingMemory, EpisodicMemory,
+    AgenticMemory,
+    CoherenceResult,
+    EpisodicMemory,
+    MemoryCoherenceConfig,
+    MemoryCoherenceError,
+    // Core types
+    MemoryCoherenceLayer,
+    MemoryEdgeType,
+    MemoryEntry,
+    MemoryId,
+    // Memory types
+    MemoryType,
+    Result as MemoryResult,
+    WorkingMemory,
 };
 
 // Pattern-to-Restriction Bridge (ADR-CE-018)
 pub use pattern_bridge::{
-    // Bridge core
-    PatternToRestrictionBridge, BridgeConfig, BridgeStats, ExportResult,
-    BridgeError, BridgeResult,
+    BridgeConfig,
+    BridgeError,
+    BridgeResult,
+    BridgeStats,
+    ExportResult,
     // Pattern types
-    PatternData, VerdictData,
+    PatternData,
     // Provider trait
     PatternProvider,
+    // Bridge core
+    PatternToRestrictionBridge,
+    VerdictData,
 };
 
 // Trait definitions for loose coupling
 pub use traits::{
+    Claim,
+    ClaimType,
     // Coherence validation
-    CoherenceValidatable, Claim, ClaimType, ContextSource, Fact, SemanticRelation, RelationType,
-    // Unified witness
-    UnifiedWitnessProvider, GenerationWitnessRef,
-    // Pattern bridge trait
-    PatternBridge, RestrictionMapRef,
-    // Memory coherence (with aliases to avoid conflicts with memory_layer)
-    MemoryType as TraitMemoryType, MemoryEntry as TraitMemoryEntry,
-    MemoryCoherenceProvider, MemoryAddResult,
+    CoherenceValidatable,
+    ConfidenceResult as TraitConfidenceResult,
     // Confidence
-    ConfidenceSource, ConfidenceResult as TraitConfidenceResult, UncertaintySource,
+    ConfidenceSource,
+    ContextSource,
+    Fact,
+    GenerationWitnessRef,
+    MemoryAddResult,
+    MemoryCoherenceProvider,
+    MemoryEntry as TraitMemoryEntry,
+    // Memory coherence (with aliases to avoid conflicts with memory_layer)
+    MemoryType as TraitMemoryType,
+    // Pattern bridge trait
+    PatternBridge,
+    RelationType,
+    RestrictionMapRef,
+    SemanticRelation,
+    UncertaintySource,
+    // Unified witness
+    UnifiedWitnessProvider,
 };
 
 // ============================================================================

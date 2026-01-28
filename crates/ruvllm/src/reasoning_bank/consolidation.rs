@@ -108,8 +108,8 @@ impl FisherInformation {
         let other_weight = 1.0 - self_weight;
         for i in 0..self.diagonal.len() {
             self.diagonal[i] = self.diagonal[i] * self_weight + other.diagonal[i] * other_weight;
-            self.ema_grad_squared[i] = self.ema_grad_squared[i] * self_weight
-                + other.ema_grad_squared[i] * other_weight;
+            self.ema_grad_squared[i] =
+                self.ema_grad_squared[i] * self_weight + other.ema_grad_squared[i] * other_weight;
         }
 
         self.sample_count = ((self.sample_count as f32 * self_weight)
@@ -145,7 +145,11 @@ pub struct ImportanceFactors {
 
 impl ImportanceScore {
     /// Compute importance score for a pattern
-    pub fn compute(pattern: &Pattern, fisher: Option<&FisherInformation>, max_age_secs: u64) -> Self {
+    pub fn compute(
+        pattern: &Pattern,
+        fisher: Option<&FisherInformation>,
+        max_age_secs: u64,
+    ) -> Self {
         let mut factors = ImportanceFactors::default();
 
         // Usage factor (log scale to avoid domination)
@@ -256,7 +260,13 @@ impl PatternConsolidator {
         // Compute importance scores
         let scores: Vec<ImportanceScore> = patterns
             .iter()
-            .map(|p| ImportanceScore::compute(p, self.fisher_info.get(&p.id), self.config.max_unused_age_secs))
+            .map(|p| {
+                ImportanceScore::compute(
+                    p,
+                    self.fisher_info.get(&p.id),
+                    self.config.max_unused_age_secs,
+                )
+            })
             .collect();
 
         // Identify patterns to prune (low importance)
@@ -394,7 +404,8 @@ impl PatternConsolidator {
 
     /// Update Fisher information for a pattern
     pub fn update_fisher(&mut self, pattern_id: u64, gradient: &[f32]) {
-        let fisher = self.fisher_info
+        let fisher = self
+            .fisher_info
             .entry(pattern_id)
             .or_insert_with(|| FisherInformation::new(gradient.len()));
 
@@ -458,8 +469,8 @@ impl PatternConsolidator {
             .count();
 
         let scale = 1.0 + 0.1 * important_count as f32;
-        self.lambda = (self.config.lambda * scale)
-            .clamp(self.config.min_lambda, self.config.max_lambda);
+        self.lambda =
+            (self.config.lambda * scale).clamp(self.config.min_lambda, self.config.max_lambda);
     }
 
     /// Consolidate all Fisher information (for memory efficiency)
@@ -469,7 +480,12 @@ impl PatternConsolidator {
         }
 
         // Average all Fisher information
-        let dim = self.fisher_info.values().next().map(|f| f.diagonal.len()).unwrap_or(0);
+        let dim = self
+            .fisher_info
+            .values()
+            .next()
+            .map(|f| f.diagonal.len())
+            .unwrap_or(0);
         if dim == 0 {
             return;
         }
@@ -631,7 +647,9 @@ mod tests {
             make_pattern(3, vec![0.0, 1.0, 0.0, 0.0], 0.9, 10),  // Different
         ];
 
-        let merged = consolidator.find_mergeable_patterns(&patterns, &[]).unwrap();
+        let merged = consolidator
+            .find_mergeable_patterns(&patterns, &[])
+            .unwrap();
         // Pattern 2 should be marked for merging into 1
         assert!(merged.contains(&2));
         assert!(!merged.contains(&1));

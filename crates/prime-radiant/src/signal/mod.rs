@@ -67,10 +67,7 @@ pub enum SignalType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NormalizedPayload {
     /// State update payload.
-    StateUpdate {
-        node_id: String,
-        state: Vec<f32>,
-    },
+    StateUpdate { node_id: String, state: Vec<f32> },
     /// Edge modification payload.
     EdgeMod {
         source: String,

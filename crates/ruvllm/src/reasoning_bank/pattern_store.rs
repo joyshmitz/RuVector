@@ -6,14 +6,14 @@
 use crate::error::{Result, RuvLLMError};
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
-use ruvector_core::{DistanceMetric, VectorDB, VectorEntry, SearchQuery};
 use ruvector_core::types::{DbOptions, HnswConfig};
+use ruvector_core::{DistanceMetric, SearchQuery, VectorDB, VectorEntry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
-use super::{Trajectory, KeyLesson, Verdict};
+use super::{KeyLesson, Trajectory, Verdict};
 
 /// Global pattern ID counter
 static PATTERN_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -213,7 +213,8 @@ impl Pattern {
     pub fn from_trajectory(trajectory: &Trajectory) -> Self {
         let category = Self::infer_category(trajectory);
 
-        let example_actions: Vec<String> = trajectory.steps
+        let example_actions: Vec<String> = trajectory
+            .steps
             .iter()
             .take(5)
             .map(|s| s.action.clone())
@@ -353,7 +354,8 @@ impl Pattern {
         self.confidence = self.confidence.max(other.confidence);
 
         // Merge collections
-        self.source_trajectories.extend(other.source_trajectories.clone());
+        self.source_trajectories
+            .extend(other.source_trajectories.clone());
         for lesson in &other.lessons {
             if !self.lessons.contains(lesson) {
                 self.lessons.push(lesson.clone());
@@ -506,7 +508,8 @@ impl PatternStore {
                 metadata: None,
             };
             let index = self.index.write();
-            index.insert(entry)
+            index
+                .insert(entry)
                 .map_err(|e| RuvLLMError::Storage(format!("Failed to insert into index: {}", e)))?;
         }
 
@@ -537,11 +540,7 @@ impl PatternStore {
     }
 
     /// Search for similar patterns
-    pub fn search_similar(
-        &self,
-        query: &[f32],
-        limit: usize,
-    ) -> Result<Vec<PatternSearchResult>> {
+    pub fn search_similar(&self, query: &[f32], limit: usize) -> Result<Vec<PatternSearchResult>> {
         let start = std::time::Instant::now();
 
         // Search HNSW index
@@ -553,7 +552,8 @@ impl PatternStore {
                 ef_search: Some(self.config.ef_search),
             };
             let index = self.index.read();
-            index.search(search_query)
+            index
+                .search(search_query)
                 .map_err(|e| RuvLLMError::Storage(format!("Search failed: {}", e)))?
         };
 
@@ -576,17 +576,14 @@ impl PatternStore {
         // Update search stats
         let elapsed_us = start.elapsed().as_micros() as u64;
         self.search_count.fetch_add(1, Ordering::Relaxed);
-        self.total_search_time_us.fetch_add(elapsed_us, Ordering::Relaxed);
+        self.total_search_time_us
+            .fetch_add(elapsed_us, Ordering::Relaxed);
 
         Ok(search_results)
     }
 
     /// Get patterns by category
-    pub fn get_by_category(
-        &self,
-        category: PatternCategory,
-        limit: usize,
-    ) -> Result<Vec<Pattern>> {
+    pub fn get_by_category(&self, category: PatternCategory, limit: usize) -> Result<Vec<Pattern>> {
         let cat_index = self.category_index.read();
         let patterns = self.patterns.read();
 
@@ -599,7 +596,11 @@ impl PatternStore {
             .collect();
 
         // Sort by confidence descending
-        result.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        result.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(result)
     }
@@ -655,7 +656,9 @@ impl PatternStore {
             let patterns = self.patterns.read();
             patterns
                 .iter()
-                .filter(|(_, p)| p.avg_quality < min_quality && p.usage_count < self.config.prune_threshold)
+                .filter(|(_, p)| {
+                    p.avg_quality < min_quality && p.usage_count < self.config.prune_threshold
+                })
                 .map(|(id, _)| *id)
                 .collect()
         };
@@ -674,17 +677,23 @@ impl PatternStore {
             let patterns = self.patterns.read();
             let mut sorted: Vec<_> = patterns
                 .iter()
-                .filter(|(_, p)| p.should_prune(
-                    self.config.prune_threshold,
-                    self.config.max_unused_age_secs,
-                    self.config.min_confidence,
-                ))
+                .filter(|(_, p)| {
+                    p.should_prune(
+                        self.config.prune_threshold,
+                        self.config.max_unused_age_secs,
+                        self.config.min_confidence,
+                    )
+                })
                 .collect();
 
             sorted.sort_by(|a, b| a.1.last_accessed.cmp(&b.1.last_accessed));
 
             let remove_count = sorted.len().min(self.config.max_patterns / 10);
-            sorted.into_iter().take(remove_count).map(|(id, _)| *id).collect()
+            sorted
+                .into_iter()
+                .take(remove_count)
+                .map(|(id, _)| *id)
+                .collect()
         };
 
         let count = to_remove.len();
@@ -788,11 +797,7 @@ mod tests {
 
     #[test]
     fn test_pattern_creation() {
-        let pattern = Pattern::new(
-            vec![0.1; 768],
-            PatternCategory::Reasoning,
-            0.9,
-        );
+        let pattern = Pattern::new(vec![0.1; 768], PatternCategory::Reasoning, 0.9);
 
         assert!(pattern.id > 0 || pattern.id == 0); // First pattern might be 0
         assert_eq!(pattern.category, PatternCategory::Reasoning);
@@ -859,7 +864,9 @@ mod tests {
         assert_eq!(results[0].pattern.id, id);
 
         // Get by category
-        let by_cat = store.get_by_category(PatternCategory::Reasoning, 10).unwrap();
+        let by_cat = store
+            .get_by_category(PatternCategory::Reasoning, 10)
+            .unwrap();
         assert!(!by_cat.is_empty());
 
         // Stats
@@ -870,7 +877,10 @@ mod tests {
     #[test]
     fn test_pattern_category() {
         assert_eq!(PatternCategory::General.to_string(), "general");
-        assert_eq!(PatternCategory::CodeGeneration.to_string(), "code_generation");
+        assert_eq!(
+            PatternCategory::CodeGeneration.to_string(),
+            "code_generation"
+        );
         assert_eq!(
             PatternCategory::Custom("test".to_string()).to_string(),
             "custom:test"

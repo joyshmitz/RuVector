@@ -105,8 +105,8 @@ impl HierarchicalPhiBatcher {
 
             if start < phi_values.len() {
                 // Aggregate via mean (could also use median, max, etc.)
-                let batch_mean: f64 = phi_values[start..end].iter().sum::<f64>()
-                    / (end - start) as f64;
+                let batch_mean: f64 =
+                    phi_values[start..end].iter().sum::<f64>() / (end - start) as f64;
                 compressed.push(batch_mean);
             }
         }
@@ -268,7 +268,10 @@ impl HierarchicalPhiResults {
 
         summary.push_str(&format!("Hierarchical Φ Computation Results\n"));
         summary.push_str(&format!("===================================\n"));
-        summary.push_str(&format!("Networks processed: {}\n", self.total_networks_processed));
+        summary.push_str(&format!(
+            "Networks processed: {}\n",
+            self.total_networks_processed
+        ));
         summary.push_str(&format!(
             "Effective simulations: {:.2e}\n",
             self.effective_simulations as f64
@@ -399,7 +402,11 @@ mod tests {
 
         // Generate test networks
         let param_space = ConsciousnessParameterSpace::new(4);
-        let networks: Vec<_> = param_space.generate_networks().into_iter().take(64).collect();
+        let networks: Vec<_> = param_space
+            .generate_networks()
+            .into_iter()
+            .take(64)
+            .collect();
 
         let results = batcher.process_hierarchical_batch(&networks);
 

@@ -71,10 +71,7 @@ impl Platform {
     pub fn supports_webgpu(&self) -> bool {
         matches!(
             self,
-            Platform::MacOS
-                | Platform::Linux
-                | Platform::Windows
-                | Platform::WebAssembly
+            Platform::MacOS | Platform::Linux | Platform::Windows | Platform::WebAssembly
         )
     }
 
@@ -136,9 +133,9 @@ impl Architecture {
     /// Get SIMD width in bytes
     pub fn simd_width(&self) -> usize {
         match self {
-            Architecture::X86_64 => 32, // AVX2
+            Architecture::X86_64 => 32,  // AVX2
             Architecture::Aarch64 => 16, // NEON
-            Architecture::Wasm32 => 16, // SIMD128
+            Architecture::Wasm32 => 16,  // SIMD128
             Architecture::Unknown => 0,
         }
     }
@@ -547,7 +544,10 @@ impl FallbackChain {
 
     /// Get the primary backend
     pub fn primary(&self) -> ComputeBackend {
-        self.backends.first().copied().unwrap_or(ComputeBackend::Cpu)
+        self.backends
+            .first()
+            .copied()
+            .unwrap_or(ComputeBackend::Cpu)
     }
 
     /// Get all backends in order
@@ -711,10 +711,7 @@ impl OptimalConfig {
         };
 
         // Flash attention availability
-        let use_flash_attention = matches!(
-            backend,
-            ComputeBackend::Metal | ComputeBackend::Cuda
-        );
+        let use_flash_attention = matches!(backend, ComputeBackend::Metal | ComputeBackend::Cuda);
 
         // Memory mapping (not available in WASM)
         let memory_mapped_weights = caps.platform.supports_native_io();

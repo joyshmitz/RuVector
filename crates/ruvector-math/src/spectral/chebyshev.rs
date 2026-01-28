@@ -134,12 +134,15 @@ impl ChebyshevExpansion {
     /// Approximate exp(-t*x) for heat kernel (x in [0, 2])
     /// Maps [0, 2] to [-1, 1] via x' = x - 1
     pub fn heat_kernel(t: f64, degree: usize) -> Self {
-        Self::from_function(|x| {
-            let exponent = -t * (x + 1.0);
-            // Clamp to prevent overflow (exp(709) ≈ max f64, exp(-745) ≈ 0)
-            let clamped = exponent.clamp(-700.0, 700.0);
-            clamped.exp()
-        }, degree)
+        Self::from_function(
+            |x| {
+                let exponent = -t * (x + 1.0);
+                // Clamp to prevent overflow (exp(709) ≈ max f64, exp(-745) ≈ 0)
+                let clamped = exponent.clamp(-700.0, 700.0);
+                clamped.exp()
+            },
+            degree,
+        )
     }
 
     /// Approximate low-pass filter: 1 if λ < cutoff, 0 otherwise
@@ -245,7 +248,9 @@ impl ChebyshevExpansion {
             d_coeffs[0] *= 0.5;
         }
 
-        Self { coefficients: d_coeffs }
+        Self {
+            coefficients: d_coeffs,
+        }
     }
 }
 

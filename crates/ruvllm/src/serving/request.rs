@@ -238,7 +238,10 @@ impl RunningRequest {
 
     /// Get remaining tokens to generate
     pub fn remaining_tokens(&self) -> usize {
-        self.request.params.max_tokens.saturating_sub(self.generated_tokens.len())
+        self.request
+            .params
+            .max_tokens
+            .saturating_sub(self.generated_tokens.len())
     }
 
     /// Get the position for the next token

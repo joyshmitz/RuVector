@@ -371,9 +371,7 @@ fn bench_lora_forward(c: &mut Criterion) {
             );
 
             group.throughput(Throughput::Elements(adapter.param_count() as u64));
-            group.bench_function(id, |b| {
-                b.iter(|| adapter.forward(black_box(&input)))
-            });
+            group.bench_function(id, |b| b.iter(|| adapter.forward(black_box(&input))));
         }
     }
 
@@ -423,7 +421,9 @@ fn bench_lora_forward_batch(c: &mut Criterion) {
 
         let id = BenchmarkId::new(format!("batch_{}", batch_size), batch_size);
 
-        group.throughput(Throughput::Elements((batch_size * adapter.param_count()) as u64));
+        group.throughput(Throughput::Elements(
+            (batch_size * adapter.param_count()) as u64,
+        ));
         group.bench_function(id, |b| {
             b.iter(|| adapter.forward_batch(black_box(&input), batch_size))
         });
@@ -447,11 +447,7 @@ fn bench_lora_gradient_accumulation(c: &mut Criterion) {
         group.throughput(Throughput::Elements(adapter.param_count() as u64));
         group.bench_function(id, |b| {
             b.iter(|| {
-                adapter.accumulate_gradient(
-                    black_box(&input),
-                    black_box(&grad_output),
-                    0.8,
-                );
+                adapter.accumulate_gradient(black_box(&input), black_box(&grad_output), 0.8);
             })
         });
     }
@@ -591,9 +587,7 @@ fn bench_lora_memory_footprint(c: &mut Criterion) {
         let id = BenchmarkId::new(format!("{}_{}KB", name, memory_bytes / 1024), memory_bytes);
 
         group.throughput(Throughput::Bytes(memory_bytes as u64));
-        group.bench_function(id, |b| {
-            b.iter(|| adapter.forward(black_box(&input)))
-        });
+        group.bench_function(id, |b| b.iter(|| adapter.forward(black_box(&input))));
     }
 
     group.finish();

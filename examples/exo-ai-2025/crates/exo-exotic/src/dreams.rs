@@ -16,9 +16,9 @@
 //! Inspired by research on hippocampal replay, REM sleep, and the
 //! activation-synthesis hypothesis.
 
-use std::collections::{HashMap, VecDeque};
 use rand::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use uuid::Uuid;
 
 /// Engine for generating and processing artificial dreams
@@ -157,9 +157,7 @@ impl DreamEngine {
             return 0.0;
         }
 
-        let total: f64 = self.dream_history.iter()
-            .map(|d| d.creativity_score)
-            .sum();
+        let total: f64 = self.dream_history.iter().map(|d| d.creativity_score).sum();
         total / self.dream_history.len() as f64
     }
 
@@ -238,14 +236,18 @@ impl DreamEngine {
         let mut consolidated = Vec::new();
 
         // Prioritize high-salience, emotionally charged memories
-        let mut candidates: Vec<_> = self.memory_traces.iter_mut()
+        let mut candidates: Vec<_> = self
+            .memory_traces
+            .iter_mut()
             .filter(|t| t.salience > 0.3 || t.emotional_valence.abs() > 0.5)
             .collect();
 
         candidates.sort_by(|a, b| {
             let score_a = a.salience + a.emotional_valence.abs();
             let score_b = b.salience + b.emotional_valence.abs();
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for trace in candidates.iter_mut().take(5) {
@@ -271,7 +273,8 @@ impl DreamEngine {
         for _ in 0..num_combinations {
             // Select random memories to combine
             let indices: Vec<usize> = (0..self.memory_traces.len()).collect();
-            let selected: Vec<_> = indices.choose_multiple(&mut self.rng, 2.min(self.memory_traces.len()))
+            let selected: Vec<_> = indices
+                .choose_multiple(&mut self.rng, 2.min(self.memory_traces.len()))
                 .cloned()
                 .collect();
 
@@ -325,7 +328,9 @@ impl DreamEngine {
         }
 
         // Minimum distance to any existing pattern
-        let min_similarity = self.memory_traces.iter()
+        let min_similarity = self
+            .memory_traces
+            .iter()
             .map(|trace| self.cosine_similarity(pattern, &trace.content))
             .fold(f64::MAX, f64::min);
 
@@ -336,9 +341,8 @@ impl DreamEngine {
     fn calculate_coherence(&self, pattern: &[f64]) -> f64 {
         // Coherence based on internal consistency (low variance)
         let mean = pattern.iter().sum::<f64>() / pattern.len().max(1) as f64;
-        let variance = pattern.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f64>() / pattern.len().max(1) as f64;
+        let variance =
+            pattern.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / pattern.len().max(1) as f64;
 
         1.0 / (1.0 + variance)
     }
@@ -372,7 +376,8 @@ impl DreamEngine {
         }
 
         let avg_novelty = patterns.iter().map(|p| p.novelty).sum::<f64>() / patterns.len() as f64;
-        let avg_coherence = patterns.iter().map(|p| p.coherence).sum::<f64>() / patterns.len() as f64;
+        let avg_coherence =
+            patterns.iter().map(|p| p.coherence).sum::<f64>() / patterns.len() as f64;
 
         // Creativity = novelty balanced with coherence
         (avg_novelty * 0.7 + avg_coherence * 0.3).clamp(0.0, 1.0)
@@ -414,9 +419,7 @@ impl DreamEngine {
                         "Novel connection discovered with novelty={:.2} coherence={:.2}",
                         pattern.novelty, pattern.coherence
                     ),
-                    source_connections: pattern.sources.windows(2)
-                        .map(|w| (w[0], w[1]))
-                        .collect(),
+                    source_connections: pattern.sources.windows(2).map(|w| (w[0], w[1])).collect(),
                     confidence: pattern.coherence,
                 });
             }
@@ -454,16 +457,16 @@ impl DreamEngine {
     pub fn statistics(&self) -> DreamStatistics {
         let total_dreams = self.dream_history.len();
         let avg_creativity = self.measure_creativity();
-        let total_insights: usize = self.dream_history.iter()
-            .map(|d| d.insights.len())
-            .sum();
+        let total_insights: usize = self.dream_history.iter().map(|d| d.insights.len()).sum();
 
         DreamStatistics {
             total_dreams,
             average_creativity: avg_creativity,
             total_insights,
             total_memories: self.memory_traces.len(),
-            most_replayed: self.memory_traces.iter()
+            most_replayed: self
+                .memory_traces
+                .iter()
                 .max_by_key(|t| t.replay_count)
                 .map(|t| (t.id, t.replay_count)),
         }

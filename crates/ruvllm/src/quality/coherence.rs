@@ -311,8 +311,8 @@ impl CoherenceValidator {
         let std_dev = compute_std_dev(&all_sims, avg);
 
         let consistency_score = avg;
-        let is_consistent = inconsistent.is_empty()
-            && consistency_score >= self.config.similarity_threshold;
+        let is_consistent =
+            inconsistent.is_empty() && consistency_score >= self.config.similarity_threshold;
 
         Ok(SemanticConsistencyResult {
             is_consistent,
@@ -339,12 +339,9 @@ impl CoherenceValidator {
         // Check for negation-based contradictions
         for i in 0..segments.len() {
             for j in (i + 1)..segments.len() {
-                if let Some(contradiction) = self.check_negation_contradiction(
-                    i,
-                    j,
-                    &segments[i],
-                    &segments[j],
-                ) {
+                if let Some(contradiction) =
+                    self.check_negation_contradiction(i, j, &segments[i], &segments[j])
+                {
                     contradictions.push(contradiction);
                 }
             }
@@ -353,12 +350,9 @@ impl CoherenceValidator {
         // Check for numeric contradictions
         for i in 0..segments.len() {
             for j in (i + 1)..segments.len() {
-                if let Some(contradiction) = self.check_numeric_contradiction(
-                    i,
-                    j,
-                    &segments[i],
-                    &segments[j],
-                ) {
+                if let Some(contradiction) =
+                    self.check_numeric_contradiction(i, j, &segments[i], &segments[j])
+                {
                     contradictions.push(contradiction);
                 }
             }
@@ -439,11 +433,7 @@ impl CoherenceValidator {
                     segment_index: i + 1,
                     violation_type: ViolationType::TopicShift,
                     severity: 1.0 - sim,
-                    description: format!(
-                        "Abrupt topic shift between segments {} and {}",
-                        i,
-                        i + 1
-                    ),
+                    description: format!("Abrupt topic shift between segments {} and {}", i, i + 1),
                     suggestion: Some("Add a transition sentence".to_string()),
                 });
                 suggestions.push(format!(
@@ -461,10 +451,7 @@ impl CoherenceValidator {
                         segment_index: i + 1,
                         violation_type: ViolationType::MissingTransition,
                         severity: 0.3,
-                        description: format!(
-                            "Missing transition marker at segment {}",
-                            i + 1
-                        ),
+                        description: format!("Missing transition marker at segment {}", i + 1),
                         suggestion: Some("Add a transition word".to_string()),
                     });
                 }
@@ -478,11 +465,8 @@ impl CoherenceValidator {
             transition_scores.iter().sum::<f32>() / transition_scores.len() as f32
         };
 
-        let violation_penalty = violations
-            .iter()
-            .map(|v| v.severity)
-            .sum::<f32>()
-            / segments.len() as f32;
+        let violation_penalty =
+            violations.iter().map(|v| v.severity).sum::<f32>() / segments.len() as f32;
 
         let flow_score = (avg_transition - violation_penalty * 0.5).clamp(0.0, 1.0);
         let has_logical_flow = flow_score >= self.config.logical_flow_threshold;
@@ -514,7 +498,8 @@ impl CoherenceValidator {
         // Simple hash-based feature extraction
         for (i, word) in words.iter().enumerate() {
             for (j, c) in word.chars().enumerate() {
-                let idx = ((c as usize * 31 + j * 17 + i * 13) % self.config.embedding_dim) as usize;
+                let idx =
+                    ((c as usize * 31 + j * 17 + i * 13) % self.config.embedding_dim) as usize;
                 embedding[idx] += 1.0;
             }
         }
@@ -643,10 +628,7 @@ impl CoherenceValidator {
                         text_b: text_b.to_string(),
                         severity: 0.6,
                         contradiction_type: ContradictionType::Numeric,
-                        explanation: format!(
-                            "Numeric inconsistency: {} vs {}",
-                            num_a, num_b
-                        ),
+                        explanation: format!("Numeric inconsistency: {} vs {}", num_a, num_b),
                     });
                 }
             }
@@ -693,8 +675,8 @@ fn compute_std_dev(values: &[f32], mean: f32) -> f32 {
         return 0.0;
     }
 
-    let variance: f32 = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>()
-        / (values.len() - 1) as f32;
+    let variance: f32 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / (values.len() - 1) as f32;
 
     variance.sqrt()
 }
@@ -748,7 +730,9 @@ mod tests {
         let validator = CoherenceValidator::default_config();
         let segments = vec!["This is a test.".to_string()];
 
-        let result = validator.validate_semantic_consistency(&segments, None).unwrap();
+        let result = validator
+            .validate_semantic_consistency(&segments, None)
+            .unwrap();
         assert!(result.is_consistent);
         assert_eq!(result.consistency_score, 1.0);
     }
@@ -761,7 +745,9 @@ mod tests {
             "The cat was sitting on the mat.".to_string(),
         ];
 
-        let result = validator.validate_semantic_consistency(&segments, None).unwrap();
+        let result = validator
+            .validate_semantic_consistency(&segments, None)
+            .unwrap();
         assert!(result.consistency_score > 0.5);
     }
 

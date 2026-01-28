@@ -111,12 +111,7 @@ impl PuzzleGenerator {
             "western",
         ));
         self.anchors.push(TemporalAnchor::new(
-            "New Year",
-            2024,
-            1,
-            1,
-            "holiday",
-            "western",
+            "New Year", 2024, 1, 1, "holiday", "western",
         ));
         self.anchors.push(TemporalAnchor::new(
             "Independence Day",
@@ -318,12 +313,15 @@ impl PuzzleGenerator {
             ConstraintType::Year => Ok((TemporalConstraint::InYear(target.year()), None)),
             ConstraintType::Month => Ok((TemporalConstraint::InMonth(target.month()), None)),
             ConstraintType::DayOfMonth => Ok((TemporalConstraint::DayOfMonth(target.day()), None)),
-            ConstraintType::DayOfWeek => Ok((TemporalConstraint::DayOfWeek(target.weekday()), None)),
+            ConstraintType::DayOfWeek => {
+                Ok((TemporalConstraint::DayOfWeek(target.weekday()), None))
+            }
             ConstraintType::DayRange => {
                 let start = target.day().saturating_sub(self.rng.gen_range(0..5));
                 let end = (target.day() + self.rng.gen_range(0..5)).min(28);
-                let start_date = NaiveDate::from_ymd_opt(target.year(), target.month(), start.max(1))
-                    .unwrap_or(target);
+                let start_date =
+                    NaiveDate::from_ymd_opt(target.year(), target.month(), start.max(1))
+                        .unwrap_or(target);
                 let end_date =
                     NaiveDate::from_ymd_opt(target.year(), target.month(), end).unwrap_or(target);
                 Ok((TemporalConstraint::Between(start_date, end_date), None))

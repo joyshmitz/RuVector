@@ -155,14 +155,21 @@ impl RequestQueue {
 
     /// Submit a new request
     pub fn submit(&mut self, request: InferenceRequest) {
-        self.queues.get_mut(&request.priority).unwrap().push_back(request);
+        self.queues
+            .get_mut(&request.priority)
+            .unwrap()
+            .push_back(request);
         self.count += 1;
     }
 
     /// Pop highest priority request
     pub fn pop(&mut self) -> Option<InferenceRequest> {
-        for priority in [RequestPriority::Realtime, RequestPriority::High,
-                         RequestPriority::Normal, RequestPriority::Low] {
+        for priority in [
+            RequestPriority::Realtime,
+            RequestPriority::High,
+            RequestPriority::Normal,
+            RequestPriority::Low,
+        ] {
             if let Some(queue) = self.queues.get_mut(&priority) {
                 if let Some(request) = queue.pop_front() {
                     self.count -= 1;
@@ -175,8 +182,12 @@ impl RequestQueue {
 
     /// Peek at next request without removing
     pub fn peek(&self) -> Option<&InferenceRequest> {
-        for priority in [RequestPriority::Realtime, RequestPriority::High,
-                         RequestPriority::Normal, RequestPriority::Low] {
+        for priority in [
+            RequestPriority::Realtime,
+            RequestPriority::High,
+            RequestPriority::Normal,
+            RequestPriority::Low,
+        ] {
             if let Some(queue) = self.queues.get(&priority) {
                 if let Some(request) = queue.front() {
                     return Some(request);
@@ -292,7 +303,9 @@ impl KvCacheManager {
 
     /// Get slot for a request
     pub fn get_slot(&self, request_id: RequestId) -> Option<&KvCacheSlot> {
-        self.request_to_slot.get(&request_id).map(|&id| &self.slots[id])
+        self.request_to_slot
+            .get(&request_id)
+            .map(|&id| &self.slots[id])
     }
 
     /// Check available slots
@@ -454,7 +467,9 @@ impl ContinuousBatchScheduler {
     fn should_preempt(&self, new_request: &InferenceRequest) -> bool {
         if !self.running.is_empty() {
             // Check if new request has higher priority
-            if let Some(lowest) = self.running.iter()
+            if let Some(lowest) = self
+                .running
+                .iter()
                 .filter(|r| r.state == RequestState::Decode)
                 .min_by_key(|r| r.priority)
             {
@@ -466,7 +481,9 @@ impl ContinuousBatchScheduler {
 
     /// Preempt lowest priority running request
     fn preempt_lowest_priority(&mut self) {
-        if let Some(idx) = self.running.iter()
+        if let Some(idx) = self
+            .running
+            .iter()
             .enumerate()
             .filter(|(_, r)| r.state == RequestState::Decode)
             .min_by_key(|(_, r)| r.priority)
@@ -566,16 +583,22 @@ fn test_request_queue_priority() {
     let mut queue = RequestQueue::new();
 
     // Add low priority first
-    queue.submit(InferenceRequest::new(vec![1], GenerateParams::default())
-        .with_priority(RequestPriority::Low));
+    queue.submit(
+        InferenceRequest::new(vec![1], GenerateParams::default())
+            .with_priority(RequestPriority::Low),
+    );
 
     // Add high priority second
-    queue.submit(InferenceRequest::new(vec![2], GenerateParams::default())
-        .with_priority(RequestPriority::High));
+    queue.submit(
+        InferenceRequest::new(vec![2], GenerateParams::default())
+            .with_priority(RequestPriority::High),
+    );
 
     // Add normal priority third
-    queue.submit(InferenceRequest::new(vec![3], GenerateParams::default())
-        .with_priority(RequestPriority::Normal));
+    queue.submit(
+        InferenceRequest::new(vec![3], GenerateParams::default())
+            .with_priority(RequestPriority::Normal),
+    );
 
     // Should get high first
     let req = queue.pop().unwrap();
@@ -700,10 +723,7 @@ fn test_preemption_recompute() {
 
 #[test]
 fn test_request_lifecycle() {
-    let mut request = InferenceRequest::new(
-        vec![1, 2, 3],
-        GenerateParams::default(),
-    );
+    let mut request = InferenceRequest::new(vec![1, 2, 3], GenerateParams::default());
 
     assert_eq!(request.state, RequestState::Queued);
     assert!(!request.is_complete());
@@ -790,13 +810,17 @@ fn test_realtime_priority() {
 
     // Add normal requests
     for _ in 0..3 {
-        queue.submit(InferenceRequest::new(vec![1], GenerateParams::default())
-            .with_priority(RequestPriority::Normal));
+        queue.submit(
+            InferenceRequest::new(vec![1], GenerateParams::default())
+                .with_priority(RequestPriority::Normal),
+        );
     }
 
     // Add realtime request last
-    queue.submit(InferenceRequest::new(vec![9], GenerateParams::default())
-        .with_priority(RequestPriority::Realtime));
+    queue.submit(
+        InferenceRequest::new(vec![9], GenerateParams::default())
+            .with_priority(RequestPriority::Realtime),
+    );
 
     // Realtime should be first despite being added last
     let req = queue.pop().unwrap();
@@ -856,7 +880,10 @@ mod async_tests {
                 tokio::spawn(async move {
                     let mut request = InferenceRequest::new(
                         vec![i as u32],
-                        GenerateParams { max_tokens: 5, ..Default::default() },
+                        GenerateParams {
+                            max_tokens: 5,
+                            ..Default::default()
+                        },
                     );
 
                     let tokens = simulate_generation(&mut request, 5).await;
@@ -944,10 +971,10 @@ fn test_high_throughput_queue() {
             _ => RequestPriority::Realtime,
         };
 
-        queue.submit(InferenceRequest::new(
-            vec![i as u32],
-            GenerateParams::default(),
-        ).with_priority(priority));
+        queue.submit(
+            InferenceRequest::new(vec![i as u32], GenerateParams::default())
+                .with_priority(priority),
+        );
     }
 
     assert_eq!(queue.len(), 1000);
@@ -992,7 +1019,11 @@ fn test_kv_cache_churn() {
     }
 
     // After freeing all, should have all slots available
-    assert_eq!(manager.available_slots(), 10, "All slots should be free after cleanup");
+    assert_eq!(
+        manager.available_slots(),
+        10,
+        "All slots should be free after cleanup"
+    );
 }
 
 #[test]

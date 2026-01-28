@@ -3,7 +3,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rand::prelude::*;
 use rand_distr::StandardNormal;
-use ruvector_math::information_geometry::{FisherInformation, NaturalGradient, KFACApproximation};
+use ruvector_math::information_geometry::{FisherInformation, KFACApproximation, NaturalGradient};
 
 fn generate_gradients(n: usize, dim: usize, seed: u64) -> Vec<Vec<f64>> {
     let mut rng = StdRng::seed_from_u64(seed);
@@ -85,7 +85,11 @@ fn bench_kfac(c: &mut Criterion) {
             .collect();
 
         let gradients: Vec<Vec<f64>> = (0..batch_size)
-            .map(|_| (0..output_dim).map(|_| rng.sample(StandardNormal)).collect())
+            .map(|_| {
+                (0..output_dim)
+                    .map(|_| rng.sample(StandardNormal))
+                    .collect()
+            })
             .collect();
 
         let weight_grad: Vec<Vec<f64>> = (0..output_dim)
@@ -95,16 +99,13 @@ fn bench_kfac(c: &mut Criterion) {
         group.throughput(Throughput::Elements((input_dim * output_dim) as u64));
 
         // K-FAC update
-        let mut kfac = ruvector_math::information_geometry::KFACApproximation::new(
-            &[(input_dim, output_dim)]
-        );
+        let mut kfac =
+            ruvector_math::information_geometry::KFACApproximation::new(&[(input_dim, output_dim)]);
 
         group.bench_function(
             BenchmarkId::new("kfac_update", format!("{}x{}", input_dim, output_dim)),
             |b| {
-                b.iter(|| {
-                    kfac.update_layer(0, black_box(&activations), black_box(&gradients))
-                });
+                b.iter(|| kfac.update_layer(0, black_box(&activations), black_box(&gradients)));
             },
         );
 

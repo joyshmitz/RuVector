@@ -15,7 +15,6 @@
 /// References:
 /// - Bauer et al. (2021): "Ripser: Efficient computation of Vietoris-Rips persistence barcodes"
 /// - Chen & Kerber (2011): "Persistent homology computation with a twist"
-
 use std::collections::HashMap;
 
 /// Simplex in a filtration
@@ -65,7 +64,9 @@ impl Simplex {
         self.faces()
             .into_iter()
             .filter_map(|face| {
-                filtration.get_filtration_value(&face).map(|val| (face, val))
+                filtration
+                    .get_filtration_value(&face)
+                    .map(|val| (face, val))
             })
             .collect()
     }

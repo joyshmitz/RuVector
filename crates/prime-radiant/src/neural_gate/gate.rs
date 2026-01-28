@@ -52,7 +52,8 @@ impl HysteresisTracker {
 
     fn update(&mut self, energy: f32) -> Option<HysteresisState> {
         // Apply exponential smoothing
-        self.smoothed_energy = self.smoothing * self.smoothed_energy + (1.0 - self.smoothing) * energy;
+        self.smoothed_energy =
+            self.smoothing * self.smoothed_energy + (1.0 - self.smoothing) * energy;
 
         let now = current_time_ms();
         let dwell_time = now - self.state_entered_ms;
@@ -260,7 +261,8 @@ impl NeuralCoherenceGate {
     /// Create a new neural coherence gate.
     pub fn new(config: NeuralGateConfig) -> Self {
         let hysteresis = HysteresisTracker::new(&config.hysteresis);
-        let dendrite = DendriticDetector::new(config.coincidence_window_us, config.num_branches / 2);
+        let dendrite =
+            DendriticDetector::new(config.coincidence_window_us, config.num_branches / 2);
         let workspace = GlobalWorkspace::new(&config.workspace);
         let hdc_memory = HdcMemory::new(config.hdc_dimension, config.memory_capacity);
 

@@ -477,7 +477,10 @@ impl ChatTemplate {
         for msg in messages {
             match msg.role {
                 Role::User => {
-                    output.push_str(&format!("<start_of_turn>user\n{}<end_of_turn>\n", msg.content));
+                    output.push_str(&format!(
+                        "<start_of_turn>user\n{}<end_of_turn>\n",
+                        msg.content
+                    ));
                 }
                 Role::Assistant => {
                     output.push_str(&format!(
@@ -487,10 +490,7 @@ impl ChatTemplate {
                 }
                 Role::System => {
                     // Gemma doesn't have native system support, prepend to first user
-                    output.push_str(&format!(
-                        "<start_of_turn>user\n{}\n",
-                        msg.content
-                    ));
+                    output.push_str(&format!("<start_of_turn>user\n{}\n", msg.content));
                 }
             }
         }
@@ -923,7 +923,11 @@ impl InferenceArenaWasm {
 
     /// Create an arena sized for model dimensions.
     #[wasm_bindgen(js_name = forModel)]
-    pub fn for_model(hidden_dim: usize, vocab_size: usize, batch_size: usize) -> InferenceArenaWasm {
+    pub fn for_model(
+        hidden_dim: usize,
+        vocab_size: usize,
+        batch_size: usize,
+    ) -> InferenceArenaWasm {
         let activations = hidden_dim * batch_size * 4;
         let logits = vocab_size * batch_size * 4;
         let scratch = hidden_dim * 4 * 4;

@@ -74,21 +74,21 @@ fn bench_gemm_comparison(c: &mut Criterion) {
     // - Very Large (8192x8192): GPU clear winner
     let sizes = [
         // Small matrices - ANE advantage zone
-        (1, 128, 128),       // Tiny matmul - ANE wins
-        (1, 256, 256),       // Small matmul - ANE wins
-        (1, 512, 512),       // Medium-small - ANE edge
+        (1, 128, 128), // Tiny matmul - ANE wins
+        (1, 256, 256), // Small matmul - ANE wins
+        (1, 512, 512), // Medium-small - ANE edge
         // Medium matrices - Transition zone
-        (1, 1024, 1024),     // ANE/GPU crossover starts
-        (1, 2048, 2048),     // Crossover zone
+        (1, 1024, 1024), // ANE/GPU crossover starts
+        (1, 2048, 2048), // Crossover zone
         // Large matrices - GPU advantage
-        (1, 4096, 4096),     // Single token, typical projection - GPU starts winning
-        (1, 4096, 11008),    // Llama MLP up-projection
-        (1, 11008, 4096),    // Llama MLP down-projection
+        (1, 4096, 4096),  // Single token, typical projection - GPU starts winning
+        (1, 4096, 11008), // Llama MLP up-projection
+        (1, 11008, 4096), // Llama MLP down-projection
         // Batch inference - ANE optimal for small batches
-        (8, 4096, 4096),     // Small batch
-        (32, 4096, 4096),    // Medium batch
-        (64, 4096, 4096),    // Optimal ANE batch size
-        (128, 4096, 4096),   // Beyond ANE optimal - GPU wins
+        (8, 4096, 4096),   // Small batch
+        (32, 4096, 4096),  // Medium batch
+        (64, 4096, 4096),  // Optimal ANE batch size
+        (128, 4096, 4096), // Beyond ANE optimal - GPU wins
     ];
 
     for (m, k, n) in sizes {
@@ -108,12 +108,7 @@ fn bench_gemm_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     // Use local GEMM implementation to avoid module dependency issues
-                    gemm_neon_local(
-                        black_box(&a),
-                        black_box(&b),
-                        black_box(&mut c_out),
-                        m, k, n,
-                    );
+                    gemm_neon_local(black_box(&a), black_box(&b), black_box(&mut c_out), m, k, n);
                 })
             });
         }
@@ -128,7 +123,9 @@ fn bench_gemm_comparison(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        m, k, n,
+                        m,
+                        k,
+                        n,
                     );
                 })
             });
@@ -144,7 +141,9 @@ fn bench_gemm_comparison(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        m, k, n,
+                        m,
+                        k,
+                        n,
                     );
                 })
             });
@@ -161,10 +160,10 @@ fn bench_batched_gemm_comparison(c: &mut Criterion) {
 
     // Typical attention shapes: batch of Q*K^T or attention*V
     let configs = [
-        (8, 128, 128, 128),   // 8 heads, seq=128
-        (32, 128, 128, 128),  // 32 heads, seq=128
-        (32, 256, 128, 256),  // 32 heads, seq=256, head_dim=128
-        (8, 512, 128, 512),   // 8 heads, seq=512
+        (8, 128, 128, 128),  // 8 heads, seq=128
+        (32, 128, 128, 128), // 32 heads, seq=128
+        (32, 256, 128, 256), // 32 heads, seq=256, head_dim=128
+        (8, 512, 128, 512),  // 8 heads, seq=512
     ];
 
     for (batch_size, m, k, n) in configs {
@@ -191,7 +190,9 @@ fn bench_batched_gemm_comparison(c: &mut Criterion) {
                             black_box(&a[a_off..a_off + m * k]),
                             black_box(&b[b_off..b_off + k * n]),
                             black_box(&mut c_out[c_off..c_off + m * n]),
-                            m, k, n,
+                            m,
+                            k,
+                            n,
                         );
                     }
                 })
@@ -208,7 +209,10 @@ fn bench_batched_gemm_comparison(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        batch_size, m, k, n,
+                        batch_size,
+                        m,
+                        k,
+                        n,
                     );
                 })
             });
@@ -233,7 +237,7 @@ fn bench_gelu_comparison(c: &mut Criterion) {
         (8, 4096),
         (32, 4096),
         (64, 4096),
-        (1, 11008),    // Llama MLP intermediate
+        (1, 11008), // Llama MLP intermediate
         (32, 11008),
     ];
 
@@ -254,10 +258,7 @@ fn bench_gelu_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::activations::batch_gelu(
-                        black_box(&mut x),
-                        dim,
-                    );
+                    ruvllm::kernels::activations::batch_gelu(black_box(&mut x), dim);
                 })
             });
         }
@@ -270,11 +271,7 @@ fn bench_gelu_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::ane_ops::gelu_ane(
-                        black_box(&mut x),
-                        batch_size,
-                        dim,
-                    );
+                    ruvllm::kernels::ane_ops::gelu_ane(black_box(&mut x), batch_size, dim);
                 })
             });
         }
@@ -314,10 +311,7 @@ fn bench_silu_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::activations::batch_silu(
-                        black_box(&mut x),
-                        dim,
-                    );
+                    ruvllm::kernels::activations::batch_silu(black_box(&mut x), dim);
                 })
             });
         }
@@ -330,11 +324,7 @@ fn bench_silu_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::ane_ops::silu_ane(
-                        black_box(&mut x),
-                        batch_size,
-                        dim,
-                    );
+                    ruvllm::kernels::ane_ops::silu_ane(black_box(&mut x), batch_size, dim);
                 })
             });
         }
@@ -350,11 +340,11 @@ fn bench_softmax_comparison(c: &mut Criterion) {
 
     // Softmax is typically applied to attention scores
     let configs = [
-        (1, 128),     // Single head, short seq
-        (32, 128),    // 32 heads, short seq
-        (32, 512),    // 32 heads, medium seq
-        (32, 2048),   // 32 heads, long seq
-        (1, 4096),    // Single head, very long
+        (1, 128),   // Single head, short seq
+        (32, 128),  // 32 heads, short seq
+        (32, 512),  // 32 heads, medium seq
+        (32, 2048), // 32 heads, long seq
+        (1, 4096),  // Single head, very long
     ];
 
     for (batch_size, dim) in configs {
@@ -374,10 +364,7 @@ fn bench_softmax_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::activations::batch_softmax(
-                        black_box(&mut x),
-                        dim,
-                    );
+                    ruvllm::kernels::activations::batch_softmax(black_box(&mut x), dim);
                 })
             });
         }
@@ -390,11 +377,7 @@ fn bench_softmax_comparison(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::ane_ops::softmax_ane(
-                        black_box(&mut x),
-                        batch_size,
-                        dim,
-                    );
+                    ruvllm::kernels::ane_ops::softmax_ane(black_box(&mut x), batch_size, dim);
                 })
             });
         }
@@ -412,13 +395,7 @@ fn bench_layer_norm_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("layernorm_ane_vs_neon");
     group.sample_size(50);
 
-    let configs = [
-        (1, 4096),
-        (8, 4096),
-        (32, 4096),
-        (64, 4096),
-        (128, 4096),
-    ];
+    let configs = [(1, 4096), (8, 4096), (32, 4096), (64, 4096), (128, 4096)];
 
     for (batch_size, dim) in configs {
         let size = batch_size * dim;
@@ -480,13 +457,7 @@ fn bench_rms_norm_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("rmsnorm_ane_vs_neon");
     group.sample_size(50);
 
-    let configs = [
-        (1, 4096),
-        (8, 4096),
-        (32, 4096),
-        (64, 4096),
-        (128, 4096),
-    ];
+    let configs = [(1, 4096), (8, 4096), (32, 4096), (64, 4096), (128, 4096)];
 
     for (batch_size, dim) in configs {
         let size = batch_size * dim;
@@ -564,16 +535,9 @@ fn bench_auto_dispatch(c: &mut Criterion) {
             bencher.iter(|| {
                 x.copy_from_slice(&x_orig);
                 #[cfg(all(target_os = "macos", feature = "coreml"))]
-                ruvllm::kernels::ane_ops::gelu_auto(
-                    black_box(&mut x),
-                    batch_size,
-                    dim,
-                );
+                ruvllm::kernels::ane_ops::gelu_auto(black_box(&mut x), batch_size, dim);
                 #[cfg(not(all(target_os = "macos", feature = "coreml")))]
-                ruvllm::kernels::activations::batch_gelu(
-                    black_box(&mut x),
-                    dim,
-                );
+                ruvllm::kernels::activations::batch_gelu(black_box(&mut x), dim);
             })
         });
     }
@@ -585,16 +549,9 @@ fn bench_auto_dispatch(c: &mut Criterion) {
             bencher.iter(|| {
                 x.copy_from_slice(&x_orig);
                 #[cfg(all(target_os = "macos", feature = "coreml"))]
-                ruvllm::kernels::ane_ops::silu_auto(
-                    black_box(&mut x),
-                    batch_size,
-                    dim,
-                );
+                ruvllm::kernels::ane_ops::silu_auto(black_box(&mut x), batch_size, dim);
                 #[cfg(not(all(target_os = "macos", feature = "coreml")))]
-                ruvllm::kernels::activations::batch_silu(
-                    black_box(&mut x),
-                    dim,
-                );
+                ruvllm::kernels::activations::batch_silu(black_box(&mut x), dim);
             })
         });
     }
@@ -655,7 +612,7 @@ fn bench_mlp_block(c: &mut Criterion) {
 
     let total_flops = 2 * batch_size * hidden_dim * intermediate_dim  // Up
                     + batch_size * intermediate_dim                    // Activation
-                    + 2 * batch_size * intermediate_dim * hidden_dim;  // Down
+                    + 2 * batch_size * intermediate_dim * hidden_dim; // Down
 
     group.throughput(Throughput::Elements(total_flops as u64));
 
@@ -669,7 +626,9 @@ fn bench_mlp_block(c: &mut Criterion) {
                     black_box(&input),
                     black_box(&w_up),
                     black_box(&mut intermediate),
-                    batch_size, hidden_dim, intermediate_dim,
+                    batch_size,
+                    hidden_dim,
+                    intermediate_dim,
                 );
                 // SiLU activation
                 ruvllm::kernels::activations::batch_silu(
@@ -681,7 +640,9 @@ fn bench_mlp_block(c: &mut Criterion) {
                     black_box(&intermediate),
                     black_box(&w_down),
                     black_box(&mut output),
-                    batch_size, intermediate_dim, hidden_dim,
+                    batch_size,
+                    intermediate_dim,
+                    hidden_dim,
                 );
             })
         });
@@ -697,7 +658,9 @@ fn bench_mlp_block(c: &mut Criterion) {
                     black_box(&input),
                     black_box(&w_up),
                     black_box(&mut intermediate),
-                    batch_size, hidden_dim, intermediate_dim,
+                    batch_size,
+                    hidden_dim,
+                    intermediate_dim,
                 );
                 // SiLU activation
                 ruvllm::kernels::ane_ops::silu_ane(
@@ -710,7 +673,9 @@ fn bench_mlp_block(c: &mut Criterion) {
                     black_box(&intermediate),
                     black_box(&w_down),
                     black_box(&mut output),
-                    batch_size, intermediate_dim, hidden_dim,
+                    batch_size,
+                    intermediate_dim,
+                    hidden_dim,
                 );
             })
         });
@@ -818,7 +783,9 @@ fn bench_crossover_detection(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        dim, dim, dim,
+                        dim,
+                        dim,
+                        dim,
                     );
                 })
             });
@@ -834,7 +801,9 @@ fn bench_crossover_detection(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        dim, dim, dim,
+                        dim,
+                        dim,
+                        dim,
                     );
                 })
             });
@@ -850,7 +819,9 @@ fn bench_crossover_detection(c: &mut Criterion) {
                         black_box(&a),
                         black_box(&b),
                         black_box(&mut c_out),
-                        dim, dim, dim,
+                        dim,
+                        dim,
+                        dim,
                     );
                 })
             });
@@ -881,9 +852,9 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
     // Transformer configuration (Llama-7B like)
     let configs = [
         // (batch, seq_len, hidden, heads, head_dim, intermediate)
-        (1, 128, 4096, 32, 128, 11008),   // Short context
-        (1, 512, 4096, 32, 128, 11008),   // Medium context
-        (1, 2048, 4096, 32, 128, 11008),  // Long context
+        (1, 128, 4096, 32, 128, 11008),  // Short context
+        (1, 512, 4096, 32, 128, 11008),  // Medium context
+        (1, 2048, 4096, 32, 128, 11008), // Long context
     ];
 
     for (batch, seq_len, hidden_dim, num_heads, head_dim, intermediate_dim) in configs {
@@ -926,15 +897,50 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     // Q, K, V projections
-                    gemm_neon_local(&hidden, &w_q, &mut q, batch * seq_len, hidden_dim, hidden_dim);
-                    gemm_neon_local(&hidden, &w_k, &mut k, batch * seq_len, hidden_dim, hidden_dim);
-                    gemm_neon_local(&hidden, &w_v, &mut v, batch * seq_len, hidden_dim, hidden_dim);
+                    gemm_neon_local(
+                        &hidden,
+                        &w_q,
+                        &mut q,
+                        batch * seq_len,
+                        hidden_dim,
+                        hidden_dim,
+                    );
+                    gemm_neon_local(
+                        &hidden,
+                        &w_k,
+                        &mut k,
+                        batch * seq_len,
+                        hidden_dim,
+                        hidden_dim,
+                    );
+                    gemm_neon_local(
+                        &hidden,
+                        &w_v,
+                        &mut v,
+                        batch * seq_len,
+                        hidden_dim,
+                        hidden_dim,
+                    );
 
                     // O projection
-                    gemm_neon_local(&v, &w_o, &mut attn_output, batch * seq_len, hidden_dim, hidden_dim);
+                    gemm_neon_local(
+                        &v,
+                        &w_o,
+                        &mut attn_output,
+                        batch * seq_len,
+                        hidden_dim,
+                        hidden_dim,
+                    );
 
                     // MLP: up projection
-                    gemm_neon_local(&attn_output, &w_up, &mut intermediate, batch * seq_len, hidden_dim, intermediate_dim);
+                    gemm_neon_local(
+                        &attn_output,
+                        &w_up,
+                        &mut intermediate,
+                        batch * seq_len,
+                        hidden_dim,
+                        intermediate_dim,
+                    );
 
                     // MLP: SiLU activation (in-place)
                     ruvllm::kernels::activations::batch_silu(
@@ -943,7 +949,14 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
                     );
 
                     // MLP: down projection
-                    gemm_neon_local(&intermediate, &w_down, &mut mlp_output, batch * seq_len, intermediate_dim, hidden_dim);
+                    gemm_neon_local(
+                        &intermediate,
+                        &w_down,
+                        &mut mlp_output,
+                        batch * seq_len,
+                        intermediate_dim,
+                        hidden_dim,
+                    );
                 })
             });
         }
@@ -953,15 +966,50 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
                 // Q, K, V projections
-                ruvllm::kernels::ane_ops::matmul_ane(&hidden, &w_q, &mut q, batch * seq_len, hidden_dim, hidden_dim);
-                ruvllm::kernels::ane_ops::matmul_ane(&hidden, &w_k, &mut k, batch * seq_len, hidden_dim, hidden_dim);
-                ruvllm::kernels::ane_ops::matmul_ane(&hidden, &w_v, &mut v, batch * seq_len, hidden_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &hidden,
+                    &w_q,
+                    &mut q,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &hidden,
+                    &w_k,
+                    &mut k,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &hidden,
+                    &w_v,
+                    &mut v,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
 
                 // O projection
-                ruvllm::kernels::ane_ops::matmul_ane(&v, &w_o, &mut attn_output, batch * seq_len, hidden_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &v,
+                    &w_o,
+                    &mut attn_output,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
 
                 // MLP: up projection
-                ruvllm::kernels::ane_ops::matmul_ane(&attn_output, &w_up, &mut intermediate, batch * seq_len, hidden_dim, intermediate_dim);
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &attn_output,
+                    &w_up,
+                    &mut intermediate,
+                    batch * seq_len,
+                    hidden_dim,
+                    intermediate_dim,
+                );
 
                 // MLP: SiLU activation (ANE)
                 ruvllm::kernels::ane_ops::silu_ane(
@@ -971,7 +1019,14 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
                 );
 
                 // MLP: down projection
-                ruvllm::kernels::ane_ops::matmul_ane(&intermediate, &w_down, &mut mlp_output, batch * seq_len, intermediate_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_ane(
+                    &intermediate,
+                    &w_down,
+                    &mut mlp_output,
+                    batch * seq_len,
+                    intermediate_dim,
+                    hidden_dim,
+                );
             })
         });
 
@@ -980,15 +1035,50 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
                 // Q, K, V projections (auto-dispatch based on size)
-                ruvllm::kernels::ane_ops::matmul_auto(&hidden, &w_q, &mut q, batch * seq_len, hidden_dim, hidden_dim);
-                ruvllm::kernels::ane_ops::matmul_auto(&hidden, &w_k, &mut k, batch * seq_len, hidden_dim, hidden_dim);
-                ruvllm::kernels::ane_ops::matmul_auto(&hidden, &w_v, &mut v, batch * seq_len, hidden_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &hidden,
+                    &w_q,
+                    &mut q,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &hidden,
+                    &w_k,
+                    &mut k,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &hidden,
+                    &w_v,
+                    &mut v,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
 
                 // O projection (auto-dispatch)
-                ruvllm::kernels::ane_ops::matmul_auto(&v, &w_o, &mut attn_output, batch * seq_len, hidden_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &v,
+                    &w_o,
+                    &mut attn_output,
+                    batch * seq_len,
+                    hidden_dim,
+                    hidden_dim,
+                );
 
                 // MLP: up projection (auto-dispatch)
-                ruvllm::kernels::ane_ops::matmul_auto(&attn_output, &w_up, &mut intermediate, batch * seq_len, hidden_dim, intermediate_dim);
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &attn_output,
+                    &w_up,
+                    &mut intermediate,
+                    batch * seq_len,
+                    hidden_dim,
+                    intermediate_dim,
+                );
 
                 // MLP: SiLU activation (auto-dispatch - typically ANE)
                 ruvllm::kernels::ane_ops::silu_auto(
@@ -998,7 +1088,14 @@ fn bench_hybrid_pipeline(c: &mut Criterion) {
                 );
 
                 // MLP: down projection (auto-dispatch)
-                ruvllm::kernels::ane_ops::matmul_auto(&intermediate, &w_down, &mut mlp_output, batch * seq_len, intermediate_dim, hidden_dim);
+                ruvllm::kernels::ane_ops::matmul_auto(
+                    &intermediate,
+                    &w_down,
+                    &mut mlp_output,
+                    batch * seq_len,
+                    intermediate_dim,
+                    hidden_dim,
+                );
             })
         });
     }
@@ -1017,14 +1114,14 @@ fn bench_activation_crossover(c: &mut Criterion) {
 
     // Test various sizes to find where ANE beats NEON
     let sizes = [
-        (1, 128),      // Tiny
-        (1, 512),      // Small
-        (1, 2048),     // Medium
-        (1, 4096),     // Llama hidden
-        (1, 11008),    // Llama intermediate
-        (32, 4096),    // Batch
-        (64, 4096),    // Larger batch
-        (128, 4096),   // Big batch
+        (1, 128),    // Tiny
+        (1, 512),    // Small
+        (1, 2048),   // Medium
+        (1, 4096),   // Llama hidden
+        (1, 11008),  // Llama intermediate
+        (32, 4096),  // Batch
+        (64, 4096),  // Larger batch
+        (128, 4096), // Big batch
     ];
 
     for (batch_size, dim) in sizes {
@@ -1042,10 +1139,7 @@ fn bench_activation_crossover(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::activations::batch_silu(
-                        black_box(&mut x),
-                        dim,
-                    );
+                    ruvllm::kernels::activations::batch_silu(black_box(&mut x), dim);
                 })
             });
         }
@@ -1058,11 +1152,7 @@ fn bench_activation_crossover(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::ane_ops::silu_ane(
-                        black_box(&mut x),
-                        batch_size,
-                        dim,
-                    );
+                    ruvllm::kernels::ane_ops::silu_ane(black_box(&mut x), batch_size, dim);
                 })
             });
         }
@@ -1075,11 +1165,7 @@ fn bench_activation_crossover(c: &mut Criterion) {
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
                     x.copy_from_slice(&x_orig);
-                    ruvllm::kernels::ane_ops::silu_auto(
-                        black_box(&mut x),
-                        batch_size,
-                        dim,
-                    );
+                    ruvllm::kernels::ane_ops::silu_auto(black_box(&mut x), batch_size, dim);
                 })
             });
         }

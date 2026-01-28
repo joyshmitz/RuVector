@@ -111,7 +111,11 @@ impl KVQuantQuantizer {
 
         Self {
             bits,
-            key_mode: if pre_rope { KVQuantKeyMode::PreRoPE } else { KVQuantKeyMode::PostRoPE },
+            key_mode: if pre_rope {
+                KVQuantKeyMode::PreRoPE
+            } else {
+                KVQuantKeyMode::PostRoPE
+            },
             value_mode: KVQuantValueMode::Uniform,
             head_dim,
             max_quant: (1u8 << bits) - 1,
@@ -331,8 +335,16 @@ impl KVQuantQuantizer {
             data,
             scale,
             zero_point: min_val,
-            outlier_indices: if outlier_indices.is_empty() { None } else { Some(outlier_indices) },
-            outlier_values: if outlier_values.is_empty() { None } else { Some(outlier_values) },
+            outlier_indices: if outlier_indices.is_empty() {
+                None
+            } else {
+                Some(outlier_indices)
+            },
+            outlier_values: if outlier_values.is_empty() {
+                None
+            } else {
+                Some(outlier_values)
+            },
         }
     }
 
@@ -435,7 +447,11 @@ impl KVQuantQuantizer {
     }
 
     /// Create calibration data from sample vectors
-    pub fn calibrate(&self, key_samples: &[Vec<f32>], value_samples: &[Vec<f32>]) -> CalibrationData {
+    pub fn calibrate(
+        &self,
+        key_samples: &[Vec<f32>],
+        value_samples: &[Vec<f32>],
+    ) -> CalibrationData {
         // Compute key statistics
         let key_stats = if !key_samples.is_empty() {
             let all_values: Vec<f32> = key_samples.iter().flatten().copied().collect();

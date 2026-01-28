@@ -40,7 +40,9 @@ impl LearnableCurvature {
 
     /// Get current curvature value
     pub fn value(&self) -> f32 {
-        self.log_k.exp().clamp(self.min_curvature, self.max_curvature)
+        self.log_k
+            .exp()
+            .clamp(self.min_curvature, self.max_curvature)
     }
 
     /// Update curvature given gradient
@@ -91,7 +93,10 @@ impl MultiCurvature {
 
         let weights = vec![1.0 / (num_components as f32).sqrt(); num_components];
 
-        Self { curvatures, weights }
+        Self {
+            curvatures,
+            weights,
+        }
     }
 
     /// Create with different initial curvatures
@@ -104,7 +109,10 @@ impl MultiCurvature {
         let num = curvatures.len();
         let weights = vec![1.0 / (num as f32).sqrt(); num];
 
-        Self { curvatures, weights }
+        Self {
+            curvatures,
+            weights,
+        }
     }
 
     /// Get all curvature values
@@ -129,10 +137,7 @@ impl MultiCurvature {
     /// Compute product distance
     ///
     /// d²((x₁,...,xₖ), (y₁,...,yₖ)) = Σᵢ wᵢ² dᵢ²(xᵢ, yᵢ)
-    pub fn product_distance_squared(
-        &self,
-        distances_squared: &[f32],
-    ) -> f32 {
+    pub fn product_distance_squared(&self, distances_squared: &[f32]) -> f32 {
         assert_eq!(distances_squared.len(), self.weights.len());
 
         self.weights
@@ -201,11 +206,7 @@ impl CoupledCurvatureOptimizer {
 /// d(x, y) = 2K · artanh(||(-x) ⊕_K y|| / K)
 ///
 /// ∂d/∂K requires chain rule through Möbius addition
-pub fn distance_gradient_wrt_curvature(
-    x: &[f32],
-    y: &[f32],
-    curvature: f32,
-) -> f32 {
+pub fn distance_gradient_wrt_curvature(x: &[f32], y: &[f32], curvature: f32) -> f32 {
     // Numerical gradient (for simplicity - could derive analytically)
     let eps = 1e-4;
 
@@ -338,8 +339,7 @@ mod tests {
 
     #[test]
     fn test_curvature_bounds() {
-        let mut curvature = LearnableCurvature::new(1.0)
-            .with_bounds(0.5, 2.0);
+        let mut curvature = LearnableCurvature::new(1.0).with_bounds(0.5, 2.0);
 
         // Try to push below minimum
         for _ in 0..100 {

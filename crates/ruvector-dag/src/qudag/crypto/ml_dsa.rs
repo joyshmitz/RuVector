@@ -69,8 +69,8 @@ mod production {
 
         /// Sign a message using real Dilithium3
         pub fn sign(sk: &MlDsa65SecretKey, message: &[u8]) -> Result<Signature, DsaError> {
-            let secret_key = dilithium3::SecretKey::from_bytes(&sk.0)
-                .map_err(|_| DsaError::InvalidSignature)?;
+            let secret_key =
+                dilithium3::SecretKey::from_bytes(&sk.0).map_err(|_| DsaError::InvalidSignature)?;
 
             let sig = dilithium3::detached_sign(message, &secret_key);
             let sig_bytes = sig.as_bytes();
@@ -90,8 +90,8 @@ mod production {
             message: &[u8],
             signature: &Signature,
         ) -> Result<bool, DsaError> {
-            let public_key = dilithium3::PublicKey::from_bytes(&pk.0)
-                .map_err(|_| DsaError::InvalidPublicKey)?;
+            let public_key =
+                dilithium3::PublicKey::from_bytes(&pk.0).map_err(|_| DsaError::InvalidPublicKey)?;
 
             // Dilithium3 signature is 3293 bytes
             let sig = dilithium3::DetachedSignature::from_bytes(&signature.0[..3293])

@@ -7,11 +7,11 @@
 //! - Interpolation between adapters
 
 use crate::error::{Result, RuvLLMError};
-use crate::lora::micro_lora::{MicroLoRA, MicroLoraConfig, LoraAdapter, TargetModule};
 use crate::lora::adapters::LoraConfig;
+use crate::lora::micro_lora::{LoraAdapter, MicroLoRA, MicroLoraConfig, TargetModule};
+use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use ndarray::Array2;
 
 /// Strategy for merging adapters
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +122,9 @@ impl AdapterMerger {
             MergeStrategy::Slerp => self.merge_slerp(adapters, output_config, hidden_dim),
             MergeStrategy::Ties => self.merge_ties(adapters, output_config, hidden_dim),
             MergeStrategy::Dare => self.merge_dare(adapters, output_config, hidden_dim),
-            MergeStrategy::TaskArithmetic => self.merge_task_arithmetic(adapters, output_config, hidden_dim),
+            MergeStrategy::TaskArithmetic => {
+                self.merge_task_arithmetic(adapters, output_config, hidden_dim)
+            }
         }
     }
 
@@ -139,7 +141,8 @@ impl AdapterMerger {
         let n = adapters.len() as f32;
 
         for module in &output_config.target_modules {
-            let merged_adapter = merged.get_adapter(module)
+            let merged_adapter = merged
+                .get_adapter(module)
                 .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found", module)))?;
             let mut merged_adapter = merged_adapter.write();
 
@@ -178,12 +181,14 @@ impl AdapterMerger {
         let merged = MicroLoRA::new(micro_config);
 
         // Normalize weights
-        let total_weight: f32 = adapters.iter()
+        let total_weight: f32 = adapters
+            .iter()
             .map(|(name, _)| self.config.weights.get(name).copied().unwrap_or(1.0))
             .sum();
 
         for module in &output_config.target_modules {
-            let merged_adapter = merged.get_adapter(module)
+            let merged_adapter = merged
+                .get_adapter(module)
                 .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found", module)))?;
             let mut merged_adapter = merged_adapter.write();
 
@@ -201,13 +206,15 @@ impl AdapterMerger {
 
                     for i in 0..merged_adapter.lora_a.nrows() {
                         for j in 0..merged_adapter.lora_a.ncols() {
-                            merged_adapter.lora_a[[i, j]] += adapter.lora_a[[i, j]] * normalized_weight;
+                            merged_adapter.lora_a[[i, j]] +=
+                                adapter.lora_a[[i, j]] * normalized_weight;
                         }
                     }
 
                     for i in 0..merged_adapter.lora_b.nrows() {
                         for j in 0..merged_adapter.lora_b.ncols() {
-                            merged_adapter.lora_b[[i, j]] += adapter.lora_b[[i, j]] * normalized_weight;
+                            merged_adapter.lora_b[[i, j]] +=
+                                adapter.lora_b[[i, j]] * normalized_weight;
                         }
                     }
                 }
@@ -225,7 +232,9 @@ impl AdapterMerger {
         hidden_dim: usize,
     ) -> Result<MicroLoRA> {
         if adapters.len() != 2 {
-            return Err(RuvLLMError::Config("SLERP requires exactly 2 adapters".to_string()));
+            return Err(RuvLLMError::Config(
+                "SLERP requires exactly 2 adapters".to_string(),
+            ));
         }
 
         let micro_config = output_config.to_micro_lora_config(hidden_dim)?;
@@ -236,23 +245,36 @@ impl AdapterMerger {
         let (_, lora_b) = &adapters[1];
 
         for module in &output_config.target_modules {
-            let merged_adapter = merged.get_adapter(module)
+            let merged_adapter = merged
+                .get_adapter(module)
                 .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found", module)))?;
             let mut merged_adapter = merged_adapter.write();
 
-            let adapter_a = lora_a.get_adapter(module)
-                .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found in first adapter", module)))?;
-            let adapter_b = lora_b.get_adapter(module)
-                .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found in second adapter", module)))?;
+            let adapter_a = lora_a.get_adapter(module).ok_or_else(|| {
+                RuvLLMError::NotFound(format!("Module {:?} not found in first adapter", module))
+            })?;
+            let adapter_b = lora_b.get_adapter(module).ok_or_else(|| {
+                RuvLLMError::NotFound(format!("Module {:?} not found in second adapter", module))
+            })?;
 
             let adapter_a = adapter_a.read();
             let adapter_b = adapter_b.read();
 
             // SLERP for A matrix
-            self.slerp_matrix(&adapter_a.lora_a, &adapter_b.lora_a, t, &mut merged_adapter.lora_a);
+            self.slerp_matrix(
+                &adapter_a.lora_a,
+                &adapter_b.lora_a,
+                t,
+                &mut merged_adapter.lora_a,
+            );
 
             // SLERP for B matrix
-            self.slerp_matrix(&adapter_a.lora_b, &adapter_b.lora_b, t, &mut merged_adapter.lora_b);
+            self.slerp_matrix(
+                &adapter_a.lora_b,
+                &adapter_b.lora_b,
+                t,
+                &mut merged_adapter.lora_b,
+            );
         }
 
         Ok(merged)
@@ -279,19 +301,16 @@ impl AdapterMerger {
         let merged = MicroLoRA::new(micro_config);
 
         for module in &output_config.target_modules {
-            let merged_adapter = merged.get_adapter(module)
+            let merged_adapter = merged
+                .get_adapter(module)
                 .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found", module)))?;
             let mut merged_adapter = merged_adapter.write();
 
             // Collect all values for each position
-            let mut values_a: Vec<Vec<f32>> = vec![
-                vec![];
-                merged_adapter.lora_a.nrows() * merged_adapter.lora_a.ncols()
-            ];
-            let mut values_b: Vec<Vec<f32>> = vec![
-                vec![];
-                merged_adapter.lora_b.nrows() * merged_adapter.lora_b.ncols()
-            ];
+            let mut values_a: Vec<Vec<f32>> =
+                vec![vec![]; merged_adapter.lora_a.nrows() * merged_adapter.lora_a.ncols()];
+            let mut values_b: Vec<Vec<f32>> =
+                vec![vec![]; merged_adapter.lora_b.nrows() * merged_adapter.lora_b.ncols()];
 
             for (_name, lora) in adapters {
                 if let Some(adapter) = lora.get_adapter(module) {
@@ -345,7 +364,8 @@ impl AdapterMerger {
         let threshold = max_abs * (1.0 - self.config.density);
 
         // Trim
-        let trimmed: Vec<f32> = values.iter()
+        let trimmed: Vec<f32> = values
+            .iter()
             .copied()
             .filter(|v| v.abs() >= threshold)
             .collect();
@@ -377,8 +397,8 @@ impl AdapterMerger {
         output_config: &LoraConfig,
         hidden_dim: usize,
     ) -> Result<MicroLoRA> {
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
 
         let mut rng = StdRng::seed_from_u64(42);
 
@@ -386,7 +406,8 @@ impl AdapterMerger {
         let merged = MicroLoRA::new(micro_config);
 
         for module in &output_config.target_modules {
-            let merged_adapter = merged.get_adapter(module)
+            let merged_adapter = merged
+                .get_adapter(module)
                 .ok_or_else(|| RuvLLMError::NotFound(format!("Module {:?} not found", module)))?;
             let mut merged_adapter = merged_adapter.write();
 
@@ -474,7 +495,9 @@ impl HotSwapManager {
         }
 
         if self.standby.is_none() {
-            return Err(RuvLLMError::Config("No standby adapter prepared".to_string()));
+            return Err(RuvLLMError::Config(
+                "No standby adapter prepared".to_string(),
+            ));
         }
 
         self.swapping = true;

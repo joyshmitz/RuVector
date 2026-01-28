@@ -73,8 +73,8 @@ mod production {
 
         /// Encapsulate a shared secret using real Kyber768
         pub fn encapsulate(pk: &MlKem768PublicKey) -> Result<EncapsulatedKey, KemError> {
-            let public_key = kyber768::PublicKey::from_bytes(&pk.0)
-                .map_err(|_| KemError::InvalidPublicKey)?;
+            let public_key =
+                kyber768::PublicKey::from_bytes(&pk.0).map_err(|_| KemError::InvalidPublicKey)?;
 
             let (ss, ct) = kyber768::encapsulate(&public_key);
 

@@ -97,14 +97,7 @@ mod tests {
 
     #[test]
     fn test_metric_value() {
-        let metric = MetricValue::new(
-            MetricType::TopologyCoherence,
-            0.7,
-            0.0,
-            1.0,
-            0.3,
-            0.1,
-        );
+        let metric = MetricValue::new(MetricType::TopologyCoherence, 0.7, 0.0, 1.0, 0.3, 0.1);
 
         assert_eq!(metric.metric_type, MetricType::TopologyCoherence);
         assert!((metric.normalized - 0.7).abs() < 1e-5);
@@ -115,11 +108,11 @@ mod tests {
     fn test_warning_critical() {
         let metric = MetricValue::new(
             MetricType::OTDistance,
-            5.0,  // High OT distance
+            5.0, // High OT distance
             0.0,
             10.0,
-            3.0,  // Warning at 3
-            7.0,  // Critical at 7
+            3.0, // Warning at 3
+            7.0, // Critical at 7
         );
 
         assert!(metric.is_warning());

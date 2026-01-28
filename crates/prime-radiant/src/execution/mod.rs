@@ -80,31 +80,29 @@ pub mod ladder;
 
 // Re-export primary types for convenient access
 pub use action::{
-    Action, ActionError, ActionId, ActionImpact, ActionMetadata, ActionResult,
-    BoxedAction, ExecutionContext, ScopeId,
+    Action, ActionError, ActionId, ActionImpact, ActionMetadata, ActionResult, BoxedAction,
+    ExecutionContext, ScopeId,
 };
 
 pub use gate::{
-    CoherenceGate, EnergyHistory, EnergySnapshot, GateDecision,
-    PolicyBundleRef, WitnessId, WitnessRecord,
+    CoherenceGate, EnergyHistory, EnergySnapshot, GateDecision, PolicyBundleRef, WitnessId,
+    WitnessRecord,
 };
 
-pub use ladder::{
-    ComputeLane, EscalationReason, LaneThresholds, LaneTransition, ThresholdError,
-};
+pub use ladder::{ComputeLane, EscalationReason, LaneThresholds, LaneTransition, ThresholdError};
 
 pub use executor::{
-    ActionExecutor, ActionResultBuilder, ExecutionResult, ExecutionStats,
-    ExecutorConfig, ExecutorStats, HumanReviewItem,
+    ActionExecutor, ActionResultBuilder, ExecutionResult, ExecutionStats, ExecutorConfig,
+    ExecutorStats, HumanReviewItem,
 };
 
 /// Prelude module for convenient imports.
 pub mod prelude {
     pub use super::{
-        Action, ActionError, ActionExecutor, ActionId, ActionImpact, ActionMetadata,
-        ActionResult, CoherenceGate, ComputeLane, EnergySnapshot, EscalationReason,
-        ExecutionContext, ExecutionResult, ExecutorConfig, GateDecision, LaneThresholds,
-        PolicyBundleRef, ScopeId, WitnessId, WitnessRecord,
+        Action, ActionError, ActionExecutor, ActionId, ActionImpact, ActionMetadata, ActionResult,
+        CoherenceGate, ComputeLane, EnergySnapshot, EscalationReason, ExecutionContext,
+        ExecutionResult, ExecutorConfig, GateDecision, LaneThresholds, PolicyBundleRef, ScopeId,
+        WitnessId, WitnessRecord,
     };
 }
 

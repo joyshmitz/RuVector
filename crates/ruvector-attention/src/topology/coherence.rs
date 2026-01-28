@@ -37,11 +37,7 @@ pub struct WindowCoherence {
 
 impl WindowCoherence {
     /// Compute coherence from keys
-    pub fn compute(
-        keys: &[&[f32]],
-        k_neighbors: usize,
-        metrics: &[CoherenceMetric],
-    ) -> Self {
+    pub fn compute(keys: &[&[f32]], k_neighbors: usize, metrics: &[CoherenceMetric]) -> Self {
         let n = keys.len();
         if n < 2 {
             return Self {
@@ -107,7 +103,9 @@ impl WindowCoherence {
                     .map(|(j, k2)| (j, Self::squared_distance(key, k2)))
                     .collect();
 
-                distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                distances.sort_unstable_by(|a, b| {
+                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 distances.iter().take(k).map(|(j, _)| *j).collect()
             })
@@ -124,11 +122,7 @@ impl WindowCoherence {
     }
 
     /// Compute specific metric
-    fn compute_metric(
-        metric: CoherenceMetric,
-        keys: &[&[f32]],
-        knn_graph: &[Vec<usize>],
-    ) -> f32 {
+    fn compute_metric(metric: CoherenceMetric, keys: &[&[f32]], knn_graph: &[Vec<usize>]) -> f32 {
         match metric {
             CoherenceMetric::BoundaryMass => Self::boundary_mass(knn_graph),
             CoherenceMetric::CutProxy => Self::cut_proxy(knn_graph),
@@ -218,7 +212,8 @@ impl WindowCoherence {
                 .collect();
 
             let mean: f32 = sims.iter().sum::<f32>() / sims.len() as f32;
-            let variance: f32 = sims.iter().map(|s| (s - mean) * (s - mean)).sum::<f32>() / sims.len() as f32;
+            let variance: f32 =
+                sims.iter().map(|s| (s - mean) * (s - mean)).sum::<f32>() / sims.len() as f32;
 
             total_variance += variance;
             count += 1;
@@ -252,7 +247,11 @@ impl WindowCoherence {
         }
 
         let mean: f32 = all_sims.iter().sum::<f32>() / all_sims.len() as f32;
-        let variance: f32 = all_sims.iter().map(|s| (s - mean) * (s - mean)).sum::<f32>() / all_sims.len() as f32;
+        let variance: f32 = all_sims
+            .iter()
+            .map(|s| (s - mean) * (s - mean))
+            .sum::<f32>()
+            / all_sims.len() as f32;
 
         // Low variance + high mean = high coherence
         let coherence = mean * (1.0 - variance.sqrt().min(1.0));
@@ -280,15 +279,16 @@ mod tests {
 
     #[test]
     fn test_coherence_computation() {
-        let keys: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32 * 0.1; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32 * 0.1; 32]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
         let coherence = WindowCoherence::compute(
             &keys_refs,
             5,
-            &[CoherenceMetric::BoundaryMass, CoherenceMetric::SimilarityVariance],
+            &[
+                CoherenceMetric::BoundaryMass,
+                CoherenceMetric::SimilarityVariance,
+            ],
         );
 
         assert!(coherence.score >= 0.0 && coherence.score <= 1.0);
@@ -298,16 +298,10 @@ mod tests {
     #[test]
     fn test_coherent_window() {
         // Highly similar keys = high coherence
-        let keys: Vec<Vec<f32>> = (0..10)
-            .map(|_| vec![0.5f32; 16])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..10).map(|_| vec![0.5f32; 16]).collect();
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
-        let coherence = WindowCoherence::compute(
-            &keys_refs,
-            3,
-            &[CoherenceMetric::Disagreement],
-        );
+        let coherence = WindowCoherence::compute(&keys_refs, 3, &[CoherenceMetric::Disagreement]);
 
         // Should be very coherent
         assert!(coherence.score > 0.8);
@@ -318,7 +312,8 @@ mod tests {
         let keys: Vec<Vec<f32>> = vec![vec![1.0; 8]; 5];
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
 
-        let mut coherence = WindowCoherence::compute(&keys_refs, 2, &[CoherenceMetric::BoundaryMass]);
+        let mut coherence =
+            WindowCoherence::compute(&keys_refs, 2, &[CoherenceMetric::BoundaryMass]);
 
         assert!(!coherence.needs_update(4));
 

@@ -207,11 +207,7 @@ impl QualityScoringEngine {
     }
 
     /// Score a text directly (without GenerationResult)
-    pub fn score_text(
-        &self,
-        text: &str,
-        context: &ScoringContext,
-    ) -> Result<QualityMetrics> {
+    pub fn score_text(&self, text: &str, context: &ScoringContext) -> Result<QualityMetrics> {
         let mut metrics = QualityMetrics::new();
 
         // Create a minimal GenerationResult-like context
@@ -244,7 +240,9 @@ impl QualityScoringEngine {
         if !context.previous_generations.is_empty() {
             let mut all_samples: Vec<String> = context.previous_generations.clone();
             all_samples.push(text.to_string());
-            let diversity_result = self.diversity_analyzer.calculate_diversity(&all_samples, None);
+            let diversity_result = self
+                .diversity_analyzer
+                .calculate_diversity(&all_samples, None);
             metrics.diversity = diversity_result.diversity_score;
         } else {
             metrics.diversity = 1.0;
@@ -622,7 +620,9 @@ impl QualityScoringEngine {
             .detect_contradictions(&segments, None)?;
 
         // Check logical flow
-        let flow_result = self.coherence_validator.check_logical_flow(&segments, None)?;
+        let flow_result = self
+            .coherence_validator
+            .check_logical_flow(&segments, None)?;
 
         // Combine scores
         let combined = coherence_result.consistency_score * 0.4
@@ -632,11 +632,7 @@ impl QualityScoringEngine {
         Ok(combined)
     }
 
-    fn score_diversity(
-        &self,
-        result: &GenerationResult,
-        context: &ScoringContext,
-    ) -> Result<f32> {
+    fn score_diversity(&self, result: &GenerationResult, context: &ScoringContext) -> Result<f32> {
         let text = result.generated_text.as_deref().unwrap_or("");
         if text.is_empty() {
             return Ok(1.0);
@@ -650,7 +646,9 @@ impl QualityScoringEngine {
             return Ok(1.0);
         }
 
-        let diversity_result = self.diversity_analyzer.calculate_diversity(&all_samples, None);
+        let diversity_result = self
+            .diversity_analyzer
+            .calculate_diversity(&all_samples, None);
 
         Ok(diversity_result.diversity_score)
     }
@@ -684,7 +682,10 @@ impl QualityScoringEngine {
 
         // Check if generated values are within reasonable range of time-series
         let ts_min = time_series.iter().cloned().fold(f64::INFINITY, f64::min);
-        let ts_max = time_series.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let ts_max = time_series
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         let ts_range = ts_max - ts_min;
 
         // Allow some extrapolation (20% beyond range)
@@ -716,11 +717,7 @@ impl QualityScoringEngine {
         Ok(range_score * 0.6 + trend_score * 0.4)
     }
 
-    fn score_uniqueness(
-        &self,
-        result: &GenerationResult,
-        context: &ScoringContext,
-    ) -> Result<f32> {
+    fn score_uniqueness(&self, result: &GenerationResult, context: &ScoringContext) -> Result<f32> {
         let text = result.generated_text.as_deref().unwrap_or("");
         Ok(self.calculate_uniqueness(text, &context.previous_generations))
     }
@@ -779,8 +776,8 @@ fn calculate_std_dev(values: &[f32], mean: f32) -> f32 {
         return 0.0;
     }
 
-    let variance: f32 = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>()
-        / (values.len() - 1) as f32;
+    let variance: f32 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / (values.len() - 1) as f32;
 
     variance.sqrt()
 }
@@ -795,11 +792,7 @@ fn calculate_slope(values: &[f32]) -> (f32, f32) {
     // Linear regression
     let sum_x: f32 = (0..values.len()).map(|i| i as f32).sum();
     let sum_y: f32 = values.iter().sum();
-    let sum_xy: f32 = values
-        .iter()
-        .enumerate()
-        .map(|(i, y)| i as f32 * y)
-        .sum();
+    let sum_xy: f32 = values.iter().enumerate().map(|(i, y)| i as f32 * y).sum();
     let sum_x2: f32 = (0..values.len()).map(|i| (i as f32).powi(2)).sum();
 
     let denominator = n * sum_x2 - sum_x * sum_x;
@@ -907,7 +900,9 @@ mod tests {
     #[test]
     fn test_score_generation() {
         let engine = QualityScoringEngine::new();
-        let result = create_test_result("This is a test generation. It has multiple sentences. The content is coherent.");
+        let result = create_test_result(
+            "This is a test generation. It has multiple sentences. The content is coherent.",
+        );
         let context = ScoringContext::default();
 
         let metrics = engine.score_generation(&result, &context).unwrap();
@@ -1012,13 +1007,7 @@ mod tests {
         let engine = QualityScoringEngine::new();
 
         for i in 0..10 {
-            let metrics = QualityMetrics::with_scores(
-                0.5 + (i as f32 * 0.05),
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-            );
+            let metrics = QualityMetrics::with_scores(0.5 + (i as f32 * 0.05), 0.5, 0.5, 0.5, 0.5);
             engine.track_quality_over_time(metrics);
         }
 
@@ -1031,10 +1020,7 @@ mod tests {
         let engine = QualityScoringEngine::new();
 
         // Exact duplicate
-        let uniqueness = engine.calculate_uniqueness(
-            "Hello world",
-            &["Hello world".to_string()],
-        );
+        let uniqueness = engine.calculate_uniqueness("Hello world", &["Hello world".to_string()]);
         assert!(uniqueness < 0.1);
 
         // Completely different

@@ -33,30 +33,37 @@
 //! ```
 
 #[cfg(target_os = "macos")]
-mod context;
-#[cfg(target_os = "macos")]
-mod pipelines;
-#[cfg(target_os = "macos")]
 mod buffers;
 #[cfg(target_os = "macos")]
+mod context;
+#[cfg(target_os = "macos")]
 mod operations;
+#[cfg(target_os = "macos")]
+mod pipelines;
 
-#[cfg(target_os = "macos")]
-pub use context::{MetalContext, MetalConfig};
-#[cfg(target_os = "macos")]
-pub use pipelines::{MetalPipelines, PipelineCache};
 #[cfg(target_os = "macos")]
 pub use buffers::{MetalBuffer, MetalBufferPool};
 #[cfg(target_os = "macos")]
+pub use context::{MetalConfig, MetalContext};
+#[cfg(target_os = "macos")]
 pub use operations::{
-    // FP16/Quantization utilities
-    fp32_to_fp16, fp16_to_fp32, quantize_int8, dequantize_int8,
-    verify_speculative_tokens,
-    // GEMV Metal GPU functions
-    GemvParams, gemv_metal, gemv_metal_with_params, gemv_metal_f16, gemv_batched_metal,
     // GEMM Metal GPU functions
     batched_gemm_metal,
+    dequantize_int8,
+    fp16_to_fp32,
+    // FP16/Quantization utilities
+    fp32_to_fp16,
+    gemv_batched_metal,
+    gemv_metal,
+    gemv_metal_f16,
+    gemv_metal_with_params,
+    quantize_int8,
+    verify_speculative_tokens,
+    // GEMV Metal GPU functions
+    GemvParams,
 };
+#[cfg(target_os = "macos")]
+pub use pipelines::{MetalPipelines, PipelineCache};
 
 use crate::error::{Result, RuvLLMError};
 use crate::kernels::AttentionConfig;
@@ -128,7 +135,7 @@ impl GemmParams {
             m: m as u32,
             n: n as u32,
             k: k as u32,
-            lda: k as u32,  // Row-major
+            lda: k as u32, // Row-major
             ldb: n as u32,
             ldc: n as u32,
             alpha: 1.0,
@@ -630,10 +637,7 @@ pub mod shader_source {
     pub fn all_optimized_shaders() -> String {
         format!(
             "{}\n{}\n{}\n{}",
-            ATTENTION_FUSED,
-            FUSED_OPS,
-            QUANTIZED,
-            ROPE_ATTENTION
+            ATTENTION_FUSED, FUSED_OPS, QUANTIZED, ROPE_ATTENTION
         )
     }
 }
@@ -711,7 +715,7 @@ mod tests {
         assert_eq!(params.kv_len, 2048);
         assert_eq!(params.causal, 1);
         assert_eq!(params.block_size, 64); // M4 Pro optimal
-        // Check scale = 1/sqrt(128) ≈ 0.0884
+                                           // Check scale = 1/sqrt(128) ≈ 0.0884
         assert!((params.scale - 0.0884).abs() < 0.001);
     }
 

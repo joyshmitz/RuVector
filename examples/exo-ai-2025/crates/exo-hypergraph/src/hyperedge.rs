@@ -146,7 +146,9 @@ impl HyperedgeIndex {
             }
 
             // Remove from relation index
-            if let Some(mut entry) = self.relation_index.get_mut(&hyperedge.relation.relation_type)
+            if let Some(mut entry) = self
+                .relation_index
+                .get_mut(&hyperedge.relation.relation_type)
             {
                 entry.retain(|he_id| he_id != id);
             }

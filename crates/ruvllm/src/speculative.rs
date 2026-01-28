@@ -293,7 +293,9 @@ impl TreeNode {
         let child = TreeNode::new(token, prob, self.depth + 1);
         self.children.push(child);
         // SAFETY: We just pushed, so children is non-empty
-        self.children.last_mut().expect("children is non-empty after push")
+        self.children
+            .last_mut()
+            .expect("children is non-empty after push")
     }
 
     /// Get all paths from this node to leaves
@@ -323,7 +325,11 @@ impl TreeNode {
         let best_child = self
             .children
             .iter()
-            .max_by(|a, b| a.prob.partial_cmp(&b.prob).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.prob
+                    .partial_cmp(&b.prob)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .expect("children is non-empty");
 
         let mut path = vec![self.token];
@@ -436,17 +442,19 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
 
     /// Tokenize input text
     fn tokenize(&self, text: &str) -> Result<Vec<u32>> {
-        let tokenizer = self.main_model.tokenizer().ok_or_else(|| {
-            RuvLLMError::InvalidOperation("No tokenizer available".to_string())
-        })?;
+        let tokenizer = self
+            .main_model
+            .tokenizer()
+            .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer available".to_string()))?;
         tokenizer.encode(text)
     }
 
     /// Decode tokens to text
     fn decode(&self, tokens: &[u32]) -> Result<String> {
-        let tokenizer = self.main_model.tokenizer().ok_or_else(|| {
-            RuvLLMError::InvalidOperation("No tokenizer available".to_string())
-        })?;
+        let tokenizer = self
+            .main_model
+            .tokenizer()
+            .ok_or_else(|| RuvLLMError::InvalidOperation("No tokenizer available".to_string()))?;
         tokenizer.decode(tokens)
     }
 
@@ -464,7 +472,11 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
     }
 
     /// Generate tokens with speculative decoding
-    pub fn generate_tokens(&self, prompt_tokens: &[u32], params: &GenerateParams) -> Result<Vec<u32>> {
+    pub fn generate_tokens(
+        &self,
+        prompt_tokens: &[u32],
+        params: &GenerateParams,
+    ) -> Result<Vec<u32>> {
         let config = self.config.read().clone();
         let mut context = prompt_tokens.to_vec();
         let mut output = Vec::new();
@@ -531,7 +543,9 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
                     if current_text.contains(stop_seq) {
                         // Trim to before stop sequence
                         let trimmed = current_text.split(stop_seq).next().unwrap_or("");
-                        return self.tokenize(trimmed).map(|t| t.into_iter().skip(prompt_tokens.len()).collect());
+                        return self
+                            .tokenize(trimmed)
+                            .map(|t| t.into_iter().skip(prompt_tokens.len()).collect());
                     }
                 }
             }
@@ -559,14 +573,20 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
                 max_tokens: 1,
                 temperature: config.draft_temperature,
                 top_p: config.draft_top_p,
-                top_k: if config.draft_temperature == 0.0 { 1 } else { 40 },
+                top_k: if config.draft_temperature == 0.0 {
+                    1
+                } else {
+                    40
+                },
                 ..Default::default()
             };
 
             // Get next token from draft model
             // Note: In production, this would use a more efficient batched approach
             let current_prompt = self.decode(&ctx)?;
-            let generated = self.draft_model.generate(&current_prompt, draft_params.clone())?;
+            let generated = self
+                .draft_model
+                .generate(&current_prompt, draft_params.clone())?;
 
             // Tokenize the generated text to get the new token
             let generated_tokens = self.tokenize(&format!("{}{}", prompt_text, generated))?;
@@ -624,7 +644,9 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
                 ..params.clone()
             };
 
-            let main_generated = self.main_model.generate(&prompt_text, main_params.clone())?;
+            let main_generated = self
+                .main_model
+                .generate(&prompt_text, main_params.clone())?;
             let main_tokens = self.tokenize(&format!("{}{}", prompt_text, main_generated))?;
 
             if main_tokens.len() <= ctx.len() {
@@ -721,11 +743,7 @@ impl<M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> SpeculativeDecoder<M, D> {
     }
 
     /// Generate with tree-based speculation (advanced)
-    pub fn generate_tree(
-        &self,
-        prompt: &str,
-        params: GenerateParams,
-    ) -> Result<String> {
+    pub fn generate_tree(&self, prompt: &str, params: GenerateParams) -> Result<String> {
         let config = self.config.read().clone();
         if !config.tree_speculation {
             return self.generate(prompt, params);
@@ -866,12 +884,17 @@ impl<'a, M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> Iterator
 
         // Generate more tokens via speculation
         let lookahead = self.config.lookahead;
-        let draft_result = self.decoder.draft_phase(&self.context, lookahead, &self.config);
+        let draft_result = self
+            .decoder
+            .draft_phase(&self.context, lookahead, &self.config);
 
         match draft_result {
             Ok(draft_tokens) if !draft_tokens.is_empty() => {
                 // Verify draft tokens
-                match self.decoder.verify_phase(&self.context, &draft_tokens, &self.params) {
+                match self
+                    .decoder
+                    .verify_phase(&self.context, &draft_tokens, &self.params)
+                {
                     Ok(verification) => {
                         // Queue accepted tokens and correction
                         let accepted = &draft_tokens[..verification.accepted_count];
@@ -893,7 +916,10 @@ impl<'a, M: LlmBackend + ?Sized, D: LlmBackend + ?Sized> Iterator
             }
             Ok(_) => {
                 // Empty draft, single token generation
-                match self.decoder.single_main_forward(&self.context, &self.params) {
+                match self
+                    .decoder
+                    .single_main_forward(&self.context, &self.params)
+                {
                     Ok(token) => {
                         self.context.push(token);
                         self.output_count += 1;
@@ -1048,8 +1074,24 @@ fn softmax_neon_optimized(logits: &[f32]) -> Vec<f32> {
             let d1 = vsubq_f32(v1, max_vec);
 
             // Fast exp
-            let e0 = fast_exp_vec(d0, one, half, sixth, twenty_fourth, one_twenty, seven_twenty);
-            let e1 = fast_exp_vec(d1, one, half, sixth, twenty_fourth, one_twenty, seven_twenty);
+            let e0 = fast_exp_vec(
+                d0,
+                one,
+                half,
+                sixth,
+                twenty_fourth,
+                one_twenty,
+                seven_twenty,
+            );
+            let e1 = fast_exp_vec(
+                d1,
+                one,
+                half,
+                sixth,
+                twenty_fourth,
+                one_twenty,
+                seven_twenty,
+            );
 
             // Store exp values
             vst1q_f32(result.as_mut_ptr().add(base), e0);

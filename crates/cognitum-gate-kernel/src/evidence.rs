@@ -621,7 +621,11 @@ impl EvidenceAccumulator {
     fn compute_likelihood_ratio(&self, obs: &Observation) -> f32 {
         match obs.obs_type {
             Observation::TYPE_CONNECTIVITY => {
-                if obs.flags != 0 { 1.5 } else { 0.5 }
+                if obs.flags != 0 {
+                    1.5
+                } else {
+                    0.5
+                }
             }
             Observation::TYPE_CUT_MEMBERSHIP => {
                 let confidence = (obs.value as f32) / 65535.0;
@@ -629,10 +633,18 @@ impl EvidenceAccumulator {
             }
             Observation::TYPE_FLOW => {
                 let flow = (obs.value as f32) / 1000.0;
-                if flow > 0.5 { 1.0 + flow } else { 1.0 / (1.0 + flow) }
+                if flow > 0.5 {
+                    1.0 + flow
+                } else {
+                    1.0 / (1.0 + flow)
+                }
             }
             Observation::TYPE_WITNESS => {
-                if obs.flags != 0 { 2.0 } else { 0.5 }
+                if obs.flags != 0 {
+                    2.0
+                } else {
+                    0.5
+                }
             }
             _ => 1.0,
         }

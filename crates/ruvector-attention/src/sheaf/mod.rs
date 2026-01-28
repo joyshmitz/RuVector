@@ -46,10 +46,15 @@ mod router;
 mod sparse;
 
 pub use attention::{SheafAttention, SheafAttentionConfig};
-pub use early_exit::{EarlyExit, EarlyExitConfig, EarlyExitResult, EarlyExitStatistics, ExitReason, process_with_early_exit};
+pub use early_exit::{
+    process_with_early_exit, EarlyExit, EarlyExitConfig, EarlyExitResult, EarlyExitStatistics,
+    ExitReason,
+};
 pub use restriction::{RestrictionMap, RestrictionMapConfig};
 pub use router::{ComputeLane, LaneStatistics, RoutingDecision, TokenRouter, TokenRouterConfig};
-pub use sparse::{ResidualSparseMask, SparseResidualAttention, SparseResidualConfig, SparsityStatistics};
+pub use sparse::{
+    ResidualSparseMask, SparseResidualAttention, SparseResidualConfig, SparsityStatistics,
+};
 
 #[cfg(test)]
 mod tests {

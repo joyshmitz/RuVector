@@ -138,8 +138,12 @@ impl TransformerLayer {
 
         Self {
             q_proj: random_tensor(hidden * hidden),
-            k_proj: random_tensor(hidden * (hidden / config.num_attention_heads * config.num_kv_heads)),
-            v_proj: random_tensor(hidden * (hidden / config.num_attention_heads * config.num_kv_heads)),
+            k_proj: random_tensor(
+                hidden * (hidden / config.num_attention_heads * config.num_kv_heads),
+            ),
+            v_proj: random_tensor(
+                hidden * (hidden / config.num_attention_heads * config.num_kv_heads),
+            ),
             o_proj: random_tensor(hidden * hidden),
             gate_proj: random_tensor(hidden * intermediate),
             up_proj: random_tensor(hidden * intermediate),
@@ -159,15 +163,31 @@ impl TransformerLayer {
 
         // 2. Attention projections (Q, K, V)
         let mut q = gemv(&self.q_proj, hidden_state, hidden, hidden);
-        let k = gemv(&self.k_proj, hidden_state, hidden, hidden / self.config.num_attention_heads * self.config.num_kv_heads);
-        let v = gemv(&self.v_proj, hidden_state, hidden, hidden / self.config.num_attention_heads * self.config.num_kv_heads);
+        let k = gemv(
+            &self.k_proj,
+            hidden_state,
+            hidden,
+            hidden / self.config.num_attention_heads * self.config.num_kv_heads,
+        );
+        let v = gemv(
+            &self.v_proj,
+            hidden_state,
+            hidden,
+            hidden / self.config.num_attention_heads * self.config.num_kv_heads,
+        );
 
         // 3. Apply RoPE (simplified)
         apply_rope_simple(&mut q, self.config.head_dim, kv_cache_len);
 
         // 4. Attention (simplified - would use flash attention in practice)
         // For single token decode, this is essentially a dot product with cached KV
-        let attn_output = attention_decode(&q, &k, &v, self.config.num_attention_heads, self.config.head_dim);
+        let attn_output = attention_decode(
+            &q,
+            &k,
+            &v,
+            self.config.num_attention_heads,
+            self.config.head_dim,
+        );
 
         // 5. Output projection
         let attn_projected = gemv(&self.o_proj, &attn_output, hidden, hidden);
@@ -181,8 +201,18 @@ impl TransformerLayer {
         rms_norm_inplace(hidden_state, &self.post_attn_norm_weight, 1e-6);
 
         // 8. MLP forward
-        let gate_out = gemv(&self.gate_proj, hidden_state, hidden, self.config.intermediate_size);
-        let up_out = gemv(&self.up_proj, hidden_state, hidden, self.config.intermediate_size);
+        let gate_out = gemv(
+            &self.gate_proj,
+            hidden_state,
+            hidden,
+            self.config.intermediate_size,
+        );
+        let up_out = gemv(
+            &self.up_proj,
+            hidden_state,
+            hidden,
+            self.config.intermediate_size,
+        );
 
         // SiLU activation and element-wise multiply
         let mut mlp_intermediate = Vec::with_capacity(self.config.intermediate_size);
@@ -192,7 +222,12 @@ impl TransformerLayer {
         }
 
         // Down projection
-        let mlp_output = gemv(&self.down_proj, &mlp_intermediate, self.config.intermediate_size, hidden);
+        let mlp_output = gemv(
+            &self.down_proj,
+            &mlp_intermediate,
+            self.config.intermediate_size,
+            hidden,
+        );
 
         // 9. Residual connection
         for i in 0..hidden {
@@ -242,7 +277,13 @@ fn apply_rope_simple(x: &mut [f32], head_dim: usize, position: usize) {
     }
 }
 
-fn attention_decode(q: &[f32], k: &[f32], v: &[f32], num_heads: usize, head_dim: usize) -> Vec<f32> {
+fn attention_decode(
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
+    num_heads: usize,
+    head_dim: usize,
+) -> Vec<f32> {
     // Simplified single-token attention decode
     let mut output = vec![0.0f32; num_heads * head_dim];
 
@@ -355,7 +396,9 @@ fn bench_multi_layer_forward(c: &mut Criterion) {
 
         let id = BenchmarkId::new(format!("{}_layers", num_layers), num_layers);
 
-        group.throughput(Throughput::Elements((config.params_per_layer() * num_layers) as u64));
+        group.throughput(Throughput::Elements(
+            (config.params_per_layer() * num_layers) as u64,
+        ));
         group.bench_function(id, |b| {
             b.iter(|| {
                 let mut h = hidden_state.clone();
@@ -385,16 +428,19 @@ fn bench_kv_cache_operations(c: &mut Criterion) {
         let k = random_tensor(config.num_kv_heads * config.head_dim);
         let v = random_tensor(config.num_kv_heads * config.head_dim);
 
-        group.bench_function(BenchmarkId::new(format!("{}_append", name), config.num_kv_heads), |b| {
-            b.iter_batched(
-                || KvCache::new(&config),
-                |mut cache| {
-                    cache.append(black_box(&k), black_box(&v));
-                    cache
-                },
-                criterion::BatchSize::SmallInput,
-            )
-        });
+        group.bench_function(
+            BenchmarkId::new(format!("{}_append", name), config.num_kv_heads),
+            |b| {
+                b.iter_batched(
+                    || KvCache::new(&config),
+                    |mut cache| {
+                        cache.append(black_box(&k), black_box(&v));
+                        cache
+                    },
+                    criterion::BatchSize::SmallInput,
+                )
+            },
+        );
 
         // Memory footprint at various sequence lengths
         for seq_len in [256, 512, 1024, 2048] {
@@ -500,14 +546,22 @@ fn bench_model_memory(c: &mut Criterion) {
         let fp16_gb = config.memory_bytes_fp16() as f64 / (1024.0 * 1024.0 * 1024.0);
         let int4_gb = config.memory_bytes_int4() as f64 / (1024.0 * 1024.0 * 1024.0);
 
-        println!("{}: FP16={:.2}GB, INT4={:.2}GB, params={}M",
-            name, fp16_gb, int4_gb, config.total_params() / 1_000_000);
+        println!(
+            "{}: FP16={:.2}GB, INT4={:.2}GB, params={}M",
+            name,
+            fp16_gb,
+            int4_gb,
+            config.total_params() / 1_000_000
+        );
 
         // Benchmark single layer to estimate per-layer latency
         let layer = TransformerLayer::new(config);
         let mut hidden_state = random_tensor(config.hidden_size);
 
-        let id = BenchmarkId::new(format!("{}_fp16_{:.1}GB", name, fp16_gb), config.total_params());
+        let id = BenchmarkId::new(
+            format!("{}_fp16_{:.1}GB", name, fp16_gb),
+            config.total_params(),
+        );
 
         group.throughput(Throughput::Elements(config.params_per_layer() as u64));
         group.bench_function(id, |b| {
@@ -549,16 +603,19 @@ fn bench_inference_components(c: &mut Criterion) {
     // Linear projection (hidden -> hidden)
     let proj_matrix = random_tensor(hidden * hidden);
     group.bench_function("linear_4096x4096", |b| {
-        b.iter(|| {
-            gemv(black_box(&proj_matrix), black_box(&input), hidden, hidden)
-        })
+        b.iter(|| gemv(black_box(&proj_matrix), black_box(&input), hidden, hidden))
     });
 
     // Linear projection (hidden -> intermediate)
     let mlp_up_matrix = random_tensor(hidden * intermediate);
     group.bench_function("linear_4096x11008", |b| {
         b.iter(|| {
-            gemv(black_box(&mlp_up_matrix), black_box(&input), hidden, intermediate)
+            gemv(
+                black_box(&mlp_up_matrix),
+                black_box(&input),
+                hidden,
+                intermediate,
+            )
         })
     });
 
@@ -570,7 +627,11 @@ fn bench_inference_components(c: &mut Criterion) {
             |mut x| {
                 for h in 0..config.num_attention_heads {
                     let offset = h * config.head_dim;
-                    apply_rope_simple(black_box(&mut x[offset..offset + config.head_dim]), config.head_dim, 100);
+                    apply_rope_simple(
+                        black_box(&mut x[offset..offset + config.head_dim]),
+                        config.head_dim,
+                        100,
+                    );
                 }
                 x
             },

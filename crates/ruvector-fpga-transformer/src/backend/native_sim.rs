@@ -116,7 +116,10 @@ impl NativeSimBackend {
         // Check preflight gate
         let preflight = self.gate.preflight(gate_hint);
         if let GateDecision::Skipped { reason } = preflight {
-            return Ok((vec![0i16; shape.vocab as usize], GateDecision::Skipped { reason }));
+            return Ok((
+                vec![0i16; shape.vocab as usize],
+                GateDecision::Skipped { reason },
+            ));
         }
 
         // Initialize hidden states from embeddings
@@ -367,9 +370,8 @@ impl TransformerBackend for NativeSimBackend {
         req.validate()?;
 
         // Get model (with poison handling)
-        let model = read_lock(&self.models, |models| {
-            models.get(&req.model).cloned()
-        })?.ok_or_else(|| Error::ModelNotFound(req.model))?;
+        let model = read_lock(&self.models, |models| models.get(&req.model).cloned())?
+            .ok_or_else(|| Error::ModelNotFound(req.model))?;
 
         // Validate shape
         if model.artifact.manifest.shape != req.shape {
@@ -405,8 +407,7 @@ impl TransformerBackend for NativeSimBackend {
         write_lock(&self.stats, |stats| {
             stats.total_inferences += 1;
             let n = stats.total_inferences;
-            stats.avg_latency_ns =
-                (stats.avg_latency_ns * (n - 1) + latency_ns as u64) / n;
+            stats.avg_latency_ns = (stats.avg_latency_ns * (n - 1) + latency_ns as u64) / n;
             match gate_decision {
                 GateDecision::EarlyExit { .. } => stats.early_exits += 1,
                 GateDecision::Skipped { .. } => stats.skipped += 1,

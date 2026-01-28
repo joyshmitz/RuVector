@@ -233,16 +233,23 @@ impl MorphogeneticNetwork {
 
     /// Get cells by type
     pub fn cells_by_type(&self, cell_type: CellType) -> Vec<&Cell> {
-        self.cells.iter().filter(|c| c.cell_type == cell_type).collect()
+        self.cells
+            .iter()
+            .filter(|c| c.cell_type == cell_type)
+            .collect()
     }
 
     /// Calculate local cell density around a position
     fn local_density(&self, pos: (i32, i32), radius: f32) -> f32 {
-        let count = self.cells.iter().filter(|c| {
-            let dx = (c.position.0 - pos.0) as f32;
-            let dy = (c.position.1 - pos.1) as f32;
-            (dx * dx + dy * dy).sqrt() <= radius
-        }).count();
+        let count = self
+            .cells
+            .iter()
+            .filter(|c| {
+                let dx = (c.position.0 - pos.0) as f32;
+                let dy = (c.position.1 - pos.1) as f32;
+                (dx * dx + dy * dy).sqrt() <= radius
+            })
+            .count();
 
         (count as f32) / (std::f32::consts::PI * radius * radius)
     }
@@ -274,17 +281,24 @@ impl MorphogeneticNetwork {
         let morphogen_names = ["signal", "receptor", "structure", "compute"];
 
         // Pre-collect signaling cell data to avoid borrow conflicts
-        let signaling_cells: Vec<(u32, (i32, i32))> = self.cells.iter()
+        let signaling_cells: Vec<(u32, (i32, i32))> = self
+            .cells
+            .iter()
             .filter(|c| c.cell_type == CellType::Signaling)
             .map(|c| (c.id, c.position))
             .collect();
 
         // Pre-compute all readings for each cell
-        let updates: Vec<(usize, Vec<(String, f32)>)> = self.cells.iter().enumerate()
+        let updates: Vec<(usize, Vec<(String, f32)>)> = self
+            .cells
+            .iter()
+            .enumerate()
             .map(|(idx, cell)| {
-                let readings: Vec<(String, f32)> = morphogen_names.iter()
+                let readings: Vec<(String, f32)> = morphogen_names
+                    .iter()
                     .map(|&name| {
-                        let conc: f32 = signaling_cells.iter()
+                        let conc: f32 = signaling_cells
+                            .iter()
                             .filter(|(id, _)| *id != cell.id)
                             .map(|(_, pos)| {
                                 let dx = (cell.position.0 - pos.0) as f32;
@@ -331,14 +345,17 @@ impl MorphogeneticNetwork {
         // Update morphogen readings
         // We need to temporarily take cells to avoid borrow issues
         let morphogen_names = ["signal", "receptor", "structure", "compute"];
-        let cell_positions: Vec<_> = self.cells.iter()
+        let cell_positions: Vec<_> = self
+            .cells
+            .iter()
             .filter(|c| c.cell_type == CellType::Signaling)
             .map(|c| c.position)
             .collect();
 
         for cell in &mut self.cells {
             for name in &morphogen_names {
-                let conc: f32 = cell_positions.iter()
+                let conc: f32 = cell_positions
+                    .iter()
                     .map(|pos| {
                         let dx = (cell.position.0 - pos.0) as f32;
                         let dy = (cell.position.1 - pos.1) as f32;
@@ -349,7 +366,8 @@ impl MorphogeneticNetwork {
 
                 // Simplified gradient contribution
                 let gradient_conc = 0.0; // Would need to refactor for full gradient support
-                cell.morphogen_readings.insert(name.to_string(), conc + gradient_conc);
+                cell.morphogen_readings
+                    .insert(name.to_string(), conc + gradient_conc);
             }
         }
 
@@ -359,7 +377,11 @@ impl MorphogeneticNetwork {
 
             for cell in &self.cells {
                 let local_density = self.local_density(cell.position, 10.0);
-                let growth_factor = cell.morphogen_readings.get("signal").copied().unwrap_or(0.0);
+                let growth_factor = cell
+                    .morphogen_readings
+                    .get("signal")
+                    .copied()
+                    .unwrap_or(0.0);
 
                 if cell.should_divide(local_density, growth_factor) && rng.gen::<f32>() > 0.7 {
                     // Create daughter cell nearby
@@ -388,7 +410,9 @@ impl MorphogeneticNetwork {
 
     /// Update cell connections based on proximity
     fn update_connections(&mut self) {
-        let positions: Vec<_> = self.cells.iter()
+        let positions: Vec<_> = self
+            .cells
+            .iter()
             .map(|c| (c.id, c.position, c.cell_type))
             .collect();
 
@@ -461,7 +485,8 @@ impl MorphogeneticNetwork {
             cell.fitness = cell.fitness.min(1.0);
 
             // Prune weak connections
-            cell.connections.retain(|_, &mut strength| strength > threshold);
+            cell.connections
+                .retain(|_, &mut strength| strength > threshold);
         }
 
         // Remove dead cells
@@ -490,7 +515,11 @@ impl MorphogeneticNetwork {
             total_cells: self.cells.len(),
             type_counts,
             total_connections,
-            average_fitness: if self.cells.is_empty() { 0.0 } else { total_fitness / self.cells.len() as f32 },
+            average_fitness: if self.cells.is_empty() {
+                0.0
+            } else {
+                total_fitness / self.cells.len() as f32
+            },
             tick: self.tick,
         }
     }
@@ -665,7 +694,7 @@ mod tests {
         network.seed_cell(51, 50, CellType::Signaling);
         network.seed_cell(50, 51, CellType::Signaling);
         for i in 0..5 {
-            network.seed_cell(50 + i, 52, CellType::Stem);  // Very close to signaling
+            network.seed_cell(50 + i, 52, CellType::Stem); // Very close to signaling
         }
 
         // Run simulation with more iterations to allow differentiation
@@ -743,9 +772,26 @@ mod tests {
         let stats = network.stats();
 
         assert_eq!(stats.total_cells, 3);
-        assert_eq!(stats.type_counts.get(&CellType::Stem).copied().unwrap_or(0), 1);
-        assert_eq!(stats.type_counts.get(&CellType::Signaling).copied().unwrap_or(0), 1);
-        assert_eq!(stats.type_counts.get(&CellType::Compute).copied().unwrap_or(0), 1);
+        assert_eq!(
+            stats.type_counts.get(&CellType::Stem).copied().unwrap_or(0),
+            1
+        );
+        assert_eq!(
+            stats
+                .type_counts
+                .get(&CellType::Signaling)
+                .copied()
+                .unwrap_or(0),
+            1
+        );
+        assert_eq!(
+            stats
+                .type_counts
+                .get(&CellType::Compute)
+                .copied()
+                .unwrap_or(0),
+            1
+        );
     }
 
     #[test]

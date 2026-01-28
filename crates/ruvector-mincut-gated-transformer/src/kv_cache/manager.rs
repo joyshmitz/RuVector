@@ -10,11 +10,11 @@ use alloc::vec::Vec;
 use std::vec::Vec;
 
 use super::hot_buffer::{HotBuffer, HotBufferConfig};
+use super::kvquant::KVQuantQuantizer;
 use super::metrics::{MemoryStats, QualityFeedback, QualityMetric, QualityTracker};
-use super::policy::{EvictionDecision, TierPolicy, RematerializationPolicy};
+use super::policy::{EvictionDecision, RematerializationPolicy, TierPolicy};
 use super::quantized_store::{QuantizedStore, QuantizedStoreConfig};
 use super::squat::SQuatQuantizer;
-use super::kvquant::KVQuantQuantizer;
 use super::tier::{TierBoundary, TierCounts};
 
 /// Archive tier quantizer selection
@@ -124,23 +124,25 @@ impl AdaptiveKVCacheConfig {
     /// Estimate memory usage in bytes
     pub fn estimate_memory(&self) -> usize {
         // Hot buffer: FP16
-        let hot_bytes = self.num_layers * self.num_heads * self.head_dim
-            * self.tail_length * 2 * 2; // 2 bytes * 2 (kv)
+        let hot_bytes = self.num_layers * self.num_heads * self.head_dim * self.tail_length * 2 * 2; // 2 bytes * 2 (kv)
 
         // Warm: 4-bit
-        let warm_bytes = self.num_layers * self.num_heads * self.head_dim
-            * self.warm_length / 2 * 2; // 0.5 bytes * 2 (kv)
+        let warm_bytes =
+            self.num_layers * self.num_heads * self.head_dim * self.warm_length / 2 * 2; // 0.5 bytes * 2 (kv)
 
         // Archive: varies by quantizer
-        let archive_len = self.max_seq_len.saturating_sub(self.tail_length + self.warm_length);
+        let archive_len = self
+            .max_seq_len
+            .saturating_sub(self.tail_length + self.warm_length);
         let archive_bytes_per_element = match self.archive_quantizer {
             ArchiveQuantizer::Kivi2Bit => 0.25,
             ArchiveQuantizer::SQuat { .. } => 0.1,
             ArchiveQuantizer::KVQuant { bits } => bits as f64 / 8.0,
             ArchiveQuantizer::Adaptive => 0.25,
         };
-        let archive_bytes = (self.num_layers * self.num_heads * self.head_dim
-            * archive_len) as f64 * archive_bytes_per_element * 2.0;
+        let archive_bytes = (self.num_layers * self.num_heads * self.head_dim * archive_len) as f64
+            * archive_bytes_per_element
+            * 2.0;
 
         hot_bytes + warm_bytes + archive_bytes as usize
     }
@@ -193,12 +195,15 @@ impl AdaptiveKVCache {
             num_heads: config.num_heads,
             head_dim: config.head_dim,
             warm_capacity: config.warm_length,
-            archive_capacity: config.max_seq_len.saturating_sub(config.tail_length + config.warm_length),
+            archive_capacity: config
+                .max_seq_len
+                .saturating_sub(config.tail_length + config.warm_length),
             warm_bits: 4,
             archive_bits: 2,
         };
 
-        let tier_boundary = TierBoundary::new(config.tail_length, config.tail_length + config.warm_length);
+        let tier_boundary =
+            TierBoundary::new(config.tail_length, config.tail_length + config.warm_length);
         let tier_policy = TierPolicy::new(tier_boundary, config.quality_target);
 
         let remat_policy = if config.enable_rematerialization {
@@ -257,12 +262,7 @@ impl AdaptiveKVCache {
     /// Compute attention with tiered cache
     ///
     /// Returns attention output: [num_heads * head_dim]
-    pub fn attention(
-        &self,
-        layer: usize,
-        query: &[f32],
-        scale: f32,
-    ) -> Vec<f32> {
+    pub fn attention(&self, layer: usize, query: &[f32], scale: f32) -> Vec<f32> {
         assert!(layer < self.config.num_layers);
         assert_eq!(query.len(), self.config.head_dim * self.config.num_heads);
 

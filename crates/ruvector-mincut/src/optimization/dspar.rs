@@ -156,7 +156,8 @@ impl DegreePresparse {
         };
 
         // Score all edges by effective resistance
-        let mut scored_edges: Vec<(EdgeId, VertexId, VertexId, Weight, f64)> = Vec::with_capacity(original_edges);
+        let mut scored_edges: Vec<(EdgeId, VertexId, VertexId, Weight, f64)> =
+            Vec::with_capacity(original_edges);
 
         for edge in graph.edges() {
             let deg_u = *self.degree_cache.get(&edge.source).unwrap_or(&1);
@@ -244,12 +245,7 @@ impl DegreePresparse {
     /// Incremental update: handle edge insertion
     ///
     /// Returns whether the edge should be included in the sparse graph
-    pub fn should_include_edge(
-        &mut self,
-        graph: &DynamicGraph,
-        u: VertexId,
-        v: VertexId,
-    ) -> bool {
+    pub fn should_include_edge(&mut self, graph: &DynamicGraph, u: VertexId, v: VertexId) -> bool {
         // Update degree cache
         self.degree_cache.insert(u, graph.degree(u));
         self.degree_cache.insert(v, graph.degree(v));
@@ -344,12 +340,16 @@ impl SpectralConcordance {
     /// Feature preservation loss (cut value approximation)
     fn feature_preservation_loss(&self, original: &DynamicGraph, sparse: &DynamicGraph) -> f64 {
         // Compare minimum degree (crude cut approximation)
-        let orig_min_deg = original.vertices().iter()
+        let orig_min_deg = original
+            .vertices()
+            .iter()
             .map(|&v| original.degree(v))
             .min()
             .unwrap_or(0) as f64;
 
-        let sparse_min_deg = sparse.vertices().iter()
+        let sparse_min_deg = sparse
+            .vertices()
+            .iter()
             .map(|&v| sparse.degree(v))
             .min()
             .unwrap_or(0) as f64;

@@ -14,11 +14,11 @@
 //! - Encouraging sparse, meaningful attention patterns
 //! - Regularizing attention weights
 
-mod kl_divergence;
 mod bottleneck;
+mod kl_divergence;
 
-pub use kl_divergence::{KLDivergence, DiagonalGaussian};
-pub use bottleneck::{InformationBottleneck, IBConfig};
+pub use bottleneck::{IBConfig, InformationBottleneck};
+pub use kl_divergence::{DiagonalGaussian, KLDivergence};
 
 #[cfg(test)]
 mod tests {

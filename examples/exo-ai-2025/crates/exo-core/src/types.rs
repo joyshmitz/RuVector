@@ -31,7 +31,10 @@ impl Pattern {
     }
 
     /// Create a pattern with metadata
-    pub fn with_metadata(embedding: Vec<f32>, metadata: HashMap<String, serde_json::Value>) -> Self {
+    pub fn with_metadata(
+        embedding: Vec<f32>,
+        metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             embedding,
             metadata,
@@ -98,26 +101,18 @@ pub enum TopologicalQuery {
         epsilon_range: (f32, f32),
     },
     /// Find N-dimensional holes in structure
-    BettiNumbers {
-        max_dimension: usize,
-    },
+    BettiNumbers { max_dimension: usize },
     /// Sheaf consistency check
-    SheafConsistency {
-        local_sections: Vec<String>,
-    },
+    SheafConsistency { local_sections: Vec<String> },
 }
 
 /// Result from hypergraph query
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum HypergraphResult {
     /// Persistence diagram
-    PersistenceDiagram {
-        birth_death_pairs: Vec<(f32, f32)>,
-    },
+    PersistenceDiagram { birth_death_pairs: Vec<(f32, f32)> },
     /// Betti numbers by dimension
-    BettiNumbers {
-        numbers: Vec<usize>,
-    },
+    BettiNumbers { numbers: Vec<usize> },
     /// Sheaf consistency result
     SheafConsistency {
         is_consistent: bool,

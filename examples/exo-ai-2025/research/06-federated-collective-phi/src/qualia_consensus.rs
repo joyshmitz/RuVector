@@ -2,9 +2,9 @@
 // Byzantine Fault Tolerant Consensus Protocol for Qualia
 // Based on PBFT (Practical Byzantine Fault Tolerance)
 
-use std::collections::{HashMap, HashSet};
-use serde::{Serialize, Deserialize};
 use super::consciousness_crdt::Quale;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// Agent identifier
 pub type AgentId = u64;
@@ -161,7 +161,10 @@ impl QualiaConsensusNode {
                 None
             }
 
-            QualiaMessage::ViewChange { new_view, agent_id: _ } => {
+            QualiaMessage::ViewChange {
+                new_view,
+                agent_id: _,
+            } => {
                 self.handle_view_change(new_view);
                 None
             }
@@ -447,7 +450,11 @@ impl ConsensusCoordinator {
     /// Run consensus round
     pub fn run_consensus_round(&mut self, leader_id: AgentId, qualia: Quale) -> ConsensusResult {
         // Leader proposes
-        let proposal = self.nodes.get_mut(&leader_id).unwrap().propose_qualia(qualia);
+        let proposal = self
+            .nodes
+            .get_mut(&leader_id)
+            .unwrap()
+            .propose_qualia(qualia);
 
         // Broadcast proposal
         let prepares = self.broadcast(proposal);
@@ -532,7 +539,13 @@ mod tests {
         assert!(prepare.is_some());
 
         // Also need to record the prepare from self
-        if let Some(QualiaMessage::QualiaPrepare { qualia: q, view, sequence, agent_id }) = prepare {
+        if let Some(QualiaMessage::QualiaPrepare {
+            qualia: q,
+            view,
+            sequence,
+            agent_id,
+        }) = prepare
+        {
             node.handle_prepare(q, view, sequence, agent_id);
         }
 
@@ -593,6 +606,9 @@ mod tests {
         assert_eq!(result, ConsensusResult::Agreed(correct_qualia));
 
         let hallucinating = node.detect_hallucinations(0);
-        assert!(hallucinating.contains(&4), "Agent 4 should be detected as hallucinating");
+        assert!(
+            hallucinating.contains(&4),
+            "Agent 4 should be detected as hallucinating"
+        );
     }
 }

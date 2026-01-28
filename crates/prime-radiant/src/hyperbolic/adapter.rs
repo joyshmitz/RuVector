@@ -89,11 +89,7 @@ impl HyperbolicAdapter {
         let norm_x_sq: f32 = x.iter().map(|v| v * v).sum();
         let norm_y_sq: f32 = y.iter().map(|v| v * v).sum();
 
-        let diff_sq: f32 = x
-            .iter()
-            .zip(y.iter())
-            .map(|(a, b)| (a - b) * (a - b))
-            .sum();
+        let diff_sq: f32 = x.iter().zip(y.iter()).map(|(a, b)| (a - b) * (a - b)).sum();
 
         let denom = (1.0 - norm_x_sq).max(EPS) * (1.0 - norm_y_sq).max(EPS);
         let inner = 1.0 + 2.0 * diff_sq / denom;

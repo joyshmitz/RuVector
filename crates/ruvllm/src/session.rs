@@ -4,7 +4,7 @@
 //! and integration with KV cache and adapters.
 
 use crate::error::{Result, RuvLLMError};
-use crate::kv_cache::{TwoTierKvCache, KvCacheConfig};
+use crate::kv_cache::{KvCacheConfig, TwoTierKvCache};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             max_lifetime_secs: 3600, // 1 hour
-            idle_timeout_secs: 300,   // 5 minutes
+            idle_timeout_secs: 300,  // 5 minutes
             max_turns: 100,
             kv_cache: KvCacheConfig::default(),
             persist: true,
@@ -234,7 +234,9 @@ impl SessionManager {
         self.sessions.insert(session_id.clone(), session_ref);
 
         // Return a copy
-        Ok(self.sessions.get(&session_id)
+        Ok(self
+            .sessions
+            .get(&session_id)
             .map(|s| {
                 let guard = s.read();
                 Session {
@@ -282,7 +284,10 @@ impl SessionManager {
             f(&mut guard);
             Ok(())
         } else {
-            Err(RuvLLMError::NotFound(format!("Session not found: {}", session_id)))
+            Err(RuvLLMError::NotFound(format!(
+                "Session not found: {}",
+                session_id
+            )))
         }
     }
 

@@ -29,7 +29,9 @@
 //! println!("Total energy: {}", energy.total_energy);
 //! ```
 
-use super::energy::{compute_norm_sq, compute_residual, CoherenceEnergy, EdgeEnergy, EdgeId, ScopeId};
+use super::energy::{
+    compute_norm_sq, compute_residual, CoherenceEnergy, EdgeEnergy, EdgeId, ScopeId,
+};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use parking_lot::RwLock;
@@ -695,8 +697,9 @@ impl CoherenceEngine {
             return Err(CoherenceError::EdgeExists(source, target));
         }
 
-        let mut edge =
-            SheafEdge::with_restriction_maps(&edge_id, &source, &target, weight, rho_source, rho_target);
+        let mut edge = SheafEdge::with_restriction_maps(
+            &edge_id, &source, &target, weight, rho_source, rho_target,
+        );
         if let Some(s) = scope.clone() {
             edge = edge.with_scope(s.clone());
             self.edge_scopes.insert(edge_id.clone(), s);
@@ -864,11 +867,9 @@ impl CoherenceEngine {
 
         for edge_ref in &edges {
             let edge = edge_ref.value();
-            if let Some(energy) = self.compute_edge_energy_with_buffers(
-                edge,
-                &mut source_buf,
-                &mut target_buf,
-            ) {
+            if let Some(energy) =
+                self.compute_edge_energy_with_buffers(edge, &mut source_buf, &mut target_buf)
+            {
                 result.insert(edge.id.clone(), energy);
             }
         }

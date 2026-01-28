@@ -43,17 +43,17 @@
 //! let result = vectors::dot_product_simd(&a, &b);
 //! ```
 
-pub mod vectors;
-pub mod matrix;
 pub mod energy;
+pub mod matrix;
+pub mod vectors;
 
 // Re-export key types
-pub use vectors::{dot_product_simd, norm_squared_simd, subtract_simd, scale_simd};
-pub use matrix::{matmul_simd, matvec_simd};
 pub use energy::{
-    batch_residuals_simd, weighted_energy_sum_simd, batch_lane_assignment_simd,
-    batch_residual_norms_simd,
+    batch_lane_assignment_simd, batch_residual_norms_simd, batch_residuals_simd,
+    weighted_energy_sum_simd,
 };
+pub use matrix::{matmul_simd, matvec_simd};
+pub use vectors::{dot_product_simd, norm_squared_simd, scale_simd, subtract_simd};
 
 /// Available SIMD instruction set widths.
 ///

@@ -2,7 +2,7 @@
 //!
 //! Check if a polynomial can be written as a sum of squared polynomials.
 
-use super::polynomial::{Polynomial, Monomial, Term};
+use super::polynomial::{Monomial, Polynomial, Term};
 
 /// SOS decomposition configuration
 #[derive(Debug, Clone)]
@@ -438,7 +438,10 @@ mod tests {
             }
             SOSResult::NotSOS { witness } => {
                 // Should not find counterexample for a true SOS polynomial
-                panic!("(x+y)² incorrectly marked as not SOS with witness {:?}", witness);
+                panic!(
+                    "(x+y)² incorrectly marked as not SOS with witness {:?}",
+                    witness
+                );
             }
         }
     }

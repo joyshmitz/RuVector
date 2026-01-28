@@ -386,6 +386,8 @@ struct IvfFlatScanState {
     search_done: bool,
     /// Metadata cache
     meta: IvfFlatMetaPage,
+    /// Whether query vector was successfully extracted
+    query_valid: bool,
 }
 
 // ============================================================================
@@ -1509,6 +1511,7 @@ unsafe extern "C" fn ivfflat_ambeginscan(
         quantization: quantization_from_u32(meta.quantization),
         search_done: false,
         meta,
+        query_valid: false,
     });
 
     (*scan).opaque = Box::into_raw(state) as *mut ::std::os::raw::c_void;
@@ -1536,53 +1539,156 @@ unsafe extern "C" fn ivfflat_amrescan(
     (*state).results.clear();
     (*state).current = 0;
     (*state).search_done = false;
+    (*state).query_valid = false;
 
     // Extract query vector from ORDER BY
     if norderbys > 0 && !orderbys.is_null() {
         let orderby = &*orderbys;
         let datum = orderby.sk_argument;
+        let typoid = orderby.sk_subtype;
 
-        // Extract RuVector from datum using FromDatum trait
-        if let Some(vector) = RuVector::from_polymorphic_datum(
-            datum,
-            false, // not null
-            pg_sys::InvalidOid,
-        ) {
+        pgrx::debug1!(
+            "IVFFlat v2: Extracting query vector, datum null={}, typoid={}",
+            datum.is_null(),
+            typoid.as_u32()
+        );
+
+        // Method 1: Try direct RuVector extraction
+        if let Some(vector) = RuVector::from_polymorphic_datum(datum, false, typoid) {
             (*state).query = vector.as_slice().to_vec();
+            (*state).query_valid = true;
             pgrx::debug1!(
-                "IVFFlat v2: Extracted query vector with {} dimensions",
+                "IVFFlat v2: Extracted query vector (direct) with {} dimensions",
                 (*state).query.len()
             );
-        } else {
-            // Fallback: try to interpret as raw pointer to varlena
-            let raw_ptr = datum.cast_mut_ptr::<pg_sys::varlena>();
-            if !raw_ptr.is_null() {
-                let detoasted = pg_sys::pg_detoast_datum(raw_ptr);
-                if !detoasted.is_null() {
-                    // Read dimensions and data from varlena
-                    let data_ptr = pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
-                    let dimensions = std::ptr::read_unaligned(data_ptr as *const u16) as usize;
-                    let f32_ptr = data_ptr.add(4) as *const f32;
-                    (*state).query = std::slice::from_raw_parts(f32_ptr, dimensions).to_vec();
+        }
+
+        // Method 2: Handle text parameter conversion
+        if !(*state).query_valid && !datum.is_null() {
+            let is_text_type = typoid == pg_sys::Oid::from(25)
+                || typoid == pg_sys::Oid::from(1043)
+                || typoid == pg_sys::Oid::from(705)
+                || typoid == pg_sys::InvalidOid;
+
+            if is_text_type {
+                if let Some(vec) = ivfflat_try_convert_text_to_ruvector(datum) {
+                    (*state).query = vec;
+                    (*state).query_valid = true;
                     pgrx::debug1!(
-                        "IVFFlat v2: Extracted query vector (fallback) with {} dimensions",
-                        dimensions
+                        "IVFFlat v2: Converted text parameter to query vector with {} dimensions",
+                        (*state).query.len()
                     );
                 }
             }
         }
 
-        // Calculate adaptive probes if query was extracted
-        if !(*state).query.is_empty() {
-            let query_norm = vector_norm(&(*state).query);
-            (*state).probes = compute_adaptive_probes(
-                (*state).meta.dimensions as usize,
-                (*state).meta.lists as usize,
-                (*state).k,
-                query_norm,
+        // Method 3: Fallback - raw varlena extraction
+        if !(*state).query_valid {
+            let raw_ptr = datum.cast_mut_ptr::<pg_sys::varlena>();
+            if !raw_ptr.is_null() {
+                let detoasted = pg_sys::pg_detoast_datum(raw_ptr);
+                if !detoasted.is_null() {
+                    let total_size = pgrx::varlena::varsize_any(detoasted as *const _);
+                    if total_size >= 8 {
+                        let data_ptr =
+                            pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
+                        let dimensions = std::ptr::read_unaligned(data_ptr as *const u16) as usize;
+                        let expected_data_size = 4 + (dimensions * 4);
+                        let actual_data_size = total_size - pg_sys::VARHDRSZ;
+
+                        if dimensions > 0
+                            && dimensions <= 16384
+                            && actual_data_size >= expected_data_size
+                        {
+                            let f32_ptr = data_ptr.add(4) as *const f32;
+                            (*state).query =
+                                std::slice::from_raw_parts(f32_ptr, dimensions).to_vec();
+                            (*state).query_valid = true;
+                            pgrx::debug1!(
+                                "IVFFlat v2: Extracted query vector (varlena fallback) with {} dimensions",
+                                dimensions
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Validate query vector
+        if !(*state).query_valid || (*state).query.is_empty() {
+            pgrx::error!(
+                "IVFFlat: Could not extract query vector from parameter. \
+                 Ensure the query vector is properly cast to ruvector type."
             );
         }
+
+        // Validate not all zeros
+        if (*state).query.iter().all(|&x| x == 0.0) {
+            pgrx::error!(
+                "IVFFlat: Query vector is all zeros, which is invalid for similarity search."
+            );
+        }
+
+        // Validate dimensions
+        if (*state).query.len() != (*state).meta.dimensions as usize {
+            pgrx::error!(
+                "IVFFlat: Query vector has {} dimensions but index expects {}",
+                (*state).query.len(),
+                (*state).meta.dimensions
+            );
+        }
+
+        // Calculate adaptive probes
+        let query_norm = vector_norm(&(*state).query);
+        (*state).probes = compute_adaptive_probes(
+            (*state).meta.dimensions as usize,
+            (*state).meta.lists as usize,
+            (*state).k,
+            query_norm,
+        );
     }
+}
+
+/// Try to convert a text datum to ruvector (for parameterized queries)
+unsafe fn ivfflat_try_convert_text_to_ruvector(datum: Datum) -> Option<Vec<f32>> {
+    let text_ptr = datum.cast_mut_ptr::<pg_sys::text>();
+    if text_ptr.is_null() {
+        return None;
+    }
+
+    let detoasted = pg_sys::pg_detoast_datum(text_ptr as *mut pg_sys::varlena);
+    if detoasted.is_null() {
+        return None;
+    }
+
+    let text_len = pgrx::varlena::varsize_any_exhdr(detoasted as *const _);
+    let text_data = pgrx::varlena::vardata_any(detoasted as *const _) as *const u8;
+
+    if text_len == 0 {
+        return None;
+    }
+
+    let text_slice = std::slice::from_raw_parts(text_data, text_len);
+    let text_str = match std::str::from_utf8(text_slice) {
+        Ok(s) => s.trim(),
+        Err(_) => return None,
+    };
+
+    if !text_str.starts_with('[') || !text_str.ends_with(']') {
+        return None;
+    }
+
+    let inner = &text_str[1..text_str.len() - 1];
+    let values: Vec<f32> = inner
+        .split(',')
+        .filter_map(|s| s.trim().parse::<f32>().ok())
+        .collect();
+
+    if values.is_empty() {
+        return None;
+    }
+
+    Some(values)
 }
 
 /// Get tuple callback

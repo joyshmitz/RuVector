@@ -18,12 +18,12 @@
 
 // Import from the crate being tested
 // Note: CoreMLBackend methods require the coreml feature
-use ruvllm::backends::{
-    AneCapabilities, ComputeUnits, GenerateParams, LlmBackend,
-    ModelArchitecture, ModelConfig, Quantization,
-};
 #[cfg(feature = "coreml")]
 use ruvllm::backends::CoreMLBackend;
+use ruvllm::backends::{
+    AneCapabilities, ComputeUnits, GenerateParams, LlmBackend, ModelArchitecture, ModelConfig,
+    Quantization,
+};
 use ruvllm::error::{Result, RuvLLMError};
 
 // ============================================================================
@@ -52,8 +52,14 @@ fn test_ane_capabilities_detection() {
     if is_apple_silicon() {
         assert!(caps.available, "ANE should be available on Apple Silicon");
         assert!(caps.tops > 0.0, "TOPS should be positive on Apple Silicon");
-        assert!(caps.max_model_size_mb > 0, "Max model size should be positive");
-        assert!(!caps.supported_ops.is_empty(), "Should have supported operations");
+        assert!(
+            caps.max_model_size_mb > 0,
+            "Max model size should be positive"
+        );
+        assert!(
+            !caps.supported_ops.is_empty(),
+            "Should have supported operations"
+        );
 
         // Verify common operations are supported
         let expected_ops = ["MatMul", "GELU", "SiLU", "LayerNorm", "Softmax"];
@@ -65,10 +71,19 @@ fn test_ane_capabilities_detection() {
             );
         }
     } else {
-        assert!(!caps.available, "ANE should not be available on non-Apple Silicon");
+        assert!(
+            !caps.available,
+            "ANE should not be available on non-Apple Silicon"
+        );
         assert_eq!(caps.tops, 0.0, "TOPS should be 0 when unavailable");
-        assert_eq!(caps.max_model_size_mb, 0, "Max model size should be 0 when unavailable");
-        assert!(caps.supported_ops.is_empty(), "No operations when unavailable");
+        assert_eq!(
+            caps.max_model_size_mb, 0,
+            "Max model size should be 0 when unavailable"
+        );
+        assert!(
+            caps.supported_ops.is_empty(),
+            "No operations when unavailable"
+        );
     }
 }
 
@@ -160,7 +175,10 @@ fn test_fallback_when_coreml_unavailable() {
         let caps = AneCapabilities::detect();
         // On non-Apple Silicon or without the feature, it should gracefully handle this
         if !is_apple_silicon() {
-            assert!(!caps.available, "ANE should not be available without coreml feature on non-Apple Silicon");
+            assert!(
+                !caps.available,
+                "ANE should not be available without coreml feature on non-Apple Silicon"
+            );
         }
     }
 
@@ -356,9 +374,9 @@ fn test_ane_tops_values() {
     if is_apple_silicon() {
         let caps = AneCapabilities::detect();
         // Detected TOPS should fall within one of the known ranges
-        let in_known_range = chip_specs.iter().any(|spec| {
-            caps.tops >= spec.min_tops && caps.tops <= spec.max_tops + 5.0
-        });
+        let in_known_range = chip_specs
+            .iter()
+            .any(|spec| caps.tops >= spec.min_tops && caps.tops <= spec.max_tops + 5.0);
 
         // Just verify it's a reasonable positive value
         assert!(caps.tops > 0.0, "TOPS should be positive");

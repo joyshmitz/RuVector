@@ -1,8 +1,8 @@
 //! Additional product manifold operations
 
+use super::ProductManifold;
 use crate::error::{MathError, Result};
 use crate::utils::{norm, EPS};
-use super::ProductManifold;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -27,7 +27,11 @@ impl ProductManifold {
 
     /// Sequential pairwise distance computation
     #[inline]
-    fn pairwise_distances_sequential(&self, points: &[Vec<f64>], n: usize) -> Result<Vec<Vec<f64>>> {
+    fn pairwise_distances_sequential(
+        &self,
+        points: &[Vec<f64>],
+        n: usize,
+    ) -> Result<Vec<Vec<f64>>> {
         let mut distances = vec![vec![0.0; n]; n];
 
         for i in 0..n {
@@ -83,7 +87,12 @@ impl ProductManifold {
 
     /// Sequential k-nearest neighbors
     #[inline]
-    fn knn_sequential(&self, query: &[f64], points: &[Vec<f64>], k: usize) -> Result<Vec<(usize, f64)>> {
+    fn knn_sequential(
+        &self,
+        query: &[f64],
+        points: &[Vec<f64>],
+        k: usize,
+    ) -> Result<Vec<(usize, f64)>> {
         let mut distances: Vec<(usize, f64)> = points
             .iter()
             .enumerate()
@@ -91,7 +100,8 @@ impl ProductManifold {
             .collect();
 
         // Use sort_unstable_by for better performance
-        distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distances
+            .sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(k);
 
         Ok(distances)
@@ -99,7 +109,12 @@ impl ProductManifold {
 
     /// Parallel k-nearest neighbors using rayon
     #[cfg(feature = "parallel")]
-    fn knn_parallel(&self, query: &[f64], points: &[Vec<f64>], k: usize) -> Result<Vec<(usize, f64)>> {
+    fn knn_parallel(
+        &self,
+        query: &[f64],
+        points: &[Vec<f64>],
+        k: usize,
+    ) -> Result<Vec<(usize, f64)>> {
         let mut distances: Vec<(usize, f64)> = points
             .par_iter()
             .enumerate()
@@ -107,7 +122,8 @@ impl ProductManifold {
             .collect();
 
         // Use sort_unstable_by for better performance
-        distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distances
+            .sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(k);
 
         Ok(distances)
@@ -130,12 +146,7 @@ impl ProductManifold {
     }
 
     /// Sample points along geodesic
-    pub fn geodesic_path(
-        &self,
-        x: &[f64],
-        y: &[f64],
-        num_points: usize,
-    ) -> Result<Vec<Vec<f64>>> {
+    pub fn geodesic_path(&self, x: &[f64], y: &[f64], num_points: usize) -> Result<Vec<Vec<f64>>> {
         let mut path = Vec::with_capacity(num_points);
 
         for i in 0..num_points {
@@ -239,8 +250,7 @@ impl ProductManifold {
         let result: Vec<f64> = (0..x.len())
             .map(|i| {
                 let v_perp = v[i] - v_u * u[i] - v_x * x[i];
-                v_perp
-                    + v_u * (-theta.sin() * x[i] + theta.cos() * u[i])
+                v_perp + v_u * (-theta.sin() * x[i] + theta.cos() * u[i])
                     - v_x * (theta.cos() * x[i] + theta.sin() * u[i])
             })
             .collect();

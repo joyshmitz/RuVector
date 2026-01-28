@@ -16,11 +16,7 @@ pub async fn run(model: &str, cache_dir: &str) -> Result<()> {
     let model_id = resolve_model_id(model);
 
     println!();
-    println!(
-        "{} {}",
-        style("Model Information:").bold().cyan(),
-        model_id
-    );
+    println!("{} {}", style("Model Information:").bold().cyan(), model_id);
     println!();
 
     // Check if model is from our recommended list
@@ -43,11 +39,7 @@ pub async fn run(model: &str, cache_dir: &str) -> Result<()> {
         print_local_info(&model_path).await?;
     } else {
         println!();
-        println!(
-            "{} {}",
-            style("Status:").bold(),
-            "Not downloaded".red()
-        );
+        println!("{} {}", style("Status:").bold(), "Not downloaded".red());
         println!();
         println!("Run 'ruvllm download {}' to download.", model);
     }
@@ -128,7 +120,10 @@ async fn fetch_model_info(model_id: &str) -> Result<()> {
             }
         }
         Err(_) => {
-            println!("  {} Could not fetch model configuration", "Warning:".yellow());
+            println!(
+                "  {} Could not fetch model configuration",
+                "Warning:".yellow()
+            );
         }
     }
 
@@ -173,12 +168,20 @@ async fn print_local_info(model_path: &PathBuf) -> Result<()> {
     println!(
         "  {} {}",
         "Tokenizer:".dimmed(),
-        if has_tokenizer { "Yes".green() } else { "No".red() }
+        if has_tokenizer {
+            "Yes".green()
+        } else {
+            "No".red()
+        }
     );
     println!(
         "  {} {}",
         "Config:".dimmed(),
-        if has_config { "Yes".green() } else { "No".red() }
+        if has_config {
+            "Yes".green()
+        } else {
+            "No".red()
+        }
     );
     println!(
         "  {} {}",
@@ -194,12 +197,31 @@ fn print_memory_estimates(model: &str) {
     if let Some(model_def) = get_model(model) {
         let params = model_def.params_b;
 
-        println!("  {} {:>8}", "Q4_K_M (4-bit):".dimmed(), format!("{:.1} GB", QuantPreset::Q4K.estimate_memory_gb(params)));
-        println!("  {} {:>8}", "Q8_0 (8-bit):".dimmed(), format!("{:.1} GB", QuantPreset::Q8.estimate_memory_gb(params)));
-        println!("  {} {:>8}", "F16 (16-bit):".dimmed(), format!("{:.1} GB", QuantPreset::F16.estimate_memory_gb(params)));
-        println!("  {} {:>8}", "F32 (32-bit):".dimmed(), format!("{:.1} GB", QuantPreset::None.estimate_memory_gb(params)));
+        println!(
+            "  {} {:>8}",
+            "Q4_K_M (4-bit):".dimmed(),
+            format!("{:.1} GB", QuantPreset::Q4K.estimate_memory_gb(params))
+        );
+        println!(
+            "  {} {:>8}",
+            "Q8_0 (8-bit):".dimmed(),
+            format!("{:.1} GB", QuantPreset::Q8.estimate_memory_gb(params))
+        );
+        println!(
+            "  {} {:>8}",
+            "F16 (16-bit):".dimmed(),
+            format!("{:.1} GB", QuantPreset::F16.estimate_memory_gb(params))
+        );
+        println!(
+            "  {} {:>8}",
+            "F32 (32-bit):".dimmed(),
+            format!("{:.1} GB", QuantPreset::None.estimate_memory_gb(params))
+        );
     } else {
-        println!("  {} Memory estimates not available for custom models", "Note:".dimmed());
+        println!(
+            "  {} Memory estimates not available for custom models",
+            "Note:".dimmed()
+        );
     }
 }
 
@@ -219,18 +241,31 @@ fn print_recommended_settings(model: &str) {
         println!("  {} {}", "Temperature:".dimmed(), temp);
         println!("  {} {}", "Top-P:".dimmed(), top_p);
         println!("  {} {} tokens", "Context:".dimmed(), context);
-        println!("  {} {}", "Quantization:".dimmed(), model_def.recommended_quant);
+        println!(
+            "  {} {}",
+            "Quantization:".dimmed(),
+            model_def.recommended_quant
+        );
 
         // Special notes based on model
         match model_def.alias.as_str() {
             "qwen-coder" => {
-                println!("  {} Use lower temperature (0.1-0.3) for code completion", "Tip:".cyan());
+                println!(
+                    "  {} Use lower temperature (0.1-0.3) for code completion",
+                    "Tip:".cyan()
+                );
             }
             "llama" => {
-                println!("  {} Excellent for function calling and structured output", "Tip:".cyan());
+                println!(
+                    "  {} Excellent for function calling and structured output",
+                    "Tip:".cyan()
+                );
             }
             "phi" => {
-                println!("  {} Great for quick testing and resource-constrained environments", "Tip:".cyan());
+                println!(
+                    "  {} Great for quick testing and resource-constrained environments",
+                    "Tip:".cyan()
+                );
             }
             _ => {}
         }

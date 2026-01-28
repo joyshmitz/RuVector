@@ -150,7 +150,7 @@ impl RuvLtraRegistry {
                 size: ModelSize::Small,
                 quantization: QuantizationLevel::Q4,
                 size_bytes: 662_000_000, // ~662MB
-                checksum: None, // Set after publishing
+                checksum: None,          // Set after publishing
                 params_b: 0.5,
                 context_length: 4096,
                 hardware: HardwareRequirements {
@@ -192,8 +192,7 @@ impl RuvLtraRegistry {
                     supports_cuda: true,
                     min_vram_gb: Some(2.0),
                 },
-                description: "High-quality Q8 quantization for better accuracy."
-                    .to_string(),
+                description: "High-quality Q8 quantization for better accuracy.".to_string(),
                 is_adapter: false,
                 base_model: None,
                 has_sona_weights: true,
@@ -253,8 +252,7 @@ impl RuvLtraRegistry {
                     supports_cuda: true,
                     min_vram_gb: Some(6.0),
                 },
-                description: "High-quality Medium model with Q8 quantization."
-                    .to_string(),
+                description: "High-quality Medium model with Q8 quantization.".to_string(),
                 is_adapter: false,
                 base_model: None,
                 has_sona_weights: true,
@@ -307,18 +305,12 @@ impl RuvLtraRegistry {
 
     /// Get models by size
     pub fn list_by_size(&self, size: ModelSize) -> Vec<&ModelInfo> {
-        self.models
-            .values()
-            .filter(|m| m.size == size)
-            .collect()
+        self.models.values().filter(|m| m.size == size).collect()
     }
 
     /// Get base models (exclude adapters)
     pub fn list_base_models(&self) -> Vec<&ModelInfo> {
-        self.models
-            .values()
-            .filter(|m| !m.is_adapter)
-            .collect()
+        self.models.values().filter(|m| !m.is_adapter).collect()
     }
 
     /// Get adapters for a specific base model

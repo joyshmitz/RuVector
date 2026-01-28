@@ -9,9 +9,7 @@
 use anyhow::Result;
 use clap::Parser;
 use ruvector_benchmarks::{
-    logging::BenchmarkLogger,
-    temporal::TemporalSolver,
-    timepuzzles::SamplePuzzles,
+    logging::BenchmarkLogger, temporal::TemporalSolver, timepuzzles::SamplePuzzles,
 };
 use std::time::{Duration, Instant};
 
@@ -191,7 +189,10 @@ fn main() -> Result<()> {
     let avg_latency = results.iter().map(|r| r.latency_ms).sum::<u64>() as f64 / total as f64;
 
     // Tool toggle analysis
-    let with_tool_correct = results.iter().filter(|r| r.tool_calls > 0 && r.correct).count();
+    let with_tool_correct = results
+        .iter()
+        .filter(|r| r.tool_calls > 0 && r.correct)
+        .count();
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║                    Probe Results                              ║");
@@ -199,8 +200,16 @@ fn main() -> Result<()> {
     println!();
     println!("📊 Overall Performance:");
     println!("   Puzzles run:      {}", total);
-    println!("   Solved:           {} ({:.1}%)", solved, solved as f64 / total as f64 * 100.0);
-    println!("   Correct:          {} ({:.1}%)", correct, accuracy * 100.0);
+    println!(
+        "   Solved:           {} ({:.1}%)",
+        solved,
+        solved as f64 / total as f64 * 100.0
+    );
+    println!(
+        "   Correct:          {} ({:.1}%)",
+        correct,
+        accuracy * 100.0
+    );
     println!();
     println!("⏱️  Efficiency:");
     println!("   Avg steps:        {:.1}", avg_steps);
@@ -256,7 +265,8 @@ fn main() -> Result<()> {
     // Accuracy by difficulty
     println!();
     println!("🎯 Accuracy by Difficulty:");
-    let mut by_diff: std::collections::HashMap<u8, (usize, usize)> = std::collections::HashMap::new();
+    let mut by_diff: std::collections::HashMap<u8, (usize, usize)> =
+        std::collections::HashMap::new();
     for (p, r) in puzzles.iter().zip(results.iter()) {
         let e = by_diff.entry(p.difficulty).or_insert((0, 0));
         e.0 += 1;

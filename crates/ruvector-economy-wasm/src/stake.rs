@@ -6,9 +6,9 @@
 //! - Stake delegation support
 //! - Lock periods for stability
 
-use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 /// Get current timestamp in milliseconds (works in both WASM and native)
 fn current_timestamp_ms() -> u64 {
@@ -48,12 +48,12 @@ impl SlashReason {
     /// Get slash percentage for this reason
     pub fn slash_percentage(&self) -> f32 {
         match self {
-            SlashReason::InvalidResult => 0.05,  // 5% for errors
-            SlashReason::DoubleSpend => 1.0,     // 100% for fraud
-            SlashReason::SybilAttack => 0.5,     // 50% for sybil
-            SlashReason::Downtime => 0.01,       // 1% for downtime
-            SlashReason::Spam => 0.1,            // 10% for spam
-            SlashReason::Malicious => 0.75,      // 75% for malicious
+            SlashReason::InvalidResult => 0.05, // 5% for errors
+            SlashReason::DoubleSpend => 1.0,    // 100% for fraud
+            SlashReason::SybilAttack => 0.5,    // 50% for sybil
+            SlashReason::Downtime => 0.01,      // 1% for downtime
+            SlashReason::Spam => 0.1,           // 10% for spam
+            SlashReason::Malicious => 0.75,     // 75% for malicious
         }
     }
 }
@@ -108,7 +108,7 @@ impl StakeManager {
     pub fn new() -> StakeManager {
         StakeManager {
             stakes: FxHashMap::default(),
-            min_stake: 100,          // 100 credits minimum
+            min_stake: 100,                  // 100 credits minimum
             default_lock_period: 86_400_000, // 24 hours in ms
             total_staked: 0,
             total_slashed: 0,
@@ -154,7 +154,8 @@ impl StakeManager {
     /// Get effective stake (own + delegated)
     #[wasm_bindgen(js_name = getEffectiveStake)]
     pub fn get_effective_stake(&self, node_id: &str) -> u64 {
-        self.stakes.get(node_id)
+        self.stakes
+            .get(node_id)
             .map(|s| s.amount + s.delegated)
             .unwrap_or(0)
     }
@@ -175,15 +176,16 @@ impl StakeManager {
         let now = current_timestamp_ms();
         let locked_until = now + self.default_lock_period;
 
-        let entry = self.stakes.entry(node_id.to_string()).or_insert_with(|| {
-            StakeEntry {
+        let entry = self
+            .stakes
+            .entry(node_id.to_string())
+            .or_insert_with(|| StakeEntry {
                 amount: 0,
                 locked_until: 0,
                 delegated: 0,
                 delegators: Vec::new(),
                 slashes: Vec::new(),
-            }
-        });
+            });
 
         entry.amount += amount;
         entry.locked_until = locked_until;
@@ -197,7 +199,9 @@ impl StakeManager {
     pub fn unstake(&mut self, node_id: &str, amount: u64) -> Result<u64, JsValue> {
         let now = current_timestamp_ms();
 
-        let entry = self.stakes.get_mut(node_id)
+        let entry = self
+            .stakes
+            .get_mut(node_id)
             .ok_or_else(|| JsValue::from_str("No stake found"))?;
 
         if now < entry.locked_until {
@@ -224,7 +228,9 @@ impl StakeManager {
     ) -> Result<u64, JsValue> {
         let now = current_timestamp_ms();
 
-        let entry = self.stakes.get_mut(node_id)
+        let entry = self
+            .stakes
+            .get_mut(node_id)
             .ok_or_else(|| JsValue::from_str("No stake found"))?;
 
         // Calculate slash amount
@@ -249,14 +255,11 @@ impl StakeManager {
 
     /// Delegate stake to another node
     #[wasm_bindgen]
-    pub fn delegate(
-        &mut self,
-        from_node: &str,
-        to_node: &str,
-        amount: u64,
-    ) -> Result<(), JsValue> {
+    pub fn delegate(&mut self, from_node: &str, to_node: &str, amount: u64) -> Result<(), JsValue> {
         // Verify from_node has sufficient stake
-        let from_entry = self.stakes.get_mut(from_node)
+        let from_entry = self
+            .stakes
+            .get_mut(from_node)
             .ok_or_else(|| JsValue::from_str("Delegator has no stake"))?;
 
         if from_entry.amount < amount {
@@ -267,15 +270,16 @@ impl StakeManager {
         from_entry.amount -= amount;
 
         // Add to to_node delegated
-        let to_entry = self.stakes.entry(to_node.to_string()).or_insert_with(|| {
-            StakeEntry {
+        let to_entry = self
+            .stakes
+            .entry(to_node.to_string())
+            .or_insert_with(|| StakeEntry {
                 amount: 0,
                 locked_until: 0,
                 delegated: 0,
                 delegators: Vec::new(),
                 slashes: Vec::new(),
-            }
-        });
+            });
 
         to_entry.delegated += amount;
         if !to_entry.delegators.contains(&from_node.to_string()) {
@@ -294,7 +298,9 @@ impl StakeManager {
         amount: u64,
     ) -> Result<(), JsValue> {
         // Reduce delegated from to_node
-        let to_entry = self.stakes.get_mut(to_node)
+        let to_entry = self
+            .stakes
+            .get_mut(to_node)
             .ok_or_else(|| JsValue::from_str("Target node not found"))?;
 
         if to_entry.delegated < amount {
@@ -304,15 +310,16 @@ impl StakeManager {
         to_entry.delegated -= amount;
 
         // Return to from_node
-        let from_entry = self.stakes.entry(from_node.to_string()).or_insert_with(|| {
-            StakeEntry {
+        let from_entry = self
+            .stakes
+            .entry(from_node.to_string())
+            .or_insert_with(|| StakeEntry {
                 amount: 0,
                 locked_until: 0,
                 delegated: 0,
                 delegators: Vec::new(),
                 slashes: Vec::new(),
-            }
-        });
+            });
 
         from_entry.amount += amount;
 
@@ -322,14 +329,18 @@ impl StakeManager {
     /// Get lock timestamp for a node
     #[wasm_bindgen(js_name = getLockTimestamp)]
     pub fn get_lock_timestamp(&self, node_id: &str) -> u64 {
-        self.stakes.get(node_id).map(|s| s.locked_until).unwrap_or(0)
+        self.stakes
+            .get(node_id)
+            .map(|s| s.locked_until)
+            .unwrap_or(0)
     }
 
     /// Check if stake is locked
     #[wasm_bindgen(js_name = isLocked)]
     pub fn is_locked(&self, node_id: &str) -> bool {
         let now = current_timestamp_ms();
-        self.stakes.get(node_id)
+        self.stakes
+            .get(node_id)
             .map(|s| now < s.locked_until)
             .unwrap_or(false)
     }
@@ -337,13 +348,17 @@ impl StakeManager {
     /// Get slash count for a node
     #[wasm_bindgen(js_name = getSlashCount)]
     pub fn get_slash_count(&self, node_id: &str) -> usize {
-        self.stakes.get(node_id).map(|s| s.slashes.len()).unwrap_or(0)
+        self.stakes
+            .get(node_id)
+            .map(|s| s.slashes.len())
+            .unwrap_or(0)
     }
 
     /// Get total amount slashed from a node
     #[wasm_bindgen(js_name = getNodeTotalSlashed)]
     pub fn get_node_total_slashed(&self, node_id: &str) -> u64 {
-        self.stakes.get(node_id)
+        self.stakes
+            .get(node_id)
             .map(|s| s.slashes.iter().map(|e| e.amount).sum())
             .unwrap_or(0)
     }
@@ -351,7 +366,10 @@ impl StakeManager {
     /// Get delegator count
     #[wasm_bindgen(js_name = getDelegatorCount)]
     pub fn get_delegator_count(&self, node_id: &str) -> usize {
-        self.stakes.get(node_id).map(|s| s.delegators.len()).unwrap_or(0)
+        self.stakes
+            .get(node_id)
+            .map(|s| s.delegators.len())
+            .unwrap_or(0)
     }
 
     /// Get number of stakers
@@ -415,7 +433,9 @@ mod tests {
             manager.stake("node-1", 1000).unwrap();
 
             // Slash for invalid result (5%)
-            let slashed = manager.slash("node-1", SlashReason::InvalidResult, "task:123").unwrap();
+            let slashed = manager
+                .slash("node-1", SlashReason::InvalidResult, "task:123")
+                .unwrap();
             assert_eq!(slashed, 50);
             assert_eq!(manager.get_stake("node-1"), 950);
             assert_eq!(manager.total_slashed(), 50);

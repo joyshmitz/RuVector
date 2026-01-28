@@ -127,7 +127,12 @@ pub async fn run(
         .route("/", get(root))
         // State and middleware
         .with_state(state)
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         .layer(TraceLayer::new_for_http());
 
     // Start server
@@ -254,10 +259,14 @@ async fn chat_completions(
 ) -> axum::response::Response {
     if request.stream {
         // Handle streaming response
-        chat_completions_stream(state, request).await.into_response()
+        chat_completions_stream(state, request)
+            .await
+            .into_response()
     } else {
         // Handle non-streaming response
-        chat_completions_non_stream(state, request).await.into_response()
+        chat_completions_non_stream(state, request)
+            .await
+            .into_response()
     }
 }
 
@@ -560,7 +569,8 @@ fn mock_response(prompt: &str) -> String {
     let prompt_lower = prompt.to_lowercase();
 
     if prompt_lower.contains("hello") || prompt_lower.contains("hi") {
-        "Hello! I'm RuvLLM, a local AI assistant running on your Mac. How can I help you today?".to_string()
+        "Hello! I'm RuvLLM, a local AI assistant running on your Mac. How can I help you today?"
+            .to_string()
     } else if prompt_lower.contains("code") || prompt_lower.contains("function") {
         "Here's an example function:\n\n```rust\nfn hello() {\n    println!(\"Hello, world!\");\n}\n```\n\nWould you like me to explain this code?".to_string()
     } else {
@@ -589,7 +599,12 @@ async fn list_models(State(state): State<SharedState>) -> impl IntoResponse {
 async fn health_check(State(state): State<SharedState>) -> impl IntoResponse {
     let state_lock = state.read().await;
 
-    let status = if state_lock.backend.as_ref().map(|b| b.is_model_loaded()).unwrap_or(false) {
+    let status = if state_lock
+        .backend
+        .as_ref()
+        .map(|b| b.is_model_loaded())
+        .unwrap_or(false)
+    {
         "healthy"
     } else {
         "degraded"

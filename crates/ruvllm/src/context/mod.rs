@@ -65,21 +65,18 @@ pub mod working_memory;
 
 // Re-exports
 pub use agentic_memory::{AgenticMemory, AgenticMemoryConfig, MemoryType};
-pub use claude_flow_bridge::{ClaudeFlowMemoryBridge, ClaudeFlowBridgeConfig, SyncResult};
+pub use claude_flow_bridge::{ClaudeFlowBridgeConfig, ClaudeFlowMemoryBridge, SyncResult};
 pub use context_manager::{
-    IntelligentContextManager, ContextManagerConfig, PreparedContext,
-    PriorityScorer, ContextElement, ElementPriority,
+    ContextElement, ContextManagerConfig, ElementPriority, IntelligentContextManager,
+    PreparedContext, PriorityScorer,
 };
 pub use episodic_memory::{
-    EpisodicMemory, EpisodicMemoryConfig, Episode, EpisodeMetadata,
-    Trajectory as EpisodeTrajectory, CompressedEpisode,
+    CompressedEpisode, Episode, EpisodeMetadata, EpisodicMemory, EpisodicMemoryConfig,
+    Trajectory as EpisodeTrajectory,
 };
-pub use semantic_cache::{
-    SemanticToolCache, SemanticCacheConfig, CachedToolResult, CacheStats,
-};
+pub use semantic_cache::{CacheStats, CachedToolResult, SemanticCacheConfig, SemanticToolCache};
 pub use working_memory::{
-    WorkingMemory, WorkingMemoryConfig, TaskContext, ScratchpadEntry,
-    AttentionWeights,
+    AttentionWeights, ScratchpadEntry, TaskContext, WorkingMemory, WorkingMemoryConfig,
 };
 
 #[cfg(test)]

@@ -110,7 +110,10 @@ impl KiviQuantizer {
 
     /// Create quantizer with Hadamard transform enabled
     pub fn with_hadamard(bits: u8, head_dim: usize) -> Self {
-        assert!(head_dim.is_power_of_two(), "Hadamard requires power-of-2 dimension");
+        assert!(
+            head_dim.is_power_of_two(),
+            "Hadamard requires power-of-2 dimension"
+        );
         let mut q = Self::new(bits, head_dim);
         q.use_hadamard = true;
         q
@@ -163,7 +166,8 @@ impl KiviQuantizer {
 
         // Quantize
         let scale = self.max_quant as f32 / (max_val - min_val);
-        let mut quantized = Vec::with_capacity((self.head_dim + self.values_per_byte - 1) / self.values_per_byte);
+        let mut quantized =
+            Vec::with_capacity((self.head_dim + self.values_per_byte - 1) / self.values_per_byte);
 
         for chunk in transformed.chunks(self.values_per_byte) {
             let mut byte = 0u8;

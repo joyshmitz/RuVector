@@ -25,7 +25,7 @@ impl Default for FloquetConfig {
     fn default() -> Self {
         Self {
             n_neurons: 100,
-            tau: 0.01, // 10ms
+            tau: 0.01,           // 10ms
             drive_period: 0.125, // 125ms = 8 Hz theta
             drive_amplitude: 1.0,
             noise_level: 0.01,
@@ -54,9 +54,7 @@ impl FloquetCognitiveSystem {
         assert_eq!(weights.shape(), &[n, n], "Weight matrix must be n x n");
 
         // Initialize firing rates randomly
-        let firing_rates = Array1::from_vec(
-            (0..n).map(|_| rand::random::<f64>() * 0.1).collect()
-        );
+        let firing_rates = Array1::from_vec((0..n).map(|_| rand::random::<f64>() * 0.1).collect());
 
         Self {
             config,
@@ -115,11 +113,9 @@ impl FloquetCognitiveSystem {
             let noise = rand::random::<f64>() * self.config.noise_level;
 
             // Neural dynamics: τ dr/dt = -r + f(Wr + I)
-            derivatives[i] = (
-                -self.firing_rates[i]
-                + Self::activation(recurrent_input + external)
-                + noise
-            ) / self.config.tau;
+            derivatives[i] =
+                (-self.firing_rates[i] + Self::activation(recurrent_input + external) + noise)
+                    / self.config.tau;
         }
 
         derivatives
@@ -140,12 +136,8 @@ impl FloquetCognitiveSystem {
         let steps_per_period = (period / self.config.dt) as usize;
         let total_steps = steps_per_period * n_periods;
 
-        let mut trajectory = FloquetTrajectory::new(
-            self.config.n_neurons,
-            total_steps,
-            self.config.dt,
-            period,
-        );
+        let mut trajectory =
+            FloquetTrajectory::new(self.config.n_neurons, total_steps, self.config.dt, period);
 
         for step in 0..total_steps {
             self.step();
@@ -205,7 +197,8 @@ impl FloquetCognitiveSystem {
         let (_, eigenvalues) = self.compute_monodromy_matrix();
 
         // Look for eigenvalue near -1 (period-doubling)
-        let min_dist_to_minus_one = eigenvalues.iter()
+        let min_dist_to_minus_one = eigenvalues
+            .iter()
             .map(|&lambda| (lambda + 1.0).abs())
             .fold(f64::INFINITY, f64::min);
 
@@ -254,7 +247,7 @@ impl FloquetTrajectory {
 
         for (i, &phase) in self.drive_phases.iter().enumerate() {
             if i > 0 {
-                let prev_phase = self.drive_phases[i-1];
+                let prev_phase = self.drive_phases[i - 1];
                 // Detect crossing of threshold phase
                 if prev_phase < phase_threshold && phase >= phase_threshold {
                     section.push(self.firing_rates[i].clone());
@@ -276,16 +269,16 @@ impl FloquetTrajectory {
 
         // Compute distances between consecutive points
         let mut distances = Vec::new();
-        for i in 0..section.len()-1 {
-            let dist = (&section[i] - &section[i+1]).mapv(|x| x*x).sum().sqrt();
+        for i in 0..section.len() - 1 {
+            let dist = (&section[i] - &section[i + 1]).mapv(|x| x * x).sum().sqrt();
             distances.push(dist);
         }
 
         // In period-doubling, alternating distances: small, large, small, large...
         // Check for this pattern
         let mut alternates = 0;
-        for i in 0..distances.len()-1 {
-            if (distances[i] < distances[i+1]) != (i % 2 == 0) {
+        for i in 0..distances.len() - 1 {
+            if (distances[i] < distances[i + 1]) != (i % 2 == 0) {
                 alternates += 1;
             }
         }
@@ -297,30 +290,32 @@ impl FloquetTrajectory {
     /// Compute spectral analysis
     pub fn compute_power_spectrum(&self) -> (Vec<f64>, Vec<f64>) {
         // Average firing rate across all neurons
-        let signal: Vec<f64> = self.firing_rates.iter()
+        let signal: Vec<f64> = self
+            .firing_rates
+            .iter()
             .map(|rates| rates.mean().unwrap())
             .collect();
 
         // FFT
-        use rustfft::{FftPlanner, num_complex::Complex};
+        use rustfft::{num_complex::Complex, FftPlanner};
 
         let n = signal.len();
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(n);
 
-        let mut buffer: Vec<Complex<f64>> = signal.iter()
-            .map(|&x| Complex { re: x, im: 0.0 })
-            .collect();
+        let mut buffer: Vec<Complex<f64>> =
+            signal.iter().map(|&x| Complex { re: x, im: 0.0 }).collect();
 
         fft.process(&mut buffer);
 
-        let power: Vec<f64> = buffer.iter()
+        let power: Vec<f64> = buffer
+            .iter()
             .take(n / 2)
             .map(|c| (c.re * c.re + c.im * c.im) / n as f64)
             .collect();
 
         let sample_rate = 1.0 / self.dt;
-        let freqs: Vec<f64> = (0..n/2)
+        let freqs: Vec<f64> = (0..n / 2)
             .map(|i| i as f64 * sample_rate / n as f64)
             .collect();
 
@@ -331,24 +326,28 @@ impl FloquetTrajectory {
     pub fn compute_order_parameter(&self, k: usize) -> Vec<f64> {
         let omega_0 = 2.0 * PI / self.drive_period;
 
-        self.firing_rates.iter().enumerate().map(|(step, rates)| {
-            let _t = step as f64 * self.dt;
-            let n = self.n_neurons;
+        self.firing_rates
+            .iter()
+            .enumerate()
+            .map(|(step, rates)| {
+                let _t = step as f64 * self.dt;
+                let n = self.n_neurons;
 
-            // Phases of each neuron
-            let mut sum_real = 0.0;
-            let mut sum_imag = 0.0;
+                // Phases of each neuron
+                let mut sum_real = 0.0;
+                let mut sum_imag = 0.0;
 
-            for i in 0..n {
-                // Simple phase extraction (more sophisticated: use Hilbert transform)
-                let phase = rates[i] * PI; // Map firing rate to phase
-                let arg = k as f64 * omega_0 * phase;
-                sum_real += arg.cos();
-                sum_imag += arg.sin();
-            }
+                for i in 0..n {
+                    // Simple phase extraction (more sophisticated: use Hilbert transform)
+                    let phase = rates[i] * PI; // Map firing rate to phase
+                    let arg = k as f64 * omega_0 * phase;
+                    sum_real += arg.cos();
+                    sum_imag += arg.sin();
+                }
 
-            ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt()
-        }).collect()
+                ((sum_real / n as f64).powi(2) + (sum_imag / n as f64).powi(2)).sqrt()
+            })
+            .collect()
     }
 }
 
@@ -371,14 +370,22 @@ pub struct PhaseDiagram {
 }
 
 impl PhaseDiagram {
-    pub fn new(amp_min: f64, amp_max: f64, n_amp: usize,
-               coupling_min: f64, coupling_max: f64, n_coupling: usize) -> Self {
+    pub fn new(
+        amp_min: f64,
+        amp_max: f64,
+        n_amp: usize,
+        coupling_min: f64,
+        coupling_max: f64,
+        n_coupling: usize,
+    ) -> Self {
         let amplitude_range = (0..n_amp)
             .map(|i| amp_min + (amp_max - amp_min) * i as f64 / (n_amp - 1) as f64)
             .collect();
 
         let coupling_range = (0..n_coupling)
-            .map(|i| coupling_min + (coupling_max - coupling_min) * i as f64 / (n_coupling - 1) as f64)
+            .map(|i| {
+                coupling_min + (coupling_max - coupling_min) * i as f64 / (n_coupling - 1) as f64
+            })
             .collect();
 
         let results = vec![vec![false; n_coupling]; n_amp];
@@ -398,7 +405,9 @@ impl PhaseDiagram {
                 config.drive_amplitude = amplitude;
 
                 let weights = FloquetCognitiveSystem::generate_asymmetric_weights(
-                    config.n_neurons, 0.2, coupling
+                    config.n_neurons,
+                    0.2,
+                    coupling,
                 );
 
                 let mut system = FloquetCognitiveSystem::new(config, weights);
@@ -428,9 +437,11 @@ impl PhaseDiagram {
         for _ in &self.coupling_range {
             print!("-");
         }
-        println!("\n     {:.2} ... {:.2}",
-                 self.coupling_range[0],
-                 self.coupling_range[self.coupling_range.len()-1]);
+        println!(
+            "\n     {:.2} ... {:.2}",
+            self.coupling_range[0],
+            self.coupling_range[self.coupling_range.len() - 1]
+        );
     }
 }
 
@@ -441,9 +452,8 @@ mod tests {
     #[test]
     fn test_floquet_system() {
         let config = FloquetConfig::default();
-        let weights = FloquetCognitiveSystem::generate_asymmetric_weights(
-            config.n_neurons, 0.2, 1.0
-        );
+        let weights =
+            FloquetCognitiveSystem::generate_asymmetric_weights(config.n_neurons, 0.2, 1.0);
 
         let mut system = FloquetCognitiveSystem::new(config, weights);
         let trajectory = system.run(10); // 10 periods
@@ -454,9 +464,8 @@ mod tests {
     #[test]
     fn test_poincare_section() {
         let config = FloquetConfig::default();
-        let weights = FloquetCognitiveSystem::generate_asymmetric_weights(
-            config.n_neurons, 0.2, 1.0
-        );
+        let weights =
+            FloquetCognitiveSystem::generate_asymmetric_weights(config.n_neurons, 0.2, 1.0);
 
         let mut system = FloquetCognitiveSystem::new(config, weights);
         let trajectory = system.run(10);

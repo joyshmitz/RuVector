@@ -248,13 +248,12 @@ impl fmt::Display for VerifyError {
                 )
             }
             VerifyError::RuntimeTooOld { required, actual } => {
-                write!(
-                    f,
-                    "Runtime too old: requires {}, have {}",
-                    required, actual
-                )
+                write!(f, "Runtime too old: requires {}, have {}", required, actual)
             }
-            VerifyError::RuntimeTooNew { max_supported, actual } => {
+            VerifyError::RuntimeTooNew {
+                max_supported,
+                actual,
+            } => {
                 write!(
                     f,
                     "Runtime too new: max supported {}, have {}",

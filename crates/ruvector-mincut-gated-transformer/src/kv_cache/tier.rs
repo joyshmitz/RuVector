@@ -34,7 +34,7 @@ impl CacheTier {
     pub fn compression_ratio(&self) -> f32 {
         match self {
             CacheTier::Hot => 1.0,
-            CacheTier::Warm => 4.0,   // 16/4
+            CacheTier::Warm => 4.0,    // 16/4
             CacheTier::Archive => 8.0, // 16/2
         }
     }

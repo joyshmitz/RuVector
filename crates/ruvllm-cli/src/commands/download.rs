@@ -124,7 +124,10 @@ pub async fn run(
 }
 
 /// Download a file with progress indication
-async fn download_with_progress(repo: &hf_hub::api::tokio::ApiRepo, file_name: &str) -> Result<PathBuf> {
+async fn download_with_progress(
+    repo: &hf_hub::api::tokio::ApiRepo,
+    file_name: &str,
+) -> Result<PathBuf> {
     // Create progress bar
     let pb = ProgressBar::new(100);
     pb.set_style(

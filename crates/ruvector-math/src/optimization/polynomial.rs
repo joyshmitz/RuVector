@@ -20,7 +20,9 @@ impl Monomial {
 
     /// Create single variable monomial x_i
     pub fn var(i: usize) -> Self {
-        Self { powers: vec![(i, 1)] }
+        Self {
+            powers: vec![(i, 1)],
+        }
     }
 
     /// Create from powers (will be sorted)
@@ -217,7 +219,11 @@ impl Polynomial {
         // Remove zero terms
         terms.retain(|_, &mut c| c.abs() >= 1e-15);
 
-        Self { terms, degree, num_vars }
+        Self {
+            terms,
+            degree,
+            num_vars,
+        }
     }
 
     /// Total degree
@@ -252,10 +258,7 @@ impl Polynomial {
 
     /// Evaluate at point
     pub fn eval(&self, x: &[f64]) -> f64 {
-        self.terms
-            .iter()
-            .map(|(m, &c)| c * m.eval(x))
-            .sum()
+        self.terms.iter().map(|(m, &c)| c * m.eval(x)).sum()
     }
 
     /// Add two polynomials
@@ -276,7 +279,11 @@ impl Polynomial {
             .map(|v| v + 1)
             .unwrap_or(0);
 
-        Polynomial { terms, degree, num_vars }
+        Polynomial {
+            terms,
+            degree,
+            num_vars,
+        }
     }
 
     /// Subtract polynomials
@@ -300,7 +307,11 @@ impl Polynomial {
         }
 
         Polynomial {
-            terms: self.terms.iter().map(|(m, &c)| (m.clone(), s * c)).collect(),
+            terms: self
+                .terms
+                .iter()
+                .map(|(m, &c)| (m.clone(), s * c))
+                .collect(),
             degree: self.degree,
             num_vars: self.num_vars,
         }
@@ -327,7 +338,11 @@ impl Polynomial {
             .map(|v| v + 1)
             .unwrap_or(0);
 
-        Polynomial { terms, degree, num_vars }
+        Polynomial {
+            terms,
+            degree,
+            num_vars,
+        }
     }
 
     /// Square polynomial
@@ -419,7 +434,11 @@ impl std::fmt::Display for Polynomial {
         }
 
         let mut sorted: Vec<_> = self.terms.iter().collect();
-        sorted.sort_by(|a, b| a.0.degree().cmp(&b.0.degree()).then_with(|| a.0.powers.cmp(&b.0.powers)));
+        sorted.sort_by(|a, b| {
+            a.0.degree()
+                .cmp(&b.0.degree())
+                .then_with(|| a.0.powers.cmp(&b.0.powers))
+        });
 
         let parts: Vec<String> = sorted
             .iter()

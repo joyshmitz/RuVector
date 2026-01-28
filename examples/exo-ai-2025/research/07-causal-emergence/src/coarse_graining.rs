@@ -56,10 +56,7 @@ impl Partition {
 ///
 /// # Algorithm
 /// T'[I,J] = (1/|group_I|) Σᵢ∈group_I Σⱼ∈group_J T[i,j]
-pub fn coarse_grain_transition_matrix(
-    micro_matrix: &[f32],
-    partition: &Partition,
-) -> Vec<f32> {
+pub fn coarse_grain_transition_matrix(micro_matrix: &[f32], partition: &Partition) -> Vec<f32> {
     let n = (micro_matrix.len() as f32).sqrt() as usize;
     let m = partition.num_macro_states();
 
@@ -108,10 +105,7 @@ impl ScaleHierarchy {
     ///
     /// # Returns
     /// Hierarchy with O(log_k n) levels
-    pub fn build_sequential(
-        micro_matrix: Vec<f32>,
-        branching_factor: usize,
-    ) -> Self {
+    pub fn build_sequential(micro_matrix: Vec<f32>, branching_factor: usize) -> Self {
         let n = (micro_matrix.len() as f32).sqrt() as usize;
         let mut levels = Vec::new();
 
@@ -137,10 +131,7 @@ impl ScaleHierarchy {
             let new_partition = Partition::sequential(current_n, branching_factor);
 
             // Coarse-grain matrix
-            current_matrix = coarse_grain_transition_matrix(
-                &current_matrix,
-                &new_partition
-            );
+            current_matrix = coarse_grain_transition_matrix(&current_matrix, &new_partition);
 
             // Update partition relative to original micro-states
             current_partition = merge_partitions(&current_partition, &new_partition);
@@ -157,10 +148,7 @@ impl ScaleHierarchy {
 
     /// Builds hierarchy using optimal coarse-graining (minimizes redundancy)
     /// More expensive but finds better emergence
-    pub fn build_optimal(
-        micro_matrix: Vec<f32>,
-        branching_factor: usize,
-    ) -> Self {
+    pub fn build_optimal(micro_matrix: Vec<f32>, branching_factor: usize) -> Self {
         let n = (micro_matrix.len() as f32).sqrt() as usize;
         let mut levels = Vec::new();
 
@@ -182,16 +170,10 @@ impl ScaleHierarchy {
             let current_n = levels.last().unwrap().num_states;
 
             // Find optimal partition using similarity clustering
-            let new_partition = find_optimal_partition(
-                &current_matrix,
-                current_n,
-                branching_factor
-            );
+            let new_partition =
+                find_optimal_partition(&current_matrix, current_n, branching_factor);
 
-            current_matrix = coarse_grain_transition_matrix(
-                &current_matrix,
-                &new_partition
-            );
+            current_matrix = coarse_grain_transition_matrix(&current_matrix, &new_partition);
 
             current_partition = merge_partitions(&current_partition, &new_partition);
 
@@ -236,16 +218,14 @@ fn merge_partitions(current: &Partition, new: &Partition) -> Partition {
         merged_groups.push(merged_group);
     }
 
-    Partition { groups: merged_groups }
+    Partition {
+        groups: merged_groups,
+    }
 }
 
 /// Finds optimal k-way partition by minimizing within-group variance
 /// Uses k-means-like clustering on transition probability vectors
-fn find_optimal_partition(
-    matrix: &[f32],
-    n: usize,
-    k: usize,
-) -> Partition {
+fn find_optimal_partition(matrix: &[f32], n: usize, k: usize) -> Partition {
     if n <= k {
         // Can't cluster into more groups than states
         return Partition::sequential(n, k);
@@ -254,7 +234,7 @@ fn find_optimal_partition(
     // Extract row vectors (outgoing transition probabilities)
     let mut rows: Vec<Vec<f32>> = Vec::with_capacity(n);
     for i in 0..n {
-        rows.push(matrix[i*n..(i+1)*n].to_vec());
+        rows.push(matrix[i * n..(i + 1) * n].to_vec());
     }
 
     // Simple k-means clustering
@@ -299,7 +279,8 @@ fn kmeans_cluster(data: &[Vec<f32>], k: usize) -> Vec<usize> {
 
         // Update centroids
         for c in 0..k {
-            let cluster_points: Vec<_> = data.iter()
+            let cluster_points: Vec<_> = data
+                .iter()
                 .zip(&labels)
                 .filter(|(_, &label)| label == c)
                 .map(|(point, _)| point)
@@ -357,10 +338,10 @@ mod tests {
     fn test_coarse_grain_deterministic() {
         // 4-state cycle: 0→1→2→3→0
         let mut micro = vec![0.0; 16];
-        micro[0*4 + 1] = 1.0;
-        micro[1*4 + 2] = 1.0;
-        micro[2*4 + 3] = 1.0;
-        micro[3*4 + 0] = 1.0;
+        micro[0 * 4 + 1] = 1.0;
+        micro[1 * 4 + 2] = 1.0;
+        micro[2 * 4 + 3] = 1.0;
+        micro[3 * 4 + 0] = 1.0;
 
         // Partition into 2 groups: [0,1] and [2,3]
         let partition = Partition {
@@ -373,7 +354,7 @@ mod tests {
         assert_eq!(macro_matrix.len(), 4);
 
         // Group 0 transitions to group 1 with prob 0.5 (state 0→1 or 1→2)
-        assert!((macro_matrix[0*2 + 1] - 0.5).abs() < 0.01);
+        assert!((macro_matrix[0 * 2 + 1] - 0.5).abs() < 0.01);
     }
 
     #[test]
@@ -382,12 +363,12 @@ mod tests {
         let mut matrix = vec![0.0; 256];
         for i in 0..16 {
             for j in 0..16 {
-                matrix[i*16 + j] = ((i + j) % 10) as f32 / 10.0;
+                matrix[i * 16 + j] = ((i + j) % 10) as f32 / 10.0;
             }
             // Normalize row
-            let row_sum: f32 = matrix[i*16..(i+1)*16].iter().sum();
+            let row_sum: f32 = matrix[i * 16..(i + 1) * 16].iter().sum();
             for j in 0..16 {
-                matrix[i*16 + j] /= row_sum;
+                matrix[i * 16 + j] /= row_sum;
             }
         }
 
@@ -408,7 +389,7 @@ mod tests {
         };
 
         let partition2 = Partition {
-            groups: vec![vec![0, 1], vec![2]],  // Merge groups 0&1, keep group 2
+            groups: vec![vec![0, 1], vec![2]], // Merge groups 0&1, keep group 2
         };
 
         let merged = merge_partitions(&partition1, &partition2);

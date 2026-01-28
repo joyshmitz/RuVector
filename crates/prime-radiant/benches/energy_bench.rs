@@ -409,11 +409,9 @@ fn bench_state_dimension(c: &mut Criterion) {
         let graph = SheafGraph::random(num_nodes, avg_degree, state_dim, 42);
 
         group.throughput(Throughput::Elements(graph.edges.len() as u64));
-        group.bench_with_input(
-            BenchmarkId::new("dim", state_dim),
-            &state_dim,
-            |b, _| b.iter(|| black_box(graph.compute_total_energy())),
-        );
+        group.bench_with_input(BenchmarkId::new("dim", state_dim), &state_dim, |b, _| {
+            b.iter(|| black_box(graph.compute_total_energy()))
+        });
     }
 
     group.finish();

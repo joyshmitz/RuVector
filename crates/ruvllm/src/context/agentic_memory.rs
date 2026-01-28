@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use crate::error::{Result, RuvLLMError};
 
-use super::episodic_memory::{EpisodicMemory, EpisodicMemoryConfig, Episode, Trajectory};
-use super::working_memory::{WorkingMemory, WorkingMemoryConfig, TaskContext};
+use super::episodic_memory::{Episode, EpisodicMemory, EpisodicMemoryConfig, Trajectory};
+use super::working_memory::{TaskContext, WorkingMemory, WorkingMemoryConfig};
 
 /// Configuration for agentic memory
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -242,8 +242,7 @@ impl AgenticMemory {
                     duration_ms: 0,
                     created_at: Utc::now(),
                 };
-                self.episodic
-                    .store_episode(trajectory, embedding, vec![])?;
+                self.episodic.store_episode(trajectory, embedding, vec![])?;
                 Ok(key.to_string())
             }
             MemoryType::Semantic => {
@@ -359,9 +358,7 @@ impl AgenticMemory {
                             .compressed
                             .as_ref()
                             .map(|c| c.summary.clone())
-                            .unwrap_or_else(|| {
-                                format!("Episode: {} steps", e.metadata.step_count)
-                            }),
+                            .unwrap_or_else(|| format!("Episode: {} steps", e.metadata.step_count)),
                         memory_type: MemoryType::Episodic,
                         score: e.metadata.quality_score,
                         metadata: {
@@ -433,11 +430,7 @@ impl AgenticMemory {
     }
 
     /// Get relevant memories across all types
-    pub fn get_relevant(
-        &self,
-        query_embedding: &[f32],
-        k: usize,
-    ) -> Result<Vec<RetrievedMemory>> {
+    pub fn get_relevant(&self, query_embedding: &[f32], k: usize) -> Result<Vec<RetrievedMemory>> {
         let mut all_results = Vec::new();
 
         // Get from each memory type

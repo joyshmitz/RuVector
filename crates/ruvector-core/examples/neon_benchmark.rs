@@ -16,18 +16,29 @@ fn main() {
 
     // Generate test data
     let vectors: Vec<Vec<f32>> = (0..num_vectors)
-        .map(|i| (0..dimensions).map(|j| ((i * j) % 1000) as f32 / 1000.0).collect())
+        .map(|i| {
+            (0..dimensions)
+                .map(|j| ((i * j) % 1000) as f32 / 1000.0)
+                .collect()
+        })
         .collect();
 
     let queries: Vec<Vec<f32>> = (0..num_queries)
-        .map(|i| (0..dimensions).map(|j| ((i * j + 500) % 1000) as f32 / 1000.0).collect())
+        .map(|i| {
+            (0..dimensions)
+                .map(|j| ((i * j + 500) % 1000) as f32 / 1000.0)
+                .collect()
+        })
         .collect();
 
     println!("Configuration:");
     println!("  - Dimensions: {}", dimensions);
     println!("  - Vectors: {}", num_vectors);
     println!("  - Queries: {}", num_queries);
-    println!("  - Total distance calculations: {}\n", num_vectors * num_queries);
+    println!(
+        "  - Total distance calculations: {}\n",
+        num_vectors * num_queries
+    );
 
     #[cfg(target_arch = "aarch64")]
     println!("Platform: ARM64 (Apple Silicon) - NEON enabled ✓\n");
@@ -48,7 +59,11 @@ fn main() {
         }
     }
     let simd_time = start.elapsed();
-    println!("  SIMD:   {:>8.2} ms  (checksum: {:.4})", simd_time.as_secs_f64() * 1000.0, simd_sum);
+    println!(
+        "  SIMD:   {:>8.2} ms  (checksum: {:.4})",
+        simd_time.as_secs_f64() * 1000.0,
+        simd_sum
+    );
 
     let start = Instant::now();
     let mut scalar_sum = 0.0f32;
@@ -58,7 +73,11 @@ fn main() {
         }
     }
     let scalar_time = start.elapsed();
-    println!("  Scalar: {:>8.2} ms  (checksum: {:.4})", scalar_time.as_secs_f64() * 1000.0, scalar_sum);
+    println!(
+        "  Scalar: {:>8.2} ms  (checksum: {:.4})",
+        scalar_time.as_secs_f64() * 1000.0,
+        scalar_sum
+    );
 
     let speedup = scalar_time.as_secs_f64() / simd_time.as_secs_f64();
     println!("  Speedup: {:.2}x\n", speedup);
@@ -76,7 +95,11 @@ fn main() {
         }
     }
     let simd_time = start.elapsed();
-    println!("  SIMD:   {:>8.2} ms  (checksum: {:.4})", simd_time.as_secs_f64() * 1000.0, simd_sum);
+    println!(
+        "  SIMD:   {:>8.2} ms  (checksum: {:.4})",
+        simd_time.as_secs_f64() * 1000.0,
+        simd_sum
+    );
 
     let start = Instant::now();
     let mut scalar_sum = 0.0f32;
@@ -86,7 +109,11 @@ fn main() {
         }
     }
     let scalar_time = start.elapsed();
-    println!("  Scalar: {:>8.2} ms  (checksum: {:.4})", scalar_time.as_secs_f64() * 1000.0, scalar_sum);
+    println!(
+        "  Scalar: {:>8.2} ms  (checksum: {:.4})",
+        scalar_time.as_secs_f64() * 1000.0,
+        scalar_sum
+    );
 
     let speedup = scalar_time.as_secs_f64() / simd_time.as_secs_f64();
     println!("  Speedup: {:.2}x\n", speedup);
@@ -104,7 +131,11 @@ fn main() {
         }
     }
     let simd_time = start.elapsed();
-    println!("  SIMD:   {:>8.2} ms  (checksum: {:.4})", simd_time.as_secs_f64() * 1000.0, simd_sum);
+    println!(
+        "  SIMD:   {:>8.2} ms  (checksum: {:.4})",
+        simd_time.as_secs_f64() * 1000.0,
+        simd_sum
+    );
 
     let start = Instant::now();
     let mut scalar_sum = 0.0f32;
@@ -114,7 +145,11 @@ fn main() {
         }
     }
     let scalar_time = start.elapsed();
-    println!("  Scalar: {:>8.2} ms  (checksum: {:.4})", scalar_time.as_secs_f64() * 1000.0, scalar_sum);
+    println!(
+        "  Scalar: {:>8.2} ms  (checksum: {:.4})",
+        scalar_time.as_secs_f64() * 1000.0,
+        scalar_sum
+    );
 
     let speedup = scalar_time.as_secs_f64() / simd_time.as_secs_f64();
     println!("  Speedup: {:.2}x\n", speedup);

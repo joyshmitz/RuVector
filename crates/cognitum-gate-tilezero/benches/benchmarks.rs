@@ -13,12 +13,10 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use cognitum_gate_tilezero::{
-    ActionContext, ActionMetadata, ActionTarget,
-    GateDecision, GateThresholds, ReducedGraph, ThreeFilterDecision,
-    TileZero, TileId,
     merge::{EdgeSummary, MergeStrategy, NodeSummary, ReportMerger, WorkerReport},
-    PermitState, PermitToken, ReceiptLog, TimestampProof, WitnessReceipt, WitnessSummary,
-    EvidenceFilter,
+    ActionContext, ActionMetadata, ActionTarget, EvidenceFilter, GateDecision, GateThresholds,
+    PermitState, PermitToken, ReceiptLog, ReducedGraph, ThreeFilterDecision, TileId, TileZero,
+    TimestampProof, WitnessReceipt, WitnessSummary,
 };
 
 // ============================================================================
@@ -96,7 +94,11 @@ fn create_worker_report(
     for i in 0..boundary_edge_count {
         report.add_boundary_edge(EdgeSummary {
             source: format!("node-{}-{}", tile_id, i % node_count.max(1)),
-            target: format!("node-{}-{}", (tile_id as usize + 1) % 256, i % node_count.max(1)),
+            target: format!(
+                "node-{}-{}",
+                (tile_id as usize + 1) % 256,
+                i % node_count.max(1)
+            ),
             capacity: rng.gen_range(1.0..100.0),
             is_boundary: true,
         });
@@ -110,7 +112,11 @@ fn create_worker_report(
 }
 
 /// Create all 255 tile reports
-fn create_all_tile_reports(epoch: u64, nodes_per_tile: usize, edges_per_tile: usize) -> Vec<WorkerReport> {
+fn create_all_tile_reports(
+    epoch: u64,
+    nodes_per_tile: usize,
+    edges_per_tile: usize,
+) -> Vec<WorkerReport> {
     (1..=255u8)
         .map(|tile_id| create_worker_report(tile_id, epoch, nodes_per_tile, edges_per_tile))
         .collect()
@@ -182,9 +188,7 @@ fn bench_merge_reports(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("255_tiles_minimal", name),
             &minimal_reports,
-            |b, reports| {
-                b.iter(|| black_box(merger.merge(black_box(reports))))
-            },
+            |b, reports| b.iter(|| black_box(merger.merge(black_box(reports)))),
         );
     }
 
@@ -222,9 +226,8 @@ fn bench_decision(c: &mut Criterion) {
     let ctx = create_action_context(0);
 
     group.bench_function("tilezero_full_decision", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(tilezero.decide(black_box(&ctx)).await)
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(tilezero.decide(black_box(&ctx)).await) });
     });
 
     // Three-filter decision only (no crypto)
@@ -237,13 +240,9 @@ fn bench_decision(c: &mut Criterion) {
     ];
 
     for (name, graph) in &graph_states {
-        group.bench_with_input(
-            BenchmarkId::new("three_filter", name),
-            graph,
-            |b, graph| {
-                b.iter(|| black_box(decision.evaluate(black_box(graph))))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("three_filter", name), graph, |b, graph| {
+            b.iter(|| black_box(decision.evaluate(black_box(graph))))
+        });
     }
 
     // Batch decisions
@@ -278,9 +277,7 @@ fn bench_receipt_hash(c: &mut Criterion) {
     let receipt = create_test_receipt(0, [0u8; 32]);
 
     // Single hash
-    group.bench_function("hash_single", |b| {
-        b.iter(|| black_box(receipt.hash()))
-    });
+    group.bench_function("hash_single", |b| b.iter(|| black_box(receipt.hash())));
 
     // Hash with varying boundary sizes
     for boundary_size in [0, 10, 50, 100] {
@@ -292,9 +289,7 @@ fn bench_receipt_hash(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("boundary_size", boundary_size),
             &receipt,
-            |b, receipt| {
-                b.iter(|| black_box(receipt.hash()))
-            },
+            |b, receipt| b.iter(|| black_box(receipt.hash())),
         );
     }
 
@@ -328,9 +323,7 @@ fn bench_receipt_chain_verify(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("verify_chain", chain_length),
             &log,
-            |b, log| {
-                b.iter(|| black_box(log.verify_chain_to((chain_length - 1) as u64)))
-            },
+            |b, log| b.iter(|| black_box(log.verify_chain_to((chain_length - 1) as u64))),
         );
     }
 
@@ -376,22 +369,23 @@ fn bench_permit_sign(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("action_len", action_len),
             &token,
-            |b, token| {
-                b.iter(|| black_box(state.sign_token(token.clone())))
-            },
+            |b, token| b.iter(|| black_box(state.sign_token(token.clone()))),
         );
     }
 
     // Batch signing
     for batch_size in [10, 50, 100] {
-        let tokens: Vec<_> = (0..batch_size).map(|i| create_test_token(i as u64)).collect();
+        let tokens: Vec<_> = (0..batch_size)
+            .map(|i| create_test_token(i as u64))
+            .collect();
 
         group.bench_with_input(
             BenchmarkId::new("batch_sign", batch_size),
             &tokens,
             |b, tokens| {
                 b.iter(|| {
-                    let signed: Vec<_> = tokens.iter()
+                    let signed: Vec<_> = tokens
+                        .iter()
                         .cloned()
                         .map(|t| state.sign_token(t))
                         .collect();
@@ -492,9 +486,7 @@ fn bench_evalue_computation(c: &mut Criterion) {
 
     // SIMD-friendly aggregation patterns
     let tile_count = 255;
-    let e_values: Vec<f64> = (0..tile_count)
-        .map(|i| 1.0 + (i as f64 * 0.01))
-        .collect();
+    let e_values: Vec<f64> = (0..tile_count).map(|i| 1.0 + (i as f64 * 0.01)).collect();
 
     group.bench_function("aggregate_255_scalar", |b| {
         b.iter(|| {
@@ -619,15 +611,9 @@ fn bench_receipt_log_operations(c: &mut Criterion) {
 // Criterion Groups
 // ============================================================================
 
-criterion_group!(
-    merge_benches,
-    bench_merge_reports,
-);
+criterion_group!(merge_benches, bench_merge_reports,);
 
-criterion_group!(
-    decision_benches,
-    bench_decision,
-);
+criterion_group!(decision_benches, bench_decision,);
 
 criterion_group!(
     crypto_benches,
@@ -644,4 +630,9 @@ criterion_group!(
     bench_receipt_log_operations,
 );
 
-criterion_main!(merge_benches, decision_benches, crypto_benches, additional_benches);
+criterion_main!(
+    merge_benches,
+    decision_benches,
+    crypto_benches,
+    additional_benches
+);

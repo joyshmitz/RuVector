@@ -81,264 +81,506 @@ pub mod witness_log;
 mod tests;
 
 // Re-exports
-pub use adapter_manager::{AdapterManager, LoraAdapter, AdapterConfig};
+pub use adapter_manager::{AdapterConfig, AdapterManager, LoraAdapter};
 pub use autodetect::{
-    SystemCapabilities, Platform, Architecture, CpuFeatures,
-    GpuCapabilities, GpuBackend, CoreInfo, ComputeBackend,
-    InferenceConfig,
-};
-pub use lora::{
-    MicroLoRA, MicroLoraConfig, TargetModule, AdaptFeedback,
-    AdapterRegistry, AdapterPool, AdapterComposer, CompositionStrategy,
-    TrainingPipeline, TrainingConfig, EwcRegularizer, LearningRateSchedule,
-};
-pub use backends::{
-    create_backend, DeviceType, DType, GenerateParams, GeneratedToken, LlmBackend,
-    ModelArchitecture, ModelConfig, ModelInfo, Quantization, SharedBackend, SpecialTokens,
-    StreamEvent, TokenStream, Tokenizer,
+    Architecture, ComputeBackend, CoreInfo, CpuFeatures, GpuBackend, GpuCapabilities,
+    InferenceConfig, Platform, SystemCapabilities,
 };
 #[cfg(feature = "candle")]
 pub use backends::CandleBackend;
+pub use backends::{
+    create_backend, DType, DeviceType, GenerateParams, GeneratedToken, LlmBackend,
+    ModelArchitecture, ModelConfig, ModelInfo, Quantization, SharedBackend, SpecialTokens,
+    StreamEvent, TokenStream, Tokenizer,
+};
 #[cfg(feature = "async-runtime")]
 pub use backends::{AsyncTokenStream, LlmBackendAsync};
-pub use error::{RuvLLMError, Result};
-pub use kv_cache::{
-    TwoTierKvCache, KvCacheConfig, CacheTier, CacheQuantization, KvCacheStats,
-    PooledKvCache, PooledKvBlock, PooledKvCacheStats,
-};
-pub use memory_pool::{
-    InferenceArena, ArenaStats,
-    BufferPool, BufferSize, PooledBuffer, BufferPoolStats,
-    ScratchSpaceManager, ScratchSpace, ScratchStats,
-    MemoryManager, MemoryManagerConfig, MemoryManagerStats,
-    CACHE_LINE_SIZE, DEFAULT_ALIGNMENT,
-};
-pub use paged_attention::{PagedAttention, PagedAttentionConfig, PageTable, PageBlock};
-pub use policy_store::{PolicyStore, PolicyEntry, PolicyType, QuantizationPolicy, RouterPolicy};
-pub use session::{SessionManager, Session, SessionConfig};
-pub use session_index::{SessionIndex, SessionState, KvCacheReference};
-pub use sona::{SonaIntegration, SonaConfig, LearningLoop};
 pub use claude_flow::{
-    ClaudeFlowAgent, ClaudeFlowTask,
-    AgentRouter, AgentType, RoutingDecision as AgentRoutingDecision,
-    TaskClassifier, TaskType, ClassificationResult,
-    FlowOptimizer, OptimizationConfig, OptimizationResult,
-    // HNSW semantic router (150x faster pattern search)
-    HnswRouter, HnswRouterConfig, HnswRouterStats, HnswRoutingResult,
-    HnswDistanceMetric, TaskPattern, HybridRouter,
+    AgentContext,
+    AgentCoordinator,
+    AgentRouter,
+    AgentState,
+    AgentType,
+    AnalyzerStats as ModelAnalyzerStats,
+    ClassificationResult,
+    ClaudeFlowAgent,
+    ClaudeFlowTask,
     // Claude API Integration (NEW)
-    ClaudeModel, MessageRole, ContentBlock, Message, ClaudeRequest, ClaudeResponse, UsageStats,
-    StreamToken, StreamEvent as ClaudeStreamEvent, QualityMonitor, ResponseStreamer, StreamStats,
-    ContextWindow, ContextManager,
-    AgentState, AgentContext, WorkflowStep, WorkflowResult, StepResult,
-    AgentCoordinator, CoordinatorStats,
-    CostEstimator, LatencyTracker, LatencySample, LatencyStats as ClaudeLatencyStats,
+    ClaudeModel,
+    ClaudeRequest,
+    ClaudeResponse,
     // Model Router (NEW) - Intelligent routing to Haiku/Sonnet/Opus
-    ComplexityFactors, ComplexityWeights, ComplexityScore,
-    TaskComplexityAnalyzer, AnalyzerStats as ModelAnalyzerStats,
-    SelectionCriteria, ModelRoutingDecision, ModelSelector, SelectorStats,
-    ModelRouter,
+    ComplexityFactors,
+    ComplexityScore,
+    ComplexityWeights,
+    ContentBlock,
+    ContextManager,
+    ContextWindow,
+    CoordinatorStats,
+    CostEstimator,
+    FlowOptimizer,
+    HnswDistanceMetric,
+    // HNSW semantic router (150x faster pattern search)
+    HnswRouter,
+    HnswRouterConfig,
+    HnswRouterStats,
+    HnswRoutingResult,
+    HooksConfig,
     // Hooks Integration (NEW v2.3) - Unified Claude Flow hooks interface
-    HooksIntegration, HooksConfig,
-    PreTaskInput, PreTaskResult, PostTaskInput, PostTaskResult,
-    PreEditInput, PreEditResult, PostEditInput, PostEditResult,
-    SessionState as HooksSessionState, SessionEndResult, SessionMetrics,
-    PatternMatch, QualityAssessment, LearningMetrics,
+    HooksIntegration,
+    HybridRouter,
+    LatencySample,
+    LatencyStats as ClaudeLatencyStats,
+    LatencyTracker,
+    LearningMetrics,
+    Message,
+    MessageRole,
+    ModelRouter,
+    ModelRoutingDecision,
+    ModelSelector,
+    OptimizationConfig,
+    OptimizationResult,
+    PatternMatch,
+    PostEditInput,
+    PostEditResult,
+    PostTaskInput,
+    PostTaskResult,
+    PreEditInput,
+    PreEditResult,
+    PreTaskInput,
+    PreTaskResult,
+    QualityAssessment,
+    QualityMonitor,
+    ResponseStreamer,
+    RoutingDecision as AgentRoutingDecision,
+    SelectionCriteria,
+    SelectorStats,
+    SessionEndResult,
+    SessionMetrics,
+    SessionState as HooksSessionState,
+    StepResult,
+    StreamEvent as ClaudeStreamEvent,
+    StreamStats,
+    StreamToken,
+    TaskClassifier,
+    TaskComplexityAnalyzer,
+    TaskPattern,
+    TaskType,
+    UsageStats,
+    WorkflowResult,
+    WorkflowStep,
 };
-pub use optimization::{
-    InferenceMetrics, MetricsCollector, MetricsSnapshot, MovingAverage, LatencyHistogram,
-    RealtimeOptimizer, RealtimeConfig, BatchSizeStrategy, KvCachePressurePolicy,
-    TokenBudgetAllocation, SpeculativeConfig, OptimizationDecision,
-    SonaLlm, SonaLlmConfig, TrainingSample, AdaptationResult, LearningLoopStats,
-    ConsolidationStrategy, OptimizationTrigger,
-};
-pub use tokenizer::{
-    RuvTokenizer, ChatMessage, ChatTemplate, Role, TokenizerSpecialTokens,
-    StreamingDecodeBuffer,
-};
-pub use speculative::{
-    SpeculativeDecoder, SpeculativeConfig as SpeculativeDecodingConfig,
-    SpeculativeStats, AtomicSpeculativeStats, VerificationResult,
-    SpeculationTree, TreeNode,
-    softmax, log_softmax, sample_from_probs, top_k_filter, top_p_filter,
-};
-pub use types::*;
-pub use witness_log::{WitnessLog, WitnessEntry, LatencyBreakdown, RoutingDecision, AsyncWriteConfig, WitnessLogStats};
+pub use error::{Result, RuvLLMError};
 pub use gguf::{
-    GgufFile, GgufModelLoader, GgufHeader, GgufValue, GgufQuantType,
-    TensorInfo, QuantizedTensor, ModelConfig as GgufModelConfig,
+    GgufFile,
+    GgufHeader,
     // New GGUF loading types
-    GgufLoader, LoadConfig, LoadProgress, LoadedWeights, LoadedTensor,
-    TensorCategory, TensorNameMapper, StreamingLoader,
-    ModelInitializer, ModelWeights, LayerWeights, WeightTensor, QuantizedWeight,
+    GgufLoader,
+    GgufModelLoader,
+    GgufQuantType,
+    GgufValue,
+    LayerWeights,
+    LoadConfig,
+    LoadProgress,
+    LoadedTensor,
+    LoadedWeights,
+    ModelConfig as GgufModelConfig,
+    ModelInitializer,
+    ModelWeights,
     ProgressModelBuilder,
+    QuantizedTensor,
+    QuantizedWeight,
+    StreamingLoader,
+    TensorCategory,
+    TensorInfo,
+    TensorNameMapper,
+    WeightTensor,
 };
 pub use hub::{
-    // Download
-    ModelDownloader, DownloadConfig, DownloadProgress, DownloadError, ChecksumVerifier,
-    // Upload
-    ModelUploader, UploadConfig, UploadProgress, UploadError, ModelMetadata,
-    // Registry
-    RuvLtraRegistry, ModelInfo as HubModelInfo, ModelSize, QuantizationLevel,
-    HardwareRequirements, get_model_info,
-    // Model Card
-    ModelCard, ModelCardBuilder, TaskType as HubTaskType, Framework, License, DatasetInfo, MetricResult,
-    // Progress
-    ProgressBar, ProgressIndicator, ProgressStyle, ProgressCallback, MultiProgress,
+    default_cache_dir,
+    get_hf_token,
+    get_model_info,
+    ChecksumVerifier,
+    DatasetInfo,
+    DownloadConfig,
+    DownloadError,
+    DownloadProgress,
+    Framework,
+    HardwareRequirements,
     // Common
-    HubError, default_cache_dir, get_hf_token,
+    HubError,
+    License,
+    MetricResult,
+    // Model Card
+    ModelCard,
+    ModelCardBuilder,
+    // Download
+    ModelDownloader,
+    ModelInfo as HubModelInfo,
+    ModelMetadata,
+    ModelSize,
+    // Upload
+    ModelUploader,
+    MultiProgress,
+    // Progress
+    ProgressBar,
+    ProgressCallback,
+    ProgressIndicator,
+    ProgressStyle,
+    QuantizationLevel,
+    // Registry
+    RuvLtraRegistry,
+    TaskType as HubTaskType,
+    UploadConfig,
+    UploadError,
+    UploadProgress,
+};
+pub use kv_cache::{
+    CacheQuantization, CacheTier, KvCacheConfig, KvCacheStats, PooledKvBlock, PooledKvCache,
+    PooledKvCacheStats, TwoTierKvCache,
+};
+pub use lora::{
+    AdaptFeedback, AdapterComposer, AdapterPool, AdapterRegistry, CompositionStrategy,
+    EwcRegularizer, LearningRateSchedule, MicroLoRA, MicroLoraConfig, TargetModule, TrainingConfig,
+    TrainingPipeline,
+};
+pub use memory_pool::{
+    ArenaStats, BufferPool, BufferPoolStats, BufferSize, InferenceArena, MemoryManager,
+    MemoryManagerConfig, MemoryManagerStats, PooledBuffer, ScratchSpace, ScratchSpaceManager,
+    ScratchStats, CACHE_LINE_SIZE, DEFAULT_ALIGNMENT,
+};
+pub use optimization::{
+    AdaptationResult, BatchSizeStrategy, ConsolidationStrategy, InferenceMetrics,
+    KvCachePressurePolicy, LatencyHistogram, LearningLoopStats, MetricsCollector, MetricsSnapshot,
+    MovingAverage, OptimizationDecision, OptimizationTrigger, RealtimeConfig, RealtimeOptimizer,
+    SonaLlm, SonaLlmConfig, SpeculativeConfig, TokenBudgetAllocation, TrainingSample,
+};
+pub use paged_attention::{PageBlock, PageTable, PagedAttention, PagedAttentionConfig};
+pub use policy_store::{PolicyEntry, PolicyStore, PolicyType, QuantizationPolicy, RouterPolicy};
+pub use quantize::{
+    dequantize_for_ane,
+    // Memory estimation
+    estimate_memory_q4,
+    estimate_memory_q5,
+    estimate_memory_q8,
+    // Quantization functions
+    quantize_ruvltra_q4,
+    quantize_ruvltra_q5,
+    quantize_ruvltra_q8,
+    MemoryEstimate,
+    // Block types
+    Q4KMBlock,
+    Q5KMBlock,
+    Q8Block,
+    QuantConfig,
+    // Progress tracking
+    QuantProgress,
+    QuantStats,
+    // Core quantizer
+    RuvltraQuantizer,
+    TargetFormat,
 };
 pub use serving::{
-    // Request types
-    InferenceRequest, RequestId, Priority, RequestState, RunningRequest,
-    CompletedRequest, FinishReason, TokenOutput,
+    BatchStats,
     // Batch types
-    BatchedRequest, BatchStats, ScheduledBatch, IterationPlan, PrefillTask, DecodeTask, TokenBudget,
-    // KV cache management
-    KvCacheManager, KvCachePoolConfig, KvCacheAllocation, KvCacheManagerStats,
+    BatchedRequest,
+    CompletedRequest,
     // Scheduler
-    ContinuousBatchScheduler, IterationScheduler, SchedulerConfig, SchedulerStats,
-    RequestQueue, PreemptionMode, PriorityPolicy,
+    ContinuousBatchScheduler,
+    DecodeTask,
+    FinishReason,
+    GenerationResult,
+    // Request types
+    InferenceRequest,
+    IterationPlan,
+    IterationScheduler,
+    KvCacheAllocation,
+    // KV cache management
+    KvCacheManager,
+    KvCacheManagerStats,
+    KvCachePoolConfig,
+    PreemptionMode,
+    PrefillTask,
+    Priority,
+    PriorityPolicy,
+    RequestId,
+    RequestQueue,
+    RequestState,
+    RunningRequest,
+    ScheduledBatch,
+    SchedulerConfig,
+    SchedulerStats,
     // Engine
-    ServingEngine, ServingEngineConfig, ServingMetrics, GenerationResult,
+    ServingEngine,
+    ServingEngineConfig,
+    ServingMetrics,
+    TokenBudget,
+    TokenOutput,
 };
-pub use quantize::{
-    // Core quantizer
-    RuvltraQuantizer, QuantConfig, TargetFormat,
-    // Quantization functions
-    quantize_ruvltra_q4, quantize_ruvltra_q5, quantize_ruvltra_q8, dequantize_for_ane,
-    // Memory estimation
-    estimate_memory_q4, estimate_memory_q5, estimate_memory_q8, MemoryEstimate,
-    // Block types
-    Q4KMBlock, Q5KMBlock, Q8Block,
-    // Progress tracking
-    QuantProgress, QuantStats,
+pub use session::{Session, SessionConfig, SessionManager};
+pub use session_index::{KvCacheReference, SessionIndex, SessionState};
+pub use sona::{LearningLoop, SonaConfig, SonaIntegration};
+pub use speculative::{
+    log_softmax, sample_from_probs, softmax, top_k_filter, top_p_filter, AtomicSpeculativeStats,
+    SpeculationTree, SpeculativeConfig as SpeculativeDecodingConfig, SpeculativeDecoder,
+    SpeculativeStats, TreeNode, VerificationResult,
+};
+pub use tokenizer::{
+    ChatMessage, ChatTemplate, Role, RuvTokenizer, StreamingDecodeBuffer, TokenizerSpecialTokens,
 };
 pub use training::{
+    AugmentationConfig,
     // Claude task dataset
-    ClaudeTaskDataset, ClaudeTaskExample, TaskCategory, TaskMetadata,
-    ComplexityLevel, DomainType, DatasetConfig, AugmentationConfig,
-    DatasetGenerator, DatasetStats,
+    ClaudeTaskDataset,
+    ClaudeTaskExample,
+    ComplexityLevel,
+    DatasetConfig,
+    DatasetGenerator,
+    DatasetStats,
+    DifficultyLevel,
+    DifficultyWeights,
+    DomainType,
+    EvaluationMetrics,
+    GrpoBatch,
     // GRPO optimizer for reinforcement learning
-    GrpoConfig, GrpoOptimizer, GrpoSample, GrpoStats, GrpoUpdateResult,
-    GrpoBatch, SampleGroup,
-    // MCP tool training
-    McpToolTrainer, McpTrainingConfig, ToolTrajectory, TrajectoryStep,
-    TrajectoryBuilder, StepBuilder, TrajectoryMetadata,
-    TrainingResult, TrainingStats, TrainingCheckpoint, EvaluationMetrics,
-    // Tool calling dataset
-    ToolCallDataset, ToolCallExample, ToolDatasetConfig, ToolDatasetStats,
-    McpToolDef, ToolParam, ParamType, DifficultyLevel, DifficultyWeights,
+    GrpoConfig,
+    GrpoOptimizer,
+    GrpoSample,
+    GrpoStats,
+    GrpoUpdateResult,
     McpToolCategory,
+    McpToolDef,
+    // MCP tool training
+    McpToolTrainer,
+    McpTrainingConfig,
+    ParamType,
+    SampleGroup,
+    StepBuilder,
+    TaskCategory,
+    TaskMetadata,
+    // Tool calling dataset
+    ToolCallDataset,
+    ToolCallExample,
+    ToolDatasetConfig,
+    ToolDatasetStats,
+    ToolParam,
+    ToolTrajectory,
+    TrainingCheckpoint,
+    TrainingResult,
+    TrainingStats,
+    TrajectoryBuilder,
+    TrajectoryMetadata,
+    TrajectoryStep,
+};
+pub use types::*;
+pub use witness_log::{
+    AsyncWriteConfig, LatencyBreakdown, RoutingDecision, WitnessEntry, WitnessLog, WitnessLogStats,
 };
 
 // RuvLTRA model architecture exports
 pub use models::{
+    AneDispatcher,
+    AneOptimization,
+    MemoryLayout,
+    QuantizationType,
+    RuvLtraAttention,
     // Configuration
-    RuvLtraConfig, AneOptimization, QuantizationType, MemoryLayout,
+    RuvLtraConfig,
+    RuvLtraDecoderLayer,
+    RuvLtraMLP,
     // Model components
-    RuvLtraModel, RuvLtraAttention, RuvLtraMLP, RuvLtraDecoderLayer,
+    RuvLtraModel,
     // Utilities
-    RuvLtraModelInfo, AneDispatcher,
+    RuvLtraModelInfo,
 };
 
 // Ruvector integration exports (unified entry point for all Ruvector capabilities)
 pub use capabilities::{
-    RuvectorCapabilities, HNSW_AVAILABLE, ATTENTION_AVAILABLE, GRAPH_AVAILABLE,
-    GNN_AVAILABLE, SONA_AVAILABLE, SIMD_AVAILABLE, PARALLEL_AVAILABLE,
-    gate_feature, gate_feature_or,
+    gate_feature, gate_feature_or, RuvectorCapabilities, ATTENTION_AVAILABLE, GNN_AVAILABLE,
+    GRAPH_AVAILABLE, HNSW_AVAILABLE, PARALLEL_AVAILABLE, SIMD_AVAILABLE, SONA_AVAILABLE,
 };
 pub use ruvector_integration::{
-    // Main integration
-    RuvectorIntegration, IntegrationConfig, IntegrationStats,
-    // Unified index
-    UnifiedIndex, VectorMetadata, IndexStats, SearchResultWithMetadata,
+    IndexStats,
+    IntegrationConfig,
+    IntegrationStats,
     // Intelligence layer
-    IntelligenceLayer, IntelligentRoutingDecision, IntelligenceLayerStats,
+    IntelligenceLayer,
+    IntelligenceLayerStats,
+    IntelligentRoutingDecision,
+    // Main integration
+    RuvectorIntegration,
+    SearchResultWithMetadata,
+    // Unified index
+    UnifiedIndex,
+    VectorMetadata,
 };
 
 // Quality scoring exports
 pub use quality::{
-    // Core metrics
-    QualityMetrics, QualityWeights, QualityDimension, QualitySummary, TrendDirection,
-    // Scoring engine
-    QualityScoringEngine, ScoringConfig, ScoringContext, QualityHistory,
-    ComparisonResult, TrendAnalysis, ImprovementRecommendation,
+    CoherenceConfig,
     // Coherence validation
-    CoherenceValidator, CoherenceConfig, SemanticConsistencyResult,
-    ContradictionResult, CoherenceViolation, LogicalFlowResult,
+    CoherenceValidator,
+    CoherenceViolation,
+    CombinedValidator,
+    ComparisonResult,
+    ContradictionResult,
+    DiversificationSuggestion,
     // Diversity analysis
-    DiversityAnalyzer, DiversityConfig, DiversityResult,
-    DiversificationSuggestion, ModeCollapseResult,
+    DiversityAnalyzer,
+    DiversityConfig,
+    DiversityResult,
+    FormatValidator,
+    ImprovementRecommendation,
+    JsonSchemaValidator,
+    LogicalFlowResult,
+    ModeCollapseResult,
+    QualityDimension,
+    QualityHistory,
+    // Core metrics
+    QualityMetrics,
+    // Scoring engine
+    QualityScoringEngine,
+    QualitySummary,
+    QualityWeights,
+    RangeValidator,
     // Schema validators
-    SchemaValidator, JsonSchemaValidator, TypeValidator, RangeValidator,
-    FormatValidator, CombinedValidator, ValidationResult, ValidationError,
+    SchemaValidator,
+    ScoringConfig,
+    ScoringContext,
+    SemanticConsistencyResult,
+    TrendAnalysis,
+    TrendDirection,
+    TypeValidator,
     ValidationCombinator,
+    ValidationError,
+    ValidationResult,
 };
 
 // Context management exports (intelligent pruning and semantic memory)
 pub use context::{
     // Agentic memory
-    AgenticMemory, AgenticMemoryConfig, MemoryType,
-    // Working memory
-    WorkingMemory, WorkingMemoryConfig, TaskContext, ScratchpadEntry, AttentionWeights,
-    // Episodic memory
-    EpisodicMemory, EpisodicMemoryConfig, Episode, EpisodeMetadata,
-    EpisodeTrajectory, CompressedEpisode,
-    // Context manager
-    IntelligentContextManager, ContextManagerConfig, PreparedContext,
-    PriorityScorer, ContextElement, ElementPriority,
-    // Semantic cache
-    SemanticToolCache, SemanticCacheConfig, CachedToolResult, CacheStats,
+    AgenticMemory,
+    AgenticMemoryConfig,
+    AttentionWeights,
+    CacheStats,
+    CachedToolResult,
+    ClaudeFlowBridgeConfig,
     // Claude Flow bridge
-    ClaudeFlowMemoryBridge, ClaudeFlowBridgeConfig, SyncResult,
+    ClaudeFlowMemoryBridge,
+    CompressedEpisode,
+    ContextElement,
+    ContextManagerConfig,
+    ElementPriority,
+    Episode,
+    EpisodeMetadata,
+    EpisodeTrajectory,
+    // Episodic memory
+    EpisodicMemory,
+    EpisodicMemoryConfig,
+    // Context manager
+    IntelligentContextManager,
+    MemoryType,
+    PreparedContext,
+    PriorityScorer,
+    ScratchpadEntry,
+    SemanticCacheConfig,
+    // Semantic cache
+    SemanticToolCache,
+    SyncResult,
+    TaskContext,
+    // Working memory
+    WorkingMemory,
+    WorkingMemoryConfig,
 };
 
 // Self-Reflection architecture exports (error recovery and self-correction)
 pub use reflection::{
-    // Reflective agent wrapper
-    ReflectiveAgent, ReflectionStrategy, ReflectionConfig, RetryConfig,
-    ExecutionContext, ExecutionResult, Reflection, PreviousAttempt,
-    BaseAgent, ReflectiveAgentStats,
+    BaseAgent,
+    CompletenessChecker,
+    ConfidenceCheckRecord,
     // Confidence-based revision (IoE pattern)
-    ConfidenceChecker, ConfidenceConfig, ConfidenceLevel, WeakPoint, RevisionResult,
-    ConfidenceCheckRecord, ConfidenceFactorWeights, WeaknessType,
+    ConfidenceChecker,
+    ConfidenceConfig,
+    ConfidenceFactorWeights,
+    ConfidenceLevel,
+    ConsistencyChecker,
+    CorrectnessChecker,
+    CritiqueIssue,
+    CritiqueResult,
+    ErrorCategory,
+    ErrorCluster,
+    ErrorLearnerStats,
+    ErrorPattern,
     // Error pattern learning
-    ErrorPatternLearner, ErrorPatternLearnerConfig, ErrorPattern, ErrorCluster,
-    RecoveryStrategy, RecoverySuggestion, ErrorCategory, RecoveryOutcome,
-    SimilarError, ErrorLearnerStats,
+    ErrorPatternLearner,
+    ErrorPatternLearnerConfig,
+    ExecutionContext,
+    ExecutionResult,
+    IssueCategory,
     // Multi-perspective critique
-    Perspective, CorrectnessChecker, CompletenessChecker, ConsistencyChecker,
-    CritiqueResult, CritiqueIssue, IssueCategory, UnifiedCritique, PerspectiveConfig,
+    Perspective,
+    PerspectiveConfig,
+    PreviousAttempt,
+    RecoveryOutcome,
+    RecoveryStrategy,
+    RecoverySuggestion,
+    Reflection,
+    ReflectionConfig,
+    ReflectionStrategy,
+    // Reflective agent wrapper
+    ReflectiveAgent,
+    ReflectiveAgentStats,
+    RetryConfig,
+    RevisionResult,
+    SimilarError,
+    UnifiedCritique,
+    WeakPoint,
+    WeaknessType,
 };
 
 // ReasoningBank exports (learning from Claude trajectories)
 pub use reasoning_bank::{
+    CompressedTrajectory,
+    ConsolidationConfig,
+    DistillationConfig,
+    FailurePattern as VerdictFailurePattern,
+    FisherInformation,
+    ImportanceScore,
+    KeyLesson,
+    // Memory distillation
+    MemoryDistiller,
+    Pattern,
+    PatternCategory,
+    // EWC++ consolidation
+    PatternConsolidator,
+    PatternSearchResult,
+    PatternStats,
+    // Pattern storage with HNSW
+    PatternStore,
+    PatternStoreConfig,
     // Main ReasoningBank
-    ReasoningBank, ReasoningBankConfig, ReasoningBankStats,
+    ReasoningBank,
+    ReasoningBankConfig,
+    ReasoningBankStats,
+    RecoveryStrategy as VerdictRecoveryStrategy,
+    RootCause,
+    StepOutcome,
     // Trajectory recording (aliased to avoid conflict with training::TrajectoryStep)
     Trajectory as ReasoningTrajectory,
+    TrajectoryId,
+    TrajectoryRecorder,
     TrajectoryStep as ReasoningTrajectoryStep,
-    TrajectoryRecorder, TrajectoryId, StepOutcome,
-    // Pattern storage with HNSW
-    PatternStore, PatternStoreConfig, Pattern, PatternCategory, PatternSearchResult, PatternStats,
     // Verdict system (aliased to avoid conflict with claude_flow::reasoning_bank::Verdict)
     Verdict as ReasoningVerdict,
-    RootCause, VerdictAnalyzer, FailurePattern as VerdictFailurePattern,
-    RecoveryStrategy as VerdictRecoveryStrategy,
-    // EWC++ consolidation
-    PatternConsolidator, ConsolidationConfig, FisherInformation, ImportanceScore,
-    // Memory distillation
-    MemoryDistiller, DistillationConfig, CompressedTrajectory, KeyLesson,
+    VerdictAnalyzer,
 };
 
 // Metal GPU acceleration exports (macOS only)
 #[cfg(all(target_os = "macos", feature = "metal-compute"))]
 pub use metal::{
-    MetalContext, MetalConfig, MetalPipelines, MetalBuffer, MetalBufferPool,
-    AttentionParams, GemmParams, NormParams, RopeParams,
-    is_metal_available, get_device_info, MetalDeviceInfo,
-    tile_sizes, shader_source,
+    get_device_info, is_metal_available, shader_source, tile_sizes, AttentionParams, GemmParams,
+    MetalBuffer, MetalBufferPool, MetalConfig, MetalContext, MetalDeviceInfo, MetalPipelines,
+    NormParams, RopeParams,
 };
 
 /// RuvLLM engine configuration.
@@ -489,20 +731,14 @@ impl RuvLLMEngine {
     pub fn new(config: RuvLLMConfig) -> Result<Self> {
         let storage_path = &config.storage_path;
 
-        let policy_store = PolicyStore::new(
-            &format!("{}/policies", storage_path),
-            config.embedding_dim,
-        )?;
+        let policy_store =
+            PolicyStore::new(&format!("{}/policies", storage_path), config.embedding_dim)?;
 
-        let session_index = SessionIndex::new(
-            &format!("{}/sessions", storage_path),
-            config.embedding_dim,
-        )?;
+        let session_index =
+            SessionIndex::new(&format!("{}/sessions", storage_path), config.embedding_dim)?;
 
-        let witness_log = WitnessLog::new(
-            &format!("{}/witness", storage_path),
-            config.embedding_dim,
-        )?;
+        let witness_log =
+            WitnessLog::new(&format!("{}/witness", storage_path), config.embedding_dim)?;
 
         let session_manager = SessionManager::new(config.session.clone());
         let adapter_manager = AdapterManager::new();
@@ -583,7 +819,11 @@ impl RuvLLMEngine {
     ///     println!("Policy: {:?}, score: {}", policy.policy_type, policy.score);
     /// }
     /// ```
-    pub fn search_policies(&self, context_embedding: &[f32], limit: usize) -> Result<Vec<PolicyEntry>> {
+    pub fn search_policies(
+        &self,
+        context_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<PolicyEntry>> {
         self.policy_store.search(context_embedding, limit)
     }
 
@@ -621,7 +861,11 @@ impl RuvLLMEngine {
     }
 
     /// Search witness logs semantically
-    pub fn search_witness(&self, query_embedding: &[f32], limit: usize) -> Result<Vec<WitnessEntry>> {
+    pub fn search_witness(
+        &self,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<WitnessEntry>> {
         self.witness_log.search(query_embedding, limit)
     }
 
@@ -640,4 +884,3 @@ impl RuvLLMEngine {
         &self.policy_store
     }
 }
-

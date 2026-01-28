@@ -23,15 +23,15 @@
 //! - Time series pattern matching
 //! - Document similarity via word embedding distributions
 
-mod sliced_wasserstein;
-mod sinkhorn;
-mod gromov_wasserstein;
 mod config;
+mod gromov_wasserstein;
+mod sinkhorn;
+mod sliced_wasserstein;
 
-pub use sliced_wasserstein::SlicedWasserstein;
-pub use sinkhorn::{SinkhornSolver, TransportPlan};
-pub use gromov_wasserstein::GromovWasserstein;
 pub use config::WassersteinConfig;
+pub use gromov_wasserstein::GromovWasserstein;
+pub use sinkhorn::{SinkhornSolver, TransportPlan};
+pub use sliced_wasserstein::SlicedWasserstein;
 
 /// Trait for optimal transport distance computations
 pub trait OptimalTransport {

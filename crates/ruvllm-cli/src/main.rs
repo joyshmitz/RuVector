@@ -258,16 +258,19 @@ async fn main() -> anyhow::Result<()> {
             force,
             revision,
         } => {
-            download::run(&model, &quantization, force, revision.as_deref(), &cache_dir).await
+            download::run(
+                &model,
+                &quantization,
+                force,
+                revision.as_deref(),
+                &cache_dir,
+            )
+            .await
         }
 
-        Commands::List { downloaded, long } => {
-            list::run(downloaded, long, &cache_dir).await
-        }
+        Commands::List { downloaded, long } => list::run(downloaded, long, &cache_dir).await,
 
-        Commands::Info { model } => {
-            info::run(&model, &cache_dir).await
-        }
+        Commands::Info { model } => info::run(&model, &cache_dir).await,
 
         Commands::Serve {
             model,

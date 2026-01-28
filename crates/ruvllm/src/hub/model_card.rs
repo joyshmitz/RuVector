@@ -132,8 +132,14 @@ impl ModelCard {
         // Model details
         content.push_str("## Model Details\n\n");
         content.push_str(&format!("- **Architecture**: {}\n", self.architecture));
-        content.push_str(&format!("- **Parameters**: {}\n", format_params(self.parameters)));
-        content.push_str(&format!("- **Context Length**: {} tokens\n", self.context_length));
+        content.push_str(&format!(
+            "- **Parameters**: {}\n",
+            format_params(self.parameters)
+        ));
+        content.push_str(&format!(
+            "- **Context Length**: {} tokens\n",
+            self.context_length
+        ));
         content.push_str(&format!("- **Framework**: {:?}\n", self.framework));
         content.push_str(&format!("- **Task**: {:?}\n\n", self.task));
 
@@ -176,7 +182,10 @@ impl ModelCard {
         content.push_str("```rust\n");
         content.push_str("use ruvllm::hub::ModelDownloader;\n\n");
         content.push_str("let downloader = ModelDownloader::new();\n");
-        content.push_str(&format!("let path = downloader.download_by_id(\"{}\")?;\n", self.name.to_lowercase()));
+        content.push_str(&format!(
+            "let path = downloader.download_by_id(\"{}\")?;\n",
+            self.name.to_lowercase()
+        ));
         content.push_str("```\n\n");
 
         // Additional metadata

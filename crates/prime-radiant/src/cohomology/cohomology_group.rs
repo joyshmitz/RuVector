@@ -266,9 +266,7 @@ impl CohomologyComputer {
         let (rref, pivot_cols) = self.row_reduce(matrix);
 
         let n_cols = matrix.ncols();
-        let free_vars: Vec<usize> = (0..n_cols)
-            .filter(|c| !pivot_cols.contains(c))
-            .collect();
+        let free_vars: Vec<usize> = (0..n_cols).filter(|c| !pivot_cols.contains(c)).collect();
 
         for &free_var in &free_vars {
             let mut kernel_vec = Array1::zeros(n_cols);
@@ -411,10 +409,8 @@ impl CohomologyComputer {
         }
 
         // Build index to simplex ID map
-        let idx_to_simplex: HashMap<usize, SimplexId> = simplex_to_idx
-            .iter()
-            .map(|(&id, &idx)| (idx, id))
-            .collect();
+        let idx_to_simplex: HashMap<usize, SimplexId> =
+            simplex_to_idx.iter().map(|(&id, &idx)| (idx, id)).collect();
 
         // If no image, all kernel elements are generators
         if image.is_empty() {
@@ -486,9 +482,7 @@ impl CohomologyComputer {
     /// Compute all cohomology groups up to max_dimension
     pub fn compute_all(&mut self) -> Vec<CohomologyGroup> {
         let max_dim = self.config.max_dimension.min(self.complex.max_dimension);
-        (0..=max_dim)
-            .map(|n| self.compute_cohomology(n))
-            .collect()
+        (0..=max_dim).map(|n| self.compute_cohomology(n)).collect()
     }
 
     /// Compute Betti numbers

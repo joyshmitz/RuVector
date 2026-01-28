@@ -726,7 +726,9 @@ self.postMessage({ type: 'WorkerReady', worker_id: -1 });
 
         // Allocate shared memory
         let total_size = (a.len() + b.len() + m * n) * std::mem::size_of::<f32>();
-        self.shared_buffers.borrow_mut().ensure_capacity(total_size)?;
+        self.shared_buffers
+            .borrow_mut()
+            .ensure_capacity(total_size)?;
 
         let buffer = self
             .shared_buffers
@@ -790,11 +792,8 @@ self.postMessage({ type: 'WorkerReady', worker_id: -1 });
         self.wait_for_tasks(&task_ids).await?;
 
         // Read result from shared buffer
-        let result_view = Float32Array::new_with_byte_offset_and_length(
-            &buffer,
-            c_offset as u32,
-            (m * n) as u32,
-        );
+        let result_view =
+            Float32Array::new_with_byte_offset_and_length(&buffer, c_offset as u32, (m * n) as u32);
         Ok(result_view.to_vec())
     }
 
@@ -894,7 +893,9 @@ self.postMessage({ type: 'WorkerReady', worker_id: -1 });
         let tensor_size = num_heads * seq_len * head_dim;
         let total_size = tensor_size * 4 * std::mem::size_of::<f32>();
 
-        self.shared_buffers.borrow_mut().ensure_capacity(total_size)?;
+        self.shared_buffers
+            .borrow_mut()
+            .ensure_capacity(total_size)?;
 
         let buffer = self
             .shared_buffers
@@ -1003,7 +1004,9 @@ self.postMessage({ type: 'WorkerReady', worker_id: -1 });
         let num_workers = self.worker_count();
         let total_size = (input.len() + gamma.len() * 2 + input.len()) * std::mem::size_of::<f32>();
 
-        self.shared_buffers.borrow_mut().ensure_capacity(total_size)?;
+        self.shared_buffers
+            .borrow_mut()
+            .ensure_capacity(total_size)?;
 
         let buffer = self
             .shared_buffers
@@ -1016,7 +1019,10 @@ self.postMessage({ type: 'WorkerReady', worker_id: -1 });
         let view = Float32Array::new(&buffer);
         view.set(&Float32Array::from(input), 0);
         view.set(&Float32Array::from(gamma), input.len() as u32);
-        view.set(&Float32Array::from(beta), (input.len() + gamma.len()) as u32);
+        view.set(
+            &Float32Array::from(beta),
+            (input.len() + gamma.len()) as u32,
+        );
 
         let input_offset = 0;
         let gamma_offset = input.len() * std::mem::size_of::<f32>();

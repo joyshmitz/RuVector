@@ -52,18 +52,16 @@
 //! ```
 
 use crate::error::{Result, RuvLLMError};
-use crate::kernels::{
-    apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig,
-};
 use crate::kernels::rope::{precompute_rope_tables_with_config, RopeConfig, RopeTables};
+use crate::kernels::{apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig};
 use crate::sona::{SonaConfig, SonaIntegration, Trajectory};
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 // =============================================================================
 // ANE Optimization Configuration
@@ -242,14 +240,14 @@ impl RuvLtraConfig {
             intermediate_size: 4864,
             num_hidden_layers: 24,
             num_attention_heads: 14,
-            num_kv_heads: 2,           // GQA ratio 7:1
+            num_kv_heads: 2, // GQA ratio 7:1
             vocab_size: 151936,
             max_position_embeddings: 32768,
-            rope_theta: 1000000.0,     // Qwen uses 1M base
+            rope_theta: 1000000.0, // Qwen uses 1M base
             rms_norm_eps: 1e-6,
-            head_dim: 64,              // 896 / 14 = 64
+            head_dim: 64, // 896 / 14 = 64
             use_flash_attention: true,
-            sliding_window: None,      // Qwen 0.5B uses full attention
+            sliding_window: None, // Qwen 0.5B uses full attention
             bos_token_id: 151643,
             eos_token_id: 151645,
             pad_token_id: 151643,
@@ -316,7 +314,7 @@ impl RuvLtraConfig {
     /// Create a minimal test configuration
     pub fn tiny() -> Self {
         Self {
-            hidden_size: 768,          // Minimum for ANE optimization
+            hidden_size: 768, // Minimum for ANE optimization
             intermediate_size: 2048,
             num_hidden_layers: 4,
             num_attention_heads: 12,
@@ -406,12 +404,16 @@ impl RuvLtraConfig {
     /// Estimate total model parameters
     pub fn estimate_params(&self) -> usize {
         let embed_params = self.vocab_size * self.hidden_size;
-        let attn_params = self.num_hidden_layers * (
-            4 * self.hidden_size * self.hidden_size  // QKV + O projections
-        );
-        let mlp_params = self.num_hidden_layers * (
-            3 * self.hidden_size * self.intermediate_size  // gate, up, down
-        );
+        let attn_params = self.num_hidden_layers
+            * (
+                4 * self.hidden_size * self.hidden_size
+                // QKV + O projections
+            );
+        let mlp_params = self.num_hidden_layers
+            * (
+                3 * self.hidden_size * self.intermediate_size
+                // gate, up, down
+            );
         let norm_params = (self.num_hidden_layers * 2 + 1) * self.hidden_size;
 
         embed_params + attn_params + mlp_params + norm_params
@@ -527,9 +529,20 @@ impl RuvLtraAttention {
         }
 
         // Project to Q, K, V
-        let mut query = self.linear_transform(hidden_states, &self.q_proj, hidden_size, hidden_size);
-        let mut key = self.linear_transform(hidden_states, &self.k_proj, hidden_size, num_kv_heads * head_dim);
-        let value = self.linear_transform(hidden_states, &self.v_proj, hidden_size, num_kv_heads * head_dim);
+        let mut query =
+            self.linear_transform(hidden_states, &self.q_proj, hidden_size, hidden_size);
+        let mut key = self.linear_transform(
+            hidden_states,
+            &self.k_proj,
+            hidden_size,
+            num_kv_heads * head_dim,
+        );
+        let value = self.linear_transform(
+            hidden_states,
+            &self.v_proj,
+            hidden_size,
+            num_kv_heads * head_dim,
+        );
 
         // Apply RoPE to Q and K
         self.apply_rope(&mut query, positions, num_heads, head_dim);
@@ -569,22 +582,23 @@ impl RuvLtraAttention {
                 }
 
                 // Apply sliding window if configured
-                let (k_slice, v_slice, _effective_kv_len) = if let Some(window) = self.config.sliding_window {
-                    let pos = positions[t];
-                    let start = pos.saturating_sub(window);
-                    if start > 0 {
-                        let start_offset = start * head_dim;
-                        (
-                            k_slice[start_offset..].to_vec(),
-                            v_slice[start_offset..].to_vec(),
-                            kv_len - start,
-                        )
+                let (k_slice, v_slice, _effective_kv_len) =
+                    if let Some(window) = self.config.sliding_window {
+                        let pos = positions[t];
+                        let start = pos.saturating_sub(window);
+                        if start > 0 {
+                            let start_offset = start * head_dim;
+                            (
+                                k_slice[start_offset..].to_vec(),
+                                v_slice[start_offset..].to_vec(),
+                                kv_len - start,
+                            )
+                        } else {
+                            (k_slice, v_slice, kv_len)
+                        }
                     } else {
                         (k_slice, v_slice, kv_len)
-                    }
-                } else {
-                    (k_slice, v_slice, kv_len)
-                };
+                    };
 
                 // Flash attention
                 let head_output = flash_attention_neon(q_slice, &k_slice, &v_slice, scale, true);
@@ -608,14 +622,25 @@ impl RuvLtraAttention {
             for t in 0..seq_len {
                 let offset = (t * num_heads + h) * head_dim;
                 let mut head_vec = x[offset..offset + head_dim].to_vec();
-                apply_rope_neon(&mut head_vec, &[positions[t]], head_dim, self.config.rope_theta);
+                apply_rope_neon(
+                    &mut head_vec,
+                    &[positions[t]],
+                    head_dim,
+                    self.config.rope_theta,
+                );
                 x[offset..offset + head_dim].copy_from_slice(&head_vec);
             }
         }
     }
 
     /// Linear transformation with ANE-aware tiling
-    fn linear_transform(&self, input: &[f32], weights: &[f32], in_dim: usize, out_dim: usize) -> Vec<f32> {
+    fn linear_transform(
+        &self,
+        input: &[f32],
+        weights: &[f32],
+        in_dim: usize,
+        out_dim: usize,
+    ) -> Vec<f32> {
         let batch_size = input.len() / in_dim;
         let mut output = vec![0.0; batch_size * out_dim];
 
@@ -752,11 +777,21 @@ impl RuvLtraMLP {
     /// SwiGLU: down_proj(SiLU(gate_proj(x)) * up_proj(x))
     pub fn forward(&self, hidden_states: &[f32]) -> Result<Vec<f32>> {
         // Gate projection + SiLU activation
-        let gate = self.linear(hidden_states, &self.gate_proj, self.hidden_size, self.intermediate_size);
+        let gate = self.linear(
+            hidden_states,
+            &self.gate_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
         let gate_activated = self.silu(&gate);
 
         // Up projection
-        let up = self.linear(hidden_states, &self.up_proj, self.hidden_size, self.intermediate_size);
+        let up = self.linear(
+            hidden_states,
+            &self.up_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
 
         // Element-wise multiply (gating)
         let hidden: Vec<f32> = gate_activated
@@ -766,7 +801,12 @@ impl RuvLtraMLP {
             .collect();
 
         // Down projection
-        let output = self.linear(&hidden, &self.down_proj, self.intermediate_size, self.hidden_size);
+        let output = self.linear(
+            &hidden,
+            &self.down_proj,
+            self.intermediate_size,
+            self.hidden_size,
+        );
 
         Ok(output)
     }
@@ -943,7 +983,9 @@ impl RuvLtraModel {
         }
 
         let sona = if config.sona_enabled {
-            Some(Arc::new(RwLock::new(SonaIntegration::new(config.sona_config.clone()))))
+            Some(Arc::new(RwLock::new(SonaIntegration::new(
+                config.sona_config.clone(),
+            ))))
         } else {
             None
         };
@@ -962,9 +1004,9 @@ impl RuvLtraModel {
     /// Enable SONA pretraining integration
     pub fn enable_sona_pretraining(&mut self) -> Result<()> {
         if self.sona.is_none() {
-            self.sona = Some(Arc::new(RwLock::new(
-                SonaIntegration::new(self.config.sona_config.clone())
-            )));
+            self.sona = Some(Arc::new(RwLock::new(SonaIntegration::new(
+                self.config.sona_config.clone(),
+            ))));
         }
         Ok(())
     }
@@ -1009,7 +1051,8 @@ impl RuvLtraModel {
                     token_id
                 )));
             }
-            hidden_states.extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
+            hidden_states
+                .extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
         }
 
         // Process through decoder layers
@@ -1036,9 +1079,9 @@ impl RuvLtraModel {
         let lm_weights = if self.tie_word_embeddings {
             &self.embed_tokens
         } else {
-            self.lm_head.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No LM head weights".to_string())
-            })?
+            self.lm_head
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No LM head weights".to_string()))?
         };
 
         // Compute logits
@@ -1066,10 +1109,13 @@ impl RuvLtraModel {
     }
 
     /// Get routing recommendation from SONA
-    pub fn get_routing_recommendation(&self, query_embedding: &[f32]) -> Option<crate::sona::RoutingRecommendation> {
-        self.sona.as_ref().map(|sona| {
-            sona.read().get_routing_recommendation(query_embedding)
-        })
+    pub fn get_routing_recommendation(
+        &self,
+        query_embedding: &[f32],
+    ) -> Option<crate::sona::RoutingRecommendation> {
+        self.sona
+            .as_ref()
+            .map(|sona| sona.read().get_routing_recommendation(query_embedding))
     }
 
     /// Get model info
@@ -1190,12 +1236,14 @@ impl AneDispatcher {
 
     /// Record an ANE operation
     pub fn record_ane_op(&self) {
-        self.ane_ops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.ane_ops
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record a GPU operation
     pub fn record_gpu_op(&self) {
-        self.gpu_ops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.gpu_ops
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get dispatch statistics
@@ -1258,7 +1306,10 @@ mod tests {
         let model = RuvLtraModel::new(&config).unwrap();
 
         assert_eq!(model.layers.len(), 4);
-        assert_eq!(model.embed_tokens.len(), config.vocab_size * config.hidden_size);
+        assert_eq!(
+            model.embed_tokens.len(),
+            config.vocab_size * config.hidden_size
+        );
     }
 
     #[test]
@@ -1284,7 +1335,8 @@ mod tests {
             ("user".to_string(), "How are you?".to_string()),
         ];
 
-        let template = RuvLtraModel::apply_chat_template(&messages, Some("You are a helpful assistant."));
+        let template =
+            RuvLtraModel::apply_chat_template(&messages, Some("You are a helpful assistant."));
 
         assert!(template.contains("<|im_start|>system"));
         assert!(template.contains("<|im_start|>user"));

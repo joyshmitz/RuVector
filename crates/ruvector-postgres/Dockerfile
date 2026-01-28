@@ -87,7 +87,7 @@ FROM postgres:17-bookworm
 # Labels
 LABEL maintainer="ruvector team"
 LABEL description="PostgreSQL with ruvector extension - high-performance vector similarity search with local embeddings"
-LABEL version="0.2.7"
+LABEL version="2.0.1"
 
 # Set embedding model cache path - models are pre-downloaded during build
 # FASTEMBED_CACHE_DIR is the correct env var for fastembed-rs

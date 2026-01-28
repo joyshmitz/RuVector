@@ -300,7 +300,8 @@ impl TileState {
             }
             DeltaTag::WeightUpdate => {
                 let wu = unsafe { delta.get_weight_update() };
-                self.graph.update_weight(wu.source, wu.target, wu.new_weight);
+                self.graph
+                    .update_weight(wu.source, wu.target, wu.new_weight);
             }
             DeltaTag::Observation => {
                 let obs = unsafe { *delta.get_observation() };
@@ -356,12 +357,8 @@ impl TileState {
             min_degree as u16 * 100 // weight scale factor
         };
 
-        let mut fragment = WitnessFragment::new(
-            seed,
-            boundary,
-            self.graph.num_vertices,
-            local_min_cut,
-        );
+        let mut fragment =
+            WitnessFragment::new(seed, boundary, self.graph.num_vertices, local_min_cut);
         fragment.component = self.graph.num_components;
         fragment.compute_hash();
 

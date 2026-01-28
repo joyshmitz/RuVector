@@ -26,11 +26,8 @@
 //! ```
 
 use crate::error::{Result, RuvLLMError};
-use crate::kernels::{
-    apply_rope_neon, flash_attention_neon, rms_norm_neon,
-    AttentionConfig,
-};
-use crate::kernels::rope::{RopeConfig, precompute_rope_tables_with_config, RopeTables};
+use crate::kernels::rope::{precompute_rope_tables_with_config, RopeConfig, RopeTables};
+use crate::kernels::{apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig};
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
@@ -292,7 +289,8 @@ impl Phi3Attention {
         }
 
         // Project to Q, K, V
-        let mut query = self.linear_transform(hidden_states, &self.q_proj, hidden_size, hidden_size);
+        let mut query =
+            self.linear_transform(hidden_states, &self.q_proj, hidden_size, hidden_size);
         let mut key = self.linear_transform(hidden_states, &self.k_proj, hidden_size, hidden_size);
         let value = self.linear_transform(hidden_states, &self.v_proj, hidden_size, hidden_size);
 
@@ -331,23 +329,24 @@ impl Phi3Attention {
                 }
 
                 // Apply sliding window if configured
-                let (k_slice, v_slice, effective_kv_len) = if let Some(window) = self.config.sliding_window {
-                    let pos = positions[t];
-                    let start = pos.saturating_sub(window);
-                    let end = kv_len;
-                    if start > 0 {
-                        let start_offset = start * head_dim;
-                        (
-                            k_slice[start_offset..].to_vec(),
-                            v_slice[start_offset..].to_vec(),
-                            end - start,
-                        )
+                let (k_slice, v_slice, effective_kv_len) =
+                    if let Some(window) = self.config.sliding_window {
+                        let pos = positions[t];
+                        let start = pos.saturating_sub(window);
+                        let end = kv_len;
+                        if start > 0 {
+                            let start_offset = start * head_dim;
+                            (
+                                k_slice[start_offset..].to_vec(),
+                                v_slice[start_offset..].to_vec(),
+                                end - start,
+                            )
+                        } else {
+                            (k_slice, v_slice, kv_len)
+                        }
                     } else {
                         (k_slice, v_slice, kv_len)
-                    }
-                } else {
-                    (k_slice, v_slice, kv_len)
-                };
+                    };
 
                 // Flash attention
                 let head_output = flash_attention_neon(q_slice, &k_slice, &v_slice, scale, true);
@@ -378,7 +377,12 @@ impl Phi3Attention {
 
                 // Scale position by scaling factor for SuRoPE
                 let scaled_pos = (positions[t] as f32 / self.config.rope_scaling_factor) as usize;
-                apply_rope_neon(&mut head_vec, &[scaled_pos], head_dim, self.config.rope_theta);
+                apply_rope_neon(
+                    &mut head_vec,
+                    &[scaled_pos],
+                    head_dim,
+                    self.config.rope_theta,
+                );
 
                 x[offset..offset + head_dim].copy_from_slice(&head_vec);
             }
@@ -386,7 +390,13 @@ impl Phi3Attention {
     }
 
     /// Linear transformation: output = input @ weights.T
-    fn linear_transform(&self, input: &[f32], weights: &[f32], in_dim: usize, out_dim: usize) -> Vec<f32> {
+    fn linear_transform(
+        &self,
+        input: &[f32],
+        weights: &[f32],
+        in_dim: usize,
+        out_dim: usize,
+    ) -> Vec<f32> {
         let batch_size = input.len() / in_dim;
         let mut output = vec![0.0; batch_size * out_dim];
 
@@ -452,7 +462,9 @@ impl Phi3MLP {
             || up_proj.len() != gate_up_size
             || down_proj.len() != down_size
         {
-            return Err(RuvLLMError::Model("Invalid MLP weight dimensions".to_string()));
+            return Err(RuvLLMError::Model(
+                "Invalid MLP weight dimensions".to_string(),
+            ));
         }
 
         self.gate_proj.copy_from_slice(gate_proj);
@@ -467,11 +479,21 @@ impl Phi3MLP {
         let batch_size = hidden_states.len() / self.hidden_size;
 
         // Gate projection + SiLU
-        let gate = self.linear(hidden_states, &self.gate_proj, self.hidden_size, self.intermediate_size);
+        let gate = self.linear(
+            hidden_states,
+            &self.gate_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
         let gate_activated = self.silu(&gate);
 
         // Up projection
-        let up = self.linear(hidden_states, &self.up_proj, self.hidden_size, self.intermediate_size);
+        let up = self.linear(
+            hidden_states,
+            &self.up_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
 
         // Element-wise multiply (gating)
         let hidden: Vec<f32> = gate_activated
@@ -481,7 +503,12 @@ impl Phi3MLP {
             .collect();
 
         // Down projection
-        let output = self.linear(&hidden, &self.down_proj, self.intermediate_size, self.hidden_size);
+        let output = self.linear(
+            &hidden,
+            &self.down_proj,
+            self.intermediate_size,
+            self.hidden_size,
+        );
 
         Ok(output)
     }
@@ -714,7 +741,8 @@ impl Phi3Model {
                     token_id
                 )));
             }
-            hidden_states.extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
+            hidden_states
+                .extend_from_slice(&self.embed_tokens[offset..offset + self.config.hidden_size]);
         }
 
         // Process through decoder layers
@@ -741,9 +769,9 @@ impl Phi3Model {
         let lm_weights = if self.tie_word_embeddings {
             &self.embed_tokens
         } else {
-            self.lm_head.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No LM head weights".to_string())
-            })?
+            self.lm_head
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No LM head weights".to_string()))?
         };
 
         // Compute logits
@@ -780,14 +808,18 @@ impl Phi3Model {
     #[cfg(feature = "candle")]
     pub fn from_gguf(_path: &std::path::Path) -> Result<Self> {
         // Implementation would parse GGUF and load weights
-        Err(RuvLLMError::NotFound("GGUF loading not yet implemented for Phi-3".to_string()))
+        Err(RuvLLMError::NotFound(
+            "GGUF loading not yet implemented for Phi-3".to_string(),
+        ))
     }
 
     /// Load model weights from safetensors format
     #[cfg(feature = "candle")]
     pub fn from_safetensors(_path: &std::path::Path) -> Result<Self> {
         // Implementation would parse safetensors and load weights
-        Err(RuvLLMError::NotFound("Safetensors loading not yet implemented for Phi-3".to_string()))
+        Err(RuvLLMError::NotFound(
+            "Safetensors loading not yet implemented for Phi-3".to_string(),
+        ))
     }
 }
 
@@ -843,7 +875,10 @@ mod tests {
         let model = Phi3Model::new(&config).unwrap();
 
         assert_eq!(model.layers.len(), 32);
-        assert_eq!(model.embed_tokens.len(), config.vocab_size * config.hidden_size);
+        assert_eq!(
+            model.embed_tokens.len(),
+            config.vocab_size * config.hidden_size
+        );
     }
 
     #[test]

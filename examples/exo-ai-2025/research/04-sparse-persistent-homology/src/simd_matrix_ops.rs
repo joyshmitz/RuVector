@@ -79,12 +79,7 @@ pub fn batch_correlation_matrix_simd(time_series: &[Vec<f32>]) -> Vec<Vec<f64>> 
             }
 
             // Compute covariance with SIMD (if available)
-            let cov = compute_covariance_simd(
-                &time_series[i],
-                &time_series[j],
-                means[i],
-                means[j],
-            );
+            let cov = compute_covariance_simd(&time_series[i], &time_series[j], means[i], means[j]);
 
             let corr = cov / (stds[i] * stds[j]);
             corr_matrix[i][j] = corr as f64;
@@ -249,12 +244,8 @@ pub fn correlation_distance_matrix_fused(time_series: &[Vec<f32>]) -> Vec<Vec<f6
                 continue;
             }
 
-            let cov = compute_covariance_simd(
-                &time_series[i],
-                &time_series[j],
-                stats[i].0,
-                stats[j].0,
-            );
+            let cov =
+                compute_covariance_simd(&time_series[i], &time_series[j], stats[i].0, stats[j].0);
 
             let corr = cov / (stats[i].1 * stats[j].1);
             let dist = 1.0 - corr.abs() as f64;

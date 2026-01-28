@@ -13,8 +13,8 @@
 
 use crate::error::{Result, RuvLLMError};
 use chrono::{DateTime, Utc};
-use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
 use ruvector_core::types::DbOptions;
+use ruvector_core::{AgenticDB, SearchQuery, VectorEntry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -165,7 +165,7 @@ impl Default for RouterPolicy {
     fn default() -> Self {
         Self {
             cell_weights: vec![0.0; 128 * 128], // Placeholder
-            head_biases: vec![0.0; 4],           // 4 model sizes
+            head_biases: vec![0.0; 4],          // 4 model sizes
             ewc_lambda: 0.1,
             training_loss: 0.0,
             learning_rate: 0.001,
@@ -190,8 +190,7 @@ impl PolicyStore {
         options.storage_path = storage_path.to_string();
         options.dimensions = embedding_dim;
 
-        let db = AgenticDB::new(options)
-            .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
+        let db = AgenticDB::new(options).map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         Ok(Self {
             db,
@@ -206,11 +205,23 @@ impl PolicyStore {
 
         // Create metadata
         let mut metadata = HashMap::new();
-        metadata.insert("policy_type".to_string(), serde_json::json!(entry.policy_type.as_str()));
-        metadata.insert("confidence".to_string(), serde_json::json!(entry.confidence));
-        metadata.insert("source".to_string(), serde_json::json!(entry.source.as_str()));
+        metadata.insert(
+            "policy_type".to_string(),
+            serde_json::json!(entry.policy_type.as_str()),
+        );
+        metadata.insert(
+            "confidence".to_string(),
+            serde_json::json!(entry.confidence),
+        );
+        metadata.insert(
+            "source".to_string(),
+            serde_json::json!(entry.source.as_str()),
+        );
         metadata.insert("parameters".to_string(), entry.parameters.clone());
-        metadata.insert("created_at".to_string(), serde_json::json!(entry.created_at.to_rfc3339()));
+        metadata.insert(
+            "created_at".to_string(),
+            serde_json::json!(entry.created_at.to_rfc3339()),
+        );
         metadata.insert("tags".to_string(), serde_json::json!(entry.tags));
 
         if let Some(ref fisher) = entry.fisher_diagonal {
@@ -225,7 +236,8 @@ impl PolicyStore {
         };
 
         // Store in Ruvector
-        self.db.insert(vector_entry)
+        self.db
+            .insert(vector_entry)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         // Update cache
@@ -243,14 +255,17 @@ impl PolicyStore {
             ef_search: None,
         };
 
-        let results = self.db.search(query)
+        let results = self
+            .db
+            .search(query)
             .map_err(|e| RuvLLMError::Storage(e.to_string()))?;
 
         let mut entries = Vec::with_capacity(results.len());
 
         for result in results {
             if let Some(metadata) = &result.metadata {
-                if let Some(entry) = self.entry_from_metadata(&result.id, query_embedding, metadata) {
+                if let Some(entry) = self.entry_from_metadata(&result.id, query_embedding, metadata)
+                {
                     entries.push(entry);
                 }
             }
@@ -270,7 +285,8 @@ impl PolicyStore {
 
     /// Search by policy type
     pub fn search_by_type(&self, policy_type: &PolicyType, limit: usize) -> Vec<PolicyEntry> {
-        self.cache.iter()
+        self.cache
+            .iter()
             .filter(|e| &e.policy_type == policy_type)
             .map(|e| e.clone())
             .take(limit)
@@ -334,16 +350,24 @@ impl PolicyStore {
     pub fn stats(&self) -> PolicyStoreStats {
         PolicyStoreStats {
             total_policies: self.cache.len(),
-            quantization_policies: self.cache.iter()
+            quantization_policies: self
+                .cache
+                .iter()
                 .filter(|e| e.policy_type == PolicyType::Quantization)
                 .count(),
-            router_policies: self.cache.iter()
+            router_policies: self
+                .cache
+                .iter()
                 .filter(|e| e.policy_type == PolicyType::Router)
                 .count(),
-            ewc_policies: self.cache.iter()
+            ewc_policies: self
+                .cache
+                .iter()
                 .filter(|e| e.policy_type == PolicyType::Ewc)
                 .count(),
-            pattern_policies: self.cache.iter()
+            pattern_policies: self
+                .cache
+                .iter()
                 .filter(|e| e.policy_type == PolicyType::Pattern)
                 .count(),
         }
@@ -366,16 +390,28 @@ impl PolicyStore {
 
         let parameters = metadata.get("parameters")?.clone();
         let created_at_str = metadata.get("created_at")?.as_str()?;
-        let created_at = DateTime::parse_from_rfc3339(created_at_str).ok()?.with_timezone(&Utc);
+        let created_at = DateTime::parse_from_rfc3339(created_at_str)
+            .ok()?
+            .with_timezone(&Utc);
 
-        let tags: Vec<String> = metadata.get("tags")
+        let tags: Vec<String> = metadata
+            .get("tags")
             .and_then(|t| t.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let fisher_diagonal: Option<Vec<f32>> = metadata.get("fisher_diagonal")
+        let fisher_diagonal: Option<Vec<f32>> = metadata
+            .get("fisher_diagonal")
             .and_then(|f| f.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect());
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_f64().map(|f| f as f32))
+                    .collect()
+            });
 
         Some(PolicyEntry {
             id: uuid,
@@ -415,7 +451,10 @@ mod tests {
     fn test_policy_type() {
         assert_eq!(PolicyType::Quantization.as_str(), "quantization");
         assert_eq!(PolicyType::Router.as_str(), "router");
-        assert_eq!(PolicyType::from_str("quantization"), Some(PolicyType::Quantization));
+        assert_eq!(
+            PolicyType::from_str("quantization"),
+            Some(PolicyType::Quantization)
+        );
     }
 
     #[test]

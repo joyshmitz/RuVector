@@ -445,9 +445,8 @@ impl GraphState {
                         }
                         PropertyOp::VectorDelta(vd) => {
                             if let Some(PropertyValue::Vector(v)) = props.get_mut(&prop_delta.key) {
-                                vd.apply(v).map_err(|e| {
-                                    GraphDeltaError::DeltaError(format!("{:?}", e))
-                                })?;
+                                vd.apply(v)
+                                    .map_err(|e| GraphDeltaError::DeltaError(format!("{:?}", e)))?;
                             }
                         }
                     }
@@ -533,10 +532,7 @@ mod tests {
 
     #[test]
     fn test_delta_compose() {
-        let d1 = GraphDeltaBuilder::new()
-            .add_node("a")
-            .add_node("b")
-            .build();
+        let d1 = GraphDeltaBuilder::new().add_node("a").add_node("b").build();
 
         let d2 = GraphDeltaBuilder::new()
             .remove_node("b")

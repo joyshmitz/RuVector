@@ -47,31 +47,20 @@
 //!
 //! **Not for production use** - for research and validation only.
 
-pub mod quantum_cognitive_state;
-pub mod interference_decision;
 pub mod collapse_attention;
+pub mod interference_decision;
+pub mod quantum_cognitive_state;
 pub mod simd_ops;
 
 // Re-export main types
 pub use quantum_cognitive_state::{
-    CognitiveState,
-    Amplitude,
-    SuperpositionBuilder,
-    tensor_product,
-    interference_visibility,
+    interference_visibility, tensor_product, Amplitude, CognitiveState, SuperpositionBuilder,
 };
 
-pub use interference_decision::{
-    InterferenceDecisionMaker,
-    interference_pattern,
-    semantic_phase,
-};
+pub use interference_decision::{interference_pattern, semantic_phase, InterferenceDecisionMaker};
 
 pub use collapse_attention::{
-    AttentionOperator,
-    DecoherenceModel,
-    ConsciousnessThreshold,
-    quantum_zeno_effect,
+    quantum_zeno_effect, AttentionOperator, ConsciousnessThreshold, DecoherenceModel,
 };
 
 /// CAFT version and theoretical framework info
@@ -94,13 +83,13 @@ mod integration_tests {
 
         // Make decision using interference
         let mut dm = InterferenceDecisionMaker::new(state.clone());
-        let (decision, prob, interference) = dm.two_alternative_choice(
-            "cooperate",
-            "defect",
-            std::f64::consts::PI / 4.0
-        );
+        let (decision, prob, interference) =
+            dm.two_alternative_choice("cooperate", "defect", std::f64::consts::PI / 4.0);
 
-        println!("Decision: {}, Probability: {}, Interference: {}", decision, prob, interference);
+        println!(
+            "Decision: {}, Probability: {}, Interference: {}",
+            decision, prob, interference
+        );
 
         // Apply attention
         let mut attention = AttentionOperator::full_attention(0, 2, 10.0);

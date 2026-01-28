@@ -2,7 +2,6 @@
 //!
 //! Efficient KL divergence for various distributions used in attention.
 
-
 /// Diagonal Gaussian parameters
 #[derive(Debug, Clone)]
 pub struct DiagonalGaussian {
@@ -157,10 +156,7 @@ mod tests {
 
     #[test]
     fn test_kl_nonzero() {
-        let g = DiagonalGaussian::new(
-            vec![1.0, 0.5, -0.5],
-            vec![0.5, 0.0, -0.5],
-        );
+        let g = DiagonalGaussian::new(vec![1.0, 0.5, -0.5], vec![0.5, 0.0, -0.5]);
         let kl = KLDivergence::gaussian_to_unit(&g);
         assert!(kl > 0.0);
     }
@@ -198,10 +194,7 @@ mod tests {
 
     #[test]
     fn test_sample() {
-        let g = DiagonalGaussian::new(
-            vec![0.0, 1.0],
-            vec![0.0, 0.0],
-        );
+        let g = DiagonalGaussian::new(vec![0.0, 1.0], vec![0.0, 0.0]);
         let epsilon = vec![0.0, 0.0];
 
         let z = g.sample(&epsilon);

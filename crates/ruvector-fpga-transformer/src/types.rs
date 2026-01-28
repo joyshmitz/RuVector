@@ -207,9 +207,9 @@ impl QuantSpec {
     /// Bytes per weight element
     pub const fn bytes_per_weight(&self) -> usize {
         match self.w_bits {
-            1 => 1,  // Packed 8 per byte, but minimum 1 byte
-            2 => 1,  // Packed 4 per byte
-            4 => 1,  // Packed 2 per byte
+            1 => 1, // Packed 8 per byte, but minimum 1 byte
+            2 => 1, // Packed 4 per byte
+            4 => 1, // Packed 2 per byte
             8 => 1,
             16 => 2,
             _ => 4,

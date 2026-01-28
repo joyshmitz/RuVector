@@ -41,18 +41,18 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub mod mamba;
 
-mod neural;
 mod dag;
 mod graph;
+mod neural;
 
 // ============================================================================
 // Re-exports for convenient access
 // ============================================================================
 
-pub use neural::*;
 pub use dag::*;
 pub use graph::*;
 pub use mamba::*;
+pub use neural::*;
 
 // ============================================================================
 // Initialization
@@ -97,14 +97,8 @@ pub fn available_mechanisms() -> JsValue {
             "parallel_branch".into(),
             "temporal_btsp".into(),
         ],
-        graph: vec![
-            "gat".into(),
-            "gcn".into(),
-            "graphsage".into(),
-        ],
-        ssm: vec![
-            "mamba".into(),
-        ],
+        graph: vec!["gat".into(), "gcn".into(), "graphsage".into()],
+        ssm: vec!["mamba".into()],
     };
     serde_wasm_bindgen::to_value(&mechanisms).unwrap()
 }
@@ -163,13 +157,25 @@ impl UnifiedAttention {
     pub fn new(mechanism: &str) -> Result<UnifiedAttention, JsError> {
         let valid_mechanisms = [
             // Neural
-            "scaled_dot_product", "multi_head", "hyperbolic", "linear",
-            "flash", "local_global", "moe",
+            "scaled_dot_product",
+            "multi_head",
+            "hyperbolic",
+            "linear",
+            "flash",
+            "local_global",
+            "moe",
             // DAG
-            "topological", "causal_cone", "critical_path", "mincut_gated",
-            "hierarchical_lorentz", "parallel_branch", "temporal_btsp",
+            "topological",
+            "causal_cone",
+            "critical_path",
+            "mincut_gated",
+            "hierarchical_lorentz",
+            "parallel_branch",
+            "temporal_btsp",
             // Graph
-            "gat", "gcn", "graphsage",
+            "gat",
+            "gcn",
+            "graphsage",
             // SSM
             "mamba",
         ];
@@ -196,11 +202,16 @@ impl UnifiedAttention {
     #[wasm_bindgen(getter)]
     pub fn category(&self) -> String {
         match self.mechanism_type.as_str() {
-            "scaled_dot_product" | "multi_head" | "hyperbolic" | "linear" |
-            "flash" | "local_global" | "moe" => "neural".to_string(),
+            "scaled_dot_product" | "multi_head" | "hyperbolic" | "linear" | "flash"
+            | "local_global" | "moe" => "neural".to_string(),
 
-            "topological" | "causal_cone" | "critical_path" | "mincut_gated" |
-            "hierarchical_lorentz" | "parallel_branch" | "temporal_btsp" => "dag".to_string(),
+            "topological"
+            | "causal_cone"
+            | "critical_path"
+            | "mincut_gated"
+            | "hierarchical_lorentz"
+            | "parallel_branch"
+            | "temporal_btsp" => "dag".to_string(),
 
             "gat" | "gcn" | "graphsage" => "graph".to_string(),
 
@@ -213,26 +224,35 @@ impl UnifiedAttention {
     /// Check if this mechanism supports sequence processing
     #[wasm_bindgen(js_name = supportsSequences)]
     pub fn supports_sequences(&self) -> bool {
-        matches!(self.mechanism_type.as_str(),
-            "scaled_dot_product" | "multi_head" | "linear" | "flash" |
-            "local_global" | "mamba"
+        matches!(
+            self.mechanism_type.as_str(),
+            "scaled_dot_product" | "multi_head" | "linear" | "flash" | "local_global" | "mamba"
         )
     }
 
     /// Check if this mechanism supports graph/DAG structures
     #[wasm_bindgen(js_name = supportsGraphs)]
     pub fn supports_graphs(&self) -> bool {
-        matches!(self.mechanism_type.as_str(),
-            "topological" | "causal_cone" | "critical_path" | "mincut_gated" |
-            "hierarchical_lorentz" | "parallel_branch" | "temporal_btsp" |
-            "gat" | "gcn" | "graphsage"
+        matches!(
+            self.mechanism_type.as_str(),
+            "topological"
+                | "causal_cone"
+                | "critical_path"
+                | "mincut_gated"
+                | "hierarchical_lorentz"
+                | "parallel_branch"
+                | "temporal_btsp"
+                | "gat"
+                | "gcn"
+                | "graphsage"
         )
     }
 
     /// Check if this mechanism supports hyperbolic geometry
     #[wasm_bindgen(js_name = supportsHyperbolic)]
     pub fn supports_hyperbolic(&self) -> bool {
-        matches!(self.mechanism_type.as_str(),
+        matches!(
+            self.mechanism_type.as_str(),
             "hyperbolic" | "hierarchical_lorentz"
         )
     }
@@ -248,7 +268,8 @@ pub fn cosine_similarity(a: Vec<f32>, b: Vec<f32>) -> Result<f32, JsError> {
     if a.len() != b.len() {
         return Err(JsError::new(&format!(
             "Vector dimensions must match: {} vs {}",
-            a.len(), b.len()
+            a.len(),
+            b.len()
         )));
     }
 
@@ -277,7 +298,8 @@ pub fn softmax(values: Vec<f32>) -> Vec<f32> {
 pub fn temperature_softmax(values: Vec<f32>, temperature: f32) -> Vec<f32> {
     if temperature <= 0.0 {
         // Return one-hot for the maximum
-        let max_idx = values.iter()
+        let max_idx = values
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)

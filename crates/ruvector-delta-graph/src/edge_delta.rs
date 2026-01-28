@@ -76,9 +76,7 @@ impl EdgeDelta {
 
     /// Check if empty
     pub fn is_empty(&self) -> bool {
-        self.property_deltas.is_empty()
-            && self.weight_delta.is_none()
-            && self.type_change.is_none()
+        self.property_deltas.is_empty() && self.weight_delta.is_none() && self.type_change.is_none()
     }
 
     /// Add a property set
@@ -161,7 +159,9 @@ impl EdgeDeltaBuilder {
 
     /// Set a property
     pub fn set(mut self, key: impl Into<String>, value: PropertyValue) -> Self {
-        self.delta.property_deltas.push(PropertyDelta::set(key, value));
+        self.delta
+            .property_deltas
+            .push(PropertyDelta::set(key, value));
         self
     }
 

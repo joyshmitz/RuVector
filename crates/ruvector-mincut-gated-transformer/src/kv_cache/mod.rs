@@ -67,26 +67,31 @@ extern crate alloc;
 pub mod legacy;
 
 // New three-tier KV cache modules
-pub mod tier;
 pub mod hot_buffer;
-pub mod quantized_store;
 pub mod kivi;
-pub mod squat;
 pub mod kvquant;
 pub mod manager;
-pub mod policy;
 pub mod metrics;
+pub mod policy;
+pub mod quantized_store;
+pub mod squat;
+pub mod tier;
 
 // Re-export legacy types for backward compatibility
 pub use legacy::{HadamardTransform, QuantBits, QuantizedKVCache};
 
 // Re-export new three-tier types
-pub use tier::{CacheTier, TierBoundary, TierConfig, TierCounts};
 pub use hot_buffer::{HotBuffer, HotBufferConfig};
-pub use quantized_store::{QuantizedStore, QuantizedEntry, DequantizedKV, QuantizedStoreConfig};
 pub use kivi::{KiviQuantizer, QuantScheme, QuantizedKV};
-pub use squat::{SQuatQuantizer, SQuatCompressed, QuantizedSubspace};
-pub use kvquant::{KVQuantQuantizer, KVQuantKeyMode, KVQuantValueMode, PreRoPEKey, QuantizedValue, CalibrationData};
+pub use kvquant::{
+    CalibrationData, KVQuantKeyMode, KVQuantQuantizer, KVQuantValueMode, PreRoPEKey, QuantizedValue,
+};
 pub use manager::{AdaptiveKVCache, AdaptiveKVCacheConfig, ArchiveQuantizer};
-pub use policy::{TierPolicy, RematerializationPolicy, EvictionDecision, MemoryTracker, RematerializationCostModel};
-pub use metrics::{QualityTracker, QualityMetric, QualityFeedback, MemoryStats, TierMetrics};
+pub use metrics::{MemoryStats, QualityFeedback, QualityMetric, QualityTracker, TierMetrics};
+pub use policy::{
+    EvictionDecision, MemoryTracker, RematerializationCostModel, RematerializationPolicy,
+    TierPolicy,
+};
+pub use quantized_store::{DequantizedKV, QuantizedEntry, QuantizedStore, QuantizedStoreConfig};
+pub use squat::{QuantizedSubspace, SQuatCompressed, SQuatQuantizer};
+pub use tier::{CacheTier, TierBoundary, TierConfig, TierCounts};

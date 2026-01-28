@@ -29,9 +29,7 @@ use wasm_bindgen::prelude::*;
 
 // Re-export the WASM engine from the main crate
 pub use ruvector_fpga_transformer::ffi::wasm_bindgen::{
-    WasmEngine,
-    micro_shape as microShape,
-    validate_artifact as validateArtifact,
+    micro_shape as microShape, validate_artifact as validateArtifact, WasmEngine,
 };
 
 /// Initialize the WASM module

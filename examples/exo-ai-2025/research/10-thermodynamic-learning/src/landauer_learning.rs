@@ -170,14 +170,20 @@ impl LandauerOptimizer {
 
     /// Information-theoretic gradient: weight by information content
     pub fn information_weighted_gradient(&self, gradient: &[f64], information: &[f64]) -> Vec<f64> {
-        gradient.iter()
+        gradient
+            .iter()
             .zip(information.iter())
             .map(|(g, i)| g * i)
             .collect()
     }
 
     /// Estimate mutual information between data and parameters
-    pub fn estimate_mutual_information(&self, data_entropy: f64, param_entropy: f64, joint_entropy: f64) -> f64 {
+    pub fn estimate_mutual_information(
+        &self,
+        data_entropy: f64,
+        param_entropy: f64,
+        joint_entropy: f64,
+    ) -> f64 {
         // I(D; θ) = H(D) + H(θ) - H(D, θ)
         data_entropy + param_entropy - joint_entropy
     }
@@ -354,7 +360,10 @@ impl SpeedEnergyTradeoff {
     pub fn new(temperature: f64) -> Self {
         // Minimum from uncertainty principle-like bound
         let min_product = constants::BOLTZMANN * temperature;
-        Self { min_product, temperature }
+        Self {
+            min_product,
+            temperature,
+        }
     }
 
     /// Minimum energy for given time constraint
@@ -487,8 +496,10 @@ pub fn example_thermodynamic_training() {
         optimizer.step(&gradient, &mut params);
 
         if epoch % 3 == 0 {
-            println!("Epoch {}: Energy dissipated = {:.3e} J",
-                epoch, optimizer.state.energy_dissipated);
+            println!(
+                "Epoch {}: Energy dissipated = {:.3e} J",
+                epoch, optimizer.state.energy_dissipated
+            );
         }
     }
 
@@ -499,5 +510,8 @@ pub fn example_thermodynamic_training() {
     let theoretical_min = constants::LANDAUER_LIMIT * bits_learned;
     println!("\nTheoretical minimum: {:.3e} J", theoretical_min);
     println!("Actual energy: {:.3e} J", optimizer.state.energy_dissipated);
-    println!("Efficiency: {:.2}x above Landauer limit", optimizer.state.landauer_multiple());
+    println!(
+        "Efficiency: {:.2}x above Landauer limit",
+        optimizer.state.landauer_multiple()
+    );
 }

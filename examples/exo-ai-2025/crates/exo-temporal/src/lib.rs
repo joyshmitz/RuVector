@@ -66,7 +66,10 @@ pub use anticipation::{
     anticipate, AnticipationHint, PrefetchCache, SequentialPatternTracker, TemporalPhase,
 };
 pub use causal::{CausalConeType, CausalGraph, CausalGraphStats};
-pub use consolidation::{compute_salience, compute_salience_batch, consolidate, ConsolidationConfig, ConsolidationResult, ConsolidationStats};
+pub use consolidation::{
+    compute_salience, compute_salience_batch, consolidate, ConsolidationConfig,
+    ConsolidationResult, ConsolidationStats,
+};
 pub use long_term::{LongTermConfig, LongTermStats, LongTermStore};
 pub use short_term::{ShortTermBuffer, ShortTermConfig, ShortTermStats};
 pub use types::*;
@@ -292,7 +295,8 @@ impl TemporalMemory {
 
     /// Strategic forgetting in long-term memory
     pub fn forget(&self) {
-        self.long_term.decay_low_salience(self.config.long_term.decay_rate);
+        self.long_term
+            .decay_low_salience(self.config.long_term.decay_rate);
     }
 
     /// Get causal graph reference
@@ -411,7 +415,10 @@ mod tests {
 
         // Consolidate to long-term
         let result = memory.consolidate();
-        assert!(result.num_consolidated >= 3, "Should consolidate all patterns");
+        assert!(
+            result.num_consolidated >= 3,
+            "Should consolidate all patterns"
+        );
 
         // Query with causal context - use p1's timestamp as reference for future cone
         let query = Query::from_embedding(vec![1.0, 0.0, 0.0]).with_origin(id1);
@@ -422,6 +429,9 @@ mod tests {
         );
 
         // Should find patterns in the causal future of p1
-        assert!(!results.is_empty(), "Should find causal descendants in future cone");
+        assert!(
+            !results.is_empty(),
+            "Should find causal descendants in future cone"
+        );
     }
 }

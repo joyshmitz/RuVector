@@ -239,9 +239,7 @@ impl TemporalSolver {
         let correct = if puzzle.solutions.is_empty() {
             true // No ground truth
         } else {
-            found_solutions
-                .iter()
-                .all(|s| puzzle.solutions.contains(s))
+            found_solutions.iter().all(|s| puzzle.solutions.contains(s))
                 && puzzle
                     .solutions
                     .iter()
@@ -408,10 +406,8 @@ impl BenchmarkResults {
         let solved = results.iter().filter(|r| r.solved).count();
         let correct = results.iter().filter(|r| r.correct).count();
         let avg_steps = results.iter().map(|r| r.steps as f64).sum::<f64>() / total as f64;
-        let avg_tools =
-            results.iter().map(|r| r.tool_calls as f64).sum::<f64>() / total as f64;
-        let avg_latency =
-            results.iter().map(|r| r.latency_ms as f64).sum::<f64>() / total as f64;
+        let avg_tools = results.iter().map(|r| r.tool_calls as f64).sum::<f64>() / total as f64;
+        let avg_latency = results.iter().map(|r| r.latency_ms as f64).sum::<f64>() / total as f64;
 
         Self {
             config,
@@ -528,15 +524,16 @@ impl AdaptiveSolver {
     /// Solve a puzzle with adaptive learning
     pub fn solve(&mut self, puzzle: &TemporalPuzzle) -> Result<SolverResult> {
         // Get constraint types for pattern matching
-        let constraint_types: Vec<String> = puzzle.constraints.iter()
+        let constraint_types: Vec<String> = puzzle
+            .constraints
+            .iter()
             .map(|c| constraint_type_name(c))
             .collect();
 
         // Get recommended strategy from ReasoningBank
-        self.current_strategy = self.reasoning_bank.get_strategy(
-            puzzle.difficulty,
-            &constraint_types,
-        );
+        self.current_strategy = self
+            .reasoning_bank
+            .get_strategy(puzzle.difficulty, &constraint_types);
 
         // Configure solver based on strategy
         self.solver.calendar_tool = self.current_strategy.use_rewriting;
@@ -552,7 +549,9 @@ impl AdaptiveSolver {
         trajectory.latency_ms = start.elapsed().as_millis() as u64;
 
         // Record attempt
-        let solution_str = result.solutions.first()
+        let solution_str = result
+            .solutions
+            .first()
             .map(|d| d.to_string())
             .unwrap_or_else(|| "none".to_string());
 
@@ -616,7 +615,10 @@ impl AdaptiveSolver {
         }
 
         // Adjust based on learned calibration
-        let calibrated_threshold = self.reasoning_bank.calibration.get_threshold(puzzle.difficulty);
+        let calibrated_threshold = self
+            .reasoning_bank
+            .calibration
+            .get_threshold(puzzle.difficulty);
         if confidence >= calibrated_threshold {
             confidence += 0.05;
         }

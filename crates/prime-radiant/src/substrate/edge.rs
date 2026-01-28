@@ -64,10 +64,12 @@ impl EdgeScratch {
     fn prepare(&mut self, dim: usize) {
         // Resize to exact dimension, reserving more capacity if needed
         if self.projected_source.capacity() < dim {
-            self.projected_source.reserve(dim - self.projected_source.len());
+            self.projected_source
+                .reserve(dim - self.projected_source.len());
         }
         if self.projected_target.capacity() < dim {
-            self.projected_target.reserve(dim - self.projected_target.len());
+            self.projected_target
+                .reserve(dim - self.projected_target.len());
         }
         if self.residual.capacity() < dim {
             self.residual.reserve(dim - self.residual.len());
@@ -256,8 +258,10 @@ impl SheafEdge {
             scratch.prepare(dim);
 
             // Apply restriction maps into scratch buffers
-            self.rho_source.apply_into(source_state, &mut scratch.projected_source);
-            self.rho_target.apply_into(target_state, &mut scratch.projected_target);
+            self.rho_source
+                .apply_into(source_state, &mut scratch.projected_source);
+            self.rho_target
+                .apply_into(target_state, &mut scratch.projected_target);
 
             // Compute residual in-place: r = projected_source - projected_target
             for i in 0..dim {
@@ -787,10 +791,8 @@ mod tests {
 
         // Second call with larger dim=5 (buffers should grow)
         let edge5 = SheafEdge::identity(source, target, 5);
-        let result5 = edge5.residual_norm_squared_no_alloc(
-            &[1.0, 2.0, 3.0, 4.0, 5.0],
-            &[0.0, 0.0, 0.0, 0.0, 0.0],
-        );
+        let result5 = edge5
+            .residual_norm_squared_no_alloc(&[1.0, 2.0, 3.0, 4.0, 5.0], &[0.0, 0.0, 0.0, 0.0, 0.0]);
         assert!((result5 - 55.0).abs() < 1e-10); // 1 + 4 + 9 + 16 + 25 = 55
 
         // Third call back to dim=3 (buffers should shrink length but keep capacity)

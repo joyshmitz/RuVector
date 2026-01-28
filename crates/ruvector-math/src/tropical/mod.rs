@@ -21,15 +21,15 @@
 //! - Neural networks with ReLU = tropical rational functions
 //! - Tropical geometry provides bounds on linear regions
 
-mod semiring;
-mod polynomial;
 mod matrix;
 mod neural_analysis;
+mod polynomial;
+mod semiring;
 
-pub use semiring::{Tropical, TropicalSemiring};
-pub use polynomial::{TropicalPolynomial, TropicalMonomial};
-pub use matrix::{TropicalMatrix, TropicalEigen, MinPlusMatrix};
+pub use matrix::{MinPlusMatrix, TropicalEigen, TropicalMatrix};
 pub use neural_analysis::{LinearRegionCounter, TropicalNeuralAnalysis};
+pub use polynomial::{TropicalMonomial, TropicalPolynomial};
+pub use semiring::{Tropical, TropicalSemiring};
 
 #[cfg(test)]
 mod tests {

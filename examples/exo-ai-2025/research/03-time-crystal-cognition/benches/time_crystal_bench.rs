@@ -1,8 +1,8 @@
 // Benchmarks for Time Crystal Cognition
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use time_crystal_cognition::*;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ndarray::Array1;
+use time_crystal_cognition::*;
 
 fn bench_discrete_time_crystal(c: &mut Criterion) {
     let mut group = c.benchmark_group("discrete_time_crystal");

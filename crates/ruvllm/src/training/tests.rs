@@ -33,10 +33,17 @@ mod tests {
 
         // Check each category has exactly 10 examples
         for category in TaskCategory::all() {
-            let count = dataset.stats.examples_per_category
+            let count = dataset
+                .stats
+                .examples_per_category
                 .get(category.name())
                 .unwrap_or(&0);
-            assert_eq!(*count, 10, "Category {} should have 10 examples", category.name());
+            assert_eq!(
+                *count,
+                10,
+                "Category {} should have 10 examples",
+                category.name()
+            );
         }
     }
 
@@ -163,9 +170,21 @@ mod tests {
         let val_ratio = val.len() as f32 / total as f32;
         let test_ratio = test.len() as f32 / total as f32;
 
-        assert!((train_ratio - 0.7).abs() < 0.05, "Train ratio should be ~0.7: {}", train_ratio);
-        assert!((val_ratio - 0.15).abs() < 0.05, "Val ratio should be ~0.15: {}", val_ratio);
-        assert!((test_ratio - 0.15).abs() < 0.05, "Test ratio should be ~0.15: {}", test_ratio);
+        assert!(
+            (train_ratio - 0.7).abs() < 0.05,
+            "Train ratio should be ~0.7: {}",
+            train_ratio
+        );
+        assert!(
+            (val_ratio - 0.15).abs() < 0.05,
+            "Val ratio should be ~0.15: {}",
+            val_ratio
+        );
+        assert!(
+            (test_ratio - 0.15).abs() < 0.05,
+            "Test ratio should be ~0.15: {}",
+            test_ratio
+        );
     }
 
     #[test]
@@ -261,7 +280,10 @@ mod tests {
         }
 
         // Should see multiple domains
-        assert!(domains_seen.len() >= 3, "Should have at least 3 different domains");
+        assert!(
+            domains_seen.len() >= 3,
+            "Should have at least 3 different domains"
+        );
     }
 
     #[test]

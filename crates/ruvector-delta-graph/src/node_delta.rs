@@ -85,7 +85,8 @@ impl NodeDelta {
 
     /// Add a vector delta for an embedding property
     pub fn vector_delta(mut self, key: impl Into<String>, delta: VectorDelta) -> Self {
-        self.property_deltas.push(PropertyDelta::vector_delta(key, delta));
+        self.property_deltas
+            .push(PropertyDelta::vector_delta(key, delta));
         self
     }
 
@@ -127,8 +128,7 @@ impl NodeDelta {
         self.property_deltas = prop_map.into_values().collect();
 
         // Merge label changes
-        let mut adds: std::collections::HashSet<String> =
-            self.label_adds.into_iter().collect();
+        let mut adds: std::collections::HashSet<String> = self.label_adds.into_iter().collect();
         let mut removes: std::collections::HashSet<String> =
             self.label_removes.into_iter().collect();
 
@@ -180,7 +180,9 @@ impl NodeDeltaBuilder {
 
     /// Set a property
     pub fn set(mut self, key: impl Into<String>, value: PropertyValue) -> Self {
-        self.delta.property_deltas.push(PropertyDelta::set(key, value));
+        self.delta
+            .property_deltas
+            .push(PropertyDelta::set(key, value));
         self
     }
 

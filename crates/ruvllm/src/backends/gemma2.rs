@@ -27,11 +27,8 @@
 //! ```
 
 use crate::error::{Result, RuvLLMError};
-use crate::kernels::{
-    apply_rope_neon, flash_attention_neon, rms_norm_neon,
-    AttentionConfig,
-};
-use crate::kernels::rope::{RopeConfig, precompute_rope_tables_with_config, RopeTables};
+use crate::kernels::rope::{precompute_rope_tables_with_config, RopeConfig, RopeTables};
+use crate::kernels::{apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig};
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
@@ -248,7 +245,11 @@ unsafe fn logit_soft_cap_neon(x: &mut [f32], cap: f32) {
 
         let tanh_vec = vsetq_lane_f32(
             t3,
-            vsetq_lane_f32(t2, vsetq_lane_f32(t1, vsetq_lane_f32(t0, vdupq_n_f32(0.0), 0), 1), 2),
+            vsetq_lane_f32(
+                t2,
+                vsetq_lane_f32(t1, vsetq_lane_f32(t0, vdupq_n_f32(0.0), 0), 1),
+                2,
+            ),
             3,
         );
 
@@ -317,7 +318,9 @@ impl Gemma2Attention {
             || v_proj.len() != self.v_proj.len()
             || o_proj.len() != self.o_proj.len()
         {
-            return Err(RuvLLMError::Model("Invalid attention weight dimensions".to_string()));
+            return Err(RuvLLMError::Model(
+                "Invalid attention weight dimensions".to_string(),
+            ));
         }
 
         self.q_proj.copy_from_slice(q_proj);
@@ -458,7 +461,8 @@ impl Gemma2Attention {
         }
 
         // Output projection
-        let output = self.linear_transform(&output, &self.o_proj, num_heads * head_dim, hidden_size);
+        let output =
+            self.linear_transform(&output, &self.o_proj, num_heads * head_dim, hidden_size);
 
         Ok(output)
     }
@@ -498,14 +502,25 @@ impl Gemma2Attention {
             for t in 0..seq_len {
                 let offset = (t * num_heads + h) * head_dim;
                 let mut head_vec = x[offset..offset + head_dim].to_vec();
-                apply_rope_neon(&mut head_vec, &[positions[t]], head_dim, self.config.rope_theta);
+                apply_rope_neon(
+                    &mut head_vec,
+                    &[positions[t]],
+                    head_dim,
+                    self.config.rope_theta,
+                );
                 x[offset..offset + head_dim].copy_from_slice(&head_vec);
             }
         }
     }
 
     /// Linear transformation
-    fn linear_transform(&self, input: &[f32], weights: &[f32], in_dim: usize, out_dim: usize) -> Vec<f32> {
+    fn linear_transform(
+        &self,
+        input: &[f32],
+        weights: &[f32],
+        in_dim: usize,
+        out_dim: usize,
+    ) -> Vec<f32> {
         let batch_size = input.len() / in_dim;
         let mut output = vec![0.0; batch_size * out_dim];
 
@@ -569,7 +584,9 @@ impl Gemma2MLP {
             || up_proj.len() != gate_up_size
             || down_proj.len() != down_size
         {
-            return Err(RuvLLMError::Model("Invalid MLP weight dimensions".to_string()));
+            return Err(RuvLLMError::Model(
+                "Invalid MLP weight dimensions".to_string(),
+            ));
         }
 
         self.gate_proj.copy_from_slice(gate_proj);
@@ -584,11 +601,21 @@ impl Gemma2MLP {
         let batch_size = hidden_states.len() / self.hidden_size;
 
         // Gate projection + GELU
-        let gate = self.linear(hidden_states, &self.gate_proj, self.hidden_size, self.intermediate_size);
+        let gate = self.linear(
+            hidden_states,
+            &self.gate_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
         let gate_activated = self.gelu(&gate);
 
         // Up projection
-        let up = self.linear(hidden_states, &self.up_proj, self.hidden_size, self.intermediate_size);
+        let up = self.linear(
+            hidden_states,
+            &self.up_proj,
+            self.hidden_size,
+            self.intermediate_size,
+        );
 
         // Element-wise multiply (gating)
         let hidden: Vec<f32> = gate_activated
@@ -598,7 +625,12 @@ impl Gemma2MLP {
             .collect();
 
         // Down projection
-        let output = self.linear(&hidden, &self.down_proj, self.intermediate_size, self.hidden_size);
+        let output = self.linear(
+            &hidden,
+            &self.down_proj,
+            self.intermediate_size,
+            self.hidden_size,
+        );
 
         Ok(output)
     }
@@ -868,9 +900,9 @@ impl Gemma2Model {
         let lm_weights = if self.tie_word_embeddings {
             &self.embed_tokens
         } else {
-            self.lm_head.as_ref().ok_or_else(|| {
-                RuvLLMError::InvalidOperation("No LM head weights".to_string())
-            })?
+            self.lm_head
+                .as_ref()
+                .ok_or_else(|| RuvLLMError::InvalidOperation("No LM head weights".to_string()))?
         };
 
         // Compute logits with soft-capping
@@ -886,7 +918,8 @@ impl Gemma2Model {
             }
 
             // Apply final logit soft-capping
-            let logit_slice = &mut logits[t * self.config.vocab_size..(t + 1) * self.config.vocab_size];
+            let logit_slice =
+                &mut logits[t * self.config.vocab_size..(t + 1) * self.config.vocab_size];
             logit_soft_cap(logit_slice, self.config.final_logit_softcapping);
         }
 
@@ -900,7 +933,10 @@ impl Gemma2Model {
         let mut result = String::new();
 
         for (role, content) in messages {
-            result.push_str(&format!("<start_of_turn>{}\n{}<end_of_turn>\n", role, content));
+            result.push_str(&format!(
+                "<start_of_turn>{}\n{}<end_of_turn>\n",
+                role, content
+            ));
         }
 
         result.push_str("<start_of_turn>model\n");
@@ -910,13 +946,17 @@ impl Gemma2Model {
     /// Load model weights from GGUF format
     #[cfg(feature = "candle")]
     pub fn from_gguf(_path: &std::path::Path) -> Result<Self> {
-        Err(RuvLLMError::NotFound("GGUF loading not yet implemented for Gemma-2".to_string()))
+        Err(RuvLLMError::NotFound(
+            "GGUF loading not yet implemented for Gemma-2".to_string(),
+        ))
     }
 
     /// Load model weights from safetensors format
     #[cfg(feature = "candle")]
     pub fn from_safetensors(_path: &std::path::Path) -> Result<Self> {
-        Err(RuvLLMError::NotFound("Safetensors loading not yet implemented for Gemma-2".to_string()))
+        Err(RuvLLMError::NotFound(
+            "Safetensors loading not yet implemented for Gemma-2".to_string(),
+        ))
     }
 }
 
@@ -945,9 +985,9 @@ mod tests {
     fn test_local_attention_alternation() {
         let config = Gemma2Config::gemma2_9b();
         assert!(!config.is_local_attention_layer(0)); // Global
-        assert!(config.is_local_attention_layer(1));  // Local
+        assert!(config.is_local_attention_layer(1)); // Local
         assert!(!config.is_local_attention_layer(2)); // Global
-        assert!(config.is_local_attention_layer(3));  // Local
+        assert!(config.is_local_attention_layer(3)); // Local
     }
 
     #[test]
@@ -992,7 +1032,10 @@ mod tests {
         let model = Gemma2Model::new(&config).unwrap();
 
         assert_eq!(model.layers.len(), 26);
-        assert_eq!(model.embed_tokens.len(), config.vocab_size * config.hidden_size);
+        assert_eq!(
+            model.embed_tokens.len(),
+            config.vocab_size * config.hidden_size
+        );
     }
 
     #[test]

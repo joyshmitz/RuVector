@@ -54,18 +54,12 @@ pub fn dequantize_i8(values: &[u8], spec: &QuantSpec) -> Vec<f32> {
 
 /// Dequantize i16 values to f32
 pub fn dequantize_i16(values: &[i16], scale: f32, zero: f32) -> Vec<f32> {
-    values
-        .iter()
-        .map(|&v| v as f32 * scale + zero)
-        .collect()
+    values.iter().map(|&v| v as f32 * scale + zero).collect()
 }
 
 /// Symmetric quantization (zero point = 0)
 pub fn quantize_symmetric_i8(values: &[f32]) -> (Vec<i8>, f32) {
-    let abs_max = values
-        .iter()
-        .map(|v| v.abs())
-        .fold(0.0f32, f32::max);
+    let abs_max = values.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
 
     if abs_max < f32::EPSILON {
         return (vec![0i8; values.len()], 1.0);
@@ -105,10 +99,7 @@ pub fn quantize_asymmetric_i8(values: &[f32]) -> (Vec<u8>, f32, i32) {
 }
 
 /// Per-channel quantization for weights
-pub fn quantize_per_channel_i8(
-    weights: &[f32],
-    out_channels: usize,
-) -> (Vec<i8>, Vec<f32>) {
+pub fn quantize_per_channel_i8(weights: &[f32], out_channels: usize) -> (Vec<i8>, Vec<f32>) {
     let in_features = weights.len() / out_channels;
     let mut quantized = Vec::with_capacity(weights.len());
     let mut scales = Vec::with_capacity(out_channels);
@@ -127,10 +118,7 @@ pub fn quantize_per_channel_i8(
 }
 
 /// Blocked quantization for hardware efficiency
-pub fn quantize_blocked_i8(
-    values: &[f32],
-    block_size: usize,
-) -> (Vec<i8>, Vec<f32>, Vec<i8>) {
+pub fn quantize_blocked_i8(values: &[f32], block_size: usize) -> (Vec<i8>, Vec<f32>, Vec<i8>) {
     let num_blocks = (values.len() + block_size - 1) / block_size;
     let mut quantized = Vec::with_capacity(values.len());
     let mut scales = Vec::with_capacity(num_blocks);

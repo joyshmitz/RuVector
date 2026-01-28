@@ -54,7 +54,10 @@ fn test_silu_vector() {
         let expected = silu_reference(x);
         assert!(
             (y - expected).abs() < 1e-6,
-            "SiLU mismatch at index {}: got {}, expected {}", i, y, expected
+            "SiLU mismatch at index {}: got {}, expected {}",
+            i,
+            y,
+            expected
         );
     }
 }
@@ -159,7 +162,9 @@ fn test_gelu_approx_vs_exact() {
         assert!(
             error < 0.01,
             "GELU approximation error too large at x={}: approx={}, exact={}",
-            x, approx, exact
+            x,
+            approx,
+            exact
         );
     }
 }
@@ -186,7 +191,7 @@ fn test_gelu_monotonicity() {
         // Not strictly monotonic but increasing trend for positive values
         if values[i] > 0.5 {
             assert!(
-                outputs[i] >= outputs[i-1] - 1e-6,
+                outputs[i] >= outputs[i - 1] - 1e-6,
                 "GELU should be increasing for positive values"
             );
         }
@@ -249,7 +254,10 @@ fn test_relu_special_values() {
 fn softmax_reference(logits: &[f32]) -> Vec<f32> {
     let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let exp_sum: f32 = logits.iter().map(|&x| (x - max_logit).exp()).sum();
-    logits.iter().map(|&x| (x - max_logit).exp() / exp_sum).collect()
+    logits
+        .iter()
+        .map(|&x| (x - max_logit).exp() / exp_sum)
+        .collect()
 }
 
 #[test]
@@ -258,7 +266,11 @@ fn test_softmax_sum_to_one() {
     let probs = softmax_reference(&logits);
 
     let sum: f32 = probs.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-6, "Softmax should sum to 1.0, got {}", sum);
+    assert!(
+        (sum - 1.0).abs() < 1e-6,
+        "Softmax should sum to 1.0, got {}",
+        sum
+    );
 }
 
 #[test]
@@ -278,7 +290,10 @@ fn test_softmax_ordering() {
 
     // Probabilities should be in increasing order
     for i in 0..probs.len() - 1 {
-        assert!(probs[i] < probs[i + 1], "Higher logit should have higher prob");
+        assert!(
+            probs[i] < probs[i + 1],
+            "Higher logit should have higher prob"
+        );
     }
 }
 
@@ -289,8 +304,14 @@ fn test_softmax_numerical_stability() {
     let probs = softmax_reference(&logits);
 
     let sum: f32 = probs.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-4, "Softmax should be stable with large inputs");
-    assert!(probs.iter().all(|p| p.is_finite()), "All probs should be finite");
+    assert!(
+        (sum - 1.0).abs() < 1e-4,
+        "Softmax should be stable with large inputs"
+    );
+    assert!(
+        probs.iter().all(|p| p.is_finite()),
+        "All probs should be finite"
+    );
 }
 
 #[test]
@@ -300,7 +321,10 @@ fn test_softmax_uniform() {
     let probs = softmax_reference(&logits);
 
     for p in &probs {
-        assert!((p - 0.25).abs() < 1e-6, "Equal logits should give uniform probs");
+        assert!(
+            (p - 0.25).abs() < 1e-6,
+            "Equal logits should give uniform probs"
+        );
     }
 }
 
@@ -320,10 +344,16 @@ fn test_softmax_temperature_effect() {
     let probs_t20 = softmax_reference(&scaled_20);
 
     // Lower temperature should concentrate probability on max
-    assert!(probs_t05[2] > probs_t1[2], "Lower temp should increase max prob");
+    assert!(
+        probs_t05[2] > probs_t1[2],
+        "Lower temp should increase max prob"
+    );
 
     // Higher temperature should flatten distribution
-    assert!(probs_t20[0] > probs_t1[0], "Higher temp should increase min prob");
+    assert!(
+        probs_t20[0] > probs_t1[0],
+        "Higher temp should increase min prob"
+    );
 }
 
 // ============================================================================
@@ -331,11 +361,18 @@ fn test_softmax_temperature_effect() {
 // ============================================================================
 
 fn leaky_relu_reference(x: f32, alpha: f32) -> f32 {
-    if x > 0.0 { x } else { alpha * x }
+    if x > 0.0 {
+        x
+    } else {
+        alpha * x
+    }
 }
 
 fn leaky_relu_vec_reference(input: &[f32], alpha: f32) -> Vec<f32> {
-    input.iter().map(|&x| leaky_relu_reference(x, alpha)).collect()
+    input
+        .iter()
+        .map(|&x| leaky_relu_reference(x, alpha))
+        .collect()
 }
 
 #[test]
@@ -367,8 +404,14 @@ fn test_leaky_relu_continuity() {
     let right = leaky_relu_reference(epsilon, alpha);
     let at_zero = leaky_relu_reference(0.0, alpha);
 
-    assert!((left - at_zero).abs() < 1e-4, "Should be continuous from left");
-    assert!((right - at_zero).abs() < 1e-4, "Should be continuous from right");
+    assert!(
+        (left - at_zero).abs() < 1e-4,
+        "Should be continuous from left"
+    );
+    assert!(
+        (right - at_zero).abs() < 1e-4,
+        "Should be continuous from right"
+    );
 }
 
 // ============================================================================
@@ -418,9 +461,18 @@ fn test_activation_performance_comparison() {
     // Print timing results (for manual inspection)
     // These assertions just verify the functions complete in reasonable time
     assert!(relu_time.as_millis() < 1000, "ReLU should complete quickly");
-    assert!(silu_time.as_millis() < 2000, "SiLU should complete in reasonable time");
-    assert!(gelu_time.as_millis() < 2000, "GELU should complete in reasonable time");
-    assert!(softmax_time.as_millis() < 1000, "Softmax should complete quickly");
+    assert!(
+        silu_time.as_millis() < 2000,
+        "SiLU should complete in reasonable time"
+    );
+    assert!(
+        gelu_time.as_millis() < 2000,
+        "GELU should complete in reasonable time"
+    );
+    assert!(
+        softmax_time.as_millis() < 1000,
+        "Softmax should complete quickly"
+    );
 }
 
 // ============================================================================
@@ -436,7 +488,11 @@ fn test_neon_softmax_vs_scalar() {
 
     // Sum should be 1.0
     let sum: f32 = scalar_result.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-4, "Softmax sum should be 1.0, got {}", sum);
+    assert!(
+        (sum - 1.0).abs() < 1e-4,
+        "Softmax sum should be 1.0, got {}",
+        sum
+    );
 
     // All probabilities should be positive
     assert!(scalar_result.iter().all(|&p| p > 0.0 && p < 1.0));
@@ -456,14 +512,23 @@ fn test_neon_softmax_large_array() {
 
     // Check sum
     let scalar_sum: f32 = scalar_result.iter().sum();
-    assert!((scalar_sum - 1.0).abs() < 1e-4, "Scalar softmax sum should be 1.0, got {}", scalar_sum);
+    assert!(
+        (scalar_sum - 1.0).abs() < 1e-4,
+        "Scalar softmax sum should be 1.0, got {}",
+        scalar_sum
+    );
 
     // Check all values are valid probabilities
-    assert!(scalar_result.iter().all(|&p| p >= 0.0 && p <= 1.0 && p.is_finite()));
+    assert!(scalar_result
+        .iter()
+        .all(|&p| p >= 0.0 && p <= 1.0 && p.is_finite()));
 
     // Check ordering is preserved
     for i in 0..scalar_result.len() - 1 {
-        assert!(scalar_result[i] <= scalar_result[i + 1], "Ordering should be preserved");
+        assert!(
+            scalar_result[i] <= scalar_result[i + 1],
+            "Ordering should be preserved"
+        );
     }
 }
 
@@ -558,7 +623,10 @@ fn test_silu_derivative_at_zero() {
     let deriv = (silu_reference(x + epsilon) - silu_reference(x - epsilon)) / (2.0 * epsilon);
 
     // SiLU'(0) = 0.5
-    assert!((deriv - 0.5).abs() < 0.01, "SiLU derivative at 0 should be 0.5");
+    assert!(
+        (deriv - 0.5).abs() < 0.01,
+        "SiLU derivative at 0 should be 0.5"
+    );
 }
 
 #[test]
@@ -569,5 +637,8 @@ fn test_gelu_derivative_positive() {
     let deriv = (gelu_reference(x + epsilon) - gelu_reference(x - epsilon)) / (2.0 * epsilon);
 
     // For positive x, GELU derivative should be close to 1
-    assert!(deriv > 0.5 && deriv < 1.5, "GELU derivative at x=1 should be near 1");
+    assert!(
+        deriv > 0.5 && deriv < 1.5,
+        "GELU derivative at x=1 should be near 1"
+    );
 }

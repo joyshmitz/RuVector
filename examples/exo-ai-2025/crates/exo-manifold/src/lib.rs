@@ -24,17 +24,17 @@ use exo_core::{Error, ManifoldConfig, ManifoldDelta, Pattern, Result, SearchResu
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-mod network;
-mod retrieval;
 mod deformation;
 mod forgetting;
+mod network;
+mod retrieval;
 pub mod simd_ops;
 
-pub use network::LearnedManifold;
-pub use simd_ops::{cosine_similarity_simd, euclidean_distance_simd, batch_distances};
-pub use retrieval::GradientDescentRetriever;
 pub use deformation::ManifoldDeformer;
 pub use forgetting::StrategicForgetting;
+pub use network::LearnedManifold;
+pub use retrieval::GradientDescentRetriever;
+pub use simd_ops::{batch_distances, cosine_similarity_simd, euclidean_distance_simd};
 
 /// Simplified manifold storage using vector similarity
 pub struct ManifoldEngine {
@@ -49,11 +49,8 @@ pub struct ManifoldEngine {
 impl ManifoldEngine {
     /// Create a new manifold engine
     pub fn new(config: ManifoldConfig) -> Self {
-        let network = LearnedManifold::new(
-            config.dimension,
-            config.hidden_dim,
-            config.hidden_layers,
-        );
+        let network =
+            LearnedManifold::new(config.dimension, config.hidden_dim, config.hidden_layers);
 
         Self {
             network: Arc::new(RwLock::new(network)),
@@ -71,10 +68,7 @@ impl ManifoldEngine {
             });
         }
 
-        let retriever = GradientDescentRetriever::new(
-            self.network.clone(),
-            self.config.clone(),
-        );
+        let retriever = GradientDescentRetriever::new(self.network.clone(), self.config.clone());
 
         retriever.retrieve(query, k, &self.patterns)
     }
@@ -91,10 +85,7 @@ impl ManifoldEngine {
         // Store pattern for later extraction
         self.patterns.write().push(pattern.clone());
 
-        let mut deformer = ManifoldDeformer::new(
-            self.network.clone(),
-            self.config.learning_rate,
-        );
+        let mut deformer = ManifoldDeformer::new(self.network.clone(), self.config.learning_rate);
 
         deformer.deform(&pattern, salience)
     }
@@ -103,11 +94,7 @@ impl ManifoldEngine {
     pub fn forget(&mut self, salience_threshold: f32, decay_rate: f32) -> Result<usize> {
         let forgetter = StrategicForgetting::new(self.network.clone());
 
-        forgetter.forget(
-            &self.patterns,
-            salience_threshold,
-            decay_rate,
-        )
+        forgetter.forget(&self.patterns, salience_threshold, decay_rate)
     }
 
     /// Get number of stored patterns

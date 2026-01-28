@@ -4,13 +4,13 @@
 //! mathematics in ruvector-math, enabling browser-based vector search
 //! with optimal transport, information geometry, and product manifolds.
 
-use wasm_bindgen::prelude::*;
 use ruvector_math::{
-    optimal_transport::{SlicedWasserstein, SinkhornSolver, GromovWasserstein},
     information_geometry::{FisherInformation, NaturalGradient},
-    spherical::SphericalSpace,
+    optimal_transport::{GromovWasserstein, SinkhornSolver, SlicedWasserstein},
     product_manifold::ProductManifold,
+    spherical::SphericalSpace,
 };
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -245,7 +245,12 @@ impl WasmFisherInformation {
 
     /// Compute diagonal FIM from gradient samples
     #[wasm_bindgen(js_name = diagonalFim)]
-    pub fn diagonal_fim(&self, gradients: &[f64], _num_samples: usize, dim: usize) -> Result<Vec<f64>, JsError> {
+    pub fn diagonal_fim(
+        &self,
+        gradients: &[f64],
+        _num_samples: usize,
+        dim: usize,
+    ) -> Result<Vec<f64>, JsError> {
         let grads = to_points(gradients, dim);
         self.inner
             .diagonal_fim(&grads)
@@ -254,12 +259,7 @@ impl WasmFisherInformation {
 
     /// Compute natural gradient
     #[wasm_bindgen(js_name = naturalGradient)]
-    pub fn natural_gradient(
-        &self,
-        fim_diag: &[f64],
-        gradient: &[f64],
-        damping: f64,
-    ) -> Vec<f64> {
+    pub fn natural_gradient(&self, fim_diag: &[f64], gradient: &[f64], damping: f64) -> Vec<f64> {
         gradient
             .iter()
             .zip(fim_diag.iter())

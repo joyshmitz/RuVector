@@ -17,8 +17,8 @@
 //! ∂u/∂t = Du∇²u + f(u,v)
 //! ∂v/∂t = Dv∇²v + g(u,v)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 /// A field where morphogenetic patterns emerge
@@ -173,7 +173,13 @@ impl MorphogeneticField {
     }
 
     /// Create with specific parameters
-    pub fn with_params(width: usize, height: usize, da: f64, db: f64, params: ReactionParams) -> Self {
+    pub fn with_params(
+        width: usize,
+        height: usize,
+        da: f64,
+        db: f64,
+        params: ReactionParams,
+    ) -> Self {
         let mut field = Self::new(width, height);
         field.da = da;
         field.db = db;
@@ -194,7 +200,9 @@ impl MorphogeneticField {
         for y in 0..self.height {
             for x in 0..self.width {
                 // Simple LCG random
-                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r = (state as f64) / (u64::MAX as f64);
                 self.inhibitor[y][x] += (r - 0.5) * magnitude;
             }
@@ -207,11 +215,11 @@ impl MorphogeneticField {
         let mut gradient_sum = 0.0;
         let mut count = 0;
 
-        for y in 1..self.height-1 {
-            for x in 1..self.width-1 {
-                let dx = self.activator[y][x+1] - self.activator[y][x-1];
-                let dy = self.activator[y+1][x] - self.activator[y-1][x];
-                gradient_sum += (dx*dx + dy*dy).sqrt();
+        for y in 1..self.height - 1 {
+            for x in 1..self.width - 1 {
+                let dx = self.activator[y][x + 1] - self.activator[y][x - 1];
+                let dy = self.activator[y + 1][x] - self.activator[y - 1][x];
+                gradient_sum += (dx * dx + dy * dy).sqrt();
                 count += 1;
             }
         }
@@ -228,34 +236,32 @@ impl MorphogeneticField {
         let mut new_a = self.activator.clone();
         let mut new_b = self.inhibitor.clone();
 
-        for y in 1..self.height-1 {
-            for x in 1..self.width-1 {
+        for y in 1..self.height - 1 {
+            for x in 1..self.width - 1 {
                 let a = self.activator[y][x];
                 let b = self.inhibitor[y][x];
 
                 // Laplacian (diffusion)
-                let lap_a = self.activator[y-1][x] + self.activator[y+1][x]
-                          + self.activator[y][x-1] + self.activator[y][x+1]
-                          - 4.0 * a;
+                let lap_a = self.activator[y - 1][x]
+                    + self.activator[y + 1][x]
+                    + self.activator[y][x - 1]
+                    + self.activator[y][x + 1]
+                    - 4.0 * a;
 
-                let lap_b = self.inhibitor[y-1][x] + self.inhibitor[y+1][x]
-                          + self.inhibitor[y][x-1] + self.inhibitor[y][x+1]
-                          - 4.0 * b;
+                let lap_b = self.inhibitor[y - 1][x]
+                    + self.inhibitor[y + 1][x]
+                    + self.inhibitor[y][x - 1]
+                    + self.inhibitor[y][x + 1]
+                    - 4.0 * b;
 
                 // Gray-Scott reaction
                 let reaction = a * b * b;
 
-                new_a[y][x] = a + self.dt * (
-                    self.da * lap_a
-                    - reaction
-                    + self.params.f * (1.0 - a)
-                );
+                new_a[y][x] =
+                    a + self.dt * (self.da * lap_a - reaction + self.params.f * (1.0 - a));
 
-                new_b[y][x] = b + self.dt * (
-                    self.db * lap_b
-                    + reaction
-                    - (self.params.f + self.params.k) * b
-                );
+                new_b[y][x] = b + self.dt
+                    * (self.db * lap_b + reaction - (self.params.f + self.params.k) * b);
 
                 // Clamp values
                 new_a[y][x] = new_a[y][x].clamp(0.0, 1.0);
@@ -293,11 +299,11 @@ impl MorphogeneticField {
         let mut best_lag = 1;
         let mut min_corr = f64::MAX;
 
-        for lag in 1..self.width/4 {
+        for lag in 1..self.width / 4 {
             let mut corr = 0.0;
             let mut count = 0;
 
-            for i in 0..self.width-lag {
+            for i in 0..self.width - lag {
                 corr += slice[i] * slice[i + lag];
                 count += 1;
             }
@@ -321,7 +327,7 @@ impl MorphogeneticField {
 
         // Check left-right symmetry
         for y in 0..self.height {
-            for x in 0..self.width/2 {
+            for x in 0..self.width / 2 {
                 let mirror_x = self.width - 1 - x;
                 let diff = (self.activator[y][x] - self.activator[y][mirror_x]).abs();
                 diff_sum += diff;
@@ -405,9 +411,7 @@ impl CognitiveEmbryogenesis {
                 self.differentiate();
                 DevelopmentStage::Mature
             }
-            DevelopmentStage::Mature => {
-                DevelopmentStage::Mature
-            }
+            DevelopmentStage::Mature => DevelopmentStage::Mature,
         };
 
         self.history.push(DevelopmentEvent {
@@ -428,7 +432,8 @@ impl CognitiveEmbryogenesis {
         let ap_gradient: Vec<f64> = (0..gradient_length)
             .map(|i| (i as f64 / gradient_length as f64))
             .collect();
-        self.gradients.insert("anterior_posterior".to_string(), ap_gradient);
+        self.gradients
+            .insert("anterior_posterior".to_string(), ap_gradient);
 
         // Dorsal-ventral gradient
         let dv_gradient: Vec<f64> = (0..gradient_length)
@@ -437,7 +442,8 @@ impl CognitiveEmbryogenesis {
                 (x * std::f64::consts::PI).sin()
             })
             .collect();
-        self.gradients.insert("dorsal_ventral".to_string(), dv_gradient);
+        self.gradients
+            .insert("dorsal_ventral".to_string(), dv_gradient);
     }
 
     fn divide_structures(&mut self) {
@@ -457,11 +463,7 @@ impl CognitiveEmbryogenesis {
             self.structures.push(CognitiveStructure {
                 id: Uuid::new_v4(),
                 structure_type: StructureType::ProcessingNode,
-                position: (
-                    0.5 + 0.3 * angle.cos(),
-                    0.5 + 0.3 * angle.sin(),
-                    0.5,
-                ),
+                position: (0.5 + 0.3 * angle.cos(), 0.5 + 0.3 * angle.sin(), 0.5),
                 size: initial.size / 4.0,
                 connectivity: Vec::new(),
                 specialization: 0.0,
@@ -474,7 +476,7 @@ impl CognitiveEmbryogenesis {
         let structure_ids: Vec<Uuid> = self.structures.iter().map(|s| s.id).collect();
 
         for i in 0..self.structures.len() {
-            for j in i+1..self.structures.len() {
+            for j in i + 1..self.structures.len() {
                 let dist = self.distance(i, j);
                 if dist < 0.5 {
                     self.structures[i].connectivity.push(structure_ids[j]);
@@ -487,7 +489,7 @@ impl CognitiveEmbryogenesis {
     fn distance(&self, i: usize, j: usize) -> f64 {
         let (x1, y1, z1) = self.structures[i].position;
         let (x2, y2, z2) = self.structures[j].position;
-        ((x2-x1).powi(2) + (y2-y1).powi(2) + (z2-z1).powi(2)).sqrt()
+        ((x2 - x1).powi(2) + (y2 - y1).powi(2) + (z2 - z1).powi(2)).sqrt()
     }
 
     fn differentiate(&mut self) {
@@ -584,8 +586,14 @@ mod tests {
 
         let pattern_type = field.detect_pattern_type();
         // Should detect some pattern type
-        assert!(matches!(pattern_type, PatternType::Spots | PatternType::Stripes
-            | PatternType::Labyrinth | PatternType::Hexagonal | PatternType::Mixed));
+        assert!(matches!(
+            pattern_type,
+            PatternType::Spots
+                | PatternType::Stripes
+                | PatternType::Labyrinth
+                | PatternType::Hexagonal
+                | PatternType::Mixed
+        ));
     }
 
     #[test]
@@ -605,12 +613,13 @@ mod tests {
         embryo.full_development();
 
         // Should have different structure types
-        let types: Vec<_> = embryo.structures().iter()
+        let types: Vec<_> = embryo
+            .structures()
+            .iter()
             .map(|s| &s.structure_type)
             .collect();
 
-        assert!(embryo.structures().iter()
-            .all(|s| s.specialization > 0.0));
+        assert!(embryo.structures().iter().all(|s| s.specialization > 0.0));
     }
 
     #[test]

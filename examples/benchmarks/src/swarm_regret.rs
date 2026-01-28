@@ -293,8 +293,8 @@ impl SwarmController {
         } else {
             0.0
         };
-        let agent_reward =
-            accuracy * self.oracle.perfect_accuracy_reward - total_steps as f64 * self.oracle.step_penalty;
+        let agent_reward = accuracy * self.oracle.perfect_accuracy_reward
+            - total_steps as f64 * self.oracle.step_penalty;
 
         // Compute oracle reward
         let oracle_reward = self.oracle.compute_reward(num_tasks);

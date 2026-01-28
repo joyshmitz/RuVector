@@ -282,8 +282,8 @@ mod tests {
         let token = PermitToken {
             decision: GateDecision::Permit,
             action_id: "test-action".to_string(),
-            timestamp: 1000000000,  // Long ago
-            ttl_ns: 1,              // 1 nanosecond TTL
+            timestamp: 1000000000, // Long ago
+            ttl_ns: 1,             // 1 nanosecond TTL
             witness_hash: [0u8; 32],
             sequence: 0,
             signature: [0u8; 64],
@@ -295,6 +295,9 @@ mod tests {
         assert!(verifier.verify(&signed).is_ok());
 
         // But full verification (including TTL) should fail
-        assert!(matches!(verifier.verify_full(&signed), Err(VerifyError::Expired)));
+        assert!(matches!(
+            verifier.verify_full(&signed),
+            Err(VerifyError::Expired)
+        ));
     }
 }

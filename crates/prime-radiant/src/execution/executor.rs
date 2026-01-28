@@ -290,7 +290,10 @@ impl ActionExecutor {
             let mut stats = self.stats.write();
             stats.total_denied += 1;
 
-            let reason = decision.reason.clone().unwrap_or_else(|| "Gate denied".to_string());
+            let reason = decision
+                .reason
+                .clone()
+                .unwrap_or_else(|| "Gate denied".to_string());
 
             return ExecutionResult {
                 result: Err(ActionError::Denied(reason)),
@@ -313,15 +316,17 @@ impl ActionExecutor {
                 "Action queued for human review"
             );
 
-            self.queue_for_human_review(action.metadata().id.clone(), witness.clone(), energy.clone());
+            self.queue_for_human_review(
+                action.metadata().id.clone(),
+                witness.clone(),
+                energy.clone(),
+            );
 
             let mut stats = self.stats.write();
             stats.total_allowed += 1;
 
             return ExecutionResult {
-                result: Err(ActionError::Denied(
-                    "Queued for human review".to_string(),
-                )),
+                result: Err(ActionError::Denied("Queued for human review".to_string())),
                 witness,
                 decision,
                 stats: ExecutionStats {
@@ -473,9 +478,7 @@ impl ActionExecutor {
         let mut queue = self.human_queue.write();
 
         if queue.len() >= self.config.max_human_queue {
-            warn!(
-                "Human review queue full, dropping oldest item"
-            );
+            warn!("Human review queue full, dropping oldest item");
             queue.pop_front();
         }
 
@@ -522,12 +525,7 @@ impl ActionExecutor {
     /// Get recent witnesses.
     pub fn recent_witnesses(&self, limit: usize) -> Vec<WitnessRecord> {
         let witnesses = self.witnesses.read();
-        witnesses
-            .iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect()
+        witnesses.iter().rev().take(limit).cloned().collect()
     }
 
     /// Get a witness by ID.
@@ -619,7 +617,12 @@ impl ActionResultBuilder {
     /// Build the result.
     pub fn build(self) -> ActionResult {
         if self.success {
-            ActionResult::success(self.action_id, self.duration_us, self.lane, self.retry_count)
+            ActionResult::success(
+                self.action_id,
+                self.duration_us,
+                self.lane,
+                self.retry_count,
+            )
         } else {
             ActionResult::failure(
                 self.action_id,
@@ -690,7 +693,9 @@ mod tests {
         fn execute(&self, _ctx: &ExecutionContext) -> Result<(), ActionError> {
             self.execute_count.fetch_add(1, Ordering::SeqCst);
             if self.should_fail {
-                Err(ActionError::ExecutionFailed("Simulated failure".to_string()))
+                Err(ActionError::ExecutionFailed(
+                    "Simulated failure".to_string(),
+                ))
             } else {
                 Ok(())
             }
@@ -829,7 +834,10 @@ mod tests {
         executor.execute(&action, &energy);
 
         // Stats should be shared
-        assert_eq!(executor.stats().total_submitted, executor2.stats().total_submitted);
+        assert_eq!(
+            executor.stats().total_submitted,
+            executor2.stats().total_submitted
+        );
     }
 
     #[test]

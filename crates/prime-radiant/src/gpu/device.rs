@@ -66,7 +66,10 @@ impl GpuDevice {
             gles_minor_version: wgpu::Gles3MinorVersion::default(),
         });
 
-        debug!("Created wgpu instance with backends: {:?}", options.backends);
+        debug!(
+            "Created wgpu instance with backends: {:?}",
+            options.backends
+        );
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -182,12 +185,13 @@ impl GpuDevice {
     /// This is useful when you need to ensure GPU work has completed
     /// before continuing on the CPU.
     pub fn poll(&self, wait: bool) -> bool {
-        self.device.poll(if wait {
-            wgpu::Maintain::Wait
-        } else {
-            wgpu::Maintain::Poll
-        })
-        .is_queue_empty()
+        self.device
+            .poll(if wait {
+                wgpu::Maintain::Wait
+            } else {
+                wgpu::Maintain::Poll
+            })
+            .is_queue_empty()
     }
 
     /// Submit a command buffer to the queue
@@ -265,7 +269,10 @@ mod tests {
     #[test]
     fn test_device_options_default() {
         let options = GpuDeviceOptions::default();
-        assert_eq!(options.power_preference, wgpu::PowerPreference::HighPerformance);
+        assert_eq!(
+            options.power_preference,
+            wgpu::PowerPreference::HighPerformance
+        );
         assert!(!options.force_fallback);
     }
 

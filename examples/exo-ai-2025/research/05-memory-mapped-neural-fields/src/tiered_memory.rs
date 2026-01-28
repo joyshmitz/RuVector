@@ -8,10 +8,10 @@ use std::time::{Duration, Instant};
 /// Storage tier levels with latency characteristics
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tier {
-    L1Dram,      // ~80 ns, 64 GB
-    L2Cxl,       // ~350 ns, 512 GB
-    L3Ssd,       // ~80 μs, 4 TB
-    L4Hdd,       // ~10 ms, 1 PB
+    L1Dram, // ~80 ns, 64 GB
+    L2Cxl,  // ~350 ns, 512 GB
+    L3Ssd,  // ~80 μs, 4 TB
+    L4Hdd,  // ~10 ms, 1 PB
 }
 
 impl Tier {
@@ -28,9 +28,9 @@ impl Tier {
     /// Typical capacity in bytes
     pub fn typical_capacity(&self) -> u64 {
         match self {
-            Tier::L1Dram => 64 * 1024 * 1024 * 1024,        // 64 GB
-            Tier::L2Cxl => 512 * 1024 * 1024 * 1024,        // 512 GB
-            Tier::L3Ssd => 4 * 1024 * 1024 * 1024 * 1024,   // 4 TB
+            Tier::L1Dram => 64 * 1024 * 1024 * 1024,         // 64 GB
+            Tier::L2Cxl => 512 * 1024 * 1024 * 1024,         // 512 GB
+            Tier::L3Ssd => 4 * 1024 * 1024 * 1024 * 1024,    // 4 TB
             Tier::L4Hdd => 1024 * 1024 * 1024 * 1024 * 1024, // 1 PB
         }
     }
@@ -294,7 +294,10 @@ impl TieredMemory {
             .ok_or("Page not in current tier")?;
 
         // Check if target tier has space
-        let target_storage = self.tiers.get_mut(&target_tier).ok_or("Target tier not found")?;
+        let target_storage = self
+            .tiers
+            .get_mut(&target_tier)
+            .ok_or("Target tier not found")?;
 
         if target_storage.available_bytes() < page.size_bytes as u64 {
             // Evict pages from target tier to make space
@@ -312,7 +315,10 @@ impl TieredMemory {
             .insert(page)?;
 
         // Update index
-        self.page_index.write().unwrap().insert(page_id, target_tier);
+        self.page_index
+            .write()
+            .unwrap()
+            .insert(page_id, target_tier);
 
         // Log migration
         self.log_migration(MigrationEvent {
@@ -328,12 +334,7 @@ impl TieredMemory {
     }
 
     /// Demote page to slower tier
-    pub fn demote(
-        &mut self,
-        page_id: u64,
-        target_tier: Tier,
-        trigger: &str,
-    ) -> Result<(), String> {
+    pub fn demote(&mut self, page_id: u64, target_tier: Tier, trigger: &str) -> Result<(), String> {
         let current_tier = self
             .page_index
             .read()
@@ -369,7 +370,10 @@ impl TieredMemory {
             .insert(page)?;
 
         // Update index
-        self.page_index.write().unwrap().insert(page_id, target_tier);
+        self.page_index
+            .write()
+            .unwrap()
+            .insert(page_id, target_tier);
 
         // Log migration
         self.log_migration(MigrationEvent {
@@ -444,9 +448,7 @@ impl TieredMemory {
                 storage
                     .pages
                     .values()
-                    .filter(|p| {
-                        p.age().as_secs() < 60 && *tier != Tier::L1Dram
-                    })
+                    .filter(|p| p.age().as_secs() < 60 && *tier != Tier::L1Dram)
                     .map(|p| (p.id, *tier))
             })
             .collect();
@@ -465,9 +467,7 @@ impl TieredMemory {
                 storage
                     .pages
                     .values()
-                    .filter(|p| {
-                        p.age().as_secs() > 300 && *tier != Tier::L4Hdd
-                    })
+                    .filter(|p| p.age().as_secs() > 300 && *tier != Tier::L4Hdd)
                     .map(|p| (p.id, *tier))
             })
             .collect();

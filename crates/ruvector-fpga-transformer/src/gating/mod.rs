@@ -6,8 +6,8 @@
 pub mod coherence_gate;
 pub mod policy_gate;
 
-pub use coherence_gate::{CoherenceGate, DefaultCoherenceGate, CoherenceConfig};
-pub use policy_gate::{PolicyGate, DefaultPolicyGate, WritePolicy};
+pub use coherence_gate::{CoherenceConfig, CoherenceGate, DefaultCoherenceGate};
+pub use policy_gate::{DefaultPolicyGate, PolicyGate, WritePolicy};
 
 use crate::types::{GateDecision, GateHint, SkipReason};
 use crate::witness::WitnessLog;

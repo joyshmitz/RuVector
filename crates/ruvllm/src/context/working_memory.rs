@@ -272,7 +272,8 @@ pub struct CachedToolResult {
 impl WorkingMemory {
     /// Create new working memory with configuration
     pub fn new(config: WorkingMemoryConfig) -> Self {
-        let attention = AttentionWeights::new(config.attention_decay_rate, config.min_attention_threshold);
+        let attention =
+            AttentionWeights::new(config.attention_decay_rate, config.min_attention_threshold);
 
         Self {
             config,
@@ -288,7 +289,9 @@ impl WorkingMemory {
     pub fn set_task(&self, task: TaskContext) {
         let task_id = task.task_id.clone();
         *self.current_task.write() = Some(task);
-        self.attention.write().set(&task_id, self.config.default_attention);
+        self.attention
+            .write()
+            .set(&task_id, self.config.default_attention);
     }
 
     /// Get current task
@@ -338,12 +341,7 @@ impl WorkingMemory {
     /// Get recent scratchpad entries
     pub fn get_recent(&self, count: usize) -> Vec<ScratchpadEntry> {
         let scratchpad = self.scratchpad.read();
-        scratchpad
-            .iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        scratchpad.iter().rev().take(count).cloned().collect()
     }
 
     /// Get scratchpad entries by type
@@ -372,7 +370,11 @@ impl WorkingMemory {
 
         with_scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
-        with_scores.into_iter().take(k).map(|(_, e)| e.clone()).collect()
+        with_scores
+            .into_iter()
+            .take(k)
+            .map(|(_, e)| e.clone())
+            .collect()
     }
 
     /// Clear scratchpad
@@ -381,7 +383,14 @@ impl WorkingMemory {
     }
 
     /// Cache tool result
-    pub fn cache_tool_result(&self, tool_name: &str, input: &str, output: String, success: bool, ttl: Duration) {
+    pub fn cache_tool_result(
+        &self,
+        tool_name: &str,
+        input: &str,
+        output: String,
+        success: bool,
+        ttl: Duration,
+    ) {
         let input_hash = format!("{:x}", md5::compute(input));
         let key = format!("{}:{}", tool_name, input_hash);
 
@@ -433,7 +442,9 @@ impl WorkingMemory {
     /// Set variable
     pub fn set_variable(&self, key: &str, value: serde_json::Value) {
         self.variables.write().insert(key.to_string(), value);
-        self.attention.write().set(key, self.config.default_attention);
+        self.attention
+            .write()
+            .set(key, self.config.default_attention);
     }
 
     /// Get variable

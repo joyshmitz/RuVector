@@ -3,12 +3,12 @@
 //! Benchmarks Metal compute shaders for LLM operations.
 //! Only runs on macOS with `metal-compute` feature enabled.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 #[cfg(all(target_os = "macos", feature = "metal-compute"))]
-use ruvllm::metal::{MetalContext, MetalConfig};
-#[cfg(all(target_os = "macos", feature = "metal-compute"))]
 use ruvllm::kernels::AttentionConfig;
+#[cfg(all(target_os = "macos", feature = "metal-compute"))]
+use ruvllm::metal::{MetalConfig, MetalContext};
 
 #[cfg(all(target_os = "macos", feature = "metal-compute"))]
 fn bench_flash_attention_metal(c: &mut Criterion) {
@@ -46,7 +46,14 @@ fn bench_flash_attention_metal(c: &mut Criterion) {
             BenchmarkId::new("metal", format!("seq{}_kv{}", seq_len, kv_len)),
             &(&query, &key, &value, &config),
             |b, (q, k, v, cfg)| {
-                b.iter(|| ctx.flash_attention(black_box(*q), black_box(*k), black_box(*v), black_box(*cfg)))
+                b.iter(|| {
+                    ctx.flash_attention(
+                        black_box(*q),
+                        black_box(*k),
+                        black_box(*v),
+                        black_box(*cfg),
+                    )
+                })
             },
         );
     }
@@ -171,7 +178,10 @@ fn bench_optimized_gemm_metal(c: &mut Criterion) {
         return;
     }
 
-    println!("Available optimizations: {:?}", ctx.available_optimizations());
+    println!(
+        "Available optimizations: {:?}",
+        ctx.available_optimizations()
+    );
 
     let mut group = c.benchmark_group("metal_gemm_optimized");
 
@@ -180,8 +190,12 @@ fn bench_optimized_gemm_metal(c: &mut Criterion) {
         let n = size;
         let k = size;
 
-        let a: Vec<half::f16> = (0..m * k).map(|i| half::f16::from_f32((i as f32) * 0.001)).collect();
-        let b: Vec<half::f16> = (0..k * n).map(|i| half::f16::from_f32((i as f32) * 0.001)).collect();
+        let a: Vec<half::f16> = (0..m * k)
+            .map(|i| half::f16::from_f32((i as f32) * 0.001))
+            .collect();
+        let b: Vec<half::f16> = (0..k * n)
+            .map(|i| half::f16::from_f32((i as f32) * 0.001))
+            .collect();
 
         // Benchmark standard GEMM
         group.bench_with_input(
@@ -217,7 +231,14 @@ fn bench_fused_attention_metal(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("metal_fused_attention");
 
-    for (seq_len, kv_len) in [(1, 512), (1, 2048), (1, 4096), (4, 512), (4, 2048), (16, 2048)] {
+    for (seq_len, kv_len) in [
+        (1, 512),
+        (1, 2048),
+        (1, 4096),
+        (4, 512),
+        (4, 2048),
+        (16, 2048),
+    ] {
         let num_heads = 32;
         let num_kv_heads = 8;
         let head_dim = 128;
@@ -246,7 +267,14 @@ fn bench_fused_attention_metal(c: &mut Criterion) {
             BenchmarkId::new("standard", format!("seq{}_kv{}", seq_len, kv_len)),
             &(&query, &key, &value, &config),
             |b, (q, k, v, cfg)| {
-                b.iter(|| ctx.flash_attention(black_box(*q), black_box(*k), black_box(*v), black_box(*cfg)))
+                b.iter(|| {
+                    ctx.flash_attention(
+                        black_box(*q),
+                        black_box(*k),
+                        black_box(*v),
+                        black_box(*cfg),
+                    )
+                })
             },
         );
 
@@ -255,7 +283,17 @@ fn bench_fused_attention_metal(c: &mut Criterion) {
             BenchmarkId::new("fused_fa2", format!("seq{}_kv{}", seq_len, kv_len)),
             &(&query, &key, &value, num_heads, num_kv_heads, head_dim),
             |b, (q, k, v, nh, nkv, hd)| {
-                b.iter(|| ctx.fused_attention(black_box(*q), black_box(*k), black_box(*v), *nh, *nkv, *hd, true))
+                b.iter(|| {
+                    ctx.fused_attention(
+                        black_box(*q),
+                        black_box(*k),
+                        black_box(*v),
+                        *nh,
+                        *nkv,
+                        *hd,
+                        true,
+                    )
+                })
             },
         );
     }
@@ -273,7 +311,12 @@ fn bench_fused_norm_residual_metal(c: &mut Criterion) {
         }
     };
 
-    if ctx.available_optimizations().iter().find(|&&s| s == "fused_layernorm_residual").is_none() {
+    if ctx
+        .available_optimizations()
+        .iter()
+        .find(|&&s| s == "fused_layernorm_residual")
+        .is_none()
+    {
         eprintln!("Fused LayerNorm+Residual not available, skipping benchmark");
         return;
     }
@@ -315,7 +358,12 @@ fn bench_fused_norm_residual_metal(c: &mut Criterion) {
             |bench, _| {
                 bench.iter(|| {
                     let mut x_clone = x.clone();
-                    ctx.fused_rmsnorm_residual(black_box(&mut x_clone), black_box(&residual), black_box(&weight), 1e-6)
+                    ctx.fused_rmsnorm_residual(
+                        black_box(&mut x_clone),
+                        black_box(&residual),
+                        black_box(&weight),
+                        1e-6,
+                    )
                 })
             },
         );
@@ -327,7 +375,13 @@ fn bench_fused_norm_residual_metal(c: &mut Criterion) {
             |bench, _| {
                 bench.iter(|| {
                     let mut x_clone = x.clone();
-                    ctx.fused_layernorm_residual(black_box(&mut x_clone), black_box(&residual), black_box(&weight), black_box(&bias), 1e-6)
+                    ctx.fused_layernorm_residual(
+                        black_box(&mut x_clone),
+                        black_box(&residual),
+                        black_box(&weight),
+                        black_box(&bias),
+                        1e-6,
+                    )
                 })
             },
         );
@@ -374,7 +428,15 @@ fn bench_rope_attention_fusion_metal(c: &mut Criterion) {
                     let mut k_clone = (*k).clone();
                     let _ = ctx.apply_rope(&mut q_clone, 0, *nh, *hd, rope_theta);
                     let _ = ctx.apply_rope(&mut k_clone, 0, *nkv, *hd, rope_theta);
-                    ctx.fused_attention(black_box(&q_clone), black_box(&k_clone), black_box(*v), *nh, *nkv, *hd, true)
+                    ctx.fused_attention(
+                        black_box(&q_clone),
+                        black_box(&k_clone),
+                        black_box(*v),
+                        *nh,
+                        *nkv,
+                        *hd,
+                        true,
+                    )
                 })
             },
         );
@@ -385,7 +447,17 @@ fn bench_rope_attention_fusion_metal(c: &mut Criterion) {
             &(&query, &key, &value, num_heads, num_kv_heads, head_dim),
             |b, (q, k, v, nh, nkv, hd)| {
                 b.iter(|| {
-                    ctx.rope_then_attention(black_box(*q), black_box(*k), black_box(*v), *nh, *nkv, *hd, 0, rope_theta, true)
+                    ctx.rope_then_attention(
+                        black_box(*q),
+                        black_box(*k),
+                        black_box(*v),
+                        *nh,
+                        *nkv,
+                        *hd,
+                        0,
+                        rope_theta,
+                        true,
+                    )
                 })
             },
         );
@@ -404,7 +476,12 @@ fn bench_swiglu_metal(c: &mut Criterion) {
         }
     };
 
-    if ctx.available_optimizations().iter().find(|&&s| s == "fused_swiglu").is_none() {
+    if ctx
+        .available_optimizations()
+        .iter()
+        .find(|&&s| s == "fused_swiglu")
+        .is_none()
+    {
         eprintln!("Fused SwiGLU not available, skipping benchmark");
         return;
     }
@@ -419,9 +496,7 @@ fn bench_swiglu_metal(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("fused", format!("size{}", size)),
             &(&gate, &up),
-            |b, (g, u)| {
-                b.iter(|| ctx.fused_swiglu(black_box(*g), black_box(*u)))
-            },
+            |b, (g, u)| b.iter(|| ctx.fused_swiglu(black_box(*g), black_box(*u))),
         );
 
         // CPU baseline for comparison
@@ -430,7 +505,9 @@ fn bench_swiglu_metal(c: &mut Criterion) {
             &(&gate, &up),
             |b, (g, u)| {
                 b.iter(|| {
-                    let result: Vec<f32> = g.iter().zip(u.iter())
+                    let result: Vec<f32> = g
+                        .iter()
+                        .zip(u.iter())
                         .map(|(&g_val, &u_val)| {
                             // SwiGLU: swish(gate) * up
                             let swish = g_val / (1.0 + (-g_val).exp());
@@ -501,9 +578,6 @@ criterion_group!(
 );
 
 #[cfg(not(all(target_os = "macos", feature = "metal-compute")))]
-criterion_group!(
-    metal_benches,
-    bench_cpu_gemm,
-);
+criterion_group!(metal_benches, bench_cpu_gemm,);
 
 criterion_main!(metal_benches);

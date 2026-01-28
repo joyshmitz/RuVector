@@ -41,8 +41,8 @@ pub use simd::*;
 use js_sys::{Array, Float32Array, Object, Reflect, Uint8Array};
 use parking_lot::RwLock;
 use ruvector_delta_core::{
-    Delta, DeltaEncoding, DeltaOp, DeltaStream, DeltaValue, DeltaWindow,
-    HybridEncoding, SparseEncoding, VectorDelta, WindowConfig, WindowType,
+    Delta, DeltaEncoding, DeltaOp, DeltaStream, DeltaValue, DeltaWindow, HybridEncoding,
+    SparseEncoding, VectorDelta, WindowConfig, WindowType,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
@@ -251,7 +251,11 @@ impl DeltaEngine {
     }
 
     /// Capture delta between two vectors
-    pub fn capture(&self, old_vec: Float32Array, new_vec: Float32Array) -> Result<JsDelta, JsValue> {
+    pub fn capture(
+        &self,
+        old_vec: Float32Array,
+        new_vec: Float32Array,
+    ) -> Result<JsDelta, JsValue> {
         if old_vec.length() != new_vec.length() {
             return Err(JsValue::from_str("Vectors must have same length"));
         }
@@ -305,8 +309,8 @@ impl DeltaEngine {
     /// Create delta from sparse entries
     #[wasm_bindgen(js_name = fromSparse)]
     pub fn from_sparse(&self, entries: JsValue) -> Result<JsDelta, JsValue> {
-        let sparse: Vec<SparseEntry> = from_value(entries)
-            .map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
+        let sparse: Vec<SparseEntry> =
+            from_value(entries).map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
 
         let ops: smallvec::SmallVec<[DeltaOp<f32>; 8]> = sparse
             .into_iter()
@@ -587,8 +591,12 @@ mod tests {
     fn test_delta_compose() {
         let engine = DeltaEngine::new(3);
 
-        let d1 = engine.from_dense(Float32Array::from(&[1.0f32, 0.0, 0.0][..])).unwrap();
-        let d2 = engine.from_dense(Float32Array::from(&[0.0f32, 1.0, 0.0][..])).unwrap();
+        let d1 = engine
+            .from_dense(Float32Array::from(&[1.0f32, 0.0, 0.0][..]))
+            .unwrap();
+        let d2 = engine
+            .from_dense(Float32Array::from(&[0.0f32, 1.0, 0.0][..]))
+            .unwrap();
 
         let composed = d1.compose(&d2);
         assert!(!composed.is_identity());

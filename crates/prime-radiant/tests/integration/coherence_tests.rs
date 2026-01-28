@@ -23,9 +23,7 @@ impl RestrictionMap {
     fn new(rows: usize, cols: usize) -> Self {
         // Identity-like (truncated or padded)
         let matrix: Vec<Vec<f32>> = (0..rows)
-            .map(|i| {
-                (0..cols).map(|j| if i == j { 1.0 } else { 0.0 }).collect()
-            })
+            .map(|i| (0..cols).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
             .collect();
         let bias = vec![0.0; rows];
         Self { matrix, bias }
@@ -35,13 +33,7 @@ impl RestrictionMap {
         self.matrix
             .iter()
             .zip(&self.bias)
-            .map(|(row, b)| {
-                row.iter()
-                    .zip(input)
-                    .map(|(a, x)| a * x)
-                    .sum::<f32>()
-                    + b
-            })
+            .map(|(row, b)| row.iter().zip(input).map(|(a, x)| a * x).sum::<f32>() + b)
             .collect()
     }
 
@@ -469,10 +461,7 @@ fn test_residual_dimension() {
 #[test]
 fn test_hotspot_identification() {
     // Find edges with highest energy
-    fn find_hotspots(
-        edge_energies: &HashMap<usize, f32>,
-        k: usize,
-    ) -> Vec<(usize, f32)> {
+    fn find_hotspots(edge_energies: &HashMap<usize, f32>, k: usize) -> Vec<(usize, f32)> {
         let mut sorted: Vec<_> = edge_energies.iter().collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
         sorted.into_iter().take(k).map(|(i, e)| (*i, *e)).collect()

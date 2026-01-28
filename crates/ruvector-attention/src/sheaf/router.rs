@@ -295,11 +295,7 @@ impl TokenRouter {
     ) -> AttentionResult<RoutingDecision> {
         // Handle small contexts
         if context.len() < self.config.min_context_size {
-            return Ok(RoutingDecision::new(
-                token_idx,
-                0.0,
-                ComputeLane::Standard,
-            ));
+            return Ok(RoutingDecision::new(token_idx, 0.0, ComputeLane::Standard));
         }
 
         // Compute energy
@@ -341,7 +337,9 @@ impl TokenRouter {
     /// Group tokens by their assigned lane
     ///
     /// Returns (reflex_indices, standard_indices, deep_indices, escalate_indices)
-    pub fn group_by_lane(decisions: &[RoutingDecision]) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
+    pub fn group_by_lane(
+        decisions: &[RoutingDecision],
+    ) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
         let mut reflex = Vec::new();
         let mut standard = Vec::new();
         let mut deep = Vec::new();
@@ -370,10 +368,7 @@ impl TokenRouter {
             0.0
         };
 
-        let max_energy = decisions
-            .iter()
-            .map(|d| d.energy)
-            .fold(0.0f32, f32::max);
+        let max_energy = decisions.iter().map(|d| d.energy).fold(0.0f32, f32::max);
 
         let min_energy = decisions
             .iter()
@@ -388,16 +383,17 @@ impl TokenRouter {
             escalate_count: escalate.len(),
             average_energy: avg_energy,
             max_energy,
-            min_energy: if min_energy.is_infinite() { 0.0 } else { min_energy },
+            min_energy: if min_energy.is_infinite() {
+                0.0
+            } else {
+                min_energy
+            },
         }
     }
 
     /// Estimate total latency for a batch based on routing
     pub fn estimate_latency_ms(decisions: &[RoutingDecision]) -> f32 {
-        decisions
-            .iter()
-            .map(|d| d.lane.typical_latency_ms())
-            .sum()
+        decisions.iter().map(|d| d.lane.typical_latency_ms()).sum()
     }
 
     /// Update thresholds based on desired lane distribution
@@ -498,7 +494,8 @@ impl LaneStatistics {
             1.0
         } else {
             let deep_latency = self.total_tokens as f32 * ComputeLane::Deep.typical_latency_ms();
-            let actual_latency = self.reflex_count as f32 * ComputeLane::Reflex.typical_latency_ms()
+            let actual_latency = self.reflex_count as f32
+                * ComputeLane::Reflex.typical_latency_ms()
                 + self.standard_count as f32 * ComputeLane::Standard.typical_latency_ms()
                 + self.deep_count as f32 * ComputeLane::Deep.typical_latency_ms();
 
@@ -645,8 +642,8 @@ mod tests {
 
     #[test]
     fn test_routing_decision_builder() {
-        let decision = RoutingDecision::new(0, 0.1, ComputeLane::Standard)
-            .with_sparse_indices(vec![1, 3, 5]);
+        let decision =
+            RoutingDecision::new(0, 0.1, ComputeLane::Standard).with_sparse_indices(vec![1, 3, 5]);
 
         assert!(decision.sparse_indices.is_some());
         assert_eq!(decision.sparse_indices.unwrap(), vec![1, 3, 5]);

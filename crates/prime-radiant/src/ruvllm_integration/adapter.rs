@@ -170,21 +170,27 @@ impl RuvLlmAdapter {
     pub fn record_pass(&self, time_us: u64) {
         self.stats.requests.fetch_add(1, Ordering::Relaxed);
         self.stats.passed.fetch_add(1, Ordering::Relaxed);
-        self.stats.total_time_us.fetch_add(time_us, Ordering::Relaxed);
+        self.stats
+            .total_time_us
+            .fetch_add(time_us, Ordering::Relaxed);
     }
 
     /// Record a failed coherence check.
     pub fn record_fail(&self, time_us: u64) {
         self.stats.requests.fetch_add(1, Ordering::Relaxed);
         self.stats.failed.fetch_add(1, Ordering::Relaxed);
-        self.stats.total_time_us.fetch_add(time_us, Ordering::Relaxed);
+        self.stats
+            .total_time_us
+            .fetch_add(time_us, Ordering::Relaxed);
     }
 
     /// Record an escalation.
     pub fn record_escalation(&self, time_us: u64) {
         self.stats.requests.fetch_add(1, Ordering::Relaxed);
         self.stats.escalated.fetch_add(1, Ordering::Relaxed);
-        self.stats.total_time_us.fetch_add(time_us, Ordering::Relaxed);
+        self.stats
+            .total_time_us
+            .fetch_add(time_us, Ordering::Relaxed);
     }
 
     /// Record a cache hit.

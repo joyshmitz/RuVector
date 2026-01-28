@@ -190,9 +190,7 @@ fn test_drift_multiple_metrics() {
     // Latency values increasing - the detector considers increasing values
     // as "improving" since it doesn't know the semantic meaning of metrics
     // Higher latency IS worsening, but numerically it's "improving" (going up)
-    assert!(
-        lat_metric.trend == DriftTrend::Improving || lat_metric.trend == DriftTrend::Declining
-    );
+    assert!(lat_metric.trend == DriftTrend::Improving || lat_metric.trend == DriftTrend::Declining);
 }
 
 #[test]

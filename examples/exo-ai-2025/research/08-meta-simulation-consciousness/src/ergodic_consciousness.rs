@@ -19,7 +19,6 @@
 //!   - Perspective invariance: Same statistics from any starting point
 //!   - Self-similarity: Structure preserved across time scales
 
-
 /// Ergodicity tester for cognitive systems
 pub struct ErgodicityAnalyzer {
     /// Number of time steps for temporal average

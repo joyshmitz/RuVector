@@ -36,12 +36,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::{
+    GgufQuantType, LoadedTensor, LoadedWeights, ModelConfig, QuantizedTensor, TensorCategory,
+};
 use crate::backends::ModelArchitecture;
 use crate::error::{Result, RuvLLMError};
-use super::{
-    LoadedWeights, LoadedTensor, TensorCategory, GgufQuantType, ModelConfig,
-    QuantizedTensor,
-};
 
 // ============================================================================
 // Model Layer Weights
@@ -316,9 +315,9 @@ impl TensorNameMap {
 impl ModelInitializer {
     /// Create a new model initializer from loaded weights.
     pub fn new(weights: LoadedWeights) -> Result<Self> {
-        let architecture = weights.architecture().ok_or_else(|| {
-            RuvLLMError::Model("Cannot determine model architecture".to_string())
-        })?;
+        let architecture = weights
+            .architecture()
+            .ok_or_else(|| RuvLLMError::Model("Cannot determine model architecture".to_string()))?;
 
         let tensor_map = match architecture {
             ModelArchitecture::Llama => TensorNameMap::llama(),
@@ -471,10 +470,7 @@ impl ModelInitializer {
     /// Extract the key identifying part of a tensor name.
     fn extract_key_part(&self, name: &str) -> String {
         // Extract the last meaningful part of the name
-        name.split('.')
-            .last()
-            .unwrap_or(name)
-            .to_string()
+        name.split('.').last().unwrap_or(name).to_string()
     }
 }
 
@@ -537,14 +533,23 @@ mod tests {
     #[test]
     fn test_tensor_name_map_llama() {
         let map = TensorNameMap::llama();
-        assert_eq!(map.layer_tensor(map.q_proj, 0), "model.layers.0.self_attn.q_proj.weight");
-        assert_eq!(map.layer_tensor(map.gate_proj, 5), "model.layers.5.mlp.gate_proj.weight");
+        assert_eq!(
+            map.layer_tensor(map.q_proj, 0),
+            "model.layers.0.self_attn.q_proj.weight"
+        );
+        assert_eq!(
+            map.layer_tensor(map.gate_proj, 5),
+            "model.layers.5.mlp.gate_proj.weight"
+        );
     }
 
     #[test]
     fn test_tensor_name_map_phi() {
         let map = TensorNameMap::phi();
-        assert_eq!(map.layer_tensor(map.o_proj, 2), "transformer.h.2.mixer.out_proj.weight");
+        assert_eq!(
+            map.layer_tensor(map.o_proj, 2),
+            "transformer.h.2.mixer.out_proj.weight"
+        );
     }
 
     #[test]

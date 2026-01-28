@@ -663,7 +663,10 @@ impl SheafCoherenceValidator {
     /// 3. Computes coherence energy
     /// 4. Evaluates against the gate
     /// 5. Returns a ValidationResult with witness
-    pub fn validate(&mut self, context: &ValidationContext) -> Result<ValidationResult, ValidationError> {
+    pub fn validate(
+        &mut self,
+        context: &ValidationContext,
+    ) -> Result<ValidationResult, ValidationError> {
         // Validate the input
         context.validate()?;
 
@@ -695,7 +698,10 @@ impl SheafCoherenceValidator {
         } else {
             WitnessDecision::deny(
                 decision.lane.as_u8(),
-                decision.reason.clone().unwrap_or_else(|| "Energy too high".to_string()),
+                decision
+                    .reason
+                    .clone()
+                    .unwrap_or_else(|| "Energy too high".to_string()),
                 confidence,
             )
         };
@@ -717,7 +723,9 @@ impl SheafCoherenceValidator {
         } else {
             ValidationResult::deny(
                 energy.total_energy,
-                decision.reason.unwrap_or_else(|| "Coherence threshold exceeded".to_string()),
+                decision
+                    .reason
+                    .unwrap_or_else(|| "Coherence threshold exceeded".to_string()),
                 witness,
                 context.request_id,
             )
@@ -878,7 +886,10 @@ impl PolicyBundleRef {
     fn into_execution_ref(self) -> crate::execution::PolicyBundleRef {
         crate::execution::PolicyBundleRef {
             id: self.id.0,
-            version: format!("{}.{}.{}", self.version.major, self.version.minor, self.version.patch),
+            version: format!(
+                "{}.{}.{}",
+                self.version.major, self.version.minor, self.version.patch
+            ),
             content_hash: *self.content_hash.as_bytes(),
         }
     }
@@ -915,7 +926,10 @@ mod tests {
             .with_response_embedding(vec![1.0, 2.0]);
 
         let result = ctx.validate();
-        assert!(matches!(result, Err(ValidationError::DimensionMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(ValidationError::DimensionMismatch { .. })
+        ));
     }
 
     #[test]
@@ -933,12 +947,7 @@ mod tests {
             .with_context_embedding(vec![1.0, 2.0, 3.0])
             .with_response_embedding(vec![1.0, 2.0, 3.0]);
 
-        let witness = ValidationWitness::new(
-            &ctx,
-            0.5,
-            WitnessDecision::allow(0, 0.9),
-            None,
-        );
+        let witness = ValidationWitness::new(&ctx, 0.5, WitnessDecision::allow(0, 0.9), None);
 
         assert!(witness.verify_integrity());
     }
@@ -959,11 +968,10 @@ mod tests {
 
     #[test]
     fn test_validator_incoherent_response() {
-        let mut validator = SheafCoherenceValidator::with_defaults()
-            .with_config(ValidatorConfig {
-                reflex_threshold: 0.01, // Very strict
-                ..Default::default()
-            });
+        let mut validator = SheafCoherenceValidator::with_defaults().with_config(ValidatorConfig {
+            reflex_threshold: 0.01, // Very strict
+            ..Default::default()
+        });
 
         // Very different embeddings should be incoherent
         let ctx = ValidationContext::new()
@@ -997,12 +1005,7 @@ mod tests {
             .with_context_embedding(vec![1.0, 2.0, 3.0])
             .with_response_embedding(vec![1.0, 2.0, 3.0]);
 
-        let witness = ValidationWitness::new(
-            &ctx,
-            0.1,
-            WitnessDecision::allow(0, 0.95),
-            None,
-        );
+        let witness = ValidationWitness::new(&ctx, 0.1, WitnessDecision::allow(0, 0.95), None);
 
         let result = ValidationResult::allow(0.1, witness, ctx.request_id);
 

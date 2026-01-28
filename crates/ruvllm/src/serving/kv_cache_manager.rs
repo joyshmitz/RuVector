@@ -214,7 +214,8 @@ impl KvCacheManager {
         // Store allocation
         self.allocations.write().insert(request_id, allocation);
         self.active_allocations.fetch_add(1, Ordering::Relaxed);
-        self.allocated_blocks.fetch_add(blocks_needed, Ordering::Relaxed);
+        self.allocated_blocks
+            .fetch_add(blocks_needed, Ordering::Relaxed);
 
         // Clear the cache slot
         self.caches[slot_id].clear();
@@ -263,7 +264,8 @@ impl KvCacheManager {
             }
 
             allocation.num_blocks = needed_blocks;
-            self.allocated_blocks.fetch_add(additional_blocks, Ordering::Relaxed);
+            self.allocated_blocks
+                .fetch_add(additional_blocks, Ordering::Relaxed);
         }
 
         allocation.current_length = new_length;
@@ -381,20 +383,16 @@ impl KvCacheManager {
 
     /// Swap in a request's KV cache from CPU memory
     pub fn swap_in(&mut self, request_id: RequestId) -> Result<usize> {
-        let swapped = self
-            .swap_space
-            .write()
-            .remove(&request_id)
-            .ok_or_else(|| {
-                RuvLLMError::NotFound(format!("No swapped cache for request {}", request_id))
-            })?;
+        let swapped = self.swap_space.write().remove(&request_id).ok_or_else(|| {
+            RuvLLMError::NotFound(format!("No swapped cache for request {}", request_id))
+        })?;
 
         // Allocate a new slot
         let slot_id = {
             let mut free_slots = self.free_slots.write();
-            free_slots.pop_front().ok_or_else(|| {
-                RuvLLMError::OutOfMemory("No free slots for swap in".to_string())
-            })?
+            free_slots
+                .pop_front()
+                .ok_or_else(|| RuvLLMError::OutOfMemory("No free slots for swap in".to_string()))?
         };
 
         // Allocate blocks

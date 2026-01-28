@@ -2,10 +2,10 @@
 //!
 //! Main attention mechanism that uses topological coherence as a permission signal.
 
-use crate::error::{AttentionError, AttentionResult};
-use crate::traits::Attention;
 use super::coherence::{CoherenceMetric, WindowCoherence};
 use super::policy::{AttentionMode, AttentionPolicy, PolicyConfig};
+use crate::error::{AttentionError, AttentionResult};
+use crate::traits::Attention;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for topology-gated attention
@@ -76,11 +76,8 @@ impl TopologyGatedAttention {
 
     /// Update coherence from keys (call periodically, not every token)
     pub fn update_coherence(&mut self, keys: &[&[f32]]) {
-        let coherence = WindowCoherence::compute(
-            keys,
-            self.config.k_neighbors,
-            &self.config.metrics,
-        );
+        let coherence =
+            WindowCoherence::compute(keys, self.config.k_neighbors, &self.config.metrics);
         self.policy.determine_mode(coherence.score);
         self.cached_coherence = Some(coherence);
     }
@@ -207,10 +204,7 @@ impl TopologyGatedAttention {
         let weights = Self::stable_softmax(&logits);
 
         // Weighted sum of selected values
-        let selected_values: Vec<&[f32]> = top_k
-            .iter()
-            .map(|(i, _)| values[*i])
-            .collect();
+        let selected_values: Vec<&[f32]> = top_k.iter().map(|(i, _)| values[*i]).collect();
 
         self.weighted_sum(&weights, &selected_values)
     }
@@ -352,17 +346,15 @@ mod tests {
         let mut attention = TopologyGatedAttention::with_dim(32);
 
         let query = vec![0.5f32; 32];
-        let keys: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![0.1 + i as f32 * 0.02; 32])
-            .collect();
-        let values: Vec<Vec<f32>> = (0..20)
-            .map(|i| vec![i as f32; 32])
-            .collect();
+        let keys: Vec<Vec<f32>> = (0..20).map(|i| vec![0.1 + i as f32 * 0.02; 32]).collect();
+        let values: Vec<Vec<f32>> = (0..20).map(|i| vec![i as f32; 32]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
 
-        let output = attention.compute_gated(&query, &keys_refs, &values_refs).unwrap();
+        let output = attention
+            .compute_gated(&query, &keys_refs, &values_refs)
+            .unwrap();
         assert_eq!(output.len(), 32);
     }
 
@@ -388,9 +380,7 @@ mod tests {
                 v
             })
             .collect();
-        let values: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32; 16])
-            .collect();
+        let values: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32; 16]).collect();
 
         let keys_refs: Vec<&[f32]> = keys.iter().map(|k| k.as_slice()).collect();
         let values_refs: Vec<&[f32]> = values.iter().map(|v| v.as_slice()).collect();
@@ -399,7 +389,9 @@ mod tests {
 
         // With diverse keys, should trigger freeze mode
         let query = vec![0.5f32; 16];
-        let _output = attention.compute_gated(&query, &keys_refs, &values_refs).unwrap();
+        let _output = attention
+            .compute_gated(&query, &keys_refs, &values_refs)
+            .unwrap();
 
         // Mode should be freeze or cautious due to low coherence
         let mode = attention.current_mode();

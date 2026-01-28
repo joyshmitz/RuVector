@@ -449,7 +449,13 @@ fn bench_gemv(c: &mut Criterion) {
     let mut group = c.benchmark_group("gemv");
     group.sample_size(50);
 
-    for (m, n) in [(256, 256), (512, 512), (1024, 1024), (2048, 2048), (4096, 4096)] {
+    for (m, n) in [
+        (256, 256),
+        (512, 512),
+        (1024, 1024),
+        (2048, 2048),
+        (4096, 4096),
+    ] {
         let a = random_tensor(m * n);
         let x = random_tensor(n);
         let mut y = vec![0.0; m];
@@ -489,7 +495,14 @@ fn bench_gemm(c: &mut Criterion) {
         group.throughput(Throughput::Elements(flops as u64));
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
     }
@@ -503,12 +516,12 @@ fn bench_gemm_non_square(c: &mut Criterion) {
 
     // Common shapes in LLM inference
     let shapes = [
-        (1, 4096, 4096),    // Single token projection
-        (32, 4096, 4096),   // Batch projection
-        (128, 4096, 4096),  // Larger batch
-        (1, 4096, 11008),   // MLP up projection (Llama2 7B)
-        (1, 11008, 4096),   // MLP down projection
-        (32, 128, 4096),    // Attention output
+        (1, 4096, 4096),   // Single token projection
+        (32, 4096, 4096),  // Batch projection
+        (128, 4096, 4096), // Larger batch
+        (1, 4096, 11008),  // MLP up projection (Llama2 7B)
+        (1, 11008, 4096),  // MLP down projection
+        (32, 128, 4096),   // Attention output
     ];
 
     for (m, k, n) in shapes {
@@ -523,7 +536,14 @@ fn bench_gemm_non_square(c: &mut Criterion) {
         group.throughput(Throughput::Elements(flops as u64));
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
     }
@@ -592,7 +612,14 @@ fn bench_gemm_nt(c: &mut Criterion) {
         group.throughput(Throughput::Elements(flops as u64));
         group.bench_function(id, |b| {
             b.iter(|| {
-                gemm_nt_neon(black_box(&a), black_box(&b_t), black_box(&mut c_out), m, k, n);
+                gemm_nt_neon(
+                    black_box(&a),
+                    black_box(&b_t),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
     }
@@ -637,7 +664,14 @@ fn bench_tiling_efficiency(c: &mut Criterion) {
         group.throughput(Throughput::Elements(flops as u64));
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), size, size, size);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    size,
+                    size,
+                    size,
+                );
             })
         });
     }
@@ -651,9 +685,9 @@ fn bench_memory_bandwidth(c: &mut Criterion) {
 
     // Test memory-bound vs compute-bound behavior
     for (m, k, n) in [
-        (1, 4096, 4096),    // Very memory bound (GEMV-like)
-        (32, 4096, 4096),   // More compute
-        (128, 4096, 4096),  // Compute bound
+        (1, 4096, 4096),   // Very memory bound (GEMV-like)
+        (32, 4096, 4096),  // More compute
+        (128, 4096, 4096), // Compute bound
     ] {
         let mat_a = random_tensor(m * k);
         let mat_b = random_tensor(k * n);
@@ -664,14 +698,27 @@ fn bench_memory_bandwidth(c: &mut Criterion) {
         let flops = 2 * m * k * n;
 
         let id = BenchmarkId::new(
-            format!("{}x{}x{}_ratio_{:.2}", m, k, n, flops as f64 / memory_bytes as f64),
+            format!(
+                "{}x{}x{}_ratio_{:.2}",
+                m,
+                k,
+                n,
+                flops as f64 / memory_bytes as f64
+            ),
             m,
         );
 
         group.throughput(Throughput::Bytes(memory_bytes as u64));
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
     }
@@ -705,7 +752,14 @@ fn bench_llm_projection_sizes(c: &mut Criterion) {
         group.throughput(Throughput::Elements(flops as u64));
         group.bench_function(id, |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
     }
@@ -1013,7 +1067,14 @@ mod parallel_benches {
             group.throughput(Throughput::Elements(flops as u64));
             group.bench_function(id, |bencher| {
                 bencher.iter(|| {
-                    gemm_parallel(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                    gemm_parallel(
+                        black_box(&mat_a),
+                        black_box(&mat_b),
+                        black_box(&mut c_out),
+                        m,
+                        k,
+                        n,
+                    );
                 })
             });
         }
@@ -1108,13 +1169,27 @@ mod parallel_benches {
 
         group.bench_function("single_thread", |bencher| {
             bencher.iter(|| {
-                gemm_neon(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_neon(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
 
         group.bench_function("parallel", |bencher| {
             bencher.iter(|| {
-                gemm_parallel(black_box(&mat_a), black_box(&mat_b), black_box(&mut c_out), m, k, n);
+                gemm_parallel(
+                    black_box(&mat_a),
+                    black_box(&mat_b),
+                    black_box(&mut c_out),
+                    m,
+                    k,
+                    n,
+                );
             })
         });
 

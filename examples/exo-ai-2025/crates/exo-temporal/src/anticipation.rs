@@ -143,7 +143,8 @@ impl SequentialPatternTracker {
         self.cache_valid.insert(from, false);
 
         // Track total sequences
-        self.total_sequences.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.total_sequences
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Predict next pattern given current (optimized O(1) cache lookup)
@@ -158,10 +159,7 @@ impl SequentialPatternTracker {
 
         // Fast O(1) lookup from pre-sorted cache
         if let Some(sorted) = self.frequency_cache.get(&current) {
-            sorted.iter()
-                .take(top_k)
-                .map(|(_, id)| *id)
-                .collect()
+            sorted.iter().take(top_k).map(|(_, id)| *id).collect()
         } else {
             Vec::new()
         }
@@ -189,7 +187,8 @@ impl SequentialPatternTracker {
 
     /// Get total number of recorded sequences
     pub fn total_sequences(&self) -> usize {
-        self.total_sequences.load(std::sync::atomic::Ordering::Relaxed)
+        self.total_sequences
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get prediction accuracy estimate (based on frequency distribution)
@@ -223,7 +222,8 @@ impl SequentialPatternTracker {
             self.cache_valid.insert(pattern, false);
         }
 
-        self.total_sequences.fetch_add(sequences.len(), std::sync::atomic::Ordering::Relaxed);
+        self.total_sequences
+            .fetch_add(sequences.len(), std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -253,7 +253,8 @@ pub fn anticipate(
                     for pattern_id in predicted {
                         if let Some(temporal_pattern) = long_term.get(&pattern_id) {
                             // Create query from pattern
-                            let query = Query::from_embedding(temporal_pattern.pattern.embedding.clone());
+                            let query =
+                                Query::from_embedding(temporal_pattern.pattern.embedding.clone());
                             let query_hash = query.hash();
 
                             // Pre-fetch if not cached
@@ -279,7 +280,8 @@ pub fn anticipate(
 
                 for pattern_id in downstream.into_iter().take(5) {
                     if let Some(temporal_pattern) = long_term.get(&pattern_id) {
-                        let query = Query::from_embedding(temporal_pattern.pattern.embedding.clone());
+                        let query =
+                            Query::from_embedding(temporal_pattern.pattern.embedding.clone());
                         let query_hash = query.hash();
 
                         // Pre-fetch if not cached
@@ -357,12 +359,7 @@ mod tests {
         let p2 = PatternId::new();
         let p3 = PatternId::new();
 
-        let sequences = vec![
-            (p1, p2),
-            (p1, p2),
-            (p1, p3),
-            (p2, p3),
-        ];
+        let sequences = vec![(p1, p2), (p1, p2), (p1, p3), (p2, p3)];
 
         tracker.record_sequences_batch(&sequences);
 

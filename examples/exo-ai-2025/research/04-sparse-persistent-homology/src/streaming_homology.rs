@@ -20,7 +20,6 @@
 /// References:
 /// - Cohen-Steiner, Edelsbrunner, Harer (2006): "Stability of Persistence Diagrams"
 /// - Kerber, Sharathkumar (2013): "Approximate Čech Complex in Low and High Dimensions"
-
 use std::collections::HashMap;
 
 /// Persistence feature (birth-death pair)

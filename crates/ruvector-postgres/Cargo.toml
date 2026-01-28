@@ -1,6 +1,6 @@
 [package]
 name = "ruvector-postgres"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 license = "MIT"
 description = "High-performance PostgreSQL vector database extension v2 - pgvector drop-in replacement with 230+ SQL functions, SIMD acceleration, Flash Attention, GNN layers, hybrid search, multi-tenancy, self-healing, and self-learning capabilities"
@@ -123,7 +123,7 @@ once_cell = "1.19"
 fastembed = { version = "5", optional = true }
 
 # Mincut-gated transformer (optional)
-ruvector-mincut-gated-transformer = { path = "../ruvector-mincut-gated-transformer", optional = true }
+ruvector-mincut-gated-transformer = { version = "0.1.0", path = "../ruvector-mincut-gated-transformer", optional = true }
 
 # Optional: Use ruvector-core for shared implementations
 # Uncomment to link with existing ruvector-core crate

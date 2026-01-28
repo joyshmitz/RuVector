@@ -215,8 +215,8 @@ impl Default for RematerializationCostModel {
         Self {
             // Approximate for a 7B model
             flops_per_token_per_layer: 2 * 4096 * 4096, // 2 * hidden^2
-            bytes_per_token: 4096 * 2 * 2, // hidden * 2 (kv) * 2 (fp16)
-            compute_budget: 1_000_000_000, // 1 GFLOP budget
+            bytes_per_token: 4096 * 2 * 2,              // hidden * 2 (kv) * 2 (fp16)
+            compute_budget: 1_000_000_000,              // 1 GFLOP budget
         }
     }
 }
@@ -276,12 +276,19 @@ impl RematerializationPolicy {
         if recompute_cost > self.cost_model.compute_budget {
             Some(EvictionDecision::Quantize { target_bits: 2 })
         } else {
-            Some(EvictionDecision::Evict { recompute_on_access: true })
+            Some(EvictionDecision::Evict {
+                recompute_on_access: true,
+            })
         }
     }
 
     /// Decide whether to evict or keep a specific token
-    pub fn should_evict(&self, token_position: usize, layer: usize, total_tokens: usize) -> EvictionDecision {
+    pub fn should_evict(
+        &self,
+        token_position: usize,
+        layer: usize,
+        total_tokens: usize,
+    ) -> EvictionDecision {
         let pressure = self.memory_tracker.pressure();
 
         if pressure < self.memory_threshold {
@@ -300,7 +307,9 @@ impl RematerializationPolicy {
         if total_tokens <= self.min_materialized {
             EvictionDecision::Keep
         } else if adjusted_cost < self.cost_model.compute_budget as f32 {
-            EvictionDecision::Evict { recompute_on_access: true }
+            EvictionDecision::Evict {
+                recompute_on_access: true,
+            }
         } else {
             EvictionDecision::Quantize { target_bits: 2 }
         }

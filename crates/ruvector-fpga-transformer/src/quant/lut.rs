@@ -271,8 +271,14 @@ mod tests {
         let result_neg = exp_lut(-256); // -1.0 in Q8.8
         let result_zero = exp_lut(0);
         let result_pos = exp_lut(256); // 1.0 in Q8.8
-        assert!(result_neg <= result_zero, "exp should be monotonically increasing");
-        assert!(result_zero <= result_pos, "exp should be monotonically increasing");
+        assert!(
+            result_neg <= result_zero,
+            "exp should be monotonically increasing"
+        );
+        assert!(
+            result_zero <= result_pos,
+            "exp should be monotonically increasing"
+        );
     }
 
     #[test]
@@ -280,14 +286,23 @@ mod tests {
         // sigmoid(0) = 0.5
         let result = sigmoid_lut(0);
         let expected = 32768u16; // 0.5 in Q0.16
-        assert!((result as i32 - expected as i32).abs() < 5000, "sigmoid(0) ≈ 0.5");
+        assert!(
+            (result as i32 - expected as i32).abs() < 5000,
+            "sigmoid(0) ≈ 0.5"
+        );
 
         // sigmoid is monotonically increasing
         let result_neg = sigmoid_lut(-1024);
         let result_zero = sigmoid_lut(0);
         let result_pos = sigmoid_lut(1024);
-        assert!(result_neg < result_zero, "sigmoid should be monotonically increasing");
-        assert!(result_zero < result_pos, "sigmoid should be monotonically increasing");
+        assert!(
+            result_neg < result_zero,
+            "sigmoid should be monotonically increasing"
+        );
+        assert!(
+            result_zero < result_pos,
+            "sigmoid should be monotonically increasing"
+        );
     }
 
     #[test]
