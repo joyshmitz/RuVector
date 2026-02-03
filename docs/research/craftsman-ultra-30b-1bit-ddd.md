@@ -1,6 +1,6 @@
 # Domain-Driven Design: Craftsman Ultra 30b 1bit
 
-**Version:** 2.3
+**Version:** 2.4
 **Date:** 2026-02-03
 **Relates to:** ADR-017-craftsman-ultra-30b-1bit-bitnet-integration
 **Status:** Research / Pre-Implementation
@@ -87,6 +87,10 @@ The following terms have precise meaning within the Craftsman Ultra domain. All 
 | **SIMD-Only Mode** | Phase 0.5 execution mode where all training runs on pure CPU SIMD (NEON on aarch64) without Metal GPU. All RLM components are GPU-agnostic except ContrastiveTrainer which has an explicit CPU fallback path. ~2-3x slower than Metal but extends platform support beyond macOS. |
 | **NEON Intrinsics** | ARM SIMD instruction set used by MicroLoRA's `forward_simd_neon_impl()` for 8x-unrolled forward passes. Available on all Apple Silicon and ARM64 platforms. x86 platforms fall to scalar fallback. |
 | **Scalar Fallback** | Platform-agnostic non-SIMD code path used when NEON (aarch64) is unavailable. Provides identical results at ~3-5x lower throughput. Enables Phase 0.5 on x86 Linux/Windows. |
+| **WASM SIMD128** | WebAssembly's fixed-width 128-bit SIMD extension (v128 type). Enables ternary kernel execution in browsers at ~4-8x over scalar WASM. Supported in all major browsers. Maps TL1's 16-entry LUT to v128.swizzle. |
+| **Dual-Target Compilation** | Cargo feature flag strategy where a single Rust codebase compiles to both native SIMD (NEON/AVX2/AVX512) and WASM SIMD128 via `#[cfg(target_arch)]` dispatch. |
+| **Bit-Sliced Ternary Matrix** | R3-Engine's approach to ternary storage: weights packed into 64-byte cache-aligned lines, processed via bitwise AND + popcount instead of traditional LUT. Enables branchless integer math. |
+| **VPOPCNTDQ** | AVX-512 vector population count instruction used by R3-Engine for ternary GEMM. Counts set bits in packed ternary representations to compute dot products via integer addition. |
 
 ---
 
@@ -1108,7 +1112,7 @@ All changes are additive. No existing backend, model, or API is modified. The `B
 | 2 | MLA (Multi-head Latent Attention) compatibility with ternary? | Phase 2 design | Open | MLA's compressed KV may conflict with ternary attention |
 | 3 | GLM-4.7-Flash tokenizer reuse or custom? | Model Lifecycle | Open | Likely reuse GLM-4 tokenizer (151K vocab) |
 | 4 | Distillation compute budget? | Phase 1 timeline | **Reduced** | RLM reuse reduces framework dev cost; compute still 800-1600 A100-hours but engineering effort ~70% less |
-| 5 | WASM target for ternary kernels? | Portability | Open | LUT-based kernels may not map to WASM SIMD efficiently |
+| 5 | WASM target for ternary kernels? | Portability | **Resolved (AD-21)** | Yes — WASM SIMD128 viable. TL1 LUT maps to v128.swizzle; R3-Engine proves dual-target Rust→WASM. ~20-40 tok/s browser. |
 | 6 | HuggingFace model name reservation? | Distribution | Open | Reserve `ruv/craftsman-ultra-30b-1bit` |
 | 7 | BitNet patent/license status? | Legal | Open | MIT license for bitnet.cpp; research papers are open |
 | 8 | Multi-Token Prediction (MTP) compat? | Speculative decoding | Open | GLM-4.7-Flash uses MTP; unclear if ternary draft model works |
@@ -1124,6 +1128,9 @@ All changes are additive. No existing backend, model, or API is modified. The `B
 | 18 | Add AVX2/AVX512 SIMD kernels to `matmul.rs`? | x86 SIMD-only performance | Open | Current kernels only have NEON (aarch64) + scalar fallback. Adding AVX2 would make x86 SIMD-only Phase 0.5 ~3-5x faster. Is it worth the effort vs just using ARM? |
 | 19 | SIMD-only vs Metal quality equivalence? | Phase 0.5 validation | Open | Does ContrastiveTrainer produce identical router accuracy on CPU vs Metal? Need empirical comparison to confirm no numerical divergence. |
 | 20 | Cloud ARM64 instances for SIMD-only Phase 0.5? | Platform portability | Open | AWS Graviton3/4 or Ampere Altra instances with 128+ GB RAM could run SIMD-only Phase 0.5 without Mac Studio. Cost-competitive? |
+| 21 | R3-Engine license compatibility? | Legal | Open | R3-Engine has no explicit license in README. Need to verify before referencing their bit-slicing approach in production code. bitnet.rs is Apache 2.0 (clear). |
+| 22 | WASM model size for browser deployment? | Feasibility | Open | 30B model is ~5.5GB ternary — too large for most browsers. Need streaming/chunked loading or deploy 2B-4T model for browser demo. |
+| 23 | SharedArrayBuffer for WASM multi-threading? | Performance | Open | WASM SIMD128 is single-threaded without SharedArrayBuffer + Web Workers. COOP/COEP headers required. Deployment complexity vs throughput gain? |
 
 ---
 
@@ -1149,3 +1156,6 @@ All changes are additive. No existing backend, model, or API is modified. The `B
 - RuvLLM MicroLoRA NEON SIMD: `crates/ruvllm/src/lora/micro_lora.rs:279-390`
 - RuvLLM NEON SIMD kernels: `crates/ruvllm/src/kernels/` (gemm_neon, gemv_neon, silu_neon, gelu_neon, relu_neon, rms_norm_neon, apply_rope_neon)
 - RuvLLM ContrastiveTrainer CPU fallback: `crates/ruvllm/src/training/contrastive.rs:171-175`
+- R3-Engine: Pure Rust BitNet inference with WASM SIMD128: https://github.com/r3-engine/r3-engine
+- bitnet.rs: Pure Rust BitNet toolkit (Apache 2.0): https://github.com/ocentra/bitnet.rs
+- WASM SIMD128 specification (V8): https://v8.dev/features/simd

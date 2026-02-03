@@ -1252,6 +1252,124 @@ The only config change is `ContrastiveTrainer.use_metal = false`. All other RLM 
 **Reused**: 100% of existing RLM stack — `MicroLoRA` NEON forward, ndarray training, `ContrastiveTrainer` CPU fallback, all existing SIMD kernels.
 **New**: 0 lines. SIMD-only mode is already supported by the existing code paths; AD-20 documents this capability explicitly.
 
+### AD-21: Native Rust Ternary Kernels with WASM Target (bitnet.cpp Port Strategy)
+
+**Decision**: Port bitnet.cpp's ternary inference kernels (TL1, TL2, I2_S) to native Rust with dual compilation targets: native SIMD (NEON/AVX2/AVX512) and WebAssembly SIMD128. This replaces the original AD-4 strategy of Python codegen → Rust intrinsics with a pure Rust implementation that leverages existing open-source work.
+
+**Rationale**: Three significant developments change the AD-4 implementation calculus:
+
+1. **R3-Engine** (https://github.com/r3-engine/r3-engine) — A pure Safe Rust BitNet inference engine achieving 80-117 tok/s single-threaded on Ryzen 9950X3D, with native WASM SIMD128 cross-compilation. Uses bit-sliced ternary matrices with AVX-512 VPOPCNTDQ, zero-copy mmap, and zero heap allocations during generation.
+
+2. **bitnet.rs** (https://github.com/ocentra/bitnet.rs) — Pure Rust BitNet toolkit with conversion, inference, training, and streaming. Apache 2.0 license. GPU path via WGSL/wgpu (Vulkan/Metal/DX12). Dedicated `bitnet-wasm` crate for browser deployment.
+
+3. **WASM SIMD128 maturity** — Fixed-width 128-bit SIMD now supported in all major browsers (Chrome, Firefox, Safari, Edge). Rust's `core::arch::wasm32` provides direct intrinsic access via `simd128` LLVM feature flag.
+
+**Comparison of approaches:**
+
+| Approach | Native Performance | WASM Support | Safety | Integration Effort | Code Reuse |
+|----------|-------------------|-------------|--------|-------------------|-----------|
+| **A: Python codegen (original AD-4)** | Optimal (platform-tuned) | None | C-level unsafe | High — custom codegen pipeline | bitnet.cpp algorithms |
+| **B: Port bitnet.cpp to Rust** | Near-optimal | Manual WASM SIMD | Mixed (`unsafe` for intrinsics) | Medium — translate C → Rust | bitnet.cpp algorithms |
+| **C: Reference R3-Engine patterns** | 80-117 tok/s proven | Native dual-target | 100% Safe Rust | Low-medium — adapt patterns | R3 bit-slicing + mmap |
+| **D: Integrate bitnet.rs crate** | GPU: 32x (WGSL), CPU: scalar | `bitnet-wasm` crate | Safe Rust + WGSL | Low — add dependency | Full crate |
+
+**Recommended: Approach C (Reference R3-Engine) with RuvLLM integration**
+
+R3-Engine's techniques are the strongest fit because:
+- **100% Safe Rust** — no `unsafe` blocks in the hot path
+- **Dual-target proven** — same codebase compiles to AVX-512 native and WASM SIMD128
+- **Zero-copy mmap** — matches our Phase 0 mmap strategy (AD-18)
+- **Cache-aligned bit-slicing** — 64-byte aligned CacheLines match CPU cache architecture
+- **VPOPCNTDQ** — bit-population-count approach to ternary GEMM is elegant and SIMD-width-agnostic
+
+**WASM SIMD128 kernel mapping for TL1:**
+
+```
+WASM SIMD128 provides v128 type (128 bits):
+- i8x16: 16 × 8-bit integers — pack 64 ternary weights (2-bit each)
+- i16x8: 8 × 16-bit integers — accumulation without overflow
+- i32x4: 4 × 32-bit integers — final dequantized output
+
+TL1 LUT (16 entries) maps naturally to a single v128:
+  v128.load(lut_ptr)           → load 16-entry LUT
+  v128.swizzle(lut, indices)   → parallel 16-way table lookup
+  i16x8.add(accum, partial)    → INT16 accumulation
+  f32x4.mul(dequant, scale)    → FP32 scale application
+
+Estimated WASM SIMD128 throughput:
+  ~20-40 tok/s for 3B active params (vs ~5-10 tok/s scalar JS)
+  ~4-8x speedup over non-SIMD WebAssembly
+```
+
+**WASM SIMD128 limitations:**
+- Fixed 128-bit width only (vs NEON 128, AVX2 256, AVX512 512)
+- No integer popcount instruction (must emulate VPOPCNTDQ via lookup or bit manipulation)
+- No gather/scatter operations (LUT access must be sequential or use swizzle)
+- Memory alignment not enforced (no hardware-guaranteed 64-byte alignment)
+- Single-threaded unless SharedArrayBuffer + Web Workers enabled
+
+**Dual-target compilation strategy (Cargo feature flags):**
+
+```rust
+// In Cargo.toml:
+[features]
+default = ["native-simd"]
+native-simd = []           # AVX2/AVX512/NEON via std::arch
+wasm-simd = ["simd128"]    # WASM SIMD128 via core::arch::wasm32
+
+// In kernel code:
+#[cfg(all(target_arch = "aarch64", feature = "native-simd"))]
+fn ternary_gemv_neon(weights: &TernaryTensor, activations: &[i8], output: &mut [f32]) { ... }
+
+#[cfg(all(target_arch = "x86_64", feature = "native-simd"))]
+fn ternary_gemv_avx2(weights: &TernaryTensor, activations: &[i8], output: &mut [f32]) { ... }
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-simd"))]
+fn ternary_gemv_wasm128(weights: &TernaryTensor, activations: &[i8], output: &mut [f32]) { ... }
+
+// Scalar fallback (always available):
+fn ternary_gemv_scalar(weights: &TernaryTensor, activations: &[i8], output: &mut [f32]) { ... }
+```
+
+**Integration with existing RuvLLM architecture:**
+
+| Existing Component | Change Needed | Impact |
+|-------------------|--------------|--------|
+| `kernels/mod.rs` | Add `ternary` module export | Low |
+| `kernels/matmul.rs` | Add ternary GEMV dispatch alongside existing FP16/Metal GEMV | Low |
+| `bitnet/mod.rs` (new) | Wire TernaryTensor to kernel dispatch | Already created (Phase 0) |
+| `gguf/quantization.rs` | BitnetT158 dequant already integrated | Already done |
+| `autodetect.rs` | Add AVX512 VPOPCNTDQ detection + WASM target detection | Low |
+| `Cargo.toml` | Add `wasm-simd` feature flag, `wasm32` target conditional deps | Low |
+| `backends/` | New `BitNetBackend` uses ternary kernel dispatch | Medium (new backend) |
+
+**Estimated implementation effort (Rust ternary kernels with WASM):**
+
+| Component | Lines | Complexity | Notes |
+|-----------|-------|-----------|-------|
+| TL1 kernel (NEON + scalar) | ~200 | Medium | Reference R3-Engine bit-slicing |
+| TL1 kernel (AVX2/AVX512) | ~250 | Medium | VPOPCNTDQ for AVX512, lookup for AVX2 |
+| TL1 kernel (WASM SIMD128) | ~150 | Medium | v128 swizzle + i16x8 accumulation |
+| I2_S kernel (all targets) | ~300 | Low | Simpler unpack-and-add |
+| TL2 kernel (all targets) | ~250 | Medium-High | 5-bit index, 32-entry LUT |
+| Kernel dispatch + autodetect | ~100 | Low | Match existing `matmul.rs` pattern |
+| LUT generation | ~80 | Low | Pre-compute at model load |
+| **Total** | **~1,330** | — | Compiles to native + WASM from single source |
+
+**Phase 0 impact**: The Phase 0 smoke test (TL1 NEON + scalar) is already partially covered by the existing `bitnet/` module. AD-21 extends this to production-grade kernels with WASM as an additional target.
+
+**Exit criteria:**
+- [ ] TL1 kernel passes bit-exact validation against bitnet.cpp reference output
+- [ ] WASM SIMD128 build produces functional `.wasm` binary
+- [ ] Native NEON throughput ≥ 80% of R3-Engine (≥ ~64-94 tok/s for 2B model)
+- [ ] AVX2 path tested on x86 Linux
+- [ ] Scalar fallback tested on generic platform
+- [ ] WASM throughput ≥ 20 tok/s for 3B active params in browser
+- [ ] Zero `unsafe` blocks in WASM path (Safe Rust only)
+- [ ] Kernel dispatch selects optimal path via `autodetect.rs` feature detection
+
+**Open question resolved**: AD-21 answers open question #5 (WASM target for ternary kernels) — **yes, WASM SIMD128 is viable** for TL1/I2_S, with ~4-8x speedup over scalar WASM. TL2's 5-bit index is less natural for 128-bit SIMD but still implementable via two-stage lookup.
+
 ---
 
 ## Consequences
@@ -1276,6 +1394,10 @@ The only config change is `ContrastiveTrainer.use_metal = false`. All other RLM 
 16. **100% RLM reuse for Phase 0.5**: No new training infrastructure needed — all 7 RLM components are production-tested and wire together directly
 17. **SIMD-only Phase 0.5**: Entire RLM refinement pipeline runs on pure CPU SIMD (NEON on aarch64) without Metal GPU — only ~2-3x slower than Metal, extends platform support to Linux ARM64 and (with scalar fallback) x86
 18. **Zero-config SIMD mode**: All training components (MicroLoRA, TrainingPipeline, EwcRegularizer, GrpoOptimizer) are already GPU-agnostic; only `ContrastiveTrainer.use_metal = false` needed for full SIMD-only execution
+19. **WASM browser deployment**: Native Rust kernels compile to WASM SIMD128 via Cargo feature flags, enabling in-browser ternary inference at ~20-40 tok/s without server roundtrip
+20. **Single-source dual-target**: One Rust codebase compiles to both native SIMD (NEON/AVX2/AVX512) and WASM SIMD128, eliminating the need for separate C++ and JS codebases
+21. **Safe Rust kernels**: Following R3-Engine's approach, production kernels can be 100% Safe Rust (no `unsafe` in hot path), eliminating entire classes of memory safety bugs vs bitnet.cpp's C++
+22. **Existing Rust ecosystem**: R3-Engine (Apache-compatible) and bitnet.rs (Apache 2.0) provide proven reference implementations to accelerate kernel development
 
 ### Negative
 
@@ -1284,7 +1406,7 @@ The only config change is `ContrastiveTrainer.use_metal = false`. All other RLM 
 3. **Quality gap**: Phase 1 may be 5-10% below GLM-4.7-Flash on some benchmarks
 4. **No GPU acceleration**: BitNet kernels are CPU-specific; GPU path requires separate optimization
 5. **Mixed-precision complexity**: Router (FP16) + experts (ternary) + attention (FP16/ternary) adds dispatch complexity
-6. **WASM limitation**: Ternary lookup table kernels may not translate efficiently to WASM SIMD
+6. **WASM SIMD128 ceiling**: Fixed 128-bit width limits throughput vs native AVX2 (256-bit) or AVX512 (512-bit); no popcount instruction requires emulation; single-threaded unless SharedArrayBuffer enabled — expect ~20-40 tok/s vs ~80-117 tok/s native
 7. **RLM scale gap**: Existing `RealContrastiveTrainer` targets 0.5B models (embedding_dim=896); scaling to 30B requires distributed data loading and increased batch sizes
 8. **No x86 SIMD kernels**: Current `kernels/matmul.rs` only implements NEON (aarch64); x86 falls to scalar fallback (~3-5x slower than NEON). Adding AVX2/AVX512 kernels would make x86 SIMD-only mode competitive but is not yet implemented
 
@@ -1387,3 +1509,9 @@ The only config change is `ContrastiveTrainer.use_metal = false`. All other RLM 
 24. RuvLLM MicroLoRA NEON SIMD forward: `crates/ruvllm/src/lora/micro_lora.rs:279-390` (forward_simd, forward_simd_neon_impl)
 25. RuvLLM NEON SIMD kernels: `crates/ruvllm/src/kernels/` (matmul: gemm_neon/gemv_neon, activations: silu_neon/gelu_neon/relu_neon, norm: rms_norm_neon, rope: apply_rope_neon)
 26. RuvLLM ContrastiveTrainer CPU fallback: `crates/ruvllm/src/training/contrastive.rs:171-175` (Metal → CPU fallback) and `contrastive.rs:475` (non-Candle pure CPU path)
+27. R3-Engine: Pure Rust BitNet inference engine with WASM SIMD128 — https://github.com/r3-engine/r3-engine
+28. bitnet.rs: Pure Rust BitNet toolkit (Apache 2.0) — https://github.com/ocentra/bitnet.rs
+29. WASM SIMD128 specification: Fixed-width 128-bit SIMD for WebAssembly — https://v8.dev/features/simd
+30. Rust `core::arch::wasm32` SIMD intrinsics — https://doc.rust-lang.org/beta/core/arch/wasm32/index.html
+31. "The state of SIMD in Rust in 2025" (Sergey Davidoff) — https://shnatsel.medium.com/the-state-of-simd-in-rust-in-2025-32c263e5f53d
+32. "Rust + WebAssembly 2025: WasmGC and SIMD" — https://dev.to/dataformathub/rust-webassembly-2025-why-wasmgc-and-simd-change-everything-3ldh
