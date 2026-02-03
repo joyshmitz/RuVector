@@ -29,6 +29,7 @@
 //! | IQ4_NL | 4.5 | 32 | i-quant 4-bit non-linear |
 
 use crate::error::{Result, RuvLLMError};
+use crate::bitnet::dequantize_bitnet_t158;
 
 // ============================================================================
 // Quantization Types
@@ -100,6 +101,8 @@ pub enum GgufQuantType {
     F64 = 28,
     /// BF16 brain float
     Bf16 = 29,
+    /// BitNet b1.58 ternary quantization (2-bit packed)
+    BitnetT158 = 30,
 }
 
 impl TryFrom<u32> for GgufQuantType {
@@ -137,6 +140,7 @@ impl TryFrom<u32> for GgufQuantType {
             27 => Ok(Self::I64),
             28 => Ok(Self::F64),
             29 => Ok(Self::Bf16),
+            30 => Ok(Self::BitnetT158),
             _ => Err(RuvLLMError::Model(format!(
                 "Unknown GGUF quantization type: {}",
                 value
@@ -163,6 +167,7 @@ impl GgufQuantType {
             Self::IQ1_S => 256,
             Self::IQ4_NL => 32,
             Self::IQ4_XS => 256,
+            Self::BitnetT158 => 256,
         }
     }
 
@@ -214,6 +219,8 @@ impl GgufQuantType {
             Self::IQ1_S => 50,
             Self::IQ4_NL => 18,
             Self::IQ4_XS => 136,
+            // BitNet b1.58: 256 elements -> 64 bytes (2-bit packed) + 2 bytes (FP16 scale) = 66 bytes
+            Self::BitnetT158 => 66,
         }
     }
 
@@ -280,6 +287,7 @@ impl GgufQuantType {
             Self::IQ1_S => "IQ1_S",
             Self::IQ4_NL => "IQ4_NL",
             Self::IQ4_XS => "IQ4_XS",
+            Self::BitnetT158 => "BITNET_T158",
         }
     }
 }
@@ -355,6 +363,14 @@ pub fn dequantize_tensor(
         GgufQuantType::Q5_K => dequantize_q5_k(data, &mut output),
         GgufQuantType::Q6_K => dequantize_q6_k(data, &mut output),
         GgufQuantType::IQ4_NL => dequantize_iq4_nl(data, &mut output),
+        GgufQuantType::BitnetT158 => dequantize_bitnet_t158_wrapper(data, &mut output),
+        GgufQuantType::IQ1_S => {
+            return Err(RuvLLMError::Model(
+                "IQ1_S dequantization requires codebook lookup tables (not yet implemented). \
+                 For BitNet ternary quantization, use BITNET_T158 type instead."
+                    .to_string(),
+            ));
+        }
         _ => {
             return Err(RuvLLMError::Model(format!(
                 "Dequantization not implemented for {:?}",
