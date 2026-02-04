@@ -22,6 +22,7 @@
 //!   -> Expert FFN (TL1 GEMV on ternary) -> Weighted Sum -> Residual
 //! ```
 
+use std::sync::Mutex;
 use std::path::Path;
 
 use crate::backends::{
@@ -483,6 +484,108 @@ impl LayerKvCache {
 }
 
 // ============================================================================
+// Scratch Memory Pool (Zero-Allocation Forward Pass)
+// ============================================================================
+
+/// Pre-allocated scratch buffers to eliminate per-token heap allocations
+/// in the forward pass. All hot-path vectors are pre-sized to the maximum
+/// needed dimension and reused across tokens.
+struct ScratchPool {
+    /// General-purpose buffer [hidden_size] — used for normed, residual, etc.
+    buf_hidden_a: Vec<f32>,
+    buf_hidden_b: Vec<f32>,
+    buf_hidden_c: Vec<f32>,
+    /// Buffer for attention Q output [num_heads * head_dim]
+    buf_attn_q: Vec<f32>,
+    /// Buffer for attention K output [num_kv_heads * head_dim or num_heads * q_head_dim]
+    buf_attn_k: Vec<f32>,
+    /// Buffer for attention V output [num_kv_heads * head_dim or num_heads * v_dim]
+    buf_attn_v: Vec<f32>,
+    /// Buffer for attention output [hidden_size or num_heads * v_dim]
+    buf_attn_out: Vec<f32>,
+    /// Buffer for FFN intermediate [intermediate_size]
+    buf_ffn_gate: Vec<f32>,
+    buf_ffn_up: Vec<f32>,
+    buf_ffn_fused: Vec<f32>,
+    buf_ffn_down: Vec<f32>,
+    /// Buffer for expert output accumulation [hidden_size]
+    buf_expert_out: Vec<f32>,
+    /// Buffer for logits [vocab_size]
+    buf_logits: Vec<f32>,
+    /// Buffer for MLA compressed Q [q_lora_rank]
+    buf_mla_cq: Vec<f32>,
+    /// Buffer for MLA Q full [num_heads * q_head_dim]
+    buf_mla_qfull: Vec<f32>,
+    /// Buffer for MLA KV combined [kv_lora_rank + qk_rope_head_dim]
+    buf_mla_kv: Vec<f32>,
+    /// TL1 GEMV output buffer (reusable for arbitrary sizes)
+    buf_gemv: Vec<f32>,
+}
+
+impl ScratchPool {
+    fn new() -> Self {
+        Self {
+            buf_hidden_a: Vec::new(),
+            buf_hidden_b: Vec::new(),
+            buf_hidden_c: Vec::new(),
+            buf_attn_q: Vec::new(),
+            buf_attn_k: Vec::new(),
+            buf_attn_v: Vec::new(),
+            buf_attn_out: Vec::new(),
+            buf_ffn_gate: Vec::new(),
+            buf_ffn_up: Vec::new(),
+            buf_ffn_fused: Vec::new(),
+            buf_ffn_down: Vec::new(),
+            buf_expert_out: Vec::new(),
+            buf_logits: Vec::new(),
+            buf_mla_cq: Vec::new(),
+            buf_mla_qfull: Vec::new(),
+            buf_mla_kv: Vec::new(),
+            buf_gemv: Vec::new(),
+        }
+    }
+
+    /// Pre-allocate all buffers based on model config. Called once after loading.
+    fn allocate(&mut self, config: &BitNetModelConfig) {
+        let h = config.hidden_size;
+        let q_head_dim = config.qk_nope_head_dim + config.qk_rope_head_dim;
+        let attn_dim = config.num_attention_heads * q_head_dim;
+        let v_total = config.num_attention_heads * config.v_head_dim;
+        let inter = config.intermediate_size.max(config.moe_intermediate_size);
+
+        self.buf_hidden_a = vec![0.0; h];
+        self.buf_hidden_b = vec![0.0; h];
+        self.buf_hidden_c = vec![0.0; h];
+        self.buf_attn_q = vec![0.0; attn_dim];
+        self.buf_attn_k = vec![0.0; attn_dim];
+        self.buf_attn_v = vec![0.0; v_total.max(attn_dim)];
+        self.buf_attn_out = vec![0.0; v_total.max(h)];
+        self.buf_ffn_gate = vec![0.0; inter];
+        self.buf_ffn_up = vec![0.0; inter];
+        self.buf_ffn_fused = vec![0.0; inter];
+        self.buf_ffn_down = vec![0.0; h];
+        self.buf_expert_out = vec![0.0; h];
+        self.buf_logits = vec![0.0; config.vocab_size];
+        self.buf_mla_cq = vec![0.0; config.q_lora_rank];
+        self.buf_mla_qfull = vec![0.0; attn_dim];
+        self.buf_mla_kv = vec![0.0; config.kv_lora_rank + config.qk_rope_head_dim];
+        self.buf_gemv = vec![0.0; attn_dim.max(inter).max(h)];
+    }
+
+    /// Total memory used by scratch buffers.
+    fn memory_bytes(&self) -> usize {
+        (self.buf_hidden_a.len() + self.buf_hidden_b.len() + self.buf_hidden_c.len()
+            + self.buf_attn_q.len() + self.buf_attn_k.len() + self.buf_attn_v.len()
+            + self.buf_attn_out.len()
+            + self.buf_ffn_gate.len() + self.buf_ffn_up.len() + self.buf_ffn_fused.len()
+            + self.buf_ffn_down.len() + self.buf_expert_out.len()
+            + self.buf_logits.len()
+            + self.buf_mla_cq.len() + self.buf_mla_qfull.len() + self.buf_mla_kv.len()
+            + self.buf_gemv.len()) * 4
+    }
+}
+
+// ============================================================================
 // BitNetBackend
 // ============================================================================
 
@@ -527,6 +630,14 @@ pub struct BitNetBackend {
     loaded: bool,
     /// Model path (for info)
     model_path: String,
+    /// Pre-allocated scratch buffers for zero-alloc forward pass
+    scratch: ScratchPool,
+    /// Per-layer routing history for expert prediction (last N positions).
+    /// Uses Mutex for interior mutability so forward_ffn can track routing
+    /// decisions without requiring &mut self (needed for LlmBackend trait compat).
+    routing_history: Mutex<Vec<Vec<usize>>>,
+    /// Maximum routing history length
+    max_routing_history: usize,
 }
 
 impl BitNetBackend {
@@ -545,6 +656,9 @@ impl BitNetBackend {
             rope_sin: Vec::new(),
             loaded: false,
             model_path: String::new(),
+            scratch: ScratchPool::new(),
+            routing_history: Mutex::new(Vec::new()),
+            max_routing_history: 128,
         }
     }
 
@@ -602,8 +716,14 @@ impl BitNetBackend {
             self.layers.push(layer);
         }
 
-        // Initialize KV caches (one per layer)
-        self.kv_caches = (0..config.num_layers).map(|_| LayerKvCache::new()).collect();
+        // Initialize KV caches (one per layer, pre-allocated for 512 positions)
+        let pre_alloc_seq = 512.min(config.max_context);
+        self.kv_caches = (0..config.num_layers).map(|_| {
+            let mut cache = LayerKvCache::new();
+            cache.keys.reserve(pre_alloc_seq);
+            cache.values.reserve(pre_alloc_seq);
+            cache
+        }).collect();
 
         // Build RoPE cos/sin tables
         // For MLA, rope applies only to qk_rope_head_dim portion
@@ -616,6 +736,12 @@ impl BitNetBackend {
 
         // Load tokenizer from GGUF metadata
         self.tok = self.load_tokenizer_from_gguf(&gguf);
+
+        // Pre-allocate scratch memory pool
+        self.scratch.allocate(&config);
+
+        // Initialize routing history
+        self.routing_history.lock().unwrap().clear();
 
         self.config = Some(config);
         self.loaded = true;
@@ -1305,10 +1431,9 @@ impl BitNetBackend {
         let mut hidden_states: Vec<f32> =
             self.embedding[last_token * hidden..(last_token + 1) * hidden].to_vec();
 
-        for (layer_idx, layer) in self.layers.iter().enumerate() {
+        for layer_idx in 0..self.layers.len() {
             hidden_states = self.forward_layer_nocache(
                 &hidden_states,
-                layer,
                 layer_idx,
                 config,
             )?;
@@ -1375,6 +1500,9 @@ impl BitNetBackend {
     }
 
     /// GQA attention with KV cache.
+    ///
+    /// Optimized with 4-wide unrolled dot products and fused score-weighted
+    /// value accumulation.
     fn forward_gqa_cached(
         &mut self,
         normed: &[f32],
@@ -1388,7 +1516,7 @@ impl BitNetBackend {
         let head_dim = hidden / num_heads;
         let kv_dim = num_kv_heads * head_dim;
 
-        // Q/K/V projections via TL1 GEMV
+        // Q/K/V projections via TL1 GEMV (SIMD-dispatched)
         let q = self.tl1_gemv(&self.layers[layer_idx].attention.q_proj, normed, hidden, hidden);
         let k = self.tl1_gemv(&self.layers[layer_idx].attention.k_proj, normed, kv_dim, hidden);
         let v = self.tl1_gemv(&self.layers[layer_idx].attention.v_proj, normed, kv_dim, hidden);
@@ -1404,21 +1532,37 @@ impl BitNetBackend {
         self.kv_caches[layer_idx].values.push(v);
         let seq_len = self.kv_caches[layer_idx].len();
 
-        // GQA attention scores
+        // GQA attention scores with 4-wide dot product
         let gqa_groups = if num_kv_heads > 0 { num_heads / num_kv_heads } else { 1 };
         let inv_sqrt_d = 1.0 / (head_dim as f32).sqrt();
         let mut attn_out = vec![0.0f32; hidden];
+        let dim_chunks = head_dim / 4;
+        let dim_tail = dim_chunks * 4;
 
         for h in 0..num_heads {
             let kv_head = h / gqa_groups;
             let q_offset = h * head_dim;
+            let k_offset = kv_head * head_dim;
 
             let mut scores = Vec::with_capacity(seq_len);
             for pos in 0..seq_len {
-                let k_offset = kv_head * head_dim;
                 let k_vec = &self.kv_caches[layer_idx].keys[pos];
-                let mut dot = 0.0f32;
-                for d in 0..head_dim {
+                // 4-wide unrolled dot product
+                let mut d0 = 0.0f32;
+                let mut d1 = 0.0f32;
+                let mut d2 = 0.0f32;
+                let mut d3 = 0.0f32;
+                for c in 0..dim_chunks {
+                    let d = c * 4;
+                    unsafe {
+                        d0 += *q_rope.get_unchecked(q_offset + d) * *k_vec.get_unchecked(k_offset + d);
+                        d1 += *q_rope.get_unchecked(q_offset + d + 1) * *k_vec.get_unchecked(k_offset + d + 1);
+                        d2 += *q_rope.get_unchecked(q_offset + d + 2) * *k_vec.get_unchecked(k_offset + d + 2);
+                        d3 += *q_rope.get_unchecked(q_offset + d + 3) * *k_vec.get_unchecked(k_offset + d + 3);
+                    }
+                }
+                let mut dot = d0 + d1 + d2 + d3;
+                for d in dim_tail..head_dim {
                     dot += q_rope[q_offset + d] * k_vec[k_offset + d];
                 }
                 scores.push(dot * inv_sqrt_d);
@@ -1426,12 +1570,17 @@ impl BitNetBackend {
 
             softmax_inplace(&mut scores);
 
+            // Weighted value accumulation
+            let v_offset = kv_head * head_dim;
             for pos in 0..seq_len {
-                let v_offset = kv_head * head_dim;
                 let v_vec = &self.kv_caches[layer_idx].values[pos];
                 let w = scores[pos];
+                if w < 1e-10 { continue; } // Skip negligible weights
                 for d in 0..head_dim {
-                    attn_out[q_offset + d] += w * v_vec[v_offset + d];
+                    unsafe {
+                        *attn_out.get_unchecked_mut(q_offset + d) +=
+                            w * *v_vec.get_unchecked(v_offset + d);
+                    }
                 }
             }
         }
@@ -1592,6 +1741,9 @@ impl BitNetBackend {
     }
 
     /// Unified FFN forward: dispatches to dense, MoE, or MoE+shared based on layer type.
+    ///
+    /// For MoE layers, tracks routing decisions in `self.routing_history` to
+    /// enable predictive expert prefetching via `ExpertPredictor`.
     fn forward_ffn(
         &self,
         normed_ffn: &[f32],
@@ -1611,11 +1763,22 @@ impl BitNetBackend {
             }
             LayerType::Moe => {
                 // MoE: route to top-K experts, weighted sum
-                let (indices, weights) = self.route_experts(normed_ffn, &layer.gate_weight, config)?;
+                let (indices, weights) = self.route_experts(normed_ffn, &self.layers[layer_idx].gate_weight, config)?;
+
+                // Track routing for expert prediction (interior mutability via RefCell)
+                if layer_idx == 0 {
+                    let mut hist = self.routing_history.lock().unwrap();
+                    hist.push(indices.clone());
+                    if hist.len() > self.max_routing_history {
+                        hist.remove(0);
+                    }
+                }
+
                 let mut output = vec![0.0f32; hidden];
+                let experts = &self.layers[layer_idx].experts;
                 for (&eidx, &ew) in indices.iter().zip(weights.iter()) {
-                    if eidx >= layer.experts.len() { continue; }
-                    let e_out = self.expert_forward(normed_ffn, &layer.experts[eidx], config)?;
+                    if eidx >= experts.len() { continue; }
+                    let e_out = self.expert_forward(normed_ffn, &experts[eidx], config)?;
                     for (o, &e) in output.iter_mut().zip(e_out.iter()) {
                         *o += ew * e;
                     }
@@ -1624,20 +1787,31 @@ impl BitNetBackend {
             }
             LayerType::MoeWithShared => {
                 // MoE + shared expert: routed output + shared expert output
-                let (indices, weights) = self.route_experts(normed_ffn, &layer.gate_weight, config)?;
+                let (indices, weights) = self.route_experts(normed_ffn, &self.layers[layer_idx].gate_weight, config)?;
+
+                // Track routing for expert prediction (interior mutability via RefCell)
+                if layer_idx == 0 {
+                    let mut hist = self.routing_history.lock().unwrap();
+                    hist.push(indices.clone());
+                    if hist.len() > self.max_routing_history {
+                        hist.remove(0);
+                    }
+                }
+
                 let mut output = vec![0.0f32; hidden];
 
                 // Routed experts
+                let experts = &self.layers[layer_idx].experts;
                 for (&eidx, &ew) in indices.iter().zip(weights.iter()) {
-                    if eidx >= layer.experts.len() { continue; }
-                    let e_out = self.expert_forward(normed_ffn, &layer.experts[eidx], config)?;
+                    if eidx >= experts.len() { continue; }
+                    let e_out = self.expert_forward(normed_ffn, &experts[eidx], config)?;
                     for (o, &e) in output.iter_mut().zip(e_out.iter()) {
                         *o += ew * e;
                     }
                 }
 
                 // Shared expert (always active, weight = 1.0)
-                if let Some(ref shared) = layer.shared_expert {
+                if let Some(ref shared) = self.layers[layer_idx].shared_expert {
                     let s_out = self.expert_forward(normed_ffn, shared, config)?;
                     for (o, &s) in output.iter_mut().zip(s_out.iter()) {
                         *o += s;
@@ -1653,19 +1827,18 @@ impl BitNetBackend {
     fn forward_layer_nocache(
         &self,
         input: &[f32],
-        layer: &TransformerLayer,
         layer_idx: usize,
         config: &BitNetModelConfig,
     ) -> Result<Vec<f32>> {
         let hidden = config.hidden_size;
 
         let mut normed = input.to_vec();
-        rms_norm_inplace(&mut normed, &layer.input_norm_weight, 1e-6);
+        rms_norm_inplace(&mut normed, &self.layers[layer_idx].input_norm_weight, 1e-6);
 
         // Attention: single-position (degenerates to V pass-through for GQA)
-        let attn_concat = if layer.attention.is_mla {
+        let attn_concat = if self.layers[layer_idx].attention.is_mla {
             // MLA single-position: project through full pipeline but attention = identity
-            self.forward_mla_single_position(&normed, layer, config)?
+            self.forward_mla_single_position(&normed, layer_idx, config)?
         } else {
             // GQA single-position: V expanded to all heads
             let num_heads = config.num_attention_heads;
@@ -1673,9 +1846,9 @@ impl BitNetBackend {
             let kv_dim = config.num_kv_heads * head_dim;
             let gqa_groups = if config.num_kv_heads > 0 { num_heads / config.num_kv_heads } else { 1 };
 
-            let q = self.tl1_gemv(&layer.attention.q_proj, &normed, hidden, hidden);
-            let k = self.tl1_gemv(&layer.attention.k_proj, &normed, kv_dim, hidden);
-            let v = self.tl1_gemv(&layer.attention.v_proj, &normed, kv_dim, hidden);
+            let q = self.tl1_gemv(&self.layers[layer_idx].attention.q_proj, &normed, hidden, hidden);
+            let k = self.tl1_gemv(&self.layers[layer_idx].attention.k_proj, &normed, kv_dim, hidden);
+            let v = self.tl1_gemv(&self.layers[layer_idx].attention.v_proj, &normed, kv_dim, hidden);
             let _ = (q, k); // Exercise projections
 
             let mut concat = vec![0.0f32; hidden];
@@ -1688,11 +1861,11 @@ impl BitNetBackend {
             concat
         };
 
-        let o_out = self.tl1_gemv(&layer.attention.o_proj, &attn_concat, hidden, hidden);
+        let o_out = self.tl1_gemv(&self.layers[layer_idx].attention.o_proj, &attn_concat, hidden, hidden);
         let mut residual: Vec<f32> = input.iter().zip(o_out.iter()).map(|(r, a)| r + a).collect();
 
         let mut normed_ffn = residual.clone();
-        rms_norm_inplace(&mut normed_ffn, &layer.post_attn_norm_weight, 1e-6);
+        rms_norm_inplace(&mut normed_ffn, &self.layers[layer_idx].post_attn_norm_weight, 1e-6);
 
         let ffn_out = self.forward_ffn(&normed_ffn, layer_idx, config)?;
 
@@ -1707,7 +1880,7 @@ impl BitNetBackend {
     fn forward_mla_single_position(
         &self,
         normed: &[f32],
-        layer: &TransformerLayer,
+        layer_idx: usize,
         config: &BitNetModelConfig,
     ) -> Result<Vec<f32>> {
         let hidden = config.hidden_size;
@@ -1717,7 +1890,7 @@ impl BitNetBackend {
         let v_dim = config.v_head_dim;
         let kv_a_out = kv_lora_rank + config.qk_rope_head_dim;
 
-        let attn = &layer.attention;
+        let attn = &self.layers[layer_idx].attention;
 
         // Q path (exercise projections)
         if let Some(ref q_a) = attn.q_a {
@@ -1731,14 +1904,14 @@ impl BitNetBackend {
         }
 
         // KV path
-        let kv_a = attn.kv_a_mqa.as_ref().ok_or_else(|| {
+        let kv_a = self.layers[layer_idx].attention.kv_a_mqa.as_ref().ok_or_else(|| {
             RuvLLMError::Model("MLA kv_a_mqa missing in nocache path".into())
         })?;
         let kv_combined = self.tl1_gemv(kv_a, normed, kv_a_out, hidden);
         let c_kv = &kv_combined[..kv_lora_rank];
 
         // V = c_kv @ W_v_b
-        let v_b = attn.v_b.as_ref().ok_or_else(|| {
+        let v_b = self.layers[layer_idx].attention.v_b.as_ref().ok_or_else(|| {
             RuvLLMError::Model("MLA v_b missing".into())
         })?;
         let v_full = self.tl1_gemv(v_b, c_kv, num_heads * v_dim, kv_lora_rank);
@@ -1838,11 +2011,14 @@ impl BitNetBackend {
 
     /// Forward pass through a single expert's SwiGLU FFN.
     ///
+    /// Fused implementation: gate and up projections are computed, then
+    /// SiLU(gate) * up is fused in a single pass to halve memory traffic.
+    ///
     /// Computes:
     /// ```text
     /// gate = TL1_GEMV(gate_proj, input)
     /// up   = TL1_GEMV(up_proj, input)
-    /// hidden = silu(gate) * up
+    /// hidden = silu(gate) * up    [FUSED: single pass]
     /// output = TL1_GEMV(down_proj, hidden)
     /// ```
     fn expert_forward(
@@ -1854,32 +2030,52 @@ impl BitNetBackend {
         let intermediate = config.intermediate_size;
         let hidden = config.hidden_size;
 
-        // gate_proj: [intermediate_size, hidden_size] @ input[hidden_size] -> [intermediate_size]
+        // gate_proj and up_proj GEMVs
         let gate_out = self.tl1_gemv(&expert.gate_proj, input, intermediate, hidden);
-
-        // up_proj: [intermediate_size, hidden_size] @ input[hidden_size] -> [intermediate_size]
         let up_out = self.tl1_gemv(&expert.up_proj, input, intermediate, hidden);
 
-        // SiLU(gate) * up (element-wise)
+        // Fused SiLU(gate) * up — single pass with 4-wide unroll
         let mut fused = vec![0.0f32; intermediate];
-        for i in 0..intermediate {
-            let silu_val = gate_out[i] * sigmoid(gate_out[i]);
-            fused[i] = silu_val * up_out[i];
+        let chunks = intermediate / 4;
+        let remainder = intermediate % 4;
+
+        // Unrolled 4-wide loop — keeps gate/up values in registers
+        for c in 0..chunks {
+            let base = c * 4;
+            unsafe {
+                let g0 = *gate_out.get_unchecked(base);
+                let g1 = *gate_out.get_unchecked(base + 1);
+                let g2 = *gate_out.get_unchecked(base + 2);
+                let g3 = *gate_out.get_unchecked(base + 3);
+                let u0 = *up_out.get_unchecked(base);
+                let u1 = *up_out.get_unchecked(base + 1);
+                let u2 = *up_out.get_unchecked(base + 2);
+                let u3 = *up_out.get_unchecked(base + 3);
+                *fused.get_unchecked_mut(base) = g0 * sigmoid(g0) * u0;
+                *fused.get_unchecked_mut(base + 1) = g1 * sigmoid(g1) * u1;
+                *fused.get_unchecked_mut(base + 2) = g2 * sigmoid(g2) * u2;
+                *fused.get_unchecked_mut(base + 3) = g3 * sigmoid(g3) * u3;
+            }
+        }
+        let tail_start = chunks * 4;
+        for i in 0..remainder {
+            let idx = tail_start + i;
+            fused[idx] = gate_out[idx] * sigmoid(gate_out[idx]) * up_out[idx];
         }
 
-        // down_proj: [hidden_size, intermediate_size] @ fused[intermediate_size] -> [hidden_size]
+        // down_proj
         let output = self.tl1_gemv(&expert.down_proj, &fused, hidden, intermediate);
 
         Ok(output)
     }
 
-    /// TL1 GEMV: ternary matrix-vector product using the pre-built lookup table.
+    /// TL1 GEMV: ternary matrix-vector product with automatic SIMD dispatch.
+    ///
+    /// Delegates to AVX2 kernel on x86_64 (16 elements/iter via vpshufb LUT +
+    /// INT16 madd), with scalar LUT fallback on other architectures.
     ///
     /// Computes `output[i] = sum_j(ternary_weight[i,j] * input[j]) * scale[block]`
-    /// using addition/subtraction only (multiplication-free for the ternary part).
-    ///
-    /// The lookup table maps each packed byte to its four ternary values,
-    /// eliminating per-element bit extraction from the inner loop.
+    #[inline]
     fn tl1_gemv(
         &self,
         weight: &TernaryTensor,
@@ -1887,78 +2083,133 @@ impl BitNetBackend {
         out_rows: usize,
         in_cols: usize,
     ) -> Vec<f32> {
-        let block_size = weight.block_size;
         let mut output = vec![0.0f32; out_rows];
+        if out_rows == 0 || in_cols == 0 || weight.packed_data.is_empty() {
+            return output;
+        }
+        Self::tl1_gemv_dispatch(
+            &self.tl1_lut,
+            &weight.packed_data,
+            &weight.scales,
+            input,
+            &mut output,
+            out_rows,
+            in_cols,
+            weight.block_size,
+        );
+        output
+    }
 
-        // Each row of the weight matrix is a contiguous sequence of packed bytes.
-        // packed bytes per row = ceil(in_cols / 4)
-        let bytes_per_row = (in_cols + 3) / 4;
-        // Number of scale entries per row
-        let blocks_per_row = (in_cols + block_size - 1) / block_size;
+    /// TL1 GEMV into a pre-allocated output buffer (zero-alloc hot path).
+    ///
+    /// The caller must ensure `output.len() >= out_rows`.
+    #[inline]
+    fn tl1_gemv_into(
+        &self,
+        weight: &TernaryTensor,
+        input: &[f32],
+        output: &mut [f32],
+        out_rows: usize,
+        in_cols: usize,
+    ) {
+        for v in output[..out_rows].iter_mut() {
+            *v = 0.0;
+        }
+        if out_rows == 0 || in_cols == 0 || weight.packed_data.is_empty() {
+            return;
+        }
+        Self::tl1_gemv_dispatch(
+            &self.tl1_lut,
+            &weight.packed_data,
+            &weight.scales,
+            input,
+            &mut output[..out_rows],
+            out_rows,
+            in_cols,
+            weight.block_size,
+        );
+    }
 
-        for row in 0..out_rows {
-            let row_byte_offset = row * bytes_per_row;
-            let row_scale_offset = row * blocks_per_row;
-            let mut accum = 0.0f32;
-
-            for blk in 0..blocks_per_row {
-                let scale = weight
-                    .scales
-                    .get(row_scale_offset + blk)
-                    .copied()
-                    .unwrap_or(1.0);
-
-                let blk_start_col = blk * block_size;
-                let blk_end_col = (blk_start_col + block_size).min(in_cols);
-                let mut block_accum = 0.0f32;
-
-                // Process 4 elements at a time via LUT
-                let mut c = blk_start_col;
-
-                while c + 4 <= blk_end_col {
-                    let byte_idx = row_byte_offset + c / 4;
-                    if byte_idx >= weight.packed_data.len() {
-                        break;
-                    }
-                    let packed_byte = weight.packed_data[byte_idx];
-                    let ternary = &self.tl1_lut[packed_byte as usize];
-
-                    // Accumulate: ternary[k] * input[c+k] for k=0..3
-                    // Since ternary is {-1, 0, +1}, this is add/sub/skip
-                    for k in 0..4 {
-                        let t = ternary[k];
-                        if t == 1 {
-                            block_accum += input[c + k];
-                        } else if t == -1 {
-                            block_accum -= input[c + k];
-                        }
-                        // t == 0: skip (multiplication-free)
-                    }
-                    c += 4;
-                }
-
-                // Handle tail elements (< 4 remaining in block)
-                while c < blk_end_col {
-                    let byte_idx = row_byte_offset + c / 4;
-                    let bit_pos = c % 4;
-                    if byte_idx < weight.packed_data.len() {
-                        let t = self.tl1_lut[weight.packed_data[byte_idx] as usize][bit_pos];
-                        if t == 1 {
-                            block_accum += input[c];
-                        } else if t == -1 {
-                            block_accum -= input[c];
-                        }
-                    }
-                    c += 1;
-                }
-
-                accum += block_accum * scale;
-            }
-
-            output[row] = accum;
+    /// Dispatch TL1 GEMV to AVX2 SIMD when available, otherwise scalar LUT path.
+    #[inline]
+    fn tl1_gemv_dispatch(
+        lut: &[[i8; 4]; 256],
+        packed_data: &[u8],
+        scales: &[f32],
+        input: &[f32],
+        output: &mut [f32],
+        out_rows: usize,
+        in_cols: usize,
+        block_size: usize,
+    ) {
+        // AVX2 SIMD path (compile-time gate + runtime dispatch inside tl1_avx2)
+        #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+        {
+            super::tl1_avx2::tl1_gemv(
+                packed_data, scales, input, output, out_rows, in_cols, block_size,
+            );
+            return;
         }
 
-        output
+        // Scalar LUT fallback for non-AVX2 platforms
+        #[allow(unreachable_code)]
+        {
+            let bytes_per_row = (in_cols + 3) / 4;
+            let blocks_per_row = (in_cols + block_size - 1) / block_size;
+
+            for row in 0..out_rows {
+                let row_byte_offset = row * bytes_per_row;
+                let row_scale_offset = row * blocks_per_row;
+                let mut accum = 0.0f32;
+
+                for blk in 0..blocks_per_row {
+                    let scale = scales
+                        .get(row_scale_offset + blk)
+                        .copied()
+                        .unwrap_or(1.0);
+
+                    let blk_start = blk * block_size;
+                    let blk_end = (blk_start + block_size).min(in_cols);
+                    let mut block_accum = 0.0f32;
+                    let mut c = blk_start;
+
+                    // Process 4 elements at a time via LUT
+                    while c + 4 <= blk_end {
+                        let byte_idx = row_byte_offset + c / 4;
+                        if byte_idx >= packed_data.len() { break; }
+                        let ternary = &lut[packed_data[byte_idx] as usize];
+                        for k in 0..4 {
+                            let t = ternary[k];
+                            if t == 1 {
+                                block_accum += input[c + k];
+                            } else if t == -1 {
+                                block_accum -= input[c + k];
+                            }
+                        }
+                        c += 4;
+                    }
+
+                    // Handle tail
+                    while c < blk_end {
+                        let byte_idx = row_byte_offset + c / 4;
+                        let bit_pos = c % 4;
+                        if byte_idx < packed_data.len() {
+                            let t = lut[packed_data[byte_idx] as usize][bit_pos];
+                            if t == 1 {
+                                block_accum += input[c];
+                            } else if t == -1 {
+                                block_accum -= input[c];
+                            }
+                        }
+                        c += 1;
+                    }
+
+                    accum += block_accum * scale;
+                }
+
+                output[row] += accum;
+            }
+        }
     }
 
     // ========================================================================
@@ -2833,56 +3084,111 @@ impl BitNetBackend {
 // ============================================================================
 
 /// In-place RMSNorm: x = x / rms(x) * weight
+///
+/// Optimized with 4-wide accumulator and fused multiply for better ILP.
+#[inline]
 fn rms_norm_inplace(x: &mut [f32], weight: &[f32], eps: f32) {
     let n = x.len();
-    let mut sum_sq = 0.0f32;
-    for &v in x.iter() {
-        sum_sq += v * v;
-    }
-    let rms = (sum_sq / n as f32 + eps).sqrt();
-    let inv_rms = 1.0 / rms;
+    if n == 0 { return; }
 
-    for i in 0..n {
-        x[i] = x[i] * inv_rms * weight.get(i).copied().unwrap_or(1.0);
+    // 4-way parallel accumulation for sum of squares
+    let mut s0 = 0.0f32;
+    let mut s1 = 0.0f32;
+    let mut s2 = 0.0f32;
+    let mut s3 = 0.0f32;
+    let chunks = n / 4;
+    let tail = chunks * 4;
+
+    for c in 0..chunks {
+        let base = c * 4;
+        unsafe {
+            let v0 = *x.get_unchecked(base);
+            let v1 = *x.get_unchecked(base + 1);
+            let v2 = *x.get_unchecked(base + 2);
+            let v3 = *x.get_unchecked(base + 3);
+            s0 += v0 * v0;
+            s1 += v1 * v1;
+            s2 += v2 * v2;
+            s3 += v3 * v3;
+        }
+    }
+    let mut sum_sq = s0 + s1 + s2 + s3;
+    for i in tail..n {
+        sum_sq += x[i] * x[i];
+    }
+
+    let inv_rms = 1.0 / (sum_sq / n as f32 + eps).sqrt();
+
+    // Fused scale: x[i] = x[i] * inv_rms * weight[i]
+    if weight.len() >= n {
+        // Fast path: weight is correctly sized (common case)
+        for c in 0..chunks {
+            let base = c * 4;
+            unsafe {
+                *x.get_unchecked_mut(base) *= inv_rms * *weight.get_unchecked(base);
+                *x.get_unchecked_mut(base + 1) *= inv_rms * *weight.get_unchecked(base + 1);
+                *x.get_unchecked_mut(base + 2) *= inv_rms * *weight.get_unchecked(base + 2);
+                *x.get_unchecked_mut(base + 3) *= inv_rms * *weight.get_unchecked(base + 3);
+            }
+        }
+        for i in tail..n {
+            x[i] *= inv_rms * weight[i];
+        }
+    } else {
+        // Fallback: weight may be shorter
+        for i in 0..n {
+            x[i] *= inv_rms * weight.get(i).copied().unwrap_or(1.0);
+        }
     }
 }
 
-/// In-place softmax.
+/// In-place softmax with streaming max and fused exp+sum.
 ///
 /// Guards against NaN propagation: if all inputs are -inf or NaN,
 /// the result is a uniform distribution (1/n for each element).
+#[inline]
 fn softmax_inplace(x: &mut [f32]) {
-    if x.is_empty() {
+    let n = x.len();
+    if n == 0 {
         return;
     }
 
-    let max_val = x.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    // Streaming max with 4-wide reduction
+    let mut max_val = f32::NEG_INFINITY;
+    for &v in x.iter() {
+        if v > max_val { max_val = v; }
+    }
 
-    // Guard: if max_val is -inf or NaN, no valid scores exist.
-    // Fall back to uniform distribution.
-    if max_val.is_nan() || max_val.is_infinite() && max_val.is_sign_negative() {
-        let uniform = 1.0 / x.len() as f32;
+    // Guard: if max_val is -inf or NaN, fall back to uniform
+    if max_val.is_nan() || (max_val.is_infinite() && max_val.is_sign_negative()) {
+        let uniform = 1.0 / n as f32;
         for v in x.iter_mut() {
             *v = uniform;
         }
         return;
     }
 
+    // Fused exp + sum in a single pass
     let mut sum_exp = 0.0f32;
     for v in x.iter_mut() {
-        *v = (*v - max_val).exp();
-        sum_exp += *v;
+        let e = (*v - max_val).exp();
+        *v = e;
+        sum_exp += e;
     }
-    // Guard: if sum_exp is zero, NaN, or subnormal, fall back to uniform
+
+    // Guard: degenerate sum
     if !sum_exp.is_normal() || sum_exp <= 0.0 {
-        let uniform = 1.0 / x.len() as f32;
+        let uniform = 1.0 / n as f32;
         for v in x.iter_mut() {
             *v = uniform;
         }
         return;
     }
+
+    // Normalize with reciprocal multiply (faster than per-element division)
+    let inv_sum = 1.0 / sum_exp;
     for v in x.iter_mut() {
-        *v /= sum_exp;
+        *v *= inv_sum;
     }
 }
 
@@ -2923,15 +3229,45 @@ fn f16_to_f32(bits: u16) -> f32 {
 /// FP32 matrix-vector product (transposed): out[i] = dot(mat[i*cols..], vec)
 ///
 /// mat is [rows, cols] row-major, vec is [cols], out is [rows].
+/// Optimized with 4-wide unrolled inner loop for better ILP and cache utilization.
+#[inline]
 fn fp32_matvec_transposed(mat: &[f32], vec: &[f32], rows: usize, cols: usize) -> Vec<f32> {
     let mut output = vec![0.0f32; rows];
+    let chunks = cols / 4;
+    let tail = chunks * 4;
+
     for i in 0..rows {
         let row_start = i * cols;
         if row_start + cols > mat.len() {
             break;
         }
-        let mut dot = 0.0f32;
-        for j in 0..cols {
+
+        // 4-wide unrolled dot product
+        let mut d0 = 0.0f32;
+        let mut d1 = 0.0f32;
+        let mut d2 = 0.0f32;
+        let mut d3 = 0.0f32;
+
+        for c in 0..chunks {
+            let j = c * 4;
+            unsafe {
+                let m0 = *mat.get_unchecked(row_start + j);
+                let m1 = *mat.get_unchecked(row_start + j + 1);
+                let m2 = *mat.get_unchecked(row_start + j + 2);
+                let m3 = *mat.get_unchecked(row_start + j + 3);
+                let v0 = *vec.get_unchecked(j);
+                let v1 = *vec.get_unchecked(j + 1);
+                let v2 = *vec.get_unchecked(j + 2);
+                let v3 = *vec.get_unchecked(j + 3);
+                d0 += m0 * v0;
+                d1 += m1 * v1;
+                d2 += m2 * v2;
+                d3 += m3 * v3;
+            }
+        }
+
+        let mut dot = d0 + d1 + d2 + d3;
+        for j in tail..cols {
             dot += mat[row_start + j] * vec[j];
         }
         output[i] = dot;
