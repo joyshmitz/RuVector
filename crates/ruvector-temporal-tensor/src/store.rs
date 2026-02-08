@@ -1934,4 +1934,248 @@ mod tests {
         assert_eq!(*ts, 200);
         assert_eq!(m.total_blocks, 5);
     }
+
+    // -----------------------------------------------------------------------
+    // Benchmarks
+    // -----------------------------------------------------------------------
+    //
+    // Run with: cargo test bench_ -- --nocapture
+    // These use std::time::Instant and std::hint::black_box for stable timing.
+
+    #[test]
+    fn bench_batch_scoring_10k() {
+        use std::time::Instant;
+        use crate::tiering::{
+            TierConfig, BlockMeta as TBlockMeta, Tier as TTier,
+            compute_scores_batch, compute_score,
+        };
+
+        let cfg = TierConfig::default();
+        let metas: Vec<TBlockMeta> = (0..10_000).map(|i| {
+            TBlockMeta {
+                ema_rate: (i as f32) * 0.0001,
+                access_window: 0x5555_5555_5555_5555,
+                last_access: 50 + (i as u64 % 100),
+                access_count: i as u64,
+                current_tier: TTier::Tier1,
+                tier_since: 0,
+            }
+        }).collect();
+
+        let iters = 1000;
+
+        // Individual scoring
+        let start = Instant::now();
+        for _ in 0..iters {
+            for m in &metas {
+                std::hint::black_box(compute_score(&cfg, 100, m));
+            }
+        }
+        let individual = start.elapsed();
+
+        // Batch scoring
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(compute_scores_batch(&cfg, 100, &metas));
+        }
+        let batch = start.elapsed();
+
+        eprintln!("Individual scoring 10k x {iters}: {:?} ({:.0} ns/block)",
+            individual, individual.as_nanos() as f64 / (iters * 10_000) as f64);
+        eprintln!("Batch scoring 10k x {iters}: {:?} ({:.0} ns/block)",
+            batch, batch.as_nanos() as f64 / (iters * 10_000) as f64);
+    }
+
+    #[test]
+    fn bench_dequant_5bit_4096() {
+        use std::time::Instant;
+
+        let data: Vec<f32> = (0..4096).map(|i| (i as f32 - 2048.0) * 0.01).collect();
+        let (packed, scale) = quantize_block(&data, 5);
+        let mut out = vec![0.0f32; 4096];
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(dequantize_block(&packed, scale, 5, 4096, &mut out));
+        }
+        let elapsed = start.elapsed();
+
+        let total_bytes = 4096u64 * 4 * iters as u64;
+        let gbs = total_bytes as f64 / elapsed.as_secs_f64() / 1e9;
+        eprintln!("Dequant 5-bit 4096 x {iters}: {:?} ({:.2} GB/s output throughput)",
+            elapsed, gbs);
+    }
+
+    #[test]
+    fn bench_dequant_7bit_4096() {
+        use std::time::Instant;
+
+        let data: Vec<f32> = (0..4096).map(|i| (i as f32 - 2048.0) * 0.01).collect();
+        let (packed, scale) = quantize_block(&data, 7);
+        let mut out = vec![0.0f32; 4096];
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(dequantize_block(&packed, scale, 7, 4096, &mut out));
+        }
+        let elapsed = start.elapsed();
+
+        let total_bytes = 4096u64 * 4 * iters as u64;
+        let gbs = total_bytes as f64 / elapsed.as_secs_f64() / 1e9;
+        eprintln!("Dequant 7-bit 4096 x {iters}: {:?} ({:.2} GB/s output throughput)",
+            elapsed, gbs);
+    }
+
+    #[test]
+    fn bench_quant_5bit_4096() {
+        use std::time::Instant;
+
+        let data: Vec<f32> = (0..4096).map(|i| (i as f32 - 2048.0) * 0.01).collect();
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(quantize_block(&data, 5));
+        }
+        let elapsed = start.elapsed();
+
+        let total_bytes = 4096u64 * 4 * iters as u64;
+        let gbs = total_bytes as f64 / elapsed.as_secs_f64() / 1e9;
+        eprintln!("Quant 5-bit 4096 x {iters}: {:?} ({:.2} GB/s input throughput)",
+            elapsed, gbs);
+    }
+
+    #[test]
+    fn bench_svd_adaptive_64x64() {
+        use std::time::Instant;
+        use crate::delta::FactorSet;
+
+        let (rows, cols) = (64, 64);
+        let data: Vec<f32> = (0..rows * cols)
+            .map(|i| (i as f32 * 0.37).sin() + (i as f32 * 0.73).cos())
+            .collect();
+
+        let iters = 100;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(
+                FactorSet::from_data_adaptive(&data, rows, cols, 16, 0.05)
+            );
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!("SVD adaptive 64x64 (max_rank=16, target=0.05) x {iters}: {:?} ({:.2} ms/iter)",
+            elapsed, elapsed.as_secs_f64() * 1000.0 / iters as f64);
+    }
+
+    #[test]
+    fn bench_format_report() {
+        use std::time::Instant;
+        use crate::metrics::StoreMetrics;
+
+        let m = StoreMetrics {
+            total_blocks: 10_000,
+            tier0_blocks: 500,
+            tier1_blocks: 4000,
+            tier2_blocks: 3500,
+            tier3_blocks: 2000,
+            tier1_bytes: 4_000_000,
+            tier2_bytes: 2_500_000,
+            tier3_bytes: 750_000,
+            total_reads: 1_000_000,
+            total_writes: 500_000,
+            total_evictions: 5000,
+            total_upgrades: 12_000,
+            total_downgrades: 8000,
+            total_reconstructions: 200,
+            total_checksum_failures: 0,
+            total_compactions: 150,
+            tier_flips_last_minute: 0.023,
+            avg_score_tier1: 0.85,
+            avg_score_tier2: 0.45,
+            avg_score_tier3: 0.12,
+        };
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(m.format_report());
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!("format_report x {iters}: {:?} ({:.0} ns/call)",
+            elapsed, elapsed.as_nanos() as f64 / iters as f64);
+    }
+
+    #[test]
+    fn bench_format_json() {
+        use std::time::Instant;
+        use crate::metrics::StoreMetrics;
+
+        let m = StoreMetrics {
+            total_blocks: 10_000,
+            tier0_blocks: 500,
+            tier1_blocks: 4000,
+            tier2_blocks: 3500,
+            tier3_blocks: 2000,
+            tier1_bytes: 4_000_000,
+            tier2_bytes: 2_500_000,
+            tier3_bytes: 750_000,
+            total_reads: 1_000_000,
+            total_writes: 500_000,
+            total_evictions: 5000,
+            total_upgrades: 12_000,
+            total_downgrades: 8000,
+            total_reconstructions: 200,
+            total_checksum_failures: 0,
+            total_compactions: 150,
+            tier_flips_last_minute: 0.023,
+            avg_score_tier1: 0.85,
+            avg_score_tier2: 0.45,
+            avg_score_tier3: 0.12,
+        };
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(m.format_json());
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!("format_json x {iters}: {:?} ({:.0} ns/call)",
+            elapsed, elapsed.as_nanos() as f64 / iters as f64);
+    }
+
+    #[test]
+    fn bench_metrics_series_trend_100() {
+        use std::time::Instant;
+        use crate::metrics::{StoreMetrics, MetricsSeries};
+
+        let mut series = MetricsSeries::new(256);
+        for i in 0..100u64 {
+            series.record(i, StoreMetrics {
+                total_blocks: 1000 + i,
+                tier1_blocks: 400 + i % 50,
+                tier2_blocks: 350,
+                tier3_blocks: 250,
+                tier1_bytes: 400_000 + i * 100,
+                tier2_bytes: 250_000,
+                tier3_bytes: 75_000,
+                total_evictions: i * 3,
+                ..Default::default()
+            });
+        }
+
+        let iters = 10_000;
+        let start = Instant::now();
+        for _ in 0..iters {
+            std::hint::black_box(series.trend());
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!("MetricsSeries trend (100 snapshots) x {iters}: {:?} ({:.0} ns/call)",
+            elapsed, elapsed.as_nanos() as f64 / iters as f64);
+    }
 }
