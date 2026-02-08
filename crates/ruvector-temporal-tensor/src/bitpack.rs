@@ -6,7 +6,16 @@
 ///
 /// Each code occupies exactly `bits` bits in the output with no alignment
 /// padding between codes. A trailing partial byte is emitted if needed.
+///
+/// For 8-bit codes, writes bytes directly without bit accumulation.
+#[inline]
 pub fn pack(codes: &[u32], bits: u32, out: &mut Vec<u8>) {
+    // Fast path: 8-bit codes map 1:1 to bytes.
+    if bits == 8 {
+        out.extend(codes.iter().map(|&c| c as u8));
+        return;
+    }
+
     let mut acc: u64 = 0;
     let mut acc_bits: u32 = 0;
 
@@ -28,7 +37,17 @@ pub fn pack(codes: &[u32], bits: u32, out: &mut Vec<u8>) {
 /// Unpack `count` unsigned codes of `bits` width from a byte stream.
 ///
 /// Stops early if the data is exhausted before `count` codes are extracted.
+///
+/// For 8-bit codes, reads bytes directly without bit accumulation.
+#[inline]
 pub fn unpack(data: &[u8], bits: u32, count: usize, out: &mut Vec<u32>) {
+    // Fast path: 8-bit codes map 1:1 from bytes.
+    if bits == 8 {
+        let n = count.min(data.len());
+        out.extend(data[..n].iter().map(|&b| b as u32));
+        return;
+    }
+
     let mask = (1u64 << bits) - 1;
     let mut acc: u64 = 0;
     let mut acc_bits: u32 = 0;

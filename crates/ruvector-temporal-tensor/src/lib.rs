@@ -74,13 +74,26 @@
 
 pub mod bitpack;
 pub mod compressor;
+pub mod delta;
 pub mod f16;
+pub mod metrics;
 pub mod quantizer;
 pub mod segment;
+pub mod store;
 pub mod tier_policy;
+pub mod tiering;
+
+pub mod agentdb;
+pub mod coherence;
+pub mod core_trait;
+#[cfg(feature = "persistence")]
+pub mod persistence;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
+
+#[cfg(feature = "ffi")]
+pub mod store_ffi;
 
 pub use compressor::TemporalTensorCompressor;
 pub use tier_policy::TierPolicy;
