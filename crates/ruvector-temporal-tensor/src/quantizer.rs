@@ -12,6 +12,7 @@ use crate::f16;
 ///
 /// Returns one f16-encoded scale per group of `group_len` elements.
 /// Each scale is `max(|v|) / qmax` for that group, stored as IEEE 754 half-precision.
+#[inline]
 pub fn compute_scales(frame: &[f32], group_len: usize, bits: u8) -> Vec<u16> {
     let qmax = qmax_from_bits(bits);
     if qmax == 0 {
@@ -83,6 +84,10 @@ pub fn frame_fits_scales_f32(
 ///
 /// Appends packed bytes to `out`. Pre-reserves the expected output size
 /// to avoid reallocations.
+///
+/// For 8-bit quantization, writes bytes directly without bit accumulation
+/// since each quantized value maps 1:1 to a u8.
+#[inline]
 pub fn quantize_and_pack_f32(
     frame: &[f32],
     scales_f32: &[f32],
@@ -94,6 +99,30 @@ pub fn quantize_and_pack_f32(
     if qmax == 0 {
         return;
     }
+
+    // Fast path: 8-bit quantization writes bytes directly, no bit accumulator.
+    if bits == 8 {
+        out.reserve(frame.len());
+        for (group_idx, chunk) in frame.chunks(group_len).enumerate() {
+            let scale = if group_idx < scales_f32.len() {
+                scales_f32[group_idx]
+            } else {
+                0.0
+            };
+            let inv_scale = if scale == 0.0 { 0.0 } else { 1.0 / scale };
+            for &v in chunk {
+                let mut q: i32 = 0;
+                if v.is_finite() {
+                    q = (v * inv_scale).round() as i32;
+                    q = q.clamp(-127, 127);
+                }
+                out.push((q + 127) as u8);
+            }
+        }
+        return;
+    }
+
+    // Generic path for sub-byte bit widths.
     let qmax_i = qmax;
     let bias = qmax;
     let bits_u32 = bits as u32;
@@ -141,6 +170,9 @@ pub fn quantize_and_pack_f32(
 ///
 /// Iterates by frame then by group to avoid per-value modulo/division
 /// and caches the f32 scale per group.
+///
+/// For 8-bit data, reads bytes directly without bit accumulation.
+#[inline]
 pub fn dequantize_f32(
     data: &[u8],
     scales_f32: &[f32],
@@ -154,12 +186,42 @@ pub fn dequantize_f32(
     if qmax == 0 {
         return;
     }
-    let bias = qmax;
-    let bits_u32 = bits as u32;
-    let mask = (1u64 << bits_u32) - 1;
 
     let total = tensor_len * frame_count;
     out.resize(total, 0.0);
+
+    // Fast path: 8-bit dequantization reads bytes directly, no bit accumulator.
+    if bits == 8 {
+        let mut out_idx = 0usize;
+        let mut byte_idx = 0usize;
+        for _frame in 0..frame_count {
+            let mut pos = 0usize;
+            let mut group_idx = 0usize;
+            while pos < tensor_len {
+                let group_end = (pos + group_len).min(tensor_len);
+                let scale = if group_idx < scales_f32.len() {
+                    scales_f32[group_idx]
+                } else {
+                    0.0
+                };
+                while pos < group_end && byte_idx < data.len() {
+                    let u = data[byte_idx] as i32;
+                    let q = u - 127;
+                    out[out_idx] = (q as f32) * scale;
+                    out_idx += 1;
+                    byte_idx += 1;
+                    pos += 1;
+                }
+                group_idx += 1;
+            }
+        }
+        return;
+    }
+
+    // Generic path for sub-byte bit widths.
+    let bias = qmax;
+    let bits_u32 = bits as u32;
+    let mask = (1u64 << bits_u32) - 1;
 
     let mut acc: u64 = 0;
     let mut acc_bits: u32 = 0;
