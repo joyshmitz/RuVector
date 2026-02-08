@@ -1371,6 +1371,40 @@ See [Domain-Driven Design](./docs/architecture/temporal-tensor-store-ddd.md) for
 - Stage V (Interrogation) → Differentiable search
 - Stage VI (3D Model) → MinCut partitioning
 
+### Quantum Simulation Engine (ruQu)
+
+| Crate | Description | crates.io |
+|-------|-------------|-----------|
+| [ruqu-core](./crates/ruqu-core) | State-vector simulator with gate operations, measurement, noise | [![crates.io](https://img.shields.io/crates/v/ruqu-core.svg)](https://crates.io/crates/ruqu-core) |
+| [ruqu-algorithms](./crates/ruqu-algorithms) | VQE, Grover's search, QAOA MaxCut, Surface Code QEC | [![crates.io](https://img.shields.io/crates/v/ruqu-algorithms.svg)](https://crates.io/crates/ruqu-algorithms) |
+| [ruqu-exotic](./crates/ruqu-exotic) | Quantum-classical hybrids: decay, interference, syndrome diagnosis | [![crates.io](https://img.shields.io/crates/v/ruqu-exotic.svg)](https://crates.io/crates/ruqu-exotic) |
+| [ruqu-wasm](./crates/ruqu-wasm) | WebAssembly bindings for browser quantum simulation | [![crates.io](https://img.shields.io/crates/v/ruqu-wasm.svg)](https://crates.io/crates/ruqu-wasm) |
+
+**Pure Rust quantum simulation** with 25-qubit WASM support:
+
+| Feature | Description |
+|---------|-------------|
+| **State-Vector Simulator** | Complex128 amplitudes, SIMD acceleration ([QE-001](./docs/adr/quantum-engine/ADR-QE-001-quantum-engine-core-architecture.md)) |
+| **VQE Algorithm** | Variational Quantum Eigensolver for chemistry ([QE-005](./docs/adr/quantum-engine/ADR-QE-005-vqe-algorithm-support.md)) |
+| **Grover's Search** | Quadratic speedup for unstructured search ([QE-006](./docs/adr/quantum-engine/ADR-QE-006-grover-search-implementation.md)) |
+| **QAOA MaxCut** | Quantum approximate optimization ([QE-007](./docs/adr/quantum-engine/ADR-QE-007-qaoa-maxcut-implementation.md)) |
+| **Surface Code QEC** | Topological error correction ([QE-008](./docs/adr/quantum-engine/ADR-QE-008-surface-code-error-correction.md)) |
+| **MinCut Coherence** | Quantum-classical integration via dynamic min-cut ([QE-012](./docs/adr/quantum-engine/ADR-QE-012-mincut-coherence-integration.md)) |
+
+```rust
+use ruqu_core::{QuantumState, Gate, Circuit};
+
+let mut circuit = Circuit::new(3);
+circuit.add_gate(Gate::H, 0);           // Hadamard
+circuit.add_gate(Gate::CNOT, 0, 1);     // Entangle
+circuit.add_gate(Gate::CNOT, 1, 2);     // GHZ state
+
+let state = circuit.execute()?;
+let result = state.measure_all();        // Collapse to |000⟩ or |111⟩
+```
+
+See [Quantum Engine ADRs](./docs/adr/quantum-engine/) for full documentation.
+
 ### Distributed Systems (Raft & Replication)
 
 | Crate | Description | crates.io |
