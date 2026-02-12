@@ -29,7 +29,7 @@ Most vector databases are static—they store embeddings and search them. That's
 **One package. Everything included:** vector search, graph queries, GNN learning, distributed clustering, local LLMs, 39 attention mechanisms, and WASM support.
 
 <details>
-<summary>📋 See Full Capabilities (30+ features)</summary>
+<summary>📋 See Full Capabilities (34 features)</summary>
 
 **Core Vector Database**
 | # | Capability | What It Does |
@@ -68,22 +68,30 @@ Most vector databases are static—they store embeddings and search them. That's
 | 20 | **FPGA transformer** | Hardware-accelerated transformer inference |
 | 21 | **Quantum coherence** | ruQu for quantum error correction via dynamic min-cut |
 
+**Genomics & Health**
+| # | Capability | What It Does |
+|---|------------|--------------|
+| 22 | **rvDNA genomic analysis** | Variant calling, protein translation, HNSW k-mer search in 12 ms |
+| 23 | **`.rvdna` file format** | AI-native binary with pre-computed vectors, tensors, and embeddings |
+| 24 | **Instant diagnostics** | Sickle cell, cancer mutations, drug dosing — runs on any device |
+| 25 | **Privacy-first WASM** | Browser-based genomics, data never leaves the device |
+
 **Platform & Integration**
 | # | Capability | What It Does |
 |---|------------|--------------|
-| 22 | **Run anywhere** | Node.js, browser (WASM), edge (rvLite), HTTP server, Rust |
-| 23 | **Drop into Postgres** | pgvector-compatible extension with SIMD acceleration |
-| 24 | **MCP integration** | Model Context Protocol server for AI assistant tools |
-| 25 | **Cloud deployment** | One-click deploy to Cloud Run, Kubernetes |
+| 26 | **Run anywhere** | Node.js, browser (WASM), edge (rvLite), HTTP server, Rust |
+| 27 | **Drop into Postgres** | pgvector-compatible extension with SIMD acceleration |
+| 28 | **MCP integration** | Model Context Protocol server for AI assistant tools |
+| 29 | **Cloud deployment** | One-click deploy to Cloud Run, Kubernetes |
 
 **Self-Learning & Adaptation**
 | # | Capability | What It Does |
 |---|------------|--------------|
-| 26 | **Self-learning hooks** | Q-learning, neural patterns, HNSW memory |
-| 27 | **ReasoningBank** | Trajectory learning with verdict judgment |
-| 28 | **Economy system** | Tokenomics, CRDT-based distributed state |
-| 29 | **Nervous system** | Event-driven reactive architecture |
-| 30 | **Agentic synthesis** | Multi-agent workflow composition |
+| 30 | **Self-learning hooks** | Q-learning, neural patterns, HNSW memory |
+| 31 | **ReasoningBank** | Trajectory learning with verdict judgment |
+| 32 | **Economy system** | Tokenomics, CRDT-based distributed state |
+| 33 | **Nervous system** | Event-driven reactive architecture |
+| 34 | **Agentic synthesis** | Multi-agent workflow composition |
 
 </details>
 
@@ -935,8 +943,10 @@ await dag.execute();
 |----------|---------|
 | **npm** | `npm install ruvector` |
 | **npm (SONA)** | `npm install @ruvector/sona` |
+| **npm (Genomics)** | `npm install @ruvector/rvdna` |
 | **Browser/WASM** | `npm install ruvector-wasm` |
 | **Rust** | `cargo add ruvector-core ruvector-graph ruvector-gnn` |
+| **Rust (Genomics)** | `cargo add rvdna` |
 | **Rust (SONA)** | `cargo add ruvector-sona` |
 | **Rust (LLM)** | `cargo add ruvllm` |
 
@@ -1084,6 +1094,12 @@ await dag.execute();
 |---------|-------------|---------|-----------|
 | [rvlite](https://www.npmjs.com/package/rvlite) | SQLite-style edge DB | [![npm](https://img.shields.io/npm/v/rvlite.svg)](https://www.npmjs.com/package/rvlite) | [![downloads](https://img.shields.io/npm/dt/rvlite.svg)](https://www.npmjs.com/package/rvlite) |
 | [@ruvector/rudag](https://www.npmjs.com/package/@ruvector/rudag) | Self-learning DAG | [![npm](https://img.shields.io/npm/v/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag) | [![downloads](https://img.shields.io/npm/dt/@ruvector/rudag.svg)](https://www.npmjs.com/package/@ruvector/rudag) |
+
+#### Genomics & Health
+
+| Package | Description | Version | Downloads |
+|---------|-------------|---------|-----------|
+| [@ruvector/rvdna](https://www.npmjs.com/package/@ruvector/rvdna) | AI-native genomic analysis + .rvdna format | [![npm](https://img.shields.io/npm/v/@ruvector/rvdna.svg)](https://www.npmjs.com/package/@ruvector/rvdna) | [![downloads](https://img.shields.io/npm/dt/@ruvector/rvdna.svg)](https://www.npmjs.com/package/@ruvector/rvdna) |
 
 #### Agentic & Synthetic Data
 
@@ -1308,6 +1324,14 @@ let syndrome = gate.assess_coherence(&quantum_state)?;
 | [sona](./crates/sona) | Self-Optimizing Neural Architecture - LoRA, EWC++, ReasoningBank | [![crates.io](https://img.shields.io/crates/v/ruvector-sona.svg)](https://crates.io/crates/ruvector-sona) |
 
 **SONA Features:** Two-tier LoRA adaptation, Elastic Weight Consolidation (EWC++), ReasoningBank for trajectory learning, runtime-adaptive learning for LLM routers.
+
+### Genomics & Health (rvDNA)
+
+| Crate | Description | crates.io |
+|-------|-------------|-----------|
+| [rvdna](./examples/dna) | AI-native genomic analysis — variant calling, protein translation, HNSW k-mer search, `.rvdna` format | [![crates.io](https://img.shields.io/crates/v/rvdna.svg)](https://crates.io/crates/rvdna) |
+
+**rvDNA Features:** 12 ms full pipeline on 5 real human genes, Bayesian variant calling (155 ns/SNP), Horvath epigenetic clock, CYP2D6 pharmacogenomics, `.rvdna` binary format with pre-computed AI features, WASM support for browser-based diagnostics. [Full README](./examples/dna/README.md)
 
 ### Standalone Edge Database (rvLite)
 
