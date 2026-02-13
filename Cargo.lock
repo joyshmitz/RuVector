@@ -5670,6 +5670,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "ospipe"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "cognitum-gate-kernel 0.1.0",
+ "console_error_panic_hook",
+ "getrandom 0.2.16",
+ "js-sys",
+ "rand 0.8.5",
+ "ruqu-algorithms",
+ "ruvector-attention 0.1.31",
+ "ruvector-cluster",
+ "ruvector-core 2.0.2",
+ "ruvector-delta-core",
+ "ruvector-filter",
+ "ruvector-gnn 2.0.2",
+ "ruvector-graph 2.0.2",
+ "ruvector-router-core",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tower 0.5.2",
+ "tower-http 0.6.8",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "owned_ttf_parser"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7439,7 +7473,7 @@ dependencies = [
 
 [[package]]
 name = "ruqu-algorithms"
-version = "2.0.3"
+version = "2.0.5"
 dependencies = [
  "approx",
  "criterion 0.5.1",
@@ -7453,7 +7487,7 @@ dependencies = [
 
 [[package]]
 name = "ruqu-core"
-version = "2.0.3"
+version = "2.0.5"
 dependencies = [
  "approx",
  "criterion 0.5.1",
@@ -7467,7 +7501,7 @@ dependencies = [
 
 [[package]]
 name = "ruqu-exotic"
-version = "2.0.3"
+version = "2.0.5"
 dependencies = [
  "approx",
  "rand 0.8.5",
@@ -7478,7 +7512,7 @@ dependencies = [
 
 [[package]]
 name = "ruqu-wasm"
-version = "2.0.3"
+version = "2.0.5"
 dependencies = [
  "getrandom 0.2.16",
  "js-sys",

@@ -78,6 +78,7 @@ members = [
     "crates/ruqu-wasm",
     "crates/ruqu-exotic",
     "examples/dna",
+    "examples/OSpipe",
 ]
 resolver = "2"
 

@@ -1333,6 +1333,77 @@ let syndrome = gate.assess_coherence(&quantum_state)?;
 
 **rvDNA Features:** 12 ms full pipeline on 5 real human genes, Bayesian variant calling (155 ns/SNP), Horvath epigenetic clock, CYP2D6 pharmacogenomics, `.rvdna` binary format with pre-computed AI features, WASM support for browser-based diagnostics. [Full README](./examples/dna/README.md)
 
+### Personal AI Memory (OSpipe)
+
+[![npm](https://img.shields.io/npm/v/@ruvector/ospipe.svg)](https://www.npmjs.com/package/@ruvector/ospipe)
+[![npm](https://img.shields.io/npm/v/@ruvector/ospipe-wasm.svg)](https://www.npmjs.com/package/@ruvector/ospipe-wasm)
+
+| Package | Description | Registry |
+|---------|-------------|----------|
+| [ospipe](./examples/OSpipe) | RuVector-enhanced personal AI memory for Screenpipe | [![crates.io](https://img.shields.io/crates/v/ospipe.svg)](https://crates.io/crates/ospipe) |
+| [@ruvector/ospipe](https://www.npmjs.com/package/@ruvector/ospipe) | TypeScript SDK with retry, timeout, and AbortSignal | [![npm](https://img.shields.io/npm/v/@ruvector/ospipe.svg)](https://www.npmjs.com/package/@ruvector/ospipe) |
+| [@ruvector/ospipe-wasm](https://www.npmjs.com/package/@ruvector/ospipe-wasm) | WASM bindings for browser deployment (145 KB) | [![npm](https://img.shields.io/npm/v/@ruvector/ospipe-wasm.svg)](https://www.npmjs.com/package/@ruvector/ospipe-wasm) |
+
+```bash
+npm install @ruvector/ospipe         # TypeScript SDK
+npm install @ruvector/ospipe-wasm    # Browser WASM
+cargo add ospipe                     # Rust crate
+```
+
+**Replaces Screenpipe's SQLite/FTS5 backend with semantic vector search.** Ask your computer what you saw, heard, and did -- with semantic understanding.
+
+<details>
+<summary>OSpipe Features & Capabilities</summary>
+
+| Feature | Description |
+|---------|-------------|
+| **HNSW Vector Search** | 61us p50 query latency via `ruvector-core` |
+| **Knowledge Graph** | Entity extraction (persons, URLs, emails, mentions) via `ruvector-graph` |
+| **Attention Reranking** | Content prioritization via `ruvector-attention` |
+| **Quantum Diversity** | MMR + quantum-inspired result selection via `ruqu-algorithms` |
+| **GNN Learning** | Search quality improves over time via `ruvector-gnn` |
+| **PII Safety Gate** | Auto-redacts credit cards, SSNs, emails before storage |
+| **Frame Deduplication** | Cosine similarity sliding window eliminates near-duplicates |
+| **Query Router** | Auto-routes to Semantic, Keyword, Graph, Temporal, or Hybrid backend |
+| **4-Tier Quantization** | f32 -> int8 -> product -> binary (97% memory savings over time) |
+| **REST API** | Axum server with `/v2/search`, `/v2/route`, `/v2/stats`, `/v2/health` |
+| **WASM Support** | Runs in browser (145 KB), bundles from 11.8 KB (micro) to 350 KB (full) |
+| **Cross-Platform** | Native: Linux, macOS, Windows; WASM: any browser |
+
+**Comparison: Screenpipe vs OSpipe**
+
+| | Screenpipe (FTS5) | OSpipe (RuVector) |
+|---|---|---|
+| Search | Keyword (FTS5) | Semantic + Keyword + Graph + Temporal |
+| Latency | ~1ms (FTS5) | 61us (HNSW p50) |
+| Relations | None | Knowledge Graph (Cypher) |
+| PII | Basic | Credit card, SSN, email redaction |
+| Dedup | None | Cosine similarity sliding window |
+| Browser | None | WASM (11.8 KB - 350 KB) |
+| Quantization | None | 4-tier age-based (f32 -> binary) |
+
+**Integrates 10 RuVector crates:** ruvector-core, ruvector-filter, ruvector-cluster, ruvector-delta-core, ruvector-router-core, cognitum-gate-kernel, ruvector-graph, ruvector-attention, ruvector-gnn, ruqu-algorithms.
+
+</details>
+
+```rust
+use ospipe::config::OsPipeConfig;
+use ospipe::pipeline::ingestion::IngestionPipeline;
+use ospipe::capture::CapturedFrame;
+
+let config = OsPipeConfig::default();
+let mut pipeline = IngestionPipeline::new(config)?;
+
+// Ingest a screen capture
+let frame = CapturedFrame::new_screen("Firefox", "Meeting Notes", "auth discussion: JWT with refresh tokens", 0);
+pipeline.ingest(frame)?;
+
+// Semantic search
+let results = pipeline.search("what was the authentication discussion?", 5)?;
+```
+
+See [OSpipe README](./examples/OSpipe/README.md) for full documentation, TypeScript/WASM quickstart, and configuration reference.
+
 ### Standalone Edge Database (rvLite)
 
 | Crate | Description | crates.io |
