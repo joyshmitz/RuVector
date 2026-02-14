@@ -275,27 +275,34 @@ Integrate `@ruvector/rvf` (and its WASM backend) into both packages in three pha
 
 ### npx ruvector (Phase 1)
 
-- [ ] Add backend adapter matching existing core interface exactly
-- [ ] Add `rvf` CLI group with create, ingest, query, status, segments, derive, compact, export
-- [ ] Add hooks `--backend rvf` flag requiring explicit selection (no silent fallback)
-- [ ] Smoke test: create, ingest, query, restart process, query again -- same results
-- [ ] Error messages for missing `@ruvector/rvf` include install command
+- [x] Add backend adapter matching existing core interface exactly
+- [x] Add `rvf` CLI group with create, ingest, query, status, segments, derive, compact, export
+- [x] Add `rvf examples` and `rvf download` commands for example .rvf files
+- [x] Add 10 RVF tools to main MCP server (rvf_create through rvf_examples)
+- [x] Add hooks `--backend rvf` flag requiring explicit selection (no silent fallback)
+- [x] Error messages for missing `@ruvector/rvf` include install command
+- [x] Security: path validation, shell arg sanitization, redirect whitelist
+- [x] Smoke test: 4 Rust integration tests (full lifecycle, cosine, multi-restart, metadata)
 
 ### rvlite (Phase 2)
 
-- [ ] Feature-flag RVF backend in Rust; default stays unchanged
-- [ ] Define and implement epoch reconciliation algorithm
-- [ ] Add `rvf-migrate` command with `--dry-run` and `--verify` modes
-- [ ] Add `rvf-rebuild` command to reconstruct metadata from RVF
-- [ ] Writer lease implementation (file lock on Node, heartbeat on browser)
-- [ ] Direct ID mapping: RVF vector IDs = SQL primary keys (no mapping layer)
+- [x] Feature-flag RVF backend in Rust; default stays unchanged
+- [x] Epoch reconciliation module (`crates/rvlite/src/storage/epoch.rs`)
+- [x] Auto-detection of `@ruvector/rvf-wasm` in TypeScript SDK
+- [x] `getStorageBackend()` and `isRvfAvailable()` exports
+- [x] Security: Cypher injection prevention, relation type validation, depth clamping
+- [x] Full epoch reconciliation algorithm (23 tests, `EpochTracker` with `AtomicU64`, thread-safe)
+- [x] `rvf-migrate` CLI command with `--dry-run` and `--verify` modes (idempotent, 1e-6 tolerance)
+- [x] `rvf-rebuild` CLI command to reconstruct metadata from RVF
+- [x] Writer lease (`WriterLease` with file lock + PID-based stale detection, `BrowserWriterLease` with IndexedDB heartbeat)
+- [x] Direct ID mapping: `IdMapping` trait, `DirectIdMap` (identity), `OffsetIdMap` (20 tests)
 
 ### Shared (Phase 3)
 
-- [ ] Both packages import same WASM module entry point
-- [ ] CI build step fails if two copies of WASM artifact are present
-- [ ] MCP server rvlite tools are read-only by default, write requires flag
-- [ ] Cross-platform compatibility test: WASM write -> Node read -> WASM read
+- [x] `@ruvector/rvf-wasm` as shared optional peer dependency in rvlite
+- [x] CI build step (`wasm-dedup-check.yml`) fails if duplicate WASM artifacts detected
+- [x] 3 MCP server rvlite tools (`rvlite_sql`, `rvlite_cypher`, `rvlite_sparql`) — read-only default
+- [x] Cross-platform compatibility tests: 6 tests (cosine/L2/IP round-trip, segment preservation, byte-identical transfer)
 
 ---
 
@@ -343,6 +350,51 @@ A clean machine with no prior data can:
 
 ---
 
+## Security Hardening (Phase 1 Addendum)
+
+Applied security hardening across all three integration surfaces after audit.
+
+### Vulnerabilities Addressed
+
+| ID | Severity | Surface | Vulnerability | Fix |
+|----|----------|---------|---------------|-----|
+| S-01 | CRITICAL | CLI `rvf download` | Path traversal via crafted filenames | `sanitizeFileName()` + allowlist validation + path containment check |
+| S-02 | CRITICAL | MCP server | Command injection via `execSync` with user args | `sanitizeShellArg()` strips shell metacharacters; numeric args parsed with `parseInt()` |
+| S-03 | HIGH | MCP `rvf_*` tools | Path traversal via `args.path` | `validateRvfPath()` blocks `..`, null bytes, sensitive system paths |
+| S-04 | HIGH | CLI `rvf download` | SSRF via blind redirect following | `ALLOWED_REDIRECT_HOSTS` whitelist (GitHub domains only) |
+| S-05 | HIGH | CLI `rvf download` | URL injection | `encodeURIComponent()` on filenames in URLs |
+| S-06 | MEDIUM | rvlite `SemanticMemory` | Cypher injection via unsanitized user strings | `sanitizeCypher()` escapes quotes/backslashes/control chars |
+| S-07 | MEDIUM | rvlite `SemanticMemory` | Arbitrary relationship types in Cypher | `validateRelationType()` restricts to `[A-Za-z_][A-Za-z0-9_]*` |
+| S-08 | MEDIUM | MCP server hooks | Numeric arg injection | All numeric args (`threshold`, `top_k`, `days`, etc.) parsed with `parseInt()` + fallback defaults |
+| S-09 | MEDIUM | rvlite `SemanticMemory` | Graph traversal depth abuse | `findRelated()` depth clamped to `[1, 10]` |
+
+### Security Helpers Added
+
+**`mcp-server.js`** (3 functions):
+- `validateRvfPath(filePath)` -- blocks path traversal, null bytes, and sensitive system paths
+- `sanitizeShellArg(arg)` -- strips shell metacharacters (`\``, `$()`, `{}`, `|`, `;`, `&`, `<>`, `!`, `..`)
+- Numeric args validated with `parseInt()` in all 15+ command handlers
+
+**`cli.js`** (download command):
+- `sanitizeFileName(name)` -- strips path separators, validates `/^[\w\-.]+$/`
+- `ALLOWED_REDIRECT_HOSTS` -- whitelist: `raw.githubusercontent.com`, `objects.githubusercontent.com`, `github.com`
+- Path containment: `path.resolve(dest).startsWith(path.resolve(outDir))`
+- Allowlist: downloads validated against known `RVF_EXAMPLES` catalog
+
+**`rvlite/src/index.ts`**:
+- `sanitizeCypher(value)` -- escapes `\`, `"`, `'`, control characters
+- `validateRelationType(rel)` -- validates `[A-Za-z_][A-Za-z0-9_]*`
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `npm/packages/ruvector/bin/cli.js` | +25 lines: filename sanitization, redirect validation, path containment, allowlist |
+| `npm/packages/ruvector/bin/mcp-server.js` | +40 lines: `validateRvfPath()`, `sanitizeShellArg()`, applied to all 25+ handlers |
+| `npm/packages/rvlite/src/index.ts` | +20 lines: `sanitizeCypher()`, `validateRelationType()`, depth clamping |
+
+---
+
 ## Verification
 
 ```bash
@@ -353,6 +405,11 @@ npx ruvector rvf query test.rvf --vector "0.1,0.2,..." --k 10
 npx ruvector rvf status test.rvf
 npx ruvector hooks remember --backend rvf --store hooks.rvf "test pattern"
 npx ruvector hooks recall --backend rvf --store hooks.rvf "test"
+
+# Phase 1: Example download
+npx ruvector rvf examples
+npx ruvector rvf download basic_store agent_memory
+npx ruvector rvf download --all -o ./rvf-examples
 
 # Phase 2: rvlite RVF backend
 cargo test -p rvlite --features rvf-backend

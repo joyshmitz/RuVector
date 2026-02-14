@@ -197,6 +197,68 @@ const similar = await memory.query("What was the weather question?", queryEmbedd
 const related = await memory.findRelated("conv-1", 2);
 ```
 
+## RVF Storage Backend
+
+RvLite can use [RVF (RuVector Format)](https://github.com/ruvnet/ruvector/tree/main/crates/rvf) as a persistent storage backend. When the optional `@ruvector/rvf-wasm` package is installed, rvlite gains file-backed persistence using the `.rvf` cognitive container format.
+
+### Install
+
+```bash
+npm install rvlite @ruvector/rvf-wasm
+```
+
+### Usage
+
+```typescript
+import { createRvLite } from 'rvlite';
+
+// rvlite auto-detects @ruvector/rvf-wasm when installed
+const db = await createRvLite({ dimensions: 384 });
+
+// All operations persist to RVF format
+await db.insert([0.1, 0.2, ...], { text: "Hello world" });
+const results = await db.search([0.1, 0.2, ...], 5);
+```
+
+### Platform Support
+
+The RVF backend works everywhere rvlite runs:
+
+| Platform | RVF Backend | Notes |
+|----------|-------------|-------|
+| Node.js (Linux, macOS, Windows) | Native or WASM | Auto-detected |
+| Browser (Chrome, Firefox, Safari) | WASM | IndexedDB + RVF |
+| Deno | WASM | Via `npm:` specifier |
+| Cloudflare Workers / Edge | WASM | Stateless queries |
+
+### Rust Feature Flag
+
+If building from source, enable the `rvf-backend` feature in `crates/rvlite`:
+
+```toml
+[dependencies]
+rvlite = { version = "0.1", features = ["rvf-backend"] }
+```
+
+This enables epoch-based reconciliation between RVF and metadata stores:
+- Monotonic epoch counter shared between RVF and metadata
+- On startup, compares epochs and rebuilds the lagging side
+- RVF file is source of truth; metadata (IndexedDB) is rebuildable cache
+
+### Download Example .rvf Files
+
+```bash
+# Download pre-built examples to test with
+curl -LO https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output/basic_store.rvf
+curl -LO https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output/semantic_search.rvf
+curl -LO https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output/agent_memory.rvf
+
+# 45 examples available at:
+# https://github.com/ruvnet/ruvector/tree/main/examples/rvf/output
+```
+
+---
+
 ## Integration with claude-flow
 
 RvLite can enhance claude-flow's memory system with semantic search:

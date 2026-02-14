@@ -1940,6 +1940,9 @@ npm test
 - **[ruvector-core](https://www.npmjs.com/package/ruvector-core)** - Core native bindings (lower-level API)
 - **[ruvector-wasm](https://www.npmjs.com/package/ruvector-wasm)** - WebAssembly implementation for browsers
 - **[ruvector-cli](https://www.npmjs.com/package/ruvector-cli)** - Standalone CLI tools
+- **[@ruvector/rvf](https://www.npmjs.com/package/@ruvector/rvf)** - RVF cognitive container SDK
+- **[@ruvector/rvf-wasm](https://www.npmjs.com/package/@ruvector/rvf-wasm)** - RVF WASM build for browsers, Deno, and edge
+- **[rvlite](https://www.npmjs.com/package/rvlite)** - Lightweight vector database with SQL, SPARQL, and Cypher
 
 ### Platform-Specific Packages (auto-installed)
 
@@ -1948,6 +1951,93 @@ npm test
 - **[ruvector-core-darwin-x64](https://www.npmjs.com/package/ruvector-core-darwin-x64)**
 - **[ruvector-core-darwin-arm64](https://www.npmjs.com/package/ruvector-core-darwin-arm64)**
 - **[ruvector-core-win32-x64-msvc](https://www.npmjs.com/package/ruvector-core-win32-x64-msvc)**
+
+---
+
+## RVF Cognitive Containers
+
+Ruvector integrates with [RVF (RuVector Format)](https://github.com/ruvnet/ruvector/tree/main/crates/rvf) — a universal binary substrate that stores vectors, models, graphs, compute kernels, and attestation in a single `.rvf` file.
+
+### Enable RVF Backend
+
+```bash
+# Install the optional RVF package
+npm install @ruvector/rvf
+
+# Set backend via environment variable
+export RUVECTOR_BACKEND=rvf
+
+# Or detect automatically (native -> rvf -> wasm fallback)
+npx ruvector info
+```
+
+```typescript
+import { getImplementationType, isRvf } from 'ruvector';
+
+console.log(getImplementationType()); // 'native' | 'rvf' | 'wasm'
+console.log(isRvf()); // true if RVF backend is active
+```
+
+### RVF CLI Commands
+
+8 RVF-specific subcommands are available through the ruvector CLI:
+
+```bash
+# Create an RVF store
+npx ruvector rvf create mydb.rvf -d 384 --metric cosine
+
+# Ingest vectors from JSON
+npx ruvector rvf ingest mydb.rvf --input vectors.json --format json
+
+# Query nearest neighbors
+npx ruvector rvf query mydb.rvf --vector "[0.1,0.2,...]" --k 10
+
+# File status and segment listing
+npx ruvector rvf status mydb.rvf
+npx ruvector rvf segments mydb.rvf
+
+# COW branching — derive a child file
+npx ruvector rvf derive mydb.rvf --output child.rvf
+
+# Compact and reclaim space
+npx ruvector rvf compact mydb.rvf
+
+# Export to JSON
+npx ruvector rvf export mydb.rvf --output dump.json
+```
+
+### RVF Platform Support
+
+| Platform | Runtime | Backend |
+|----------|---------|---------|
+| Linux x86_64 / aarch64 | Node.js 18+ | Native (N-API) |
+| macOS x86_64 / arm64 | Node.js 18+ | Native (N-API) |
+| Windows x86_64 | Node.js 18+ | Native (N-API) |
+| Any | Deno | WASM (`@ruvector/rvf-wasm`) |
+| Any | Browser | WASM (`@ruvector/rvf-wasm`) |
+| Any | Cloudflare Workers | WASM (`@ruvector/rvf-wasm`) |
+
+### Download Example .rvf Files
+
+45 pre-built example files are available (~11 MB total):
+
+```bash
+# Download a specific example
+curl -LO https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output/basic_store.rvf
+
+# Popular examples:
+#   basic_store.rvf (152 KB)        — 1,000 vectors, dim 128
+#   semantic_search.rvf (755 KB)    — Semantic search with HNSW
+#   rag_pipeline.rvf (303 KB)       — RAG pipeline embeddings
+#   agent_memory.rvf (32 KB)        — AI agent memory store
+#   self_booting.rvf (31 KB)        — Self-booting with kernel
+#   progressive_index.rvf (2.5 MB)  — Large-scale HNSW index
+
+# Generate all examples locally
+cd crates/rvf && cargo run --example generate_all
+```
+
+Full catalog: [examples/rvf/output/](https://github.com/ruvnet/ruvector/tree/main/examples/rvf/output)
 
 ## 🐛 Troubleshooting
 

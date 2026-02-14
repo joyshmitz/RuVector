@@ -50,6 +50,7 @@ console_error_panic_hook = "0.1"
 # ===== RVF Backend (optional) =====
 rvf-runtime = { path = "../rvf/rvf-runtime", features = ["std"], optional = true }
 rvf-types = { path = "../rvf/rvf-types", features = ["std"], optional = true }
+fs2 = { version = "0.4", optional = true }
 
 # ===== Standard Dependencies =====
 serde = { version = "1.0", features = ["derive"] }
@@ -69,7 +70,7 @@ getrandom = { version = "0.2", features = ["js"] }
 
 [features]
 default = []
-rvf-backend = ["dep:rvf-runtime", "dep:rvf-types"]
+rvf-backend = ["dep:rvf-runtime", "dep:rvf-types", "dep:fs2"]
 # Feature flags to be added later
 # sql = ["dep:sqlparser"]
 # sparql = []

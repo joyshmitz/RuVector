@@ -7120,6 +7120,167 @@ rvfCmd.command('export <path>')
     } catch (e) { console.error(chalk.red(e.message)); process.exit(1); }
   });
 
+// RVF example download/list commands
+const RVF_EXAMPLES = [
+  { name: 'basic_store', size: '152 KB', desc: '1,000 vectors, dim 128, cosine metric' },
+  { name: 'semantic_search', size: '755 KB', desc: 'Semantic search with HNSW index' },
+  { name: 'rag_pipeline', size: '303 KB', desc: 'RAG pipeline with embeddings' },
+  { name: 'embedding_cache', size: '755 KB', desc: 'Cached embedding store' },
+  { name: 'quantization', size: '1.5 MB', desc: 'PQ-compressed vectors' },
+  { name: 'progressive_index', size: '2.5 MB', desc: 'Large-scale progressive HNSW index' },
+  { name: 'filtered_search', size: '255 KB', desc: 'Metadata-filtered vector search' },
+  { name: 'recommendation', size: '102 KB', desc: 'Recommendation engine vectors' },
+  { name: 'agent_memory', size: '32 KB', desc: 'AI agent episodic memory' },
+  { name: 'swarm_knowledge', size: '86 KB', desc: 'Multi-agent shared knowledge base' },
+  { name: 'experience_replay', size: '27 KB', desc: 'RL experience replay buffer' },
+  { name: 'tool_cache', size: '26 KB', desc: 'MCP tool call cache' },
+  { name: 'mcp_in_rvf', size: '32 KB', desc: 'MCP server embedded in RVF' },
+  { name: 'ruvbot', size: '51 KB', desc: 'Chatbot knowledge store' },
+  { name: 'claude_code_appliance', size: '17 KB', desc: 'Claude Code cognitive appliance' },
+  { name: 'lineage_parent', size: '52 KB', desc: 'COW parent file' },
+  { name: 'lineage_child', size: '26 KB', desc: 'COW child (derived) file' },
+  { name: 'self_booting', size: '31 KB', desc: 'Self-booting with KERNEL_SEG' },
+  { name: 'linux_microkernel', size: '15 KB', desc: 'Embedded Linux microkernel' },
+  { name: 'ebpf_accelerator', size: '153 KB', desc: 'eBPF distance accelerator' },
+  { name: 'browser_wasm', size: '14 KB', desc: 'Browser WASM module embedded' },
+  { name: 'tee_attestation', size: '102 KB', desc: 'TEE attestation with witnesses' },
+  { name: 'zero_knowledge', size: '52 KB', desc: 'ZK-proof witness chain' },
+  { name: 'sealed_engine', size: '208 KB', desc: 'Sealed inference engine' },
+  { name: 'access_control', size: '77 KB', desc: 'Permission-gated vectors' },
+  { name: 'financial_signals', size: '202 KB', desc: 'Financial signal vectors' },
+  { name: 'medical_imaging', size: '302 KB', desc: 'Medical imaging embeddings' },
+  { name: 'legal_discovery', size: '903 KB', desc: 'Legal document discovery' },
+  { name: 'multimodal_fusion', size: '804 KB', desc: 'Multi-modal embedding fusion' },
+  { name: 'hyperbolic_taxonomy', size: '23 KB', desc: 'Hyperbolic space taxonomy' },
+  { name: 'network_telemetry', size: '16 KB', desc: 'Network telemetry vectors' },
+  { name: 'postgres_bridge', size: '152 KB', desc: 'PostgreSQL bridge vectors' },
+  { name: 'ruvllm_inference', size: '133 KB', desc: 'RuvLLM inference cache' },
+  { name: 'serverless', size: '509 KB', desc: 'Serverless deployment bundle' },
+  { name: 'edge_iot', size: '27 KB', desc: 'Edge/IoT lightweight store' },
+  { name: 'dedup_detector', size: '153 KB', desc: 'Deduplication detector' },
+  { name: 'compacted', size: '77 KB', desc: 'Post-compaction example' },
+  { name: 'posix_fileops', size: '52 KB', desc: 'POSIX file operations test' },
+  { name: 'network_sync_a', size: '52 KB', desc: 'Network sync peer A' },
+  { name: 'network_sync_b', size: '52 KB', desc: 'Network sync peer B' },
+  { name: 'agent_handoff_a', size: '31 KB', desc: 'Agent handoff source' },
+  { name: 'agent_handoff_b', size: '11 KB', desc: 'Agent handoff target' },
+  { name: 'reasoning_parent', size: '5.6 KB', desc: 'Reasoning chain parent' },
+  { name: 'reasoning_child', size: '8.1 KB', desc: 'Reasoning chain child' },
+  { name: 'reasoning_grandchild', size: '162 B', desc: 'Minimal derived file' },
+];
+
+const RVF_BASE_URL = 'https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output';
+
+rvfCmd.command('examples')
+  .description('List available example .rvf files')
+  .option('--json', 'Output as JSON')
+  .action((opts) => {
+    if (opts.json) {
+      console.log(JSON.stringify(RVF_EXAMPLES, null, 2));
+      return;
+    }
+    console.log(chalk.bold.cyan('\nAvailable RVF Example Files (45 total)\n'));
+    console.log(chalk.dim(`Download: npx ruvector rvf download <name>\n`));
+    const maxName = Math.max(...RVF_EXAMPLES.map(e => e.name.length));
+    const maxSize = Math.max(...RVF_EXAMPLES.map(e => e.size.length));
+    for (const ex of RVF_EXAMPLES) {
+      const name = chalk.green(ex.name.padEnd(maxName));
+      const size = chalk.yellow(ex.size.padStart(maxSize));
+      console.log(`  ${name}  ${size}  ${chalk.dim(ex.desc)}`);
+    }
+    console.log(chalk.dim(`\nFull catalog: https://github.com/ruvnet/ruvector/tree/main/examples/rvf/output\n`));
+  });
+
+rvfCmd.command('download [names...]')
+  .description('Download example .rvf files from GitHub')
+  .option('-a, --all', 'Download all 45 examples (~11 MB)')
+  .option('-o, --output <dir>', 'Output directory', '.')
+  .action(async (names, opts) => {
+    const https = require('https');
+    const ALLOWED_REDIRECT_HOSTS = ['raw.githubusercontent.com', 'objects.githubusercontent.com', 'github.com'];
+    const sanitizeFileName = (name) => {
+      // Strip path separators and parent directory references
+      const base = path.basename(name);
+      // Only allow alphanumeric, underscores, hyphens, dots
+      if (!/^[\w\-.]+$/.test(base)) throw new Error(`Invalid filename: ${base}`);
+      return base;
+    };
+    const downloadFile = (url, dest) => new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(dest);
+      https.get(url, (res) => {
+        if (res.statusCode === 302 || res.statusCode === 301) {
+          const redirectUrl = res.headers.location;
+          try {
+            const redirectHost = new URL(redirectUrl).hostname;
+            if (!ALLOWED_REDIRECT_HOSTS.includes(redirectHost)) {
+              file.close();
+              reject(new Error(`Redirect to untrusted host: ${redirectHost}`));
+              return;
+            }
+          } catch { file.close(); reject(new Error('Invalid redirect URL')); return; }
+          https.get(redirectUrl, (res2) => { res2.pipe(file); file.on('finish', () => { file.close(); resolve(); }); }).on('error', reject);
+          return;
+        }
+        if (res.statusCode !== 200) { file.close(); fs.unlinkSync(dest); reject(new Error(`HTTP ${res.statusCode}`)); return; }
+        res.pipe(file);
+        file.on('finish', () => { file.close(); resolve(); });
+      }).on('error', reject);
+    });
+
+    let toDownload = [];
+    if (opts.all) {
+      toDownload = RVF_EXAMPLES.map(e => e.name);
+    } else if (names && names.length > 0) {
+      toDownload = names;
+    } else {
+      console.error(chalk.red('Specify example names or use --all. Run `npx ruvector rvf examples` to list.'));
+      process.exit(1);
+    }
+
+    const outDir = path.resolve(opts.output);
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+    console.log(chalk.bold.cyan(`\nDownloading ${toDownload.length} .rvf file(s) to ${outDir}\n`));
+    let ok = 0, fail = 0;
+    for (const name of toDownload) {
+      const rawName = name.endsWith('.rvf') ? name : `${name}.rvf`;
+      let fileName;
+      try { fileName = sanitizeFileName(rawName); } catch (e) {
+        console.log(chalk.red(`SKIPPED: ${e.message}`));
+        fail++;
+        continue;
+      }
+      // Validate against known examples when not using --all
+      if (!opts.all) {
+        const baseName = fileName.replace(/\.rvf$/, '');
+        if (!RVF_EXAMPLES.some(e => e.name === baseName)) {
+          console.log(chalk.red(`SKIPPED: Unknown example '${baseName}'. Run 'npx ruvector rvf examples' to list.`));
+          fail++;
+          continue;
+        }
+      }
+      const url = `${RVF_BASE_URL}/${encodeURIComponent(fileName)}`;
+      const dest = path.join(outDir, fileName);
+      // Path containment check
+      if (!path.resolve(dest).startsWith(path.resolve(outDir) + path.sep) && path.resolve(dest) !== path.resolve(outDir)) {
+        console.log(chalk.red(`SKIPPED: Path traversal detected for '${fileName}'`));
+        fail++;
+        continue;
+      }
+      try {
+        process.stdout.write(chalk.dim(`  ${fileName} ... `));
+        await downloadFile(url, dest);
+        const stat = fs.statSync(dest);
+        console.log(chalk.green(`OK (${(stat.size / 1024).toFixed(0)} KB)`));
+        ok++;
+      } catch (e) {
+        console.log(chalk.red(`FAILED: ${e.message}`));
+        fail++;
+      }
+    }
+    console.log(chalk.bold(`\nDone: ${ok} downloaded, ${fail} failed\n`));
+  });
+
 // MCP Server command
 const mcpCmd = program.command('mcp').description('MCP (Model Context Protocol) server for Claude Code integration');
 
@@ -7142,7 +7303,7 @@ mcpCmd.command('info')
     console.log(chalk.white('The RuVector MCP server provides self-learning intelligence'));
     console.log(chalk.white('tools to Claude Code via the Model Context Protocol.\n'));
 
-    console.log(chalk.bold('Available Tools:'));
+    console.log(chalk.bold('Hooks Tools:'));
     console.log(chalk.dim('  hooks_stats      - Get intelligence statistics'));
     console.log(chalk.dim('  hooks_route      - Route task to best agent'));
     console.log(chalk.dim('  hooks_remember   - Store context in vector memory'));
@@ -7153,6 +7314,23 @@ mcpCmd.command('info')
     console.log(chalk.dim('  hooks_verify     - Verify hooks configuration'));
     console.log(chalk.dim('  hooks_doctor     - Diagnose setup issues'));
     console.log(chalk.dim('  hooks_export     - Export intelligence data'));
+
+    console.log(chalk.bold('\nRVF Vector Store Tools:'));
+    console.log(chalk.dim('  rvf_create       - Create new .rvf vector store'));
+    console.log(chalk.dim('  rvf_open         - Open existing .rvf store'));
+    console.log(chalk.dim('  rvf_ingest       - Insert vectors into store'));
+    console.log(chalk.dim('  rvf_query        - Query nearest neighbors'));
+    console.log(chalk.dim('  rvf_delete       - Delete vectors by ID'));
+    console.log(chalk.dim('  rvf_status       - Get store status'));
+    console.log(chalk.dim('  rvf_compact      - Compact store'));
+    console.log(chalk.dim('  rvf_derive       - COW-branch to child store'));
+    console.log(chalk.dim('  rvf_segments     - List file segments'));
+    console.log(chalk.dim('  rvf_examples     - List example .rvf files'));
+
+    console.log(chalk.bold('\nrvlite Query Tools:'));
+    console.log(chalk.dim('  rvlite_sql       - Execute SQL query over rvlite vector DB'));
+    console.log(chalk.dim('  rvlite_cypher    - Execute Cypher graph query'));
+    console.log(chalk.dim('  rvlite_sparql    - Execute SPARQL RDF query'));
 
     console.log(chalk.bold('\n📦 Resources:'));
     console.log(chalk.dim('  ruvector://intelligence/stats     - Current statistics'));

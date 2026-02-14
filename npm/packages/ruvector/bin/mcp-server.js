@@ -24,7 +24,46 @@ const {
 } = require('@modelcontextprotocol/sdk/types.js');
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
+
+// ── Security Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Validate a file path argument for RVF operations.
+ * Prevents path traversal and restricts to safe locations.
+ */
+function validateRvfPath(filePath) {
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    throw new Error('Path must be a non-empty string');
+  }
+  const resolved = path.resolve(filePath);
+  // Block obvious path traversal
+  if (filePath.includes('..') || filePath.includes('\0')) {
+    throw new Error('Path traversal detected');
+  }
+  // Block sensitive system paths
+  const blocked = ['/etc', '/proc', '/sys', '/dev', '/boot', '/root', '/var/run'];
+  for (const prefix of blocked) {
+    if (resolved.startsWith(prefix)) {
+      throw new Error(`Access to ${prefix} is not allowed`);
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Sanitize a shell argument to prevent command injection.
+ * Strips shell metacharacters and limits length.
+ */
+function sanitizeShellArg(arg) {
+  if (typeof arg !== 'string') return '';
+  // Remove null bytes, backticks, $(), and other shell metacharacters
+  return arg
+    .replace(/\0/g, '')
+    .replace(/[`$(){}|;&<>!]/g, '')
+    .replace(/\.\./g, '')
+    .slice(0, 4096);
+}
 
 // Try to load the full IntelligenceEngine
 let IntelligenceEngine = null;
@@ -1045,6 +1084,161 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  // ── RVF Vector Store Tools ────────────────────────────────────────────────
+  {
+    name: 'rvf_create',
+    description: 'Create a new RVF vector store (.rvf file) with specified dimensions and distance metric',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path for the new .rvf store' },
+        dimension: { type: 'number', description: 'Vector dimensionality (e.g. 128, 384, 768, 1536)' },
+        metric: { type: 'string', description: 'Distance metric: cosine, l2, or dotproduct', default: 'cosine' }
+      },
+      required: ['path', 'dimension']
+    }
+  },
+  {
+    name: 'rvf_open',
+    description: 'Open an existing RVF store for read-write operations',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to existing .rvf file' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'rvf_ingest',
+    description: 'Insert vectors into an RVF store',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' },
+        entries: { type: 'array', description: 'Array of {id, vector, metadata?} objects', items: { type: 'object' } }
+      },
+      required: ['path', 'entries']
+    }
+  },
+  {
+    name: 'rvf_query',
+    description: 'Query nearest neighbors in an RVF store',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' },
+        vector: { type: 'array', description: 'Query vector as array of numbers', items: { type: 'number' } },
+        k: { type: 'number', description: 'Number of results to return', default: 10 }
+      },
+      required: ['path', 'vector']
+    }
+  },
+  {
+    name: 'rvf_delete',
+    description: 'Delete vectors by ID from an RVF store',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' },
+        ids: { type: 'array', description: 'Vector IDs to delete', items: { type: 'number' } }
+      },
+      required: ['path', 'ids']
+    }
+  },
+  {
+    name: 'rvf_status',
+    description: 'Get status of an RVF store (vector count, dimension, metric, file size)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'rvf_compact',
+    description: 'Compact an RVF store to reclaim space from deleted vectors',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'rvf_derive',
+    description: 'Derive a child RVF store from a parent using copy-on-write branching',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        parent_path: { type: 'string', description: 'Path to parent .rvf store' },
+        child_path: { type: 'string', description: 'Path for the new child .rvf store' }
+      },
+      required: ['parent_path', 'child_path']
+    }
+  },
+  {
+    name: 'rvf_segments',
+    description: 'List all segments in an RVF file (VEC, INDEX, KERNEL, EBPF, WITNESS, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to .rvf store' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'rvf_examples',
+    description: 'List available example .rvf files with download URLs from the ruvector repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filter: { type: 'string', description: 'Filter examples by name or description substring' }
+      },
+      required: []
+    }
+  },
+  // ── rvlite Query Tools ──────────────────────────────────────────────────
+  {
+    name: 'rvlite_sql',
+    description: 'Execute SQL query over rvlite vector database with optional RVF backend',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'SQL query string (supports distance() and vec_search() functions)' },
+        db_path: { type: 'string', description: 'Path to database file (optional)' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'rvlite_cypher',
+    description: 'Execute Cypher graph query over rvlite property graph',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Cypher query string' },
+        db_path: { type: 'string', description: 'Path to database file (optional)' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'rvlite_sparql',
+    description: 'Execute SPARQL query over rvlite RDF triple store',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'SPARQL query string' },
+        db_path: { type: 'string', description: 'Path to database file (optional)' }
+      },
+      required: ['query']
+    }
   }
 ];
 
@@ -1654,7 +1848,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_ast_analyze': {
         try {
-          const output = execSync(`npx ruvector hooks ast-analyze "${args.file}" --json`, { encoding: 'utf-8', timeout: 30000 });
+          const safeFile = sanitizeShellArg(args.file);
+          const output = execSync(`npx ruvector hooks ast-analyze "${safeFile}" --json`, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
@@ -1663,8 +1858,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_ast_complexity': {
         try {
-          const filesArg = args.files.map(f => `"${f}"`).join(' ');
-          const output = execSync(`npx ruvector hooks ast-complexity ${filesArg} --threshold ${args.threshold || 10}`, { encoding: 'utf-8', timeout: 60000 });
+          const filesArg = args.files.map(f => `"${sanitizeShellArg(f)}"`).join(' ');
+          const threshold = parseInt(args.threshold, 10) || 10;
+          const output = execSync(`npx ruvector hooks ast-complexity ${filesArg} --threshold ${threshold}`, { encoding: 'utf-8', timeout: 60000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
@@ -1673,7 +1869,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_diff_analyze': {
         try {
-          const cmd = args.commit ? `npx ruvector hooks diff-analyze "${args.commit}" --json` : 'npx ruvector hooks diff-analyze --json';
+          const cmd = args.commit ? `npx ruvector hooks diff-analyze "${sanitizeShellArg(args.commit)}" --json` : 'npx ruvector hooks diff-analyze --json';
           const output = execSync(cmd, { encoding: 'utf-8', timeout: 60000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1683,7 +1879,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_diff_classify': {
         try {
-          const cmd = args.commit ? `npx ruvector hooks diff-classify "${args.commit}"` : 'npx ruvector hooks diff-classify';
+          const cmd = args.commit ? `npx ruvector hooks diff-classify "${sanitizeShellArg(args.commit)}"` : 'npx ruvector hooks diff-classify';
           const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1693,7 +1889,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_diff_similar': {
         try {
-          const output = execSync(`npx ruvector hooks diff-similar -k ${args.top_k || 5} --commits ${args.commits || 50}`, { encoding: 'utf-8', timeout: 120000 });
+          const topK = parseInt(args.top_k, 10) || 5;
+          const commits = parseInt(args.commits, 10) || 50;
+          const output = execSync(`npx ruvector hooks diff-similar -k ${topK} --commits ${commits}`, { encoding: 'utf-8', timeout: 120000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
@@ -1702,7 +1900,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_coverage_route': {
         try {
-          const output = execSync(`npx ruvector hooks coverage-route "${args.file}"`, { encoding: 'utf-8', timeout: 15000 });
+          const safeFile = sanitizeShellArg(args.file);
+          const output = execSync(`npx ruvector hooks coverage-route "${safeFile}"`, { encoding: 'utf-8', timeout: 15000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
@@ -1711,7 +1910,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_coverage_suggest': {
         try {
-          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const filesArg = args.files.map(f => `"${sanitizeShellArg(f)}"`).join(' ');
           const output = execSync(`npx ruvector hooks coverage-suggest ${filesArg}`, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1721,7 +1920,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_graph_mincut': {
         try {
-          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const filesArg = args.files.map(f => `"${sanitizeShellArg(f)}"`).join(' ');
           const output = execSync(`npx ruvector hooks graph-mincut ${filesArg}`, { encoding: 'utf-8', timeout: 60000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1731,9 +1930,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_graph_cluster': {
         try {
-          const filesArg = args.files.map(f => `"${f}"`).join(' ');
-          const method = args.method || 'louvain';
-          const clusters = args.clusters || 3;
+          const filesArg = args.files.map(f => `"${sanitizeShellArg(f)}"`).join(' ');
+          const method = sanitizeShellArg(args.method || 'louvain');
+          const clusters = parseInt(args.clusters, 10) || 3;
           const output = execSync(`npx ruvector hooks graph-cluster ${filesArg} --method ${method} --clusters ${clusters}`, { encoding: 'utf-8', timeout: 60000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1743,7 +1942,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_security_scan': {
         try {
-          const filesArg = args.files.map(f => `"${f}"`).join(' ');
+          const filesArg = args.files.map(f => `"${sanitizeShellArg(f)}"`).join(' ');
           const output = execSync(`npx ruvector hooks security-scan ${filesArg}`, { encoding: 'utf-8', timeout: 120000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -1753,7 +1952,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_rag_context': {
         try {
-          let cmd = `npx ruvector hooks rag-context "${args.query}" -k ${args.top_k || 5}`;
+          const safeQuery = sanitizeShellArg(args.query);
+          const topK = parseInt(args.top_k, 10) || 5;
+          let cmd = `npx ruvector hooks rag-context "${safeQuery}" -k ${topK}`;
           if (args.rerank) cmd += ' --rerank';
           const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
@@ -1764,7 +1965,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_git_churn': {
         try {
-          const output = execSync(`npx ruvector hooks git-churn --days ${args.days || 30} --top ${args.top || 10}`, { encoding: 'utf-8', timeout: 30000 });
+          const days = parseInt(args.days, 10) || 30;
+          const top = parseInt(args.top, 10) || 10;
+          const output = execSync(`npx ruvector hooks git-churn --days ${days} --top ${top}`, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }] };
@@ -1773,8 +1976,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'hooks_route_enhanced': {
         try {
-          let cmd = `npx ruvector hooks route-enhanced "${args.task}"`;
-          if (args.file) cmd += ` --file "${args.file}"`;
+          const safeTask = sanitizeShellArg(args.task);
+          let cmd = `npx ruvector hooks route-enhanced "${safeTask}"`;
+          if (args.file) cmd += ` --file "${sanitizeShellArg(args.file)}"`;
           const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
           return { content: [{ type: 'text', text: output }] };
         } catch (e) {
@@ -2199,7 +2403,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // BACKGROUND WORKERS HANDLERS (via agentic-flow)
       // ============================================
       case 'workers_dispatch': {
-        const prompt = args.prompt;
+        const prompt = sanitizeShellArg(args.prompt);
         try {
           const result = execSync(`npx agentic-flow@alpha workers dispatch "${prompt.replace(/"/g, '\\"')}"`, {
             encoding: 'utf-8',
@@ -2380,8 +2584,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'workers_run': {
-        const name = args.name;
-        const targetPath = args.path || '.';
+        const name = sanitizeShellArg(args.name);
+        const targetPath = sanitizeShellArg(args.path || '.');
         try {
           const result = execSync(`npx agentic-flow@alpha workers run "${name}" --path "${targetPath}"`, {
             encoding: 'utf-8',
@@ -2447,7 +2651,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'workers_load_config': {
-        const configFile = args.file || 'workers.yaml';
+        const configFile = sanitizeShellArg(args.file || 'workers.yaml');
         try {
           const result = execSync(`npx agentic-flow@alpha workers load-config --file "${configFile}"`, {
             encoding: 'utf-8',
@@ -2465,6 +2669,244 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             error: `Config load failed from '${configFile}'`,
             message: e.message
           }, null, 2) }] };
+        }
+      }
+
+      // ── RVF Tool Handlers ─────────────────────────────────────────────────
+      case 'rvf_create': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { createRvfStore } = require('../dist/core/rvf-wrapper.js');
+          const store = await createRvfStore(safePath, { dimension: args.dimension, metric: args.metric || 'cosine' });
+          const status = store.status ? await store.status() : { dimension: args.dimension };
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, path: safePath, ...status }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message, hint: 'Install @ruvector/rvf: npm install @ruvector/rvf' }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_open': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfStatus } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const status = await rvfStatus(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, path: safePath, ...status }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_ingest': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfIngest, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const result = await rvfIngest(store, args.entries);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...result }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_query': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfQuery, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const results = await rvfQuery(store, args.vector, args.k || 10);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, results }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_delete': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfDelete, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const result = await rvfDelete(store, args.ids);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...result }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_status': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfStatus, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const status = await rvfStatus(store);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...status }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_compact': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfCompact, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const result = await rvfCompact(store);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...result }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_derive': {
+        try {
+          const safeParent = validateRvfPath(args.parent_path);
+          const safeChild = validateRvfPath(args.child_path);
+          const { openRvfStore, rvfDerive, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safeParent);
+          await rvfDerive(store, safeChild);
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, parent: safeParent, child: safeChild }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_segments': {
+        try {
+          const safePath = validateRvfPath(args.path);
+          const { openRvfStore, rvfClose } = require('../dist/core/rvf-wrapper.js');
+          const store = await openRvfStore(safePath);
+          const segs = await store.segments();
+          await rvfClose(store);
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, segments: segs }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvf_examples': {
+        const BASE_URL = 'https://raw.githubusercontent.com/ruvnet/ruvector/main/examples/rvf/output';
+        const examples = [
+          { name: 'basic_store', size: '152 KB', desc: '1,000 vectors, dim 128' },
+          { name: 'semantic_search', size: '755 KB', desc: 'Semantic search with HNSW' },
+          { name: 'rag_pipeline', size: '303 KB', desc: 'RAG pipeline embeddings' },
+          { name: 'agent_memory', size: '32 KB', desc: 'AI agent episodic memory' },
+          { name: 'swarm_knowledge', size: '86 KB', desc: 'Multi-agent knowledge base' },
+          { name: 'self_booting', size: '31 KB', desc: 'Self-booting with kernel' },
+          { name: 'ebpf_accelerator', size: '153 KB', desc: 'eBPF distance accelerator' },
+          { name: 'tee_attestation', size: '102 KB', desc: 'TEE attestation + witnesses' },
+          { name: 'lineage_parent', size: '52 KB', desc: 'COW parent file' },
+          { name: 'lineage_child', size: '26 KB', desc: 'COW child (derived)' },
+          { name: 'claude_code_appliance', size: '17 KB', desc: 'Claude Code appliance' },
+          { name: 'progressive_index', size: '2.5 MB', desc: 'Large-scale HNSW index' },
+        ];
+        let filtered = examples;
+        if (args.filter) {
+          const f = args.filter.toLowerCase();
+          filtered = examples.filter(e => e.name.includes(f) || e.desc.toLowerCase().includes(f));
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          total: 45,
+          shown: filtered.length,
+          examples: filtered.map(e => ({ ...e, url: `${BASE_URL}/${e.name}.rvf` })),
+          catalog: 'https://github.com/ruvnet/ruvector/tree/main/examples/rvf/output'
+        }, null, 2) }] };
+      }
+
+      // ── rvlite Query Tool Handlers ──────────────────────────────────────
+      case 'rvlite_sql': {
+        try {
+          let rvlite;
+          try {
+            rvlite = require('rvlite');
+          } catch (_e) {
+            return { content: [{ type: 'text', text: JSON.stringify({
+              success: false,
+              error: 'rvlite package not installed',
+              hint: 'Install with: npm install rvlite'
+            }, null, 2) }] };
+          }
+          const safeQuery = sanitizeShellArg(args.query);
+          const dbOpts = args.db_path ? { path: validateRvfPath(args.db_path) } : {};
+          const db = new rvlite.Database(dbOpts);
+          const results = db.sql(safeQuery);
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: true,
+            query_type: 'sql',
+            results,
+            row_count: Array.isArray(results) ? results.length : 0
+          }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: false,
+            error: e.message
+          }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvlite_cypher': {
+        try {
+          let rvlite;
+          try {
+            rvlite = require('rvlite');
+          } catch (_e) {
+            return { content: [{ type: 'text', text: JSON.stringify({
+              success: false,
+              error: 'rvlite package not installed',
+              hint: 'Install with: npm install rvlite'
+            }, null, 2) }] };
+          }
+          const safeQuery = sanitizeShellArg(args.query);
+          const dbOpts = args.db_path ? { path: validateRvfPath(args.db_path) } : {};
+          const db = new rvlite.Database(dbOpts);
+          const results = db.cypher(safeQuery);
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: true,
+            query_type: 'cypher',
+            results,
+            row_count: Array.isArray(results) ? results.length : 0
+          }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: false,
+            error: e.message
+          }, null, 2) }], isError: true };
+        }
+      }
+
+      case 'rvlite_sparql': {
+        try {
+          let rvlite;
+          try {
+            rvlite = require('rvlite');
+          } catch (_e) {
+            return { content: [{ type: 'text', text: JSON.stringify({
+              success: false,
+              error: 'rvlite package not installed',
+              hint: 'Install with: npm install rvlite'
+            }, null, 2) }] };
+          }
+          const safeQuery = sanitizeShellArg(args.query);
+          const dbOpts = args.db_path ? { path: validateRvfPath(args.db_path) } : {};
+          const db = new rvlite.Database(dbOpts);
+          const results = db.sparql(safeQuery);
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: true,
+            query_type: 'sparql',
+            results,
+            row_count: Array.isArray(results) ? results.length : 0
+          }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({
+            success: false,
+            error: e.message
+          }, null, 2) }], isError: true };
         }
       }
 
