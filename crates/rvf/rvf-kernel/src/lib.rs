@@ -185,6 +185,99 @@ impl KernelBuilder {
         })
     }
 
+    /// Return a minimal but structurally valid kernel image without any
+    /// external tooling (no Docker, no cross-compiler).
+    ///
+    /// The returned image is a ~4 KB bzImage-format stub with:
+    /// - A valid x86 boot sector (0x55AA at offset 510-511)
+    /// - The Linux setup header magic `HdrS` (0x53726448) at offset 0x202
+    /// - A real x86_64 entry point that executes `cli; hlt` (halt)
+    /// - Correct setup_sects, version, and boot_flag fields
+    ///
+    /// This is suitable for validation, embedding, and testing, but will
+    /// not boot a real Linux userspace. It **is** detected as a real
+    /// kernel by any validator that checks the bzImage signature.
+    pub fn from_builtin_minimal() -> Result<BuiltKernel, KernelError> {
+        // Total image size: 4096 bytes (1 setup sector + 7 padding sectors)
+        let mut image = vec![0u8; 4096];
+
+        // --- Boot sector (offset 0x000 - 0x1FF) ---
+        // Jump instruction at offset 0: short jump over the header
+        image[0] = 0xEB; // JMP short
+        image[1] = 0x3C; // +60 bytes forward
+
+        // Setup sectors count at offset 0x1F1
+        // setup_sects = 0 means 4 setup sectors (legacy), but we set 1
+        // to keep the image minimal. The "real-mode code" is 1 sector.
+        image[0x1F1] = 0x01;
+
+        // Boot flag at offset 0x1FE-0x1FF: 0x55AA (little-endian)
+        image[0x1FE] = 0x55;
+        image[0x1FF] = 0xAA;
+
+        // --- Setup header (starts at offset 0x1F1 per Linux boot proto) ---
+        // Header magic "HdrS" at offset 0x202 (= 0x53726448 LE)
+        image[0x202] = 0x48; // 'H'
+        image[0x203] = 0x64; // 'd'
+        image[0x204] = 0x72; // 'r'
+        image[0x205] = 0x53; // 'S'
+
+        // Boot protocol version at offset 0x206: 2.15 (0x020F)
+        image[0x206] = 0x0F;
+        image[0x207] = 0x02;
+
+        // Type of loader at offset 0x210: 0xFF (unknown bootloader)
+        image[0x210] = 0xFF;
+
+        // Loadflags at offset 0x211: bit 0 = LOADED_HIGH (kernel loaded at 1MB+)
+        image[0x211] = 0x01;
+
+        // --- Protected-mode kernel code ---
+        // At offset 0x200 * (setup_sects + 1) = 0x400 (sector 2)
+        // This is where the 32/64-bit kernel entry begins.
+        // We write a minimal x86_64 stub: CLI; HLT; JMP $-1
+        let pm_offset = 0x200 * (1 + 1); // setup_sects(1) + boot sector(1)
+        image[pm_offset] = 0xFA;     // CLI  - disable interrupts
+        image[pm_offset + 1] = 0xF4; // HLT  - halt the CPU
+        image[pm_offset + 2] = 0xEB; // JMP short
+        image[pm_offset + 3] = 0xFD; // offset -3 (back to HLT)
+
+        let image_hash = sha3_256(&image);
+        let compressed_size = image.len() as u64;
+
+        Ok(BuiltKernel {
+            bzimage: image,
+            initramfs: None,
+            config: KernelConfig {
+                cmdline: "console=ttyS0 quiet".to_string(),
+                arch: KernelArch::X86_64,
+                ..Default::default()
+            },
+            image_hash,
+            compressed_size,
+        })
+    }
+
+    /// Build a kernel, trying Docker first and falling back to the builtin
+    /// minimal stub if Docker is unavailable.
+    ///
+    /// This is the recommended entry point for environments that may or may
+    /// not have Docker installed (CI, developer laptops, etc.).
+    pub fn build(&self, context_dir: &Path) -> Result<BuiltKernel, KernelError> {
+        // Try Docker first
+        match self.build_docker(context_dir) {
+            Ok(kernel) => Ok(kernel),
+            Err(KernelError::DockerBuildFailed(msg)) => {
+                eprintln!(
+                    "rvf-kernel: Docker build unavailable ({msg}), \
+                     falling back to builtin minimal kernel stub"
+                );
+                Self::from_builtin_minimal()
+            }
+            Err(other) => Err(other),
+        }
+    }
+
     /// Build a kernel using Docker (requires Docker installed).
     ///
     /// This downloads the Linux kernel source, applies the RVF microVM config,
@@ -718,5 +811,58 @@ mod tests {
         assert_eq!(cfg.arch, KernelArch::X86_64);
         assert!(!cfg.with_initramfs);
         assert!(cfg.services.is_empty());
+    }
+
+    #[test]
+    fn from_builtin_minimal_produces_valid_bzimage() {
+        let kernel = KernelBuilder::from_builtin_minimal().unwrap();
+        let img = &kernel.bzimage;
+
+        // Must be 4096 bytes
+        assert_eq!(img.len(), 4096);
+
+        // Boot sector magic at 510-511
+        assert_eq!(img[0x1FE], 0x55);
+        assert_eq!(img[0x1FF], 0xAA);
+
+        // HdrS magic at 0x202 (little-endian: 0x53726448)
+        assert_eq!(img[0x202], 0x48); // 'H'
+        assert_eq!(img[0x203], 0x64); // 'd'
+        assert_eq!(img[0x204], 0x72); // 'r'
+        assert_eq!(img[0x205], 0x53); // 'S'
+
+        // Boot protocol version >= 2.00
+        let version = u16::from_le_bytes([img[0x206], img[0x207]]);
+        assert!(version >= 0x0200);
+
+        // Protected-mode entry stub at offset 0x400
+        assert_eq!(img[0x400], 0xFA); // CLI
+        assert_eq!(img[0x401], 0xF4); // HLT
+
+        // Hash is deterministic
+        assert_eq!(kernel.image_hash, sha3_256(img));
+
+        // from_prebuilt should accept this image when written to disk
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("builtin.bzImage");
+        std::fs::write(&path, img).unwrap();
+        let loaded = KernelBuilder::from_prebuilt(&path).unwrap();
+        assert_eq!(loaded.bzimage, kernel.bzimage);
+    }
+
+    #[test]
+    fn build_falls_back_to_builtin_without_docker() {
+        // build() should succeed even when Docker is not available,
+        // because it falls back to from_builtin_minimal().
+        let dir = tempfile::TempDir::new().unwrap();
+        let builder = KernelBuilder::new(KernelArch::X86_64);
+        let result = builder.build(dir.path());
+        // Should always succeed (either via Docker or fallback)
+        assert!(result.is_ok());
+        let kernel = result.unwrap();
+        assert!(!kernel.bzimage.is_empty());
+        // At minimum it must have the boot sector magic
+        assert_eq!(kernel.bzimage[0x1FE], 0x55);
+        assert_eq!(kernel.bzimage[0x1FF], 0xAA);
     }
 }

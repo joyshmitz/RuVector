@@ -280,6 +280,37 @@ impl SegmentWriter {
         Ok((seg_id, offset))
     }
 
+    /// Write a WITNESS_SEG containing a serialized witness entry.
+    ///
+    /// Payload layout:
+    ///   `witness_type` (u8) + `timestamp_ns` (u64 LE) +
+    ///   `action_len` (u32 LE) + `action` (bytes) + `prev_hash` (32 bytes)
+    ///
+    /// Returns the segment ID and byte offset where it was written.
+    pub(crate) fn write_witness_seg<W: Write + Seek>(
+        &mut self,
+        writer: &mut W,
+        witness_type: u8,
+        timestamp_ns: u64,
+        action: &[u8],
+        prev_hash: &[u8; 32],
+    ) -> io::Result<(u64, u64)> {
+        let seg_id = self.alloc_seg_id();
+
+        let action_len = action.len() as u32;
+        let payload_size = 1 + 8 + 4 + action.len() + 32;
+        let mut payload = Vec::with_capacity(payload_size);
+
+        payload.push(witness_type);
+        payload.extend_from_slice(&timestamp_ns.to_le_bytes());
+        payload.extend_from_slice(&action_len.to_le_bytes());
+        payload.extend_from_slice(action);
+        payload.extend_from_slice(prev_hash);
+
+        let offset = self.write_segment(writer, SegmentType::Witness as u8, seg_id, &payload)?;
+        Ok((seg_id, offset))
+    }
+
     /// Low-level: write a segment header + payload to the writer.
     /// Returns the byte offset where the segment was written.
     fn write_segment<W: Write + Seek>(
@@ -437,6 +468,55 @@ mod tests {
         // Verify payload starts with kernel header bytes.
         let payload_start = SEGMENT_HEADER_SIZE;
         assert_eq!(&data[payload_start..payload_start + 128], &[0xAAu8; 128]);
+    }
+
+    #[test]
+    fn write_witness_seg_round_trip() {
+        let mut buf = Cursor::new(Vec::new());
+        let mut writer = SegmentWriter::new(1);
+
+        let witness_type = 0x01u8; // Computation
+        let timestamp_ns = 1_700_000_000_000_000_000u64;
+        let action = b"ingest:count=10,epoch=1";
+        let prev_hash = [0u8; 32];
+
+        let (seg_id, offset) = writer
+            .write_witness_seg(&mut buf, witness_type, timestamp_ns, action, &prev_hash)
+            .unwrap();
+        assert_eq!(seg_id, 1);
+        assert_eq!(offset, 0);
+
+        let data = buf.into_inner();
+        assert!(data.len() > SEGMENT_HEADER_SIZE);
+
+        // Check magic.
+        let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        assert_eq!(magic, SEGMENT_MAGIC);
+
+        // Check seg_type == Witness (0x0A).
+        assert_eq!(data[5], SegmentType::Witness as u8);
+
+        // Verify payload starts with witness_type byte.
+        let payload_start = SEGMENT_HEADER_SIZE;
+        assert_eq!(data[payload_start], witness_type);
+
+        // Verify timestamp.
+        let ts_bytes: [u8; 8] = data[payload_start + 1..payload_start + 9].try_into().unwrap();
+        assert_eq!(u64::from_le_bytes(ts_bytes), timestamp_ns);
+
+        // Verify action length.
+        let action_len_bytes: [u8; 4] = data[payload_start + 9..payload_start + 13].try_into().unwrap();
+        assert_eq!(u32::from_le_bytes(action_len_bytes), action.len() as u32);
+
+        // Verify action bytes.
+        let action_start = payload_start + 13;
+        let action_end = action_start + action.len();
+        assert_eq!(&data[action_start..action_end], action);
+
+        // Verify prev_hash (32 zero bytes).
+        let hash_start = action_end;
+        let hash_end = hash_start + 32;
+        assert_eq!(&data[hash_start..hash_end], &[0u8; 32]);
     }
 
     #[test]

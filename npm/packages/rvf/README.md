@@ -337,6 +337,198 @@ const results = await db.search([0.1, 0.2, ...], 5);
 | `rvf-cli` | CLI binary |
 | `rvf-import` | Import from external formats |
 
+## Real-World Examples
+
+### Self-Booting Microservice (Rust)
+
+Create a single `.rvf` file that contains 50 vectors AND a bootable kernel — drop it on a VM and it boots:
+
+```rust
+use rvf_runtime::{RvfStore, RvfOptions, QueryOptions};
+use rvf_runtime::options::DistanceMetric;
+use rvf_types::kernel::{KernelArch, KernelType};
+
+// 1. Create store with vectors
+let mut store = RvfStore::create("bootable.rvf", RvfOptions {
+    dimension: 128, metric: DistanceMetric::L2, ..Default::default()
+})?;
+store.ingest_batch(&vectors, &ids, None)?;
+
+// 2. Embed a kernel — file now boots as a microservice
+store.embed_kernel(
+    KernelArch::X86_64 as u8,
+    KernelType::Hermit as u8,
+    0x0018,  // HAS_QUERY_API | HAS_NETWORKING
+    &kernel_image,
+    8080,
+    Some("console=ttyS0 quiet"),
+)?;
+
+// 3. Verify everything is in one file
+let (header, image) = store.extract_kernel()?.unwrap();
+println!("Kernel: {} bytes, vectors: {}", image.len(), store.query(&q, 5, &QueryOptions::default())?.len());
+store.close()?;
+// Result: 31 KB file with vectors + kernel + witness chain
+```
+
+Run: `cd examples/rvf && cargo run --example self_booting`
+
+### Linux Microkernel Distribution
+
+A single `.rvf` file as an immutable, bootable Linux distribution:
+
+```rust
+use rvf_runtime::{RvfStore, RvfOptions, MetadataEntry, MetadataValue, FilterExpr, QueryOptions};
+use rvf_crypto::{create_witness_chain, sign_segment, verify_segment, shake256_256, WitnessEntry};
+use ed25519_dalek::SigningKey;
+
+// 1. Create system image with 20 packages as vector embeddings
+let mut store = RvfStore::create("microkernel.rvf", options)?;
+for pkg in packages {
+    store.ingest_batch(&[&pkg.embedding], &[pkg.id], Some(&[MetadataEntry {
+        key: "package".into(),
+        value: MetadataValue::String(format!("{}@{}", pkg.name, pkg.version)),
+    }]))?;
+}
+
+// 2. Embed kernel + SSH keys
+store.embed_kernel(KernelArch::X86_64 as u8, KernelType::Linux as u8, 0x001F, &kernel, 8080, None)?;
+
+// 3. Sign with Ed25519 — prevents unauthorized modifications
+let signature = sign_segment(&segment_bytes, &signing_key);
+verify_segment(&segment_bytes, &signature, &verifying_key)?;
+
+// 4. Witness chain — every package install is audited
+let chain = create_witness_chain(&witness_entries);
+// Result: 14 KB file = bootable OS + packages + SSH + crypto + witness
+```
+
+Run: `cd examples/rvf && cargo run --example linux_microkernel`
+
+### Claude Code Appliance
+
+Build an AI development environment as a single sealed file:
+
+```rust
+// Creates a .rvf file containing:
+// - 20 development packages (rust, node, python, etc.)
+// - Real Linux kernel with SSH on port 2222
+// - eBPF XDP program for fast-path vector lookups
+// - Vector store with development context embeddings
+// - 6-entry witness chain for audit
+// - Ed25519 + ML-DSA-65 signatures
+let store = RvfStore::create("claude_code_appliance.rvf", options)?;
+// ... embed packages, kernel, eBPF, witness chain, signatures ...
+// Result: 17 KB sealed cognitive container
+```
+
+Run: `cd examples/rvf && cargo run --example claude_code_appliance`
+
+### CLI Proof-of-Operations
+
+```bash
+# Full lifecycle in one session:
+
+# Create a vector store
+rvf create demo.rvf --dimension 128
+
+# Ingest 100 vectors from JSON
+rvf ingest demo.rvf --input data.json --format json
+
+# Query nearest neighbors
+rvf query demo.rvf --vector "0.1,0.2,0.3,..." --k 5
+
+# Derive a COW child (only stores differences)
+rvf derive demo.rvf child.rvf --type filter
+
+# Inspect all segments
+rvf inspect demo.rvf
+# Output: MANIFEST_SEG (4 KB), VEC_SEG (51 KB), INDEX_SEG (12 KB)
+
+# Verify witness chain integrity
+rvf verify-witness demo.rvf
+
+# Embed a kernel — file becomes self-booting
+rvf embed-kernel demo.rvf --image bzImage --arch x86_64
+
+# Launch in QEMU microVM
+rvf launch demo.rvf --port 8080
+
+# Compact and reclaim space
+rvf compact demo.rvf
+```
+
+### Witness Chain Verification
+
+```rust
+use rvf_crypto::{create_witness_chain, verify_witness_chain, shake256_256, WitnessEntry};
+
+// Every operation is recorded in a tamper-evident hash chain
+let entries = vec![
+    WitnessEntry {
+        prev_hash: [0; 32],
+        action_hash: shake256_256(b"ingest: 1000 vectors, dim 384"),
+        timestamp_ns: 1_700_000_000_000_000_000,
+        witness_type: 0x01, // PROVENANCE
+    },
+    WitnessEntry {
+        prev_hash: [0; 32], // linked by create_witness_chain
+        action_hash: shake256_256(b"query: top-10, cosine"),
+        timestamp_ns: 1_700_000_001_000_000_000,
+        witness_type: 0x03, // SEARCH
+    },
+    WitnessEntry {
+        prev_hash: [0; 32],
+        action_hash: shake256_256(b"embed: kernel x86_64, 8080"),
+        timestamp_ns: 1_700_000_002_000_000_000,
+        witness_type: 0x02, // COMPUTATION
+    },
+];
+
+let chain_bytes = create_witness_chain(&entries);
+let verified = verify_witness_chain(&chain_bytes)?;
+assert_eq!(verified.len(), 3);
+// Changing any byte in any entry breaks the entire chain
+```
+
+### COW Branching (Git-like for Vectors)
+
+```rust
+use rvf_runtime::{RvfStore, RvfOptions};
+use rvf_types::DerivationType;
+
+// Parent: 1M vectors (~512 MB)
+let parent = RvfStore::create("parent.rvf", options)?;
+parent.ingest_batch(&million_vectors, &ids, None)?;
+
+// Child: shares all parent data, only stores changes
+let child = parent.derive("child.rvf", DerivationType::Filter, None)?;
+assert_eq!(child.lineage_depth(), 1);
+
+// Modify 100 vectors → only 10 clusters copied (~2.5 MB, not 512 MB)
+child.ingest_batch(&updated_vectors, &updated_ids, None)?;
+
+// Query child — transparent parent resolution
+let results = child.query(&query, 10, &QueryOptions::default())?;
+// Results come from both local (modified) and inherited (parent) clusters
+```
+
+### Generate All 45 Example Files
+
+```bash
+cd examples/rvf
+cargo run --example generate_all
+ls output/
+# 45 .rvf files ready to inspect:
+#   basic_store.rvf (152 KB)        — 1,000 vectors
+#   self_booting.rvf (31 KB)        — vectors + kernel
+#   linux_microkernel.rvf (15 KB)   — bootable OS image
+#   claude_code_appliance.rvf (17 KB) — AI dev environment
+#   sealed_engine.rvf (208 KB)      — signed inference engine
+#   agent_memory.rvf (32 KB)        — AI agent memory
+#   ... and 39 more
+```
+
 ## License
 
 MIT

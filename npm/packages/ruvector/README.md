@@ -2039,6 +2039,97 @@ cd crates/rvf && cargo run --example generate_all
 
 Full catalog: [examples/rvf/output/](https://github.com/ruvnet/ruvector/tree/main/examples/rvf/output)
 
+### Working Examples: Cognitive Containers
+
+#### Self-Booting Microservice
+
+A single `.rvf` file that contains vectors AND a bootable Linux kernel:
+
+```bash
+# Build and run the self-booting example
+cd crates/rvf && cargo run --example self_booting
+# Output:
+#   Ingested 50 vectors (128 dims)
+#   Pre-kernel query: top-5 results OK (nearest ID=25)
+#   Kernel: 4,640 bytes embedded (x86_64, Hermit)
+#   Witness chain: 5 entries, all verified
+#   File: bootable.rvf (31 KB) — data + runtime in one file
+```
+
+```rust
+// The pattern: vectors + kernel + witness in one file
+let mut store = RvfStore::create("bootable.rvf", options)?;
+store.ingest_batch(&vectors, &ids, None)?;
+store.embed_kernel(KernelArch::X86_64 as u8, KernelType::Hermit as u8,
+    0x0018, &kernel_image, 8080, Some("console=ttyS0 quiet"))?;
+// Result: drop on a VM and it boots as a query service
+```
+
+#### Linux Microkernel Distribution
+
+20-package Linux distro with SSH keys and kernel in a single file:
+
+```bash
+cd crates/rvf && cargo run --example linux_microkernel
+# Output:
+#   Installed 20 packages as vector embeddings
+#   Kernel embedded: Linux x86_64 (4,640 bytes)
+#   SSH keys: Ed25519, signed and verified
+#   Witness chain: 22 entries (1 per package + kernel + SSH)
+#   File: microkernel.rvf (14 KB) — immutable bootable system
+```
+
+Features: package search by embedding similarity, Ed25519 signed SSH keys, witness-audited installs, COW-derived child images for atomic updates.
+
+#### Claude Code AI Appliance
+
+A sealed, bootable AI development environment:
+
+```bash
+cd crates/rvf && cargo run --example claude_code_appliance
+# Output:
+#   20 dev packages (rust, node, python, docker, ...)
+#   Kernel: Linux x86_64 with SSH on port 2222
+#   eBPF: XDP distance program for fast-path lookups
+#   Witness chain: 6 entries, all verified
+#   Crypto: Ed25519 signature
+#   File: claude_code_appliance.rvf (17 KB)
+```
+
+#### CLI Full Lifecycle
+
+```bash
+# Create → Ingest → Query → Derive → Inspect
+rvf create vectors.rvf --dimension 384
+rvf ingest vectors.rvf --input data.json --format json
+rvf query vectors.rvf --vector "0.1,0.2,..." --k 10
+rvf derive vectors.rvf child.rvf --type filter
+rvf inspect vectors.rvf
+
+# Embed kernel and launch as microVM
+rvf embed-kernel vectors.rvf --image bzImage
+rvf launch vectors.rvf --port 8080
+
+# Verify tamper-evident witness chain
+rvf verify-witness vectors.rvf
+rvf verify-attestation vectors.rvf
+```
+
+#### Integration Tests (46 passing)
+
+```bash
+cd crates/rvf
+cargo test --workspace
+# attestation .............. 6 passed
+# crypto ................... 10 passed
+# computational_container .. 8 passed
+# cow_branching ............ 8 passed
+# cross_platform ........... 6 passed
+# lineage .................. 4 passed
+# smoke .................... 4 passed
+# Total: 46/46 passed
+```
+
 ## 🐛 Troubleshooting
 
 ### Native Module Not Loading

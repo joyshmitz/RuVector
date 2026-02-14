@@ -9413,6 +9413,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "ctrlc",
+ "rvf-crypto",
  "rvf-launch",
  "rvf-manifest",
  "rvf-runtime",

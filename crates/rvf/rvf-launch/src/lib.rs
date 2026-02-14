@@ -84,17 +84,144 @@ pub struct MicroVm {
     _workdir: tempfile::TempDir,
 }
 
+/// Result of a requirements check.
+#[derive(Clone, Debug)]
+pub struct RequirementsReport {
+    /// Whether qemu-system-x86_64 (or arch equivalent) was found.
+    pub qemu_found: bool,
+    /// Path to the QEMU binary, if found.
+    pub qemu_path: Option<PathBuf>,
+    /// Whether KVM acceleration is available.
+    pub kvm_available: bool,
+    /// Platform-specific install instructions if QEMU is missing.
+    pub install_hint: String,
+}
+
+impl std::fmt::Display for RequirementsReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.qemu_found {
+            writeln!(f, "QEMU: found at {}", self.qemu_path.as_ref().unwrap().display())?;
+        } else {
+            writeln!(f, "QEMU: NOT FOUND")?;
+            writeln!(f, "  Install instructions:")?;
+            writeln!(f, "  {}", self.install_hint)?;
+        }
+        writeln!(f, "KVM:  {}", if self.kvm_available { "available" } else { "not available (will use TCG)" })
+    }
+}
+
+/// Description of what a launch would execute, without spawning QEMU.
+#[derive(Clone, Debug)]
+pub struct DryRunResult {
+    /// The full QEMU command line that would be executed.
+    pub command_line: Vec<String>,
+    /// Path to the kernel image that would be used.
+    pub kernel_path: PathBuf,
+    /// Path to the initramfs, if any.
+    pub initramfs_path: Option<PathBuf>,
+    /// The kernel command line that would be passed.
+    pub cmdline: String,
+    /// Whether KVM would be used.
+    pub use_kvm: bool,
+    /// Memory allocation in MiB.
+    pub memory_mb: u32,
+    /// Number of virtual CPUs.
+    pub vcpus: u32,
+    /// The API port mapping.
+    pub api_port: u16,
+}
+
+impl std::fmt::Display for DryRunResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Dry run - QEMU command that would be executed:")?;
+        writeln!(f, "  {}", self.command_line.join(" "))?;
+        writeln!(f, "")?;
+        writeln!(f, "  Kernel:    {}", self.kernel_path.display())?;
+        if let Some(ref initrd) = self.initramfs_path {
+            writeln!(f, "  Initramfs: {}", initrd.display())?;
+        }
+        writeln!(f, "  Cmdline:   {}", self.cmdline)?;
+        writeln!(f, "  KVM:       {}", if self.use_kvm { "yes" } else { "no (TCG)" })?;
+        writeln!(f, "  Memory:    {} MiB", self.memory_mb)?;
+        writeln!(f, "  vCPUs:     {}", self.vcpus)?;
+        writeln!(f, "  API port:  {}", self.api_port)
+    }
+}
+
 /// Top-level launcher API.
 pub struct Launcher;
 
 impl Launcher {
+    /// Check whether all requirements for launching a microVM are met.
+    ///
+    /// Returns a `RequirementsReport` with details about what was found
+    /// and platform-specific install instructions if QEMU is missing.
+    pub fn check_requirements(arch: KernelArch) -> RequirementsReport {
+        let qemu_result = qemu::find_qemu(arch);
+        let kvm = qemu::kvm_available();
+
+        let install_hint = match std::env::consts::OS {
+            "linux" => {
+                // Detect package manager
+                if std::path::Path::new("/usr/bin/apt").exists()
+                    || std::path::Path::new("/usr/bin/apt-get").exists()
+                {
+                    "sudo apt install qemu-system-x86".to_string()
+                } else if std::path::Path::new("/usr/bin/dnf").exists() {
+                    "sudo dnf install qemu-system-x86".to_string()
+                } else if std::path::Path::new("/usr/bin/pacman").exists() {
+                    "sudo pacman -S qemu-system-x86".to_string()
+                } else if std::path::Path::new("/sbin/apk").exists() {
+                    "sudo apk add qemu-system-x86_64".to_string()
+                } else {
+                    "Install QEMU via your distribution's package manager \
+                     (e.g. apt, dnf, pacman)"
+                        .to_string()
+                }
+            }
+            "macos" => "brew install qemu".to_string(),
+            _ => "Download QEMU from https://www.qemu.org/download/".to_string(),
+        };
+
+        match qemu_result {
+            Ok(path) => RequirementsReport {
+                qemu_found: true,
+                qemu_path: Some(path),
+                kvm_available: kvm,
+                install_hint,
+            },
+            Err(_) => RequirementsReport {
+                qemu_found: false,
+                qemu_path: None,
+                kvm_available: kvm,
+                install_hint,
+            },
+        }
+    }
+
     /// Extract kernel from an RVF file and launch it in a QEMU microVM.
+    ///
+    /// Calls `check_requirements()` first and returns a helpful error if
+    /// QEMU is not found.
     pub fn launch(config: &LaunchConfig) -> Result<MicroVm, LaunchError> {
         if !config.rvf_path.exists() {
             return Err(LaunchError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("RVF file not found: {}", config.rvf_path.display()),
             )));
+        }
+
+        // Check requirements first (unless user provided a custom binary)
+        if config.qemu_binary.is_none() {
+            let report = Self::check_requirements(KernelArch::X86_64);
+            if !report.qemu_found {
+                return Err(LaunchError::QemuNotFound {
+                    searched: vec![format!(
+                        "QEMU not found. Install it with: {}",
+                        report.install_hint,
+                    )],
+                });
+            }
         }
 
         // Extract kernel from RVF
@@ -127,6 +254,57 @@ impl Launcher {
             pid,
             _extracted: Some(extracted),
             _workdir: workdir,
+        })
+    }
+
+    /// Show what WOULD be executed without actually spawning QEMU.
+    ///
+    /// Useful for CI/testing and debugging launch configuration. Extracts
+    /// the kernel from the RVF file and builds the full command line, but
+    /// does not spawn any process.
+    pub fn dry_run(config: &LaunchConfig) -> Result<DryRunResult, LaunchError> {
+        if !config.rvf_path.exists() {
+            return Err(LaunchError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("RVF file not found: {}", config.rvf_path.display()),
+            )));
+        }
+
+        let extracted = extract::extract_kernel(&config.rvf_path)?;
+        let workdir = tempfile::tempdir().map_err(LaunchError::TempFile)?;
+        let qemu_cmd = qemu::build_command(config, &extracted, workdir.path())?;
+
+        // Reconstruct the command line as a Vec<String>
+        let cmd = &qemu_cmd.command;
+        let program = cmd.get_program().to_string_lossy().to_string();
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        let mut command_line = vec![program];
+        command_line.extend(args);
+
+        let kernel_path = config
+            .kernel_path
+            .clone()
+            .unwrap_or_else(|| extracted.kernel_path.clone());
+
+        let initramfs_path = config
+            .initramfs_path
+            .clone()
+            .or_else(|| extracted.initramfs_path.clone());
+
+        let use_kvm = config.enable_kvm && qemu::kvm_available();
+
+        Ok(DryRunResult {
+            command_line,
+            kernel_path,
+            initramfs_path,
+            cmdline: extracted.cmdline,
+            use_kvm,
+            memory_mb: config.memory_mb,
+            vcpus: config.vcpus,
+            api_port: config.api_port,
         })
     }
 
@@ -388,5 +566,139 @@ mod tests {
         assert_eq!(VmStatus::Running, VmStatus::Running);
         assert_eq!(VmStatus::Exited(Some(0)), VmStatus::Exited(Some(0)));
         assert_ne!(VmStatus::Running, VmStatus::Exited(None));
+    }
+
+    #[test]
+    fn check_requirements_returns_report() {
+        let report = Launcher::check_requirements(KernelArch::X86_64);
+        // Install hint should never be empty
+        assert!(!report.install_hint.is_empty());
+        // Display formatting should work
+        let display = format!("{report}");
+        assert!(display.contains("QEMU:"));
+        assert!(display.contains("KVM:"));
+
+        if report.qemu_found {
+            assert!(report.qemu_path.is_some());
+        } else {
+            assert!(report.qemu_path.is_none());
+        }
+    }
+
+    #[test]
+    fn check_requirements_has_platform_install_hint() {
+        let report = Launcher::check_requirements(KernelArch::X86_64);
+        // On Linux CI we expect an apt/dnf/pacman hint
+        #[cfg(target_os = "linux")]
+        {
+            assert!(
+                report.install_hint.contains("apt")
+                    || report.install_hint.contains("dnf")
+                    || report.install_hint.contains("pacman")
+                    || report.install_hint.contains("apk")
+                    || report.install_hint.contains("package manager"),
+                "expected Linux install hint, got: {}",
+                report.install_hint,
+            );
+        }
+    }
+
+    #[test]
+    fn launch_rejects_missing_rvf() {
+        let config = LaunchConfig {
+            rvf_path: PathBuf::from("/nonexistent/test.rvf"),
+            ..Default::default()
+        };
+        let result = Launcher::launch(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn dry_run_rejects_missing_rvf() {
+        let config = LaunchConfig {
+            rvf_path: PathBuf::from("/nonexistent/test.rvf"),
+            ..Default::default()
+        };
+        let result = Launcher::dry_run(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn dry_run_with_real_rvf() {
+        use rvf_runtime::options::RvfOptions;
+        use rvf_runtime::RvfStore;
+
+        let dir = tempfile::tempdir().unwrap();
+        let rvf_path = dir.path().join("dry_run.rvf");
+
+        let opts = RvfOptions {
+            dimension: 4,
+            ..Default::default()
+        };
+        let mut store = RvfStore::create(&rvf_path, opts).unwrap();
+        let image = b"MZ\x00fake-kernel-for-dry-run-test";
+        store
+            .embed_kernel(
+                KernelArch::X86_64 as u8,
+                0x01,
+                0,
+                image,
+                8080,
+                Some("console=ttyS0"),
+            )
+            .unwrap();
+        store.close().unwrap();
+
+        let config = LaunchConfig {
+            rvf_path: rvf_path.clone(),
+            memory_mb: 256,
+            vcpus: 2,
+            api_port: 9090,
+            ..Default::default()
+        };
+
+        let result = Launcher::dry_run(&config);
+        // dry_run may fail if QEMU binary not found - that is expected
+        match result {
+            Ok(dry) => {
+                assert!(!dry.command_line.is_empty());
+                assert!(dry.command_line[0].contains("qemu"));
+                assert_eq!(dry.memory_mb, 256);
+                assert_eq!(dry.vcpus, 2);
+                assert_eq!(dry.api_port, 9090);
+                assert_eq!(dry.cmdline, "console=ttyS0");
+                // Display should work
+                let display = format!("{dry}");
+                assert!(display.contains("Dry run"));
+                assert!(display.contains("256 MiB"));
+            }
+            Err(LaunchError::QemuNotFound { .. }) => {
+                // Expected in environments without QEMU
+            }
+            Err(other) => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn requirements_report_display() {
+        let report = RequirementsReport {
+            qemu_found: true,
+            qemu_path: Some(PathBuf::from("/usr/bin/qemu-system-x86_64")),
+            kvm_available: false,
+            install_hint: "sudo apt install qemu-system-x86".to_string(),
+        };
+        let s = format!("{report}");
+        assert!(s.contains("/usr/bin/qemu-system-x86_64"));
+        assert!(s.contains("not available"));
+
+        let report_missing = RequirementsReport {
+            qemu_found: false,
+            qemu_path: None,
+            kvm_available: false,
+            install_hint: "brew install qemu".to_string(),
+        };
+        let s2 = format!("{report_missing}");
+        assert!(s2.contains("NOT FOUND"));
+        assert!(s2.contains("brew install qemu"));
     }
 }

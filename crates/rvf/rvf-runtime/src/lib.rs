@@ -33,7 +33,7 @@ pub use filter::FilterExpr;
 pub use membership::MembershipFilter;
 pub use options::{
     CompactionResult, DeleteResult, IngestResult, MetadataEntry, MetadataValue, QueryOptions,
-    RvfOptions, SearchResult,
+    RvfOptions, SearchResult, WitnessConfig,
 };
 pub use status::StoreStatus;
 pub use store::RvfStore;

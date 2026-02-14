@@ -26,6 +26,31 @@ pub enum CompressionProfile {
     Product,
 }
 
+/// Configuration for automatic witness segment generation.
+#[derive(Clone, Debug)]
+pub struct WitnessConfig {
+    /// Append a witness entry after each ingest operation. Default: true.
+    pub witness_ingest: bool,
+    /// Append a witness entry after each delete operation. Default: true.
+    pub witness_delete: bool,
+    /// Append a witness entry after each compact operation. Default: true.
+    pub witness_compact: bool,
+    /// Append a witness entry after each query operation. Default: false.
+    /// Enable this for audit-trail compliance; it adds I/O to the hot path.
+    pub audit_queries: bool,
+}
+
+impl Default for WitnessConfig {
+    fn default() -> Self {
+        Self {
+            witness_ingest: true,
+            witness_delete: true,
+            witness_compact: true,
+            audit_queries: false,
+        }
+    }
+}
+
 /// Options for creating a new RVF store.
 #[derive(Clone, Debug)]
 pub struct RvfOptions {
@@ -45,6 +70,8 @@ pub struct RvfOptions {
     pub m: u16,
     /// HNSW ef_construction: beam width during index build.
     pub ef_construction: u16,
+    /// Witness auto-generation configuration.
+    pub witness: WitnessConfig,
 }
 
 impl Default for RvfOptions {
@@ -58,6 +85,7 @@ impl Default for RvfOptions {
             signing: false,
             m: 16,
             ef_construction: 200,
+            witness: WitnessConfig::default(),
         }
     }
 }

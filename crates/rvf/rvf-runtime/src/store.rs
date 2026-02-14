@@ -31,6 +31,15 @@ fn err(code: ErrorCode) -> RvfError {
     RvfError::Code(code)
 }
 
+/// Witness type discriminators matching rvf-crypto's WitnessType.
+/// Kept here to avoid a hard dependency on rvf-crypto in the runtime.
+mod witness_types {
+    /// Data provenance witness (tracks data origin and lineage).
+    pub const DATA_PROVENANCE: u8 = 0x00;
+    /// Computation witness (tracks processing / transform operations).
+    pub const COMPUTATION: u8 = 0x01;
+}
+
 /// The main RVF store handle.
 ///
 /// Provides create, open, ingest, query, delete, compact, and close.
@@ -54,6 +63,9 @@ pub struct RvfStore {
     membership_filter: Option<MembershipFilter>,
     /// Path to the parent file (for COW reads that need parent data).
     parent_path: Option<PathBuf>,
+    /// Hash of the last witness entry, used to chain-link successive witnesses.
+    /// All zeros when no witness has been written yet (genesis).
+    last_witness_hash: [u8; 32],
 }
 
 impl RvfStore {
@@ -103,6 +115,7 @@ impl RvfStore {
             cow_engine: None,
             membership_filter: None,
             parent_path: None,
+            last_witness_hash: [0u8; 32],
         };
 
         store.write_manifest()?;
@@ -153,6 +166,7 @@ impl RvfStore {
             cow_engine: None,
             membership_filter: None,
             parent_path: None,
+            last_witness_hash: [0u8; 32],
         };
 
         store.boot()?;
@@ -198,6 +212,7 @@ impl RvfStore {
             cow_engine: None,
             membership_filter: None,
             parent_path: None,
+            last_witness_hash: [0u8; 32],
         };
 
         store.boot()?;
@@ -276,6 +291,19 @@ impl RvfStore {
         self.file.sync_all().map_err(|_| err(ErrorCode::FsyncFailed))?;
 
         self.epoch += 1;
+
+        // Append a witness entry recording this ingest operation.
+        if self.options.witness.witness_ingest {
+            let action = format!(
+                "ingest:count={},epoch={}",
+                accepted, self.epoch
+            );
+            self.append_witness(
+                witness_types::COMPUTATION,
+                action.as_bytes(),
+            )?;
+        }
+
         self.write_manifest()?;
 
         Ok(IngestResult { accepted, rejected, epoch: self.epoch })
@@ -332,6 +360,36 @@ impl RvfStore {
         Ok(results)
     }
 
+    /// Query the store with optional audit witness.
+    ///
+    /// Behaves identically to [`query`] but, when `audit_queries` is enabled
+    /// in the store's `WitnessConfig`, appends a WITNESS_SEG recording the
+    /// query operation. Requires `&mut self` due to the file write.
+    pub fn query_audited(
+        &mut self,
+        vector: &[f32],
+        k: usize,
+        options: &QueryOptions,
+    ) -> Result<Vec<SearchResult>, RvfError> {
+        let results = self.query(vector, k, options)?;
+
+        if self.options.witness.audit_queries && !self.read_only {
+            let action = format!(
+                "query:k={},results={},epoch={}",
+                k, results.len(), self.epoch
+            );
+            self.append_witness(
+                witness_types::COMPUTATION,
+                action.as_bytes(),
+            )?;
+            // Flush the witness to disk but skip a full manifest rewrite
+            // to keep query overhead minimal.
+            self.file.sync_all().map_err(|_| err(ErrorCode::FsyncFailed))?;
+        }
+
+        Ok(results)
+    }
+
     /// Soft-delete vectors by ID.
     pub fn delete(&mut self, ids: &[u64]) -> Result<DeleteResult, RvfError> {
         if self.read_only {
@@ -362,6 +420,19 @@ impl RvfStore {
         }
 
         self.epoch = epoch;
+
+        // Append a witness entry recording this delete operation.
+        if self.options.witness.witness_delete {
+            let action = format!(
+                "delete:count={},epoch={}",
+                deleted, self.epoch
+            );
+            self.append_witness(
+                witness_types::DATA_PROVENANCE,
+                action.as_bytes(),
+            )?;
+        }
+
         self.write_manifest()?;
 
         Ok(DeleteResult { deleted, epoch: self.epoch })
@@ -540,6 +611,22 @@ impl RvfStore {
         self.segment_dir = new_segment_dir;
         self.seg_writer = Some(seg_writer);
         self.last_compaction_time = now_secs();
+
+        // Reset witness chain after compaction (the file has been rewritten).
+        self.last_witness_hash = [0u8; 32];
+
+        // Append a witness entry recording this compact operation.
+        if self.options.witness.witness_compact {
+            let action = format!(
+                "compact:segments_compacted={},bytes_reclaimed={},epoch={}",
+                segments_compacted, bytes_reclaimed, self.epoch
+            );
+            self.append_witness(
+                witness_types::COMPUTATION,
+                action.as_bytes(),
+            )?;
+            self.file.sync_all().map_err(|_| err(ErrorCode::FsyncFailed))?;
+        }
 
         Ok(CompactionResult { segments_compacted, bytes_reclaimed, epoch: self.epoch })
     }
@@ -1049,6 +1136,7 @@ impl RvfStore {
             cow_engine: None,
             membership_filter: None,
             parent_path: Some(self.path.clone()),
+            last_witness_hash: [0u8; 32],
         };
 
         store.write_manifest()?;
@@ -1074,7 +1162,65 @@ impl RvfStore {
         Ok(simple_shake256_256(&buf))
     }
 
+    /// Return the hash of the last witness entry (for external verification).
+    pub fn last_witness_hash(&self) -> &[u8; 32] {
+        &self.last_witness_hash
+    }
+
     // ── Internal methods ──────────────────────────────────────────────
+
+    /// Append a witness segment to the file and update the witness chain.
+    ///
+    /// `witness_type` is one of the `witness_types::*` constants.
+    /// `action` is a human-readable action description encoded as bytes.
+    ///
+    /// The witness entry is chain-linked to the previous witness via
+    /// `last_witness_hash` using `simple_shake256_256`.
+    fn append_witness(
+        &mut self,
+        witness_type: u8,
+        action: &[u8],
+    ) -> Result<(), RvfError> {
+        let writer = self.seg_writer.as_mut()
+            .ok_or_else(|| err(ErrorCode::InvalidManifest))?;
+
+        let timestamp_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
+
+        let (seg_id, seg_offset) = {
+            let mut buf_writer = BufWriter::new(&self.file);
+            buf_writer.seek(SeekFrom::End(0))
+                .map_err(|_| err(ErrorCode::FsyncFailed))?;
+            writer.write_witness_seg(
+                &mut buf_writer,
+                witness_type,
+                timestamp_ns,
+                action,
+                &self.last_witness_hash,
+            ).map_err(|_| err(ErrorCode::FsyncFailed))?
+        };
+
+        // Compute the payload length for the segment directory.
+        let payload_len = (1 + 8 + 4 + action.len() + 32) as u64;
+        self.segment_dir.push((
+            seg_id, seg_offset, payload_len, SegmentType::Witness as u8,
+        ));
+
+        // Build the serialized witness entry bytes and hash them to update
+        // the chain. This mirrors the payload layout exactly so that
+        // external verifiers can reconstruct the chain from raw segments.
+        let mut entry_bytes = Vec::with_capacity(1 + 8 + 4 + action.len() + 32);
+        entry_bytes.push(witness_type);
+        entry_bytes.extend_from_slice(&timestamp_ns.to_le_bytes());
+        entry_bytes.extend_from_slice(&(action.len() as u32).to_le_bytes());
+        entry_bytes.extend_from_slice(action);
+        entry_bytes.extend_from_slice(&self.last_witness_hash);
+        self.last_witness_hash = simple_shake256_256(&entry_bytes);
+
+        Ok(())
+    }
 
     fn boot(&mut self) -> Result<(), RvfError> {
         let manifest = {
@@ -1787,6 +1933,217 @@ mod tests {
         let store = RvfStore::create(&path, options).unwrap();
         assert!(store.extract_kernel().unwrap().is_none());
         assert!(store.extract_ebpf().unwrap().is_none());
+        store.close().unwrap();
+    }
+
+    // ── Witness integration tests ────────────────────────────────────
+
+    /// Helper: count how many WITNESS_SEG entries exist in the segment directory.
+    fn count_witness_segments(store: &RvfStore) -> usize {
+        store.segment_dir()
+            .iter()
+            .filter(|&&(_, _, _, stype)| stype == SegmentType::Witness as u8)
+            .count()
+    }
+
+    #[test]
+    fn test_ingest_creates_witness() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_ingest.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        // Before ingest: no witness segments.
+        assert_eq!(count_witness_segments(&store), 0);
+
+        let v1 = vec![1.0, 0.0, 0.0, 0.0];
+        let v2 = vec![0.0, 1.0, 0.0, 0.0];
+        let vecs: Vec<&[f32]> = vec![&v1, &v2];
+        let ids = vec![1, 2];
+        store.ingest_batch(&vecs, &ids, None).unwrap();
+
+        // After ingest: exactly 1 witness segment.
+        assert_eq!(count_witness_segments(&store), 1);
+
+        // The last_witness_hash should be non-zero now.
+        assert_ne!(store.last_witness_hash(), &[0u8; 32]);
+
+        store.close().unwrap();
+    }
+
+    #[test]
+    fn test_delete_creates_witness() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_delete.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        let v1 = vec![1.0, 0.0, 0.0, 0.0];
+        let v2 = vec![0.0, 1.0, 0.0, 0.0];
+        store.ingest_batch(&[&v1[..], &v2[..]], &[1, 2], None).unwrap();
+
+        // 1 witness from ingest.
+        assert_eq!(count_witness_segments(&store), 1);
+
+        store.delete(&[1]).unwrap();
+
+        // 2 witnesses: 1 from ingest + 1 from delete.
+        assert_eq!(count_witness_segments(&store), 2);
+
+        store.close().unwrap();
+    }
+
+    #[test]
+    fn test_compact_creates_witness() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_compact.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        let vecs: Vec<Vec<f32>> = (0..5).map(|i| vec![i as f32, 0.0, 0.0, 0.0]).collect();
+        let vec_refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
+        let ids: Vec<u64> = (0..5).collect();
+        store.ingest_batch(&vec_refs, &ids, None).unwrap();
+        store.delete(&[0, 2]).unwrap();
+
+        // Before compact: 1 witness from ingest + 1 witness from delete = 2.
+        assert_eq!(count_witness_segments(&store), 2);
+
+        store.compact().unwrap();
+
+        // After compaction the file is rewritten. Witness segments from
+        // before compaction are preserved (they are non-Vec/non-Manifest/
+        // non-Journal) plus the new compact witness is appended: 2 + 1 = 3.
+        assert_eq!(count_witness_segments(&store), 3);
+
+        // Verify the last witness hash is non-zero.
+        assert_ne!(store.last_witness_hash(), &[0u8; 32]);
+
+        store.close().unwrap();
+    }
+
+    #[test]
+    fn test_witness_chain_integrity() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_chain.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        // Perform 3 operations to build a chain of 3 witnesses.
+        let v1 = vec![1.0, 0.0, 0.0, 0.0];
+        let v2 = vec![0.0, 1.0, 0.0, 0.0];
+        let v3 = vec![0.0, 0.0, 1.0, 0.0];
+
+        store.ingest_batch(&[&v1[..]], &[1], None).unwrap();
+        let hash_after_first = *store.last_witness_hash();
+        assert_ne!(hash_after_first, [0u8; 32]);
+
+        store.ingest_batch(&[&v2[..]], &[2], None).unwrap();
+        let hash_after_second = *store.last_witness_hash();
+        // Each successive hash must be different (chain progresses).
+        assert_ne!(hash_after_second, hash_after_first);
+        assert_ne!(hash_after_second, [0u8; 32]);
+
+        store.ingest_batch(&[&v3[..]], &[3], None).unwrap();
+        let hash_after_third = *store.last_witness_hash();
+        assert_ne!(hash_after_third, hash_after_second);
+        assert_ne!(hash_after_third, hash_after_first);
+
+        // Total witness segments should be 3.
+        assert_eq!(count_witness_segments(&store), 3);
+
+        store.close().unwrap();
+    }
+
+    #[test]
+    fn test_witness_disabled_produces_no_segments() {
+        use crate::options::WitnessConfig;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_off.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            witness: WitnessConfig {
+                witness_ingest: false,
+                witness_delete: false,
+                witness_compact: false,
+                audit_queries: false,
+            },
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        let v1 = vec![1.0, 0.0, 0.0, 0.0];
+        store.ingest_batch(&[&v1[..]], &[1], None).unwrap();
+        store.delete(&[1]).unwrap();
+
+        // No witness segments should have been created.
+        assert_eq!(count_witness_segments(&store), 0);
+        assert_eq!(store.last_witness_hash(), &[0u8; 32]);
+
+        store.close().unwrap();
+    }
+
+    #[test]
+    fn test_query_audited_creates_witness() {
+        use crate::options::WitnessConfig;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("witness_query.rvf");
+
+        let options = RvfOptions {
+            dimension: 4,
+            metric: DistanceMetric::L2,
+            witness: WitnessConfig {
+                witness_ingest: false, // disable ingest witness to isolate query
+                witness_delete: false,
+                witness_compact: false,
+                audit_queries: true,
+            },
+            ..Default::default()
+        };
+
+        let mut store = RvfStore::create(&path, options).unwrap();
+
+        let v1 = vec![1.0, 0.0, 0.0, 0.0];
+        store.ingest_batch(&[&v1[..]], &[1], None).unwrap();
+
+        // Regular query should NOT create a witness (immutable &self).
+        let _results = store.query(&[1.0, 0.0, 0.0, 0.0], 1, &QueryOptions::default()).unwrap();
+        assert_eq!(count_witness_segments(&store), 0);
+
+        // Audited query SHOULD create a witness.
+        let _results = store.query_audited(&[1.0, 0.0, 0.0, 0.0], 1, &QueryOptions::default()).unwrap();
+        assert_eq!(count_witness_segments(&store), 1);
+        assert_ne!(store.last_witness_hash(), &[0u8; 32]);
+
         store.close().unwrap();
     }
 
