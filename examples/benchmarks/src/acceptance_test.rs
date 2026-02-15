@@ -23,7 +23,7 @@
 use crate::agi_contract::{ContractDelta, ContractHealth, ViabilityChecklist};
 use crate::intelligence_metrics::{DifficultyStats, RawMetrics};
 use crate::reasoning_bank::ReasoningBank;
-use crate::temporal::{AdaptiveSolver, KnowledgeCompiler, TemporalConstraint, TemporalPuzzle};
+use crate::temporal::{AdaptiveSolver, KnowledgeCompiler, PolicyKernel, TemporalConstraint, TemporalPuzzle};
 use crate::timepuzzles::{PuzzleGenerator, PuzzleGeneratorConfig};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -33,23 +33,28 @@ use serde::{Deserialize, Serialize};
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Ablation mode for controlled comparison.
-/// Every cycle runs the same seeded tasks in each mode.
+///
+/// All modes share the same solver capabilities (including skip_weekday).
+/// What differs is the **policy mechanism** that decides how to use them:
+/// - Mode A: Fixed heuristic policy (posterior_range + distractor_count)
+/// - Mode B: Compiler-suggested policy (compiled skip_mode from signatures)
+/// - Mode C: Learned PolicyKernel policy (contextual bandit over skip modes)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AblationMode {
-    /// Mode A: No compiler, fixed router (baseline)
+    /// Mode A: Fixed heuristic policy (baseline)
     Baseline,
-    /// Mode B: Compiler enabled, fixed router
+    /// Mode B: Compiler-suggested policy
     CompilerOnly,
-    /// Mode C: Compiler enabled, adaptive router
+    /// Mode C: Learned PolicyKernel policy (compiler + router + learning)
     Full,
 }
 
 impl std::fmt::Display for AblationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AblationMode::Baseline => write!(f, "A (baseline)"),
-            AblationMode::CompilerOnly => write!(f, "B (compiler)"),
-            AblationMode::Full => write!(f, "C (compiler+router)"),
+            AblationMode::Baseline => write!(f, "A (fixed policy)"),
+            AblationMode::CompilerOnly => write!(f, "B (compiled policy)"),
+            AblationMode::Full => write!(f, "C (learned policy)"),
         }
     }
 }
@@ -64,6 +69,10 @@ pub struct AblationResult {
     pub compiler_misses: usize,
     pub compiler_false_hits: usize,
     pub cost_saved_by_compiler: f64,
+    /// PolicyKernel stats
+    pub early_commit_rate: f64,
+    pub early_commit_penalties: f64,
+    pub policy_context_buckets: usize,
 }
 
 /// Full ablation comparison across all three modes.
@@ -112,6 +121,17 @@ impl AblationComparison {
         println!("  Compiler (Mode B): hits={}, misses={}, false_hits={}",
             self.mode_b.compiler_hits, self.mode_b.compiler_misses, self.mode_b.compiler_false_hits);
         println!("  Cost saved by compiler: {:.2}", self.mode_b.cost_saved_by_compiler);
+        println!();
+        println!("  PolicyKernel:");
+        println!("    Mode A early-commit rate: {:.2}%", self.mode_a.early_commit_rate * 100.0);
+        println!("    Mode B early-commit rate: {:.2}%", self.mode_b.early_commit_rate * 100.0);
+        println!("    Mode C early-commit rate: {:.2}%  (context buckets: {})",
+            self.mode_c.early_commit_rate * 100.0, self.mode_c.policy_context_buckets);
+        println!();
+        println!("  Policy Differences (all modes have same capabilities):");
+        println!("    Mode A: fixed heuristic (posterior_range + distractor_count)");
+        println!("    Mode B: compiler-suggested skip_mode from signatures");
+        println!("    Mode C: learned PolicyKernel (contextual bandit)");
         println!();
 
         println!("  Ablation Assertions:");
@@ -327,6 +347,12 @@ pub fn run_acceptance_test(config: &HoldoutConfig) -> Result<AcceptanceResult> {
 }
 
 /// Run acceptance test in a specific ablation mode.
+///
+/// All modes share the same solver capabilities.
+/// Policy mechanism differs:
+/// - Baseline: fixed heuristic policy
+/// - CompilerOnly: compiler-suggested policy
+/// - Full: learned PolicyKernel policy
 pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> Result<AblationResult> {
     // 1. Generate frozen holdout set
     let holdout = generate_holdout(config)?;
@@ -334,6 +360,7 @@ pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> 
     // 2. Initialize persistent learning state
     let mut bank = ReasoningBank::new();
     let mut compiler = KnowledgeCompiler::new();
+    let mut policy_kernel = PolicyKernel::new();
     let mut cycle_metrics: Vec<CycleMetrics> = Vec::new();
     let mut health_history: Vec<ContractHealth> = Vec::new();
 
@@ -354,10 +381,16 @@ pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> 
         let checkpoint_id = bank.checkpoint();
 
         // 3. Training phase: solve new tasks, update bank
-        let training_acc = train_cycle_mode(&mut bank, &mut compiler, config, cycle, compiler_enabled, router_enabled)?;
+        let training_acc = train_cycle_mode(
+            &mut bank, &mut compiler, &mut policy_kernel,
+            config, cycle, compiler_enabled, router_enabled,
+        )?;
 
         // 4. Holdout evaluation: clean pass (quick probe for rollback check)
-        let (_, probe_acc) = evaluate_holdout_clean_mode(&holdout, &bank, &compiler, config, compiler_enabled, router_enabled)?;
+        let (_, probe_acc) = evaluate_holdout_clean_mode(
+            &holdout, &bank, &compiler, &policy_kernel,
+            config, compiler_enabled, router_enabled,
+        )?;
 
         // Rollback if training made accuracy worse (viability check #3)
         if cycle > 0 {
@@ -382,12 +415,18 @@ pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> 
         }
 
         // 5. Holdout evaluation: clean (definitive, with possibly rolled-back bank)
-        let (clean_raw, clean_acc) = evaluate_holdout_clean_mode(&holdout, &bank, &compiler, config, compiler_enabled, router_enabled)?;
+        let (clean_raw, clean_acc) = evaluate_holdout_clean_mode(
+            &holdout, &bank, &compiler, &policy_kernel,
+            config, compiler_enabled, router_enabled,
+        )?;
 
         // 6. Holdout evaluation: noisy pass
-        let (noisy_raw, noise_acc) = evaluate_holdout_noisy_mode(&holdout, &bank, &compiler, config, cycle, compiler_enabled, router_enabled)?;
+        let (noisy_raw, noise_acc) = evaluate_holdout_noisy_mode(
+            &holdout, &bank, &compiler, &policy_kernel,
+            config, cycle, compiler_enabled, router_enabled,
+        )?;
 
-        // 6. Merge clean + noisy into combined contract raw
+        // Merge clean + noisy into combined contract raw
         let combined = merge_raw(&clean_raw, &noisy_raw);
         let health = ContractHealth::from_raw(&combined);
         health_history.push(health.clone());
@@ -506,9 +545,12 @@ pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> 
         0.0
     };
 
-    // Print compiler diagnostics in verbose mode
+    // Print diagnostics in verbose mode
     if config.verbose && compiler_enabled {
         compiler.print_diagnostics();
+    }
+    if config.verbose {
+        policy_kernel.print_diagnostics();
     }
 
     Ok(AblationResult {
@@ -518,13 +560,19 @@ pub fn run_acceptance_test_mode(config: &HoldoutConfig, mode: &AblationMode) -> 
         compiler_misses: compiler.misses,
         compiler_false_hits: compiler.false_hits,
         cost_saved_by_compiler: cost_saved,
+        early_commit_rate: policy_kernel.early_commit_rate(),
+        early_commit_penalties: policy_kernel.early_commit_penalties,
+        policy_context_buckets: policy_kernel.context_stats.len(),
     })
 }
 
 /// Run all three ablation modes and compare results.
-/// Mode A = baseline (no compiler, fixed router)
-/// Mode B = compiler only (Strategy Zero enabled)
-/// Mode C = full (compiler + adaptive router)
+///
+/// All modes share the same solver capabilities (skip_weekday, rewriting, etc).
+/// What differs is the policy mechanism:
+/// Mode A = fixed heuristic policy (posterior_range + distractor_count)
+/// Mode B = compiler-suggested policy (compiled skip_mode)
+/// Mode C = learned PolicyKernel policy (contextual bandit)
 pub fn run_ablation_comparison(config: &HoldoutConfig) -> Result<AblationComparison> {
     let mode_a = run_acceptance_test_mode(config, &AblationMode::Baseline)?;
     let mode_b = run_acceptance_test_mode(config, &AblationMode::CompilerOnly)?;
@@ -587,6 +635,7 @@ fn generate_holdout(config: &HoldoutConfig) -> Result<Vec<TemporalPuzzle>> {
 fn train_cycle_mode(
     bank: &mut ReasoningBank,
     compiler: &mut KnowledgeCompiler,
+    policy_kernel: &mut PolicyKernel,
     config: &HoldoutConfig,
     cycle: usize,
     compiler_enabled: bool,
@@ -596,6 +645,7 @@ fn train_cycle_mode(
     solver.compiler = compiler.clone();
     solver.compiler_enabled = compiler_enabled;
     solver.router_enabled = router_enabled;
+    solver.policy_kernel = policy_kernel.clone();
     let pc = PuzzleGeneratorConfig {
         min_difficulty: 1,
         max_difficulty: 10,
@@ -659,6 +709,7 @@ fn train_cycle_mode(
 
     *bank = solver.reasoning_bank.clone();
     *compiler = solver.compiler.clone();
+    *policy_kernel = solver.policy_kernel.clone();
     Ok(correct as f64 / puzzles.len() as f64)
 }
 
@@ -666,6 +717,7 @@ fn evaluate_holdout_clean_mode(
     holdout: &[TemporalPuzzle],
     bank: &ReasoningBank,
     compiler: &KnowledgeCompiler,
+    policy_kernel: &PolicyKernel,
     config: &HoldoutConfig,
     compiler_enabled: bool,
     router_enabled: bool,
@@ -675,6 +727,7 @@ fn evaluate_holdout_clean_mode(
     solver.compiler = compiler.clone();
     solver.compiler_enabled = compiler_enabled;
     solver.router_enabled = router_enabled;
+    solver.policy_kernel = policy_kernel.clone();
     solver.external_step_limit = Some(config.step_budget);
 
     for puzzle in holdout {
@@ -711,6 +764,7 @@ fn evaluate_holdout_noisy_mode(
     holdout: &[TemporalPuzzle],
     bank: &ReasoningBank,
     compiler: &KnowledgeCompiler,
+    policy_kernel: &PolicyKernel,
     config: &HoldoutConfig,
     cycle: usize,
     compiler_enabled: bool,
@@ -721,6 +775,7 @@ fn evaluate_holdout_noisy_mode(
     solver.compiler = compiler.clone();
     solver.compiler_enabled = compiler_enabled;
     solver.router_enabled = router_enabled;
+    solver.policy_kernel = policy_kernel.clone();
     solver.external_step_limit = Some(config.step_budget);
     let mut rng = Rng64::new(config.holdout_seed.wrapping_add(cycle as u64 * 31337));
 

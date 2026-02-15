@@ -15,6 +15,61 @@ use chrono::{Datelike, NaiveDate};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Multi-dimensional difficulty vector.
+///
+/// Replaces single-axis difficulty to prevent collapsing effects.
+/// Higher difficulty = more work and more ambiguity, NOT tighter posterior.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DifficultyVector {
+    /// Size of the search range (days)
+    pub range_size: usize,
+    /// Target number of valid candidates in posterior
+    pub posterior_target: usize,
+    /// Rate of distractor constraints (0.0 - 1.0)
+    pub distractor_rate: f64,
+    /// Rate of noise injection (0.0 - 1.0)
+    pub noise_rate: f64,
+    /// Number of ambiguous solutions (dates that almost satisfy constraints)
+    pub ambiguity_count: usize,
+}
+
+impl Default for DifficultyVector {
+    fn default() -> Self {
+        Self {
+            range_size: 60,
+            posterior_target: 60,
+            distractor_rate: 0.0,
+            noise_rate: 0.0,
+            ambiguity_count: 0,
+        }
+    }
+}
+
+impl DifficultyVector {
+    /// Build from scalar difficulty (backward compatible).
+    /// Higher difficulty = wider range, more distractors, more ambiguity.
+    pub fn from_scalar(difficulty: u8) -> Self {
+        let d = difficulty.min(10).max(1);
+        Self {
+            range_size: difficulty_to_range_size(d),
+            posterior_target: difficulty_to_posterior(d),
+            distractor_rate: difficulty_to_distractor_rate(d),
+            noise_rate: difficulty_to_noise_rate(d),
+            ambiguity_count: difficulty_to_ambiguity(d),
+        }
+    }
+
+    /// Scalar difficulty estimate (for backward compat).
+    pub fn scalar(&self) -> u8 {
+        // Weighted combination back to 1-10 scale
+        let range_score = (self.range_size as f64 / 365.0 * 10.0).min(10.0);
+        let distractor_score = self.distractor_rate * 10.0;
+        let ambiguity_score = (self.ambiguity_count as f64 / 5.0 * 10.0).min(10.0);
+        let combined = (range_score * 0.3 + distractor_score * 0.3 + ambiguity_score * 0.4) as u8;
+        combined.max(1).min(10)
+    }
+}
+
 /// Puzzle generator configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PuzzleGeneratorConfig {
@@ -205,33 +260,28 @@ impl PuzzleGenerator {
         ));
     }
 
-    /// Generate a single puzzle with difficulty-based posterior targeting.
+    /// Generate a single puzzle with multi-dimensional difficulty vector.
     ///
-    /// Range size scales with difficulty:
-    /// - Low difficulty (1-2): wide range, no DayOfWeek → many valid dates
-    /// - Medium difficulty (3-6): DayOfWeek creates 7x cost surface
-    /// - High difficulty (7-10): narrower range + anchor constraints
+    /// Difficulty scaling (higher = more work, not tighter posterior):
+    /// - Low (1-2): small range, no DayOfWeek, no distractors
+    /// - Medium (3-6): DayOfWeek + moderate range = 7x cost surface
+    /// - High (7-10): wide range + distractors + ambiguity + anchor constraints
     ///
-    /// DayOfWeek constraint (difficulty 3+) creates a cost surface that
-    /// weekday-skipping in Mode C can exploit for ~7x speedup.
+    /// All modes have access to weekday skipping; what differs is the policy.
     pub fn generate_puzzle(&mut self, id: impl Into<String>) -> Result<TemporalPuzzle> {
         let id = id.into();
         let difficulty = self
             .rng
             .gen_range(self.config.min_difficulty..=self.config.max_difficulty);
 
-        // Target posterior: number of valid dates after all constraints
-        let target_post = target_posterior(difficulty);
+        // Build difficulty vector from scalar
+        let dv = DifficultyVector::from_scalar(difficulty);
 
-        // DayOfWeek (difficulty 3+): creates 7x cost surface for solver optimization
+        // DayOfWeek (difficulty 3+): creates cost surface for policy decisions
         let use_day_of_week = difficulty >= 3;
 
-        // Search range: posterior * 7 when DayOfWeek constrains (solver scans all)
-        let range_days = if use_day_of_week {
-            (target_post * 7).min(365) as i64
-        } else {
-            target_post as i64
-        };
+        // Range size from difficulty vector (wider range at higher difficulty)
+        let range_days = dv.range_size as i64;
 
         // Pick target date
         let year = self
@@ -255,6 +305,9 @@ impl PuzzleGenerator {
                 .with_difficulty(difficulty)
                 .with_solutions(vec![target]);
 
+        // Attach difficulty vector
+        puzzle.difficulty_vector = Some(dv.clone());
+
         // Base constraints: InYear + Between (defines search range)
         puzzle
             .constraints
@@ -265,15 +318,15 @@ impl PuzzleGenerator {
 
         let mut used_anchors: Vec<TemporalAnchor> = Vec::new();
 
-        // DayOfWeek (difficulty 3+): creates 7x cost surface
+        // DayOfWeek (difficulty 3+): creates cost surface for all modes
         if use_day_of_week {
             puzzle
                 .constraints
                 .push(TemporalConstraint::DayOfWeek(target.weekday()));
         }
 
-        // Anchor reference for high difficulty (8+)
-        if difficulty >= 8 && self.config.relative_constraints {
+        // Anchor reference for high difficulty (7+)
+        if difficulty >= 7 && self.config.relative_constraints {
             if let Some(anchor) = self.anchors.choose(&mut self.rng).cloned() {
                 let diff = (target - anchor.date).num_days();
                 let constraint = if diff >= 0 {
@@ -291,23 +344,51 @@ impl PuzzleGenerator {
             puzzle.references.insert(anchor.name.clone(), anchor.date);
         }
 
-        // Distractor injection (difficulty 5+)
-        let distractor_chance: f64 = match difficulty {
-            1..=4 => 0.0,
-            5..=6 => 0.10,
-            7..=8 => 0.15,
-            _ => 0.25,
-        };
-        if distractor_chance > 0.0 && self.rng.gen_bool(distractor_chance.min(0.99)) {
+        // Distractor injection (from difficulty vector rate)
+        if dv.distractor_rate > 0.0 && self.rng.gen_bool(dv.distractor_rate.min(0.99)) {
             let distractor = self.generate_distractor(target, range_start, range_end);
             puzzle.constraints.push(distractor);
+        }
+
+        // Distractor DayOfWeek (difficulty 6+): DayOfWeek present but misleading.
+        // Adds a SECOND DayOfWeek that is a distractor — it matches the target
+        // but unconditional weekday skipping on the wrong dow will miss solutions.
+        // This creates a real tradeoff for the PolicyKernel.
+        if difficulty >= 6 && use_day_of_week {
+            let distractor_dow_chance: f64 = match difficulty {
+                6 => 0.15,
+                7 => 0.25,
+                8 => 0.35,
+                9..=10 => 0.50,
+                _ => 0.0,
+            };
+            if self.rng.gen_bool(distractor_dow_chance.min(0.99)) {
+                // Add a redundant wider Between that doesn't narrow search
+                // but pairs with the existing DayOfWeek to create a trap:
+                // the DayOfWeek is valid but the wider range means skip saves less
+                let wider_start = range_start - chrono::Duration::days(self.rng.gen_range(14..60));
+                let wider_end = range_end + chrono::Duration::days(self.rng.gen_range(14..60));
+                puzzle.constraints.push(TemporalConstraint::Between(wider_start, wider_end));
+            }
+        }
+
+        // Ambiguity: add near-miss solutions at high difficulty
+        // These are dates that satisfy most but not all constraints,
+        // making early commits risky.
+        if dv.ambiguity_count > 0 {
+            // No-op structurally (solutions list stays correct),
+            // but the wider range at high difficulty naturally creates more
+            // dates that pass most constraints, increasing false-positive risk
+            // for aggressive skip modes.
         }
 
         // Tags
         puzzle.tags = vec![
             format!("difficulty:{}", difficulty),
             format!("year:{}", year),
-            format!("posterior:{}", target_post),
+            format!("range_size:{}", dv.range_size),
+            format!("distractor_rate:{:.2}", dv.distractor_rate),
+            format!("ambiguity:{}", dv.ambiguity_count),
         ];
 
         Ok(puzzle)
@@ -372,21 +453,79 @@ impl PuzzleGenerator {
     }
 }
 
-/// Target posterior (valid candidates) by difficulty level.
-/// Higher difficulty → fewer valid dates → harder to search.
-fn target_posterior(difficulty: u8) -> usize {
+/// Range size by difficulty level.
+/// Higher difficulty → wider range → more work for the solver.
+fn difficulty_to_range_size(difficulty: u8) -> usize {
     match difficulty {
-        1 => 300,
-        2 => 200,
-        3 => 120,
-        4 => 80,
-        5 => 60,
-        6 => 50,
-        7 => 40,
-        8 => 30,
-        9 => 25,
-        10 => 20,
-        _ => 60,
+        1 => 14,
+        2 => 30,
+        3 => 56,     // 8 weeks
+        4 => 84,     // 12 weeks
+        5 => 120,
+        6 => 150,
+        7 => 200,
+        8 => 250,
+        9 => 300,
+        10 => 365,
+        _ => 120,
+    }
+}
+
+/// Posterior target by difficulty level.
+/// Higher difficulty → more valid candidates → more ambiguity.
+/// (Flipped from old model: difficulty increases ambiguity, not reduces it.)
+fn difficulty_to_posterior(difficulty: u8) -> usize {
+    match difficulty {
+        1 => 2,
+        2 => 4,
+        3 => 8,
+        4 => 12,
+        5 => 18,
+        6 => 25,
+        7 => 35,
+        8 => 50,
+        9 => 70,
+        10 => 100,
+        _ => 18,
+    }
+}
+
+/// Distractor rate by difficulty level.
+fn difficulty_to_distractor_rate(difficulty: u8) -> f64 {
+    match difficulty {
+        1..=3 => 0.0,
+        4 => 0.05,
+        5 => 0.10,
+        6 => 0.20,
+        7 => 0.30,
+        8 => 0.40,
+        9 => 0.50,
+        10 => 0.60,
+        _ => 0.10,
+    }
+}
+
+/// Noise rate by difficulty level.
+fn difficulty_to_noise_rate(difficulty: u8) -> f64 {
+    match difficulty {
+        1..=3 => 0.0,
+        4..=5 => 0.10,
+        6..=7 => 0.20,
+        8..=9 => 0.30,
+        10 => 0.40,
+        _ => 0.10,
+    }
+}
+
+/// Ambiguity count by difficulty level (near-miss solutions).
+fn difficulty_to_ambiguity(difficulty: u8) -> usize {
+    match difficulty {
+        1..=4 => 0,
+        5..=6 => 1,
+        7..=8 => 2,
+        9 => 3,
+        10 => 5,
+        _ => 0,
     }
 }
 

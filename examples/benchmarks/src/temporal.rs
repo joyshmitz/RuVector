@@ -54,6 +54,8 @@ pub struct TemporalPuzzle {
     pub difficulty: u8,
     /// Tags for categorization
     pub tags: Vec<String>,
+    /// Multi-dimensional difficulty vector (None = use scalar difficulty)
+    pub difficulty_vector: Option<crate::timepuzzles::DifficultyVector>,
 }
 
 impl TemporalPuzzle {
@@ -67,6 +69,7 @@ impl TemporalPuzzle {
             solutions: Vec::new(),
             difficulty: 5,
             tags: Vec::new(),
+            difficulty_vector: None,
         }
     }
 
@@ -497,6 +500,265 @@ mod tests {
 // ============================================================================
 
 use crate::reasoning_bank::{ReasoningBank, Strategy, Trajectory, Verdict};
+use crate::timepuzzles::DifficultyVector;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PolicyKernel — learned skip-mode selection
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Skip mode for the temporal solver scan loop.
+/// All modes have access to all skip modes.
+/// What differs is the *policy* that selects the mode.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum SkipMode {
+    /// Linear scan: check every date in range (1-day increments)
+    None,
+    /// Weekday skip: advance by 7 days when DayOfWeek constraint is present
+    Weekday,
+    /// Hybrid: weekday skip for initial scan, then full refinement pass
+    /// around candidates to catch near-misses under noise
+    Hybrid,
+}
+
+impl Default for SkipMode {
+    fn default() -> Self {
+        SkipMode::None
+    }
+}
+
+impl std::fmt::Display for SkipMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SkipMode::None => write!(f, "none"),
+            SkipMode::Weekday => write!(f, "weekday"),
+            SkipMode::Hybrid => write!(f, "hybrid"),
+        }
+    }
+}
+
+/// Context features for PolicyKernel decisions.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PolicyContext {
+    /// Number of dates in the posterior (search range)
+    pub posterior_range: usize,
+    /// Number of distractor constraints in the puzzle
+    pub distractor_count: usize,
+    /// Whether a DayOfWeek constraint is present
+    pub has_day_of_week: bool,
+    /// Whether noise was injected
+    pub noisy: bool,
+    /// Difficulty vector components
+    pub difficulty: DifficultyVector,
+    /// Recent false-hit density (rolling window)
+    pub recent_false_hit_rate: f64,
+}
+
+/// Outcome of a skip-mode decision for learning.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SkipOutcome {
+    /// The skip mode that was used
+    pub mode: SkipMode,
+    /// Whether the solve was correct
+    pub correct: bool,
+    /// Steps taken
+    pub steps: usize,
+    /// Whether this was an early commit that turned out wrong
+    pub early_commit_wrong: bool,
+}
+
+/// Per-context skip-mode statistics for learned policy.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SkipModeStats {
+    pub attempts: usize,
+    pub successes: usize,
+    pub total_steps: usize,
+    pub early_commit_wrongs: usize,
+}
+
+impl SkipModeStats {
+    /// Reward: balances accuracy, cost, and early-commit safety.
+    pub fn reward(&self) -> f64 {
+        if self.attempts == 0 { return 0.5; }
+        let accuracy = self.successes as f64 / self.attempts as f64;
+        let cost_bonus = 0.3 * (1.0 - (self.total_steps as f64 / self.attempts as f64) / 200.0).max(0.0);
+        let penalty = if self.early_commit_wrongs > 0 {
+            0.2 * (self.early_commit_wrongs as f64 / self.attempts as f64)
+        } else {
+            0.0
+        };
+        (accuracy * 0.5 + cost_bonus - penalty).max(0.0)
+    }
+}
+
+/// PolicyKernel: decides skip_mode based on context.
+///
+/// Three policy levels:
+/// - **Fixed** (Mode A): deterministic heuristic based on posterior_range + distractor_count
+/// - **Compiled** (Mode B): compiler-suggested skip_mode from CompiledSolveConfig
+/// - **Learned** (Mode C): contextual stats drive selection, adapts from outcomes
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PolicyKernel {
+    /// Per-context bucket → per-skip-mode stats (for learned policy)
+    pub context_stats: HashMap<String, HashMap<String, SkipModeStats>>,
+    /// Early commit penalty accumulator
+    pub early_commit_penalties: f64,
+    /// Total early commits tracked
+    pub early_commits_total: usize,
+    /// Total early commits that were wrong
+    pub early_commits_wrong: usize,
+    /// Exploration rate for learned policy
+    pub epsilon: f64,
+    /// RNG state
+    rng_state: u64,
+}
+
+impl PolicyKernel {
+    pub fn new() -> Self {
+        Self {
+            epsilon: 0.15,
+            rng_state: 42,
+            ..Default::default()
+        }
+    }
+
+    /// Fixed baseline policy (Mode A):
+    /// Uses posterior_range + distractor_count to decide.
+    /// - If DayOfWeek is present AND posterior_range > 30 AND distractor_count == 0: Weekday
+    /// - If DayOfWeek is present AND distractor_count > 0: Hybrid (safe fallback)
+    /// - Otherwise: None
+    pub fn fixed_policy(ctx: &PolicyContext) -> SkipMode {
+        if !ctx.has_day_of_week {
+            return SkipMode::None;
+        }
+        if ctx.distractor_count == 0 && ctx.posterior_range > 30 {
+            SkipMode::Weekday
+        } else if ctx.distractor_count > 0 {
+            // Distractors present: skip is risky, use hybrid for safety
+            SkipMode::Hybrid
+        } else {
+            // Small range: skip saves little, linear is fine
+            SkipMode::None
+        }
+    }
+
+    /// Compiled policy (Mode B):
+    /// Uses compiler-suggested skip_mode from CompiledSolveConfig.
+    /// Falls back to fixed policy if compiler has no suggestion.
+    pub fn compiled_policy(ctx: &PolicyContext, compiled_skip: Option<SkipMode>) -> SkipMode {
+        compiled_skip.unwrap_or_else(|| Self::fixed_policy(ctx))
+    }
+
+    /// Learned policy (Mode C):
+    /// Uses contextual stats to pick the best skip mode.
+    /// Epsilon-greedy exploration for discovering better policies.
+    pub fn learned_policy(&mut self, ctx: &PolicyContext) -> SkipMode {
+        if !ctx.has_day_of_week {
+            return SkipMode::None;
+        }
+
+        let bucket = Self::context_bucket(ctx);
+
+        // Epsilon-greedy exploration
+        let r = self.next_f64();
+        if r < self.epsilon {
+            // Explore: random mode
+            return match (self.next_f64() * 3.0) as u8 {
+                0 => SkipMode::None,
+                1 => SkipMode::Weekday,
+                _ => SkipMode::Hybrid,
+            };
+        }
+
+        // Exploit: pick mode with highest reward
+        let stats_map = self.context_stats.entry(bucket).or_default();
+        let modes = ["none", "weekday", "hybrid"];
+        let mut best_mode = SkipMode::None;
+        let mut best_reward = -1.0f64;
+
+        for mode_name in &modes {
+            let stats = stats_map.get(*mode_name).cloned().unwrap_or_default();
+            let reward = stats.reward();
+            if reward > best_reward {
+                best_reward = reward;
+                best_mode = match *mode_name {
+                    "weekday" => SkipMode::Weekday,
+                    "hybrid" => SkipMode::Hybrid,
+                    _ => SkipMode::None,
+                };
+            }
+        }
+
+        best_mode
+    }
+
+    /// Record the outcome of a skip-mode decision.
+    pub fn record_outcome(&mut self, ctx: &PolicyContext, outcome: &SkipOutcome) {
+        let bucket = Self::context_bucket(ctx);
+        let mode_name = outcome.mode.to_string();
+
+        let stats_map = self.context_stats.entry(bucket).or_default();
+        let stats = stats_map.entry(mode_name).or_default();
+        stats.attempts += 1;
+        stats.total_steps += outcome.steps;
+        if outcome.correct { stats.successes += 1; }
+        if outcome.early_commit_wrong {
+            stats.early_commit_wrongs += 1;
+            self.early_commits_wrong += 1;
+            // Penalty proportional to how early the commit was
+            // (fewer steps = earlier commit = higher penalty)
+            let penalty = 1.0 - (outcome.steps as f64 / 200.0).min(1.0);
+            self.early_commit_penalties += penalty;
+        }
+        self.early_commits_total += 1;
+    }
+
+    /// Early commit penalty rate.
+    pub fn early_commit_rate(&self) -> f64 {
+        if self.early_commits_total == 0 { return 0.0; }
+        self.early_commits_wrong as f64 / self.early_commits_total as f64
+    }
+
+    /// Build a context bucket key for stats grouping.
+    fn context_bucket(ctx: &PolicyContext) -> String {
+        let range_bucket = match ctx.posterior_range {
+            0..=30 => "small",
+            31..=100 => "medium",
+            101..=300 => "large",
+            _ => "xlarge",
+        };
+        let distractor_bucket = if ctx.distractor_count == 0 { "clean" } else { "distracted" };
+        format!("{}:{}", range_bucket, distractor_bucket)
+    }
+
+    fn next_f64(&mut self) -> f64 {
+        let mut x = self.rng_state.max(1);
+        x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+        self.rng_state = x;
+        (x as f64) / (u64::MAX as f64)
+    }
+
+    /// Print diagnostic summary.
+    pub fn print_diagnostics(&self) {
+        println!();
+        println!("  PolicyKernel Diagnostics");
+        println!("  Early commits: {}/{} wrong ({:.1}%)",
+            self.early_commits_wrong, self.early_commits_total,
+            self.early_commit_rate() * 100.0);
+        println!("  Accumulated penalty: {:.2}", self.early_commit_penalties);
+        println!("  Context buckets: {}", self.context_stats.len());
+
+        for (bucket, modes) in &self.context_stats {
+            println!("    {}", bucket);
+            for (mode, stats) in modes {
+                println!("      {:<8} attempts={:<4} success={:<4} avg_steps={:.1} ecw={} reward={:.3}",
+                    mode, stats.attempts, stats.successes,
+                    if stats.attempts > 0 { stats.total_steps as f64 / stats.attempts as f64 } else { 0.0 },
+                    stats.early_commit_wrongs,
+                    stats.reward());
+            }
+        }
+    }
+}
 
 /// Adaptive temporal solver with learning capabilities
 ///
@@ -529,6 +791,8 @@ pub struct CompiledSolveConfig {
     pub hit_count: usize,
     /// Counterexample count (failures on this signature)
     pub counterexample_count: usize,
+    /// Compiled skip mode suggestion (for Mode B policy)
+    pub compiled_skip_mode: SkipMode,
 }
 
 impl CompiledSolveConfig {
@@ -607,6 +871,10 @@ impl KnowledgeCompiler {
             let sig = format!("{}:{}:{}", COMPILER_SIG_VERSION, traj.difficulty, sig_parts.join(","));
 
             if let Some(attempt) = traj.attempts.first() {
+                // Determine compiled skip mode from constraint types
+                let has_dow = traj.constraint_types.iter().any(|c| c == "DayOfWeek");
+                let compiled_skip = if has_dow { SkipMode::Weekday } else { SkipMode::None };
+
                 let entry = self.signature_cache.entry(sig).or_insert(CompiledSolveConfig {
                     use_rewriting: true,
                     max_steps: attempt.steps,
@@ -616,6 +884,7 @@ impl KnowledgeCompiler {
                     stop_after_first: true,
                     hit_count: 0,
                     counterexample_count: 0,
+                    compiled_skip_mode: compiled_skip,
                 });
                 // Keep minimum steps that succeeded
                 entry.max_steps = entry.max_steps.min(attempt.steps);
@@ -898,6 +1167,8 @@ pub struct AdaptiveSolver {
     pub router: StrategyRouter,
     /// Whether to use the adaptive router instead of fixed strategy selection
     pub router_enabled: bool,
+    /// PolicyKernel for skip-mode decisions (all modes use this)
+    pub policy_kernel: PolicyKernel,
 }
 
 impl Default for AdaptiveSolver {
@@ -919,6 +1190,7 @@ impl AdaptiveSolver {
             compiler_enabled: false,
             router: StrategyRouter::new(),
             router_enabled: false,
+            policy_kernel: PolicyKernel::new(),
         }
     }
 
@@ -934,6 +1206,7 @@ impl AdaptiveSolver {
             compiler_enabled: false,
             router: StrategyRouter::new(),
             router_enabled: false,
+            policy_kernel: PolicyKernel::new(),
         }
     }
 
@@ -947,11 +1220,45 @@ impl AdaptiveSolver {
         &mut self.solver
     }
 
+    /// Build a PolicyContext from puzzle features.
+    fn build_policy_context(&self, puzzle: &TemporalPuzzle) -> PolicyContext {
+        let has_dow = puzzle.constraints.iter().any(|c| matches!(c, TemporalConstraint::DayOfWeek(_)));
+
+        // Estimate posterior range from Between constraint
+        let posterior_range = puzzle.constraints.iter().find_map(|c| match c {
+            TemporalConstraint::Between(start, end) => {
+                Some((*end - *start).num_days().max(0) as usize)
+            }
+            _ => None,
+        }).unwrap_or(365);
+
+        // Count distractors: redundant constraints that don't narrow the search
+        // (wider Between, redundant InYear, After well before range)
+        let distractor_count = count_distractors(puzzle);
+
+        let dv = puzzle.difficulty_vector.clone().unwrap_or_else(|| {
+            DifficultyVector::from_scalar(puzzle.difficulty)
+        });
+
+        PolicyContext {
+            posterior_range,
+            distractor_count,
+            has_day_of_week: has_dow,
+            noisy: false,
+            difficulty: dv,
+            recent_false_hit_rate: self.policy_kernel.early_commit_rate(),
+        }
+    }
+
     /// Solve a puzzle with adaptive learning.
-    /// If compiler_enabled, tries Strategy Zero (compiled config) first.
-    /// If router_enabled, uses contextual bandit for strategy selection.
+    ///
+    /// All modes have access to the same solver capabilities (including skip_weekday).
+    /// What differs is the **policy** that decides how to use them:
+    /// - Mode A (baseline): fixed heuristic policy
+    /// - Mode B (compiler): compiler-suggested policy
+    /// - Mode C (full): learned PolicyKernel policy
     pub fn solve(&mut self, puzzle: &TemporalPuzzle) -> Result<SolverResult> {
-        // Reset weekday skipping (set for Mode C in fallback path)
+        // Reset solver state
         self.solver.skip_weekday = None;
 
         // Get constraint types for pattern matching
@@ -961,6 +1268,44 @@ impl AdaptiveSolver {
             .map(|c| constraint_type_name(c))
             .collect();
 
+        // Build policy context (same for all modes)
+        let policy_ctx = self.build_policy_context(puzzle);
+
+        // ─── PolicyKernel: decide skip_mode (all modes participate) ──────
+        let skip_mode = if self.router_enabled {
+            // Mode C: learned policy
+            self.policy_kernel.learned_policy(&policy_ctx)
+        } else if self.compiler_enabled {
+            // Mode B: compiler-suggested policy
+            let compiled_skip = self.compiler.lookup(puzzle)
+                .map(|config| config.compiled_skip_mode.clone());
+            PolicyKernel::compiled_policy(&policy_ctx, compiled_skip)
+        } else {
+            // Mode A: fixed baseline policy
+            PolicyKernel::fixed_policy(&policy_ctx)
+        };
+
+        // Apply skip_mode to solver
+        match &skip_mode {
+            SkipMode::None => {
+                self.solver.skip_weekday = None;
+            }
+            SkipMode::Weekday => {
+                self.solver.skip_weekday = puzzle.constraints.iter().find_map(|c| match c {
+                    TemporalConstraint::DayOfWeek(w) => Some(*w),
+                    _ => None,
+                });
+            }
+            SkipMode::Hybrid => {
+                // Hybrid: use weekday skip for initial scan (set here),
+                // then do a refinement pass below if needed
+                self.solver.skip_weekday = puzzle.constraints.iter().find_map(|c| match c {
+                    TemporalConstraint::DayOfWeek(w) => Some(*w),
+                    _ => None,
+                });
+            }
+        }
+
         // Accumulated steps across all attempts (Strategy Zero + fallback)
         let mut extra_steps: usize = 0;
         let mut extra_tool_calls: usize = 0;
@@ -968,7 +1313,6 @@ impl AdaptiveSolver {
         // ─── Strategy Zero: KnowledgeCompiler (bounded trial) ────────────
         if self.compiler_enabled {
             let conf_threshold = self.compiler.confidence_threshold;
-            // Extract all config data before releasing the borrow
             let compiled = self.compiler.lookup(puzzle).map(|config| {
                 (
                     config.expected_correct,
@@ -981,7 +1325,6 @@ impl AdaptiveSolver {
 
             if let Some((expected_correct, confidence, trial_budget, use_rewriting, stop_first)) = compiled {
                 if expected_correct && confidence >= conf_threshold {
-                    // Bounded trial: cap at 25% of external limit to make misses cheap
                     self.solver.calendar_tool = use_rewriting;
                     self.solver.stop_after_first = stop_first;
                     self.solver.max_steps = trial_budget;
@@ -990,11 +1333,9 @@ impl AdaptiveSolver {
                     let result = self.solver.solve(puzzle)?;
                     let latency = start.elapsed().as_millis() as u64;
 
-                    // Reset stop_after_first for fallback path
                     self.solver.stop_after_first = false;
 
                     if result.correct {
-                        // Strategy Zero win — record and return
                         self.compiler.record_success(puzzle, result.steps);
                         let mut trajectory = Trajectory::new(&puzzle.id, puzzle.difficulty);
                         trajectory.constraint_types = constraint_types;
@@ -1011,7 +1352,15 @@ impl AdaptiveSolver {
                         self.reasoning_bank.record_trajectory(trajectory);
                         self.episodes += 1;
 
-                        // Update router if enabled
+                        // Record successful skip outcome
+                        let outcome = SkipOutcome {
+                            mode: skip_mode,
+                            correct: true,
+                            steps: result.steps,
+                            early_commit_wrong: false,
+                        };
+                        self.policy_kernel.record_outcome(&policy_ctx, &outcome);
+
                         if self.router_enabled {
                             let ctx = StrategyRouter::context(puzzle, false);
                             self.router.update(&ctx, "compiler", true, result.steps, false);
@@ -1019,10 +1368,20 @@ impl AdaptiveSolver {
 
                         return Ok(result);
                     } else {
-                        // Strategy Zero failed — bounded trial overhead only
                         extra_steps += result.steps;
                         extra_tool_calls += result.tool_calls;
                         self.compiler.record_failure(puzzle);
+
+                        // Record early commit wrong if solver claimed solved but was wrong
+                        if result.solved && !result.correct {
+                            let outcome = SkipOutcome {
+                                mode: skip_mode.clone(),
+                                correct: false,
+                                steps: result.steps,
+                                early_commit_wrong: true,
+                            };
+                            self.policy_kernel.record_outcome(&policy_ctx, &outcome);
+                        }
                     }
                 }
             }
@@ -1038,13 +1397,11 @@ impl AdaptiveSolver {
                 "adaptive".to_string(),
             ];
             let ranked = self.router.select(&ctx, &available);
-            // Use the top-ranked strategy
             if let Some((top_strategy, _)) = ranked.first() {
                 self.current_strategy = self.reasoning_bank
                     .strategy_from_name(top_strategy, puzzle.difficulty);
             }
         } else {
-            // Fixed strategy selection from ReasoningBank
             self.current_strategy = self
                 .reasoning_bank
                 .get_strategy(puzzle.difficulty, &constraint_types);
@@ -1056,17 +1413,6 @@ impl AdaptiveSolver {
             .unwrap_or(self.current_strategy.max_steps);
         self.solver.stop_after_first = false;
 
-        // Weekday skipping: detect DayOfWeek constraint for compiler/router modes
-        // Mode A (baseline): no skipping → linear scan
-        // Mode B (compiler): skipping → compiler policy reduces cost
-        // Mode C (full): skipping → compiler + router optimize further
-        if self.compiler_enabled || self.router_enabled {
-            self.solver.skip_weekday = puzzle.constraints.iter().find_map(|c| match c {
-                TemporalConstraint::DayOfWeek(w) => Some(*w),
-                _ => None,
-            });
-        }
-
         // Create trajectory for this puzzle
         let mut trajectory = Trajectory::new(&puzzle.id, puzzle.difficulty);
         trajectory.constraint_types = constraint_types;
@@ -1075,6 +1421,50 @@ impl AdaptiveSolver {
         let start = std::time::Instant::now();
         let mut result = self.solver.solve(puzzle)?;
         trajectory.latency_ms = start.elapsed().as_millis() as u64;
+
+        // ─── Hybrid refinement pass ──────────────────────────────────────
+        // If Hybrid mode was used and we found solutions via weekday skip,
+        // do a narrow linear scan around each candidate to catch near-misses.
+        if skip_mode == SkipMode::Hybrid && !result.solutions.is_empty() {
+            let mut refined_solutions = result.solutions.clone();
+            self.solver.skip_weekday = None; // Linear for refinement
+            let saved_max = self.solver.max_steps;
+            self.solver.max_steps = 14; // Check ±7 days around each candidate
+
+            for candidate in &result.solutions {
+                let refine_start = *candidate - chrono::Duration::days(7);
+                let refine_end = *candidate + chrono::Duration::days(7);
+                let refine_puzzle = TemporalPuzzle {
+                    id: puzzle.id.clone(),
+                    description: puzzle.description.clone(),
+                    constraints: puzzle.constraints.clone(),
+                    references: puzzle.references.clone(),
+                    solutions: puzzle.solutions.clone(),
+                    difficulty: puzzle.difficulty,
+                    tags: puzzle.tags.clone(),
+                    difficulty_vector: puzzle.difficulty_vector.clone(),
+                };
+                // Manually search the refinement window
+                let mut cur = refine_start;
+                while cur <= refine_end {
+                    if let Ok(true) = refine_puzzle.check_date(cur) {
+                        if !refined_solutions.contains(&cur) {
+                            refined_solutions.push(cur);
+                        }
+                    }
+                    cur = match cur.succ_opt() { Some(d) => d, None => break };
+                    result.steps += 1;
+                }
+            }
+            self.solver.max_steps = saved_max;
+            result.solutions = refined_solutions;
+            // Re-check correctness after refinement
+            result.correct = if puzzle.solutions.is_empty() {
+                true
+            } else {
+                puzzle.solutions.iter().all(|s| result.solutions.contains(s))
+            };
+        }
 
         // Accumulate overhead from failed Strategy Zero attempt
         result.steps += extra_steps;
@@ -1116,6 +1506,16 @@ impl AdaptiveSolver {
         };
 
         trajectory.set_verdict(verdict, puzzle.solutions.first().map(|d| d.to_string()));
+
+        // ─── Record PolicyKernel outcome ─────────────────────────────────
+        let early_commit_wrong = result.solved && !result.correct;
+        let outcome = SkipOutcome {
+            mode: skip_mode,
+            correct: result.correct,
+            steps: result.steps,
+            early_commit_wrong,
+        };
+        self.policy_kernel.record_outcome(&policy_ctx, &outcome);
 
         // Update router stats
         if self.router_enabled {
@@ -1176,6 +1576,53 @@ impl AdaptiveSolver {
     pub fn get_hints(&self, constraint_types: &[String]) -> Vec<String> {
         self.reasoning_bank.get_hints(constraint_types)
     }
+}
+
+/// Count distractor constraints in a puzzle.
+/// A distractor is a constraint that is likely redundant (doesn't narrow the search much).
+fn count_distractors(puzzle: &TemporalPuzzle) -> usize {
+    let mut count = 0;
+    let mut seen_between = false;
+    let mut seen_inyear = false;
+    let mut seen_dow = false;
+
+    for c in &puzzle.constraints {
+        match c {
+            TemporalConstraint::Between(_, _) => {
+                if seen_between {
+                    count += 1; // Redundant Between (wider or duplicate)
+                }
+                seen_between = true;
+            }
+            TemporalConstraint::InYear(_) => {
+                if seen_inyear {
+                    count += 1; // Redundant InYear
+                }
+                seen_inyear = true;
+            }
+            TemporalConstraint::DayOfWeek(_) => {
+                if seen_dow {
+                    count += 1; // Redundant DayOfWeek
+                }
+                seen_dow = true;
+            }
+            TemporalConstraint::After(d) => {
+                // After a date well before the Between range → distractor
+                if seen_between {
+                    if let Some(between_start) = puzzle.constraints.iter().find_map(|c2| match c2 {
+                        TemporalConstraint::Between(s, _) => Some(*s),
+                        _ => None,
+                    }) {
+                        if *d < between_start - chrono::Duration::days(14) {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    count
 }
 
 /// Get the type name of a constraint for pattern matching
