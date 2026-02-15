@@ -35,6 +35,8 @@ pub mod status;
 pub mod store;
 pub mod witness;
 pub mod write_path;
+pub mod agi_authority;
+pub mod agi_coherence;
 pub mod agi_container;
 
 pub use adversarial::{
