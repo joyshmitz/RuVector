@@ -258,24 +258,6 @@ impl KernelBuilder {
         })
     }
 
-    /// Enable ultra-fast boot mode.
-    ///
-    /// Switches to the `ULTRAFAST_BOOT_CONFIG` kernel configuration which
-    /// strips NUMA, cgroups, namespaces, ext4, netfilter, IPv6, debug, and
-    /// other subsystems to achieve sub-100ms cold start. The kernel boots
-    /// from initramfs only (no persistent filesystem).
-    ///
-    /// Trade-offs: no container isolation, no IPv6, no firewall, no
-    /// persistent filesystem.
-    pub fn ultrafast(mut self) -> Self {
-        self.config.cmdline = "console=ttyS0 quiet loglevel=0 nokaslr \
-            tsc=reliable no_timer_check noreplace-smp \
-            rcupdate.rcu_expedited=1 rcu_nocbs=0-3 \
-            random.trust_cpu=on"
-            .to_string();
-        self
-    }
-
     /// Build a kernel, trying Docker first and falling back to the builtin
     /// minimal stub if Docker is unavailable.
     ///
@@ -349,18 +331,6 @@ impl KernelBuilder {
         extra_binaries: &[(&str, &[u8])],
     ) -> Result<Vec<u8>, KernelError> {
         initramfs::build_initramfs(services, extra_binaries)
-    }
-
-    /// Build an ultra-fast boot initramfs with minimal startup overhead.
-    ///
-    /// Skips network enumeration, DHCP, /etc setup, and extraneous mounts.
-    /// Target: kernel-to-service in under 50ms of userspace init time.
-    pub fn build_fast_initramfs(
-        &self,
-        services: &[&str],
-        extra_binaries: &[(&str, &[u8])],
-    ) -> Result<Vec<u8>, KernelError> {
-        initramfs::build_fast_initramfs(services, extra_binaries)
     }
 
     /// Get the kernel flags based on the current configuration.

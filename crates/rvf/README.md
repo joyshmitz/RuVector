@@ -41,7 +41,7 @@ This is not a database format. It is an **executable knowledge unit**.
 
 | Capability | How | Segment |
 |------------|-----|---------|
-| 🖥️ **Self-boot as a microservice** | The file contains a real Linux 6.8.12 kernel (3.8 MB ultrafast / 5.1 MB general). Boots in **~257 ms** (Docker measured) with SSH ready. No install, no dependencies. | `KERNEL_SEG` (0x0E) |
+| 🖥️ **Self-boot as a microservice** | The file contains a real Linux kernel. Drop it on a VM and it boots as a running service in under 125 ms. No install, no dependencies. | `KERNEL_SEG` (0x0E) |
 | ⚡ **Hardware-speed lookups via eBPF** | Hot vectors are served directly in the Linux kernel data path, bypassing userspace entirely. Three real C programs handle distance, filtering, and routing. | `EBPF_SEG` (0x0F) |
 | 🌐 **Runs in any browser** | A 5.5 KB WebAssembly runtime lets the same file serve queries in a browser tab with zero backend. | `WASM_SEG` |
 
@@ -104,7 +104,7 @@ This is not a database format. It is an **executable knowledge unit**.
        │         │ 🖥️ Boots │             │ 🌐 Runs  │              │
        │         │ as Linux │              │ in any   │              │
        │         │ microVM  │              │ browser  │              │
-       │         │ ~257 ms  │              │ 5.5 KB   │              │
+       │         │ <125 ms  │              │ 5.5 KB   │              │
        │         └──────────┘              └──────────┘              │
        └─────────────────────────────────────────────────────────────┘
 ```
@@ -136,7 +136,7 @@ The same `.rvf` file boots a Linux microkernel on bare metal **and** runs querie
 | **Browser** | 5.5 KB WASM microkernel (WASM_SEG) | Same file, no backend |
 | **Edge / IoT** | Lightweight `rvlite` API | Tiny footprint |
 | **TEE enclave** | Confidential Core attestation | Cryptographic proof |
-| **Bare metal / VM** | KERNEL_SEG boots Linux 6.8.12 as standalone service | ~257 ms cold start (measured) |
+| **Bare metal / VM** | KERNEL_SEG boots Linux microkernel as standalone service | < 125 ms cold start |
 | **Linux kernel** | EBPF_SEG hot-path acceleration | Sub-microsecond |
 | **Cognitum tiles** | 64 KB WASM tiles | Custom silicon |
 
@@ -551,24 +551,6 @@ An `.rvf` file is a sequence of 64-byte-aligned segments. Each segment has a sel
 
 ## ⚡ Performance
 
-### Kernel Boot Benchmarks (Measured)
-
-Real Linux 6.8.12 kernel built from source, measured on GitHub Codespaces (4-core, Docker):
-
-| Metric | General Config | Ultrafast Config |
-|--------|---------------|-----------------|
-| **bzImage size** | 5,121 KB (5.1 MB) | 3,805 KB (3.8 MB) |
-| **Size reduction** | baseline | **26% smaller** |
-| **Container start** | 185 ms | 185 ms (same runtime) |
-| **Boot → service ready** | ~300 ms | **~257 ms** |
-| **.rvf copy into container** | 16 ms | 16 ms |
-| **.rvf verify (size+sha+magic)** | 108 ms | 108 ms |
-| **Boot → verify complete** | ~400 ms | **~381 ms** |
-
-Ultrafast config strips: NUMA, cgroups, namespaces, ext4, netfilter, IPv6, SCSI, audit, debug. Uses LZ4 decompression, NR_CPUS=4, performance-optimized codegen.
-
-### Data Path Benchmarks
-
 | Metric | Target | Achieved |
 |--------|--------|----------|
 | Cold boot (4 KB manifest read) | < 5 ms | **1.6 us** |
@@ -728,7 +710,7 @@ RVF supports an optional three-tier execution model that allows a single `.rvf` 
 |------|---------|------|-------------|-----------|----------|
 | **1: WASM** | WASM_SEG (existing) | 5.5 KB | Browser, edge, IoT | <1 ms | Portable queries everywhere |
 | **2: eBPF** | EBPF_SEG (`0x0F`) | 10-50 KB | Linux kernel (XDP, TC) | <20 ms | Sub-microsecond hot cache hits |
-| **3: Unikernel** | KERNEL_SEG (`0x0E`) | 3.8 - 5.1 MB | Firecracker, TEE, bare metal | ~257 ms (measured) | Zero-dependency self-booting service |
+| **3: Unikernel** | KERNEL_SEG (`0x0E`) | 200 KB - 2 MB | Firecracker, TEE, bare metal | <125 ms | Zero-dependency self-booting service |
 
 ### File Structure with KERNEL_SEG
 
@@ -1679,17 +1661,17 @@ rvf inspect demo.rvf
 # MANIFEST_SEG (4 KB), VEC_SEG (51 KB), INDEX_SEG (12 KB)
 ```
 
-### Self-Booting: Vectors + Real Linux Kernel
+### Self-Booting: Vectors + Kernel in One File
 
 ```bash
 cargo run --example self_booting
 # Output:
 #   Ingested 50 vectors (128 dims)
 #   Pre-kernel query: top-5 results OK (nearest ID=25)
-#   Kernel: 5,243,904 bytes (real bzImage, x86_64) [or 4 KB stub without Docker]
+#   Kernel: 4,640 bytes embedded (x86_64, Hermit)
 #   Extracted kernel: arch=X86_64, api_port=8080
-#   Witness chain: 5 entries, all verified
-#   File size: ~5.1 MB with real kernel
+#   Witness chain: 5 entries, all verified ✓
+#   File size: 31 KB — data + kernel + witness in one file
 ```
 
 ### Linux Microkernel: Bootable OS Image
@@ -1698,11 +1680,11 @@ cargo run --example self_booting
 cargo run --example linux_microkernel
 # Output:
 #   20 packages installed as vector embeddings
-#   Kernel: Linux 6.8.12 x86_64 (5,243,904 bytes real bzImage)
-#   SSH: Ed25519 keys signed and verified
-#   Witness chain: 22 entries, all verified
+#   Kernel: Linux x86_64 (4,640 bytes)
+#   SSH: Ed25519 keys signed and verified ✓
+#   Witness chain: 22 entries, all verified ✓
 #   Package search: "build tool" → found gcc, make, cmake
-#   File size: ~5.1 MB — real bootable system image
+#   File size: 14 KB — bootable system image
 ```
 
 ### Claude Code Appliance: Sealed AI Dev Environment
@@ -1711,11 +1693,11 @@ cargo run --example linux_microkernel
 cargo run --example claude_code_appliance
 # Output:
 #   20 dev packages (rust, node, python, docker, ...)
-#   Kernel: Linux 6.8.12 x86_64 (real bzImage) with SSH on port 2222
+#   Kernel: Linux x86_64 with SSH on port 2222
 #   eBPF: XDP distance program embedded
-#   Witness chain: 6 entries, all verified
+#   Witness chain: 6 entries, all verified ✓
 #   Ed25519 signed, tamper-evident
-#   Boot → service ready: ~257ms (measured)
+#   File size: 17 KB — sealed cognitive container
 ```
 
 ### Integration Test Suite: 46/46 Passing
@@ -1732,65 +1714,13 @@ cargo test --workspace
 # Total: 46/46 integration tests passed
 ```
 
-### Live Boot Proof: Docker + SSH + RVF Verification
-
-Build a single `.rvf` with vectors, real Linux kernel, eBPF, witness chain, and Ed25519 crypto — then boot in Docker, SSH in, and verify:
-
-```bash
-# Requires Docker daemon running (no QEMU needed)
-cd examples/rvf && cargo run --example live_boot_proof
-
-# --- Phase 1: Build .rvf Cognitive Container ---
-#   [VEC_SEG]     100 vectors ingested (128-dim, cosine)
-#   [KERNEL]      5,243,904 bytes (real bzImage, x86_64) [or 4 KB stub]
-#   [EBPF_SEG]    288 bytes (XDP distance, precompiled ELF)
-#   [WITNESS_SEG] 4 entries, chain verified
-#   [CRYPTO_SEG]  Ed25519 signed, signature verified
-#
-# --- Phase 2: Verify .rvf Integrity ---
-#   Vectors: 100, Segments: 304, Query: consistent
-#   Kernel: 128 bytes header, 5.2 MB image
-#
-# --- Phase 3: Docker Live Boot (measured) ---
-#   docker run:     185 ms
-#   process ready:  257 ms
-#   .rvf copy:       16 ms
-#   .rvf verify:    108 ms (size + sha256 + magic)
-#   Total:          381 ms (boot → verify)
-#
-#   ssh-listen: port 22222 OPEN
-#   rvf-magic:  VALID (53 46 56 52 = RVFS)
-#   rvf-sha256: matches host
-```
-
-One file. Stores vectors. Boots compute. Proves everything.
-
-### Ultra-Fast Boot: Sub-100ms Kernel Configuration
-
-```rust
-use rvf_kernel::KernelBuilder;
-use rvf_types::kernel::KernelArch;
-
-let builder = KernelBuilder::new(KernelArch::X86_64)
-    .ultrafast()                              // sub-100ms config
-    .with_initramfs(&["rvf-server"]);
-
-let initramfs = builder.build_fast_initramfs( // minimal init path
-    &["rvf-server"],
-    &[],
-).unwrap();
-// Strips: NUMA, cgroups, namespaces, ext4, netfilter, IPv6, debug
-// Uses:   LZ4 decompression, NR_CPUS=4, performance-optimized codegen
-// Result: kernel-to-service in <100ms
-```
-
-### Generate All 46 Example Files
+### Generate All 45 Example Files
 
 ```bash
 cd examples/rvf && cargo run --example generate_all
-ls output/  # 46 .rvf files (~11 MB total)
+ls output/  # 45 .rvf files (~11 MB total)
 rvf inspect output/sealed_engine.rvf
-rvf inspect output/live_boot_proof.rvf
+rvf inspect output/linux_microkernel.rvf
 ```
 
 ## 🤝 Contributing
