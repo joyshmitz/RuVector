@@ -1,6 +1,6 @@
 {
   "name": "@ruvector/rvf-node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "RuVector Format Node.js native bindings",
   "main": "index.js",
   "types": "index.d.ts",
@@ -8,7 +8,10 @@
     "name": "rvf-node",
     "triples": {
       "defaults": true,
-      "additional": ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu"]
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu"
+      ]
     }
   },
   "scripts": {
