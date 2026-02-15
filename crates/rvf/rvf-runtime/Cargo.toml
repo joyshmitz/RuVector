@@ -15,6 +15,7 @@ rust-version = "1.87"
 default = ["std"]
 std = []
 wasm = []
+qr = []
 ed25519 = ["rvf-types/ed25519"]
 
 [dependencies]

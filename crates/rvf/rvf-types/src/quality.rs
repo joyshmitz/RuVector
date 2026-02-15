@@ -293,8 +293,6 @@ pub fn derive_response_quality(retrieval_qualities: &[RetrievalQuality]) -> Resp
 #[cfg(test)]
 mod tests {
     use super::*;
-    extern crate alloc;
-    use alloc::vec;
 
     #[test]
     fn retrieval_quality_ordering() {
