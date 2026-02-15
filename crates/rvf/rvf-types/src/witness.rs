@@ -271,6 +271,9 @@ impl WitnessHeader {
 
 /// A single tool call record within a witness trace.
 ///
+/// Requires the `alloc` feature because the variable-length `action` field
+/// uses `Vec<u8>`.
+///
 /// Variable-length: 32 bytes fixed header + action_len bytes.
 ///
 /// ```text
@@ -285,10 +288,11 @@ impl WitnessHeader {
 /// 0x1C    u32       tokens
 /// 0x20    [u8; action_len]  action (UTF-8 tool name)
 /// ```
+#[cfg(any(feature = "alloc", test))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ToolCallEntry {
     /// Tool name / action (e.g. "Bash", "Edit", "Read").
-    pub action: Vec<u8>,
+    pub action: alloc::vec::Vec<u8>,
     /// SHA-256 of args, truncated to 8 bytes.
     pub args_hash: [u8; 8],
     /// SHA-256 of result, truncated to 8 bytes.
@@ -304,8 +308,10 @@ pub struct ToolCallEntry {
 }
 
 /// Fixed header size for a ToolCallEntry (before the action string).
+#[cfg(any(feature = "alloc", test))]
 pub const TOOL_CALL_FIXED_SIZE: usize = 32;
 
+#[cfg(any(feature = "alloc", test))]
 impl ToolCallEntry {
     /// Total serialized size.
     pub fn wire_size(&self) -> usize {
@@ -313,8 +319,8 @@ impl ToolCallEntry {
     }
 
     /// Serialize to bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(self.wire_size());
+    pub fn to_bytes(&self) -> alloc::vec::Vec<u8> {
+        let mut buf = alloc::vec::Vec::with_capacity(self.wire_size());
         buf.extend_from_slice(&(self.action.len() as u16).to_le_bytes());
         buf.push(self.policy_check as u8);
         buf.push(0); // pad

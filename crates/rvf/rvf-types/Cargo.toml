@@ -13,8 +13,12 @@ rust-version = "1.87"
 
 [features]
 default = []
-std = []
+alloc = []
+std = ["alloc"]
 serde = ["dep:serde"]
+ed25519 = ["dep:ed25519-dalek", "dep:rand_core"]
 
 [dependencies]
 serde = { version = "1", default-features = false, features = ["derive"], optional = true }
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc", "rand_core"], optional = true }
+rand_core = { version = "0.6", default-features = false, optional = true }

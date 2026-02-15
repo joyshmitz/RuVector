@@ -1612,12 +1612,6 @@ dependencies = [
 [[package]]
 name = "rvf-adapter-claude-flow"
 version = "0.1.0"
-dependencies = [
- "rvf-crypto",
- "rvf-runtime",
- "rvf-types",
- "tempfile",
-]
 
 [[package]]
 name = "rvf-adapter-ospipe"
@@ -1817,6 +1811,8 @@ dependencies = [
 name = "rvf-types"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
+ "rand_core",
  "serde",
 ]
 

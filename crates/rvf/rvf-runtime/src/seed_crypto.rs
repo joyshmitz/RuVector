@@ -10,6 +10,10 @@ use rvf_types::sha256::{ct_eq, hmac_sha256, sha256};
 /// Signature algorithm ID for HMAC-SHA256 (built-in, zero-dep).
 pub const SIG_ALGO_HMAC_SHA256: u16 = 2;
 
+/// Signature algorithm ID for Ed25519 (RFC 8032 asymmetric signing).
+#[cfg(feature = "ed25519")]
+pub const SIG_ALGO_ED25519: u16 = 0;
+
 /// Compute the 8-byte content hash for SeedHeader.content_hash.
 ///
 /// SHA-256 of the data payload (microkernel + manifest) truncated to 64 bits.
@@ -67,6 +71,41 @@ pub fn verify_layer(expected_hash: &[u8; 16], layer_data: &[u8]) -> bool {
 pub fn verify_content_hash(expected: &[u8; 8], data: &[u8]) -> bool {
     let computed = seed_content_hash(data);
     computed == *expected
+}
+
+// ---------------------------------------------------------------------------
+// Ed25519 asymmetric signing (feature-gated)
+// ---------------------------------------------------------------------------
+
+/// Sign a seed payload using Ed25519 (RFC 8032).
+///
+/// Takes a 32-byte secret key and returns a 64-byte signature.
+/// This is asymmetric: only the holder of the secret key can sign,
+/// but anyone with the corresponding public key can verify.
+#[cfg(feature = "ed25519")]
+pub fn sign_seed_ed25519(
+    secret_key: &[u8; 32],
+    payload: &[u8],
+) -> [u8; 64] {
+    rvf_types::ed25519::ed25519_sign(secret_key, payload)
+}
+
+/// Verify a seed signature using Ed25519 (RFC 8032).
+///
+/// Takes a 32-byte public key and a 64-byte signature.
+/// Returns `true` if the signature is valid for the given payload.
+#[cfg(feature = "ed25519")]
+pub fn verify_seed_ed25519(
+    public_key: &[u8; 32],
+    payload: &[u8],
+    signature: &[u8],
+) -> bool {
+    if signature.len() != 64 {
+        return false;
+    }
+    let mut sig_arr = [0u8; 64];
+    sig_arr.copy_from_slice(signature);
+    rvf_types::ed25519::ed25519_verify(public_key, payload, &sig_arr)
 }
 
 #[cfg(test)]
@@ -148,5 +187,56 @@ mod tests {
         let h1 = seed_content_hash(b"data1");
         let h2 = seed_content_hash(b"data2");
         assert_ne!(h1, h2);
+    }
+
+    // --- Ed25519 tests (feature-gated) ---
+
+    #[cfg(feature = "ed25519")]
+    mod ed25519_tests {
+        use super::*;
+
+        /// Build a deterministic keypair for tests.
+        fn test_keypair() -> ([u8; 32], [u8; 32]) {
+            let secret = [0x42u8; 32];
+            let kp = rvf_types::ed25519::Ed25519Keypair::from_secret(&secret);
+            (kp.secret_key(), kp.public_key())
+        }
+
+        #[test]
+        fn ed25519_sign_verify_round_trip() {
+            let (secret, public) = test_keypair();
+            let payload = b"RVQS header + microkernel + manifest bytes";
+            let sig = sign_seed_ed25519(&secret, payload);
+            assert!(verify_seed_ed25519(&public, payload, &sig));
+        }
+
+        #[test]
+        fn ed25519_wrong_key_rejects() {
+            let (secret, _public) = test_keypair();
+            let other_secret = [0x99u8; 32];
+            let other_kp = rvf_types::ed25519::Ed25519Keypair::from_secret(&other_secret);
+            let payload = b"some payload";
+            let sig = sign_seed_ed25519(&secret, payload);
+            assert!(!verify_seed_ed25519(&other_kp.public_key(), payload, &sig));
+        }
+
+        #[test]
+        fn ed25519_tampered_payload_rejects() {
+            let (secret, public) = test_keypair();
+            let payload = b"original payload";
+            let sig = sign_seed_ed25519(&secret, payload);
+            assert!(!verify_seed_ed25519(&public, b"tampered payload", &sig));
+        }
+
+        #[test]
+        fn ed25519_short_signature_rejects() {
+            let (_secret, public) = test_keypair();
+            assert!(!verify_seed_ed25519(&public, b"data", &[0u8; 16]));
+        }
+
+        #[test]
+        fn ed25519_algo_constant() {
+            assert_eq!(SIG_ALGO_ED25519, 0);
+        }
     }
 }

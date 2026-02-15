@@ -9570,6 +9570,8 @@ dependencies = [
 name = "rvf-types"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
+ "rand_core 0.6.4",
  "serde",
 ]
 

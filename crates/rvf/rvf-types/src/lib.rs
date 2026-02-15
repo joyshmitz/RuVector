@@ -7,7 +7,11 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(test)]
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+// Tests always need alloc (for Vec, format!, etc.) even without the feature.
+#[cfg(all(test, not(feature = "alloc")))]
 extern crate alloc;
 
 pub mod checksum;
@@ -36,6 +40,8 @@ pub mod quality;
 pub mod qr_seed;
 pub mod security;
 pub mod sha256;
+#[cfg(feature = "ed25519")]
+pub mod ed25519;
 pub mod wasm_bootstrap;
 pub mod witness;
 
@@ -89,14 +95,23 @@ pub use qr_seed::{
 };
 pub use security::{HardeningFields, SecurityError, SecurityPolicy};
 pub use sha256::{sha256, hmac_sha256, Sha256};
+#[cfg(feature = "ed25519")]
+pub use ed25519::{
+    Ed25519Keypair, ed25519_sign, ed25519_verify, ct_eq_sig,
+    PUBLIC_KEY_SIZE as ED25519_PUBLIC_KEY_SIZE,
+    SECRET_KEY_SIZE as ED25519_SECRET_KEY_SIZE,
+    SIGNATURE_SIZE as ED25519_SIGNATURE_SIZE,
+};
 pub use witness::{
-    GovernanceMode, PolicyCheck, Scorecard, TaskOutcome, ToolCallEntry,
+    GovernanceMode, PolicyCheck, Scorecard, TaskOutcome,
     WitnessHeader, WITNESS_MAGIC, WITNESS_HEADER_SIZE,
     WIT_SIGNED, WIT_HAS_SPEC, WIT_HAS_PLAN, WIT_HAS_TRACE,
     WIT_HAS_DIFF, WIT_HAS_TEST_LOG, WIT_HAS_POSTMORTEM,
     WIT_TAG_SPEC, WIT_TAG_PLAN, WIT_TAG_TRACE, WIT_TAG_DIFF,
     WIT_TAG_TEST_LOG, WIT_TAG_POSTMORTEM,
 };
+#[cfg(feature = "alloc")]
+pub use witness::{ToolCallEntry, TOOL_CALL_FIXED_SIZE};
 pub use wasm_bootstrap::{
     WasmHeader, WasmRole, WasmTarget, WASM_MAGIC,
     WASM_FEAT_SIMD, WASM_FEAT_BULK_MEMORY, WASM_FEAT_MULTI_VALUE,

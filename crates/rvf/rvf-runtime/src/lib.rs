@@ -25,6 +25,8 @@ pub mod filter;
 pub mod locking;
 pub mod membership;
 pub mod options;
+#[cfg(feature = "qr")]
+pub mod qr_encode;
 pub mod qr_seed;
 pub mod read_path;
 pub mod safety_net;
@@ -57,6 +59,12 @@ pub use seed_crypto::{
     seed_content_hash, layer_content_hash, full_content_hash,
     sign_seed, verify_seed, verify_layer, SIG_ALGO_HMAC_SHA256,
 };
+#[cfg(feature = "ed25519")]
+pub use seed_crypto::{
+    sign_seed_ed25519, verify_seed_ed25519, SIG_ALGO_ED25519,
+};
+#[cfg(feature = "qr")]
+pub use qr_encode::{QrEncoder, QrCode, QrError, EcLevel};
 pub use safety_net::{
     selective_safety_net_scan, should_activate_safety_net, Candidate, SafetyNetResult,
 };
