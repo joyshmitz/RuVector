@@ -7934,6 +7934,7 @@ dependencies = [
  "ruvector-core 2.0.3",
  "serde",
  "serde_json",
+ "sha2",
  "statistical",
  "tempfile",
  "thiserror 2.0.17",
