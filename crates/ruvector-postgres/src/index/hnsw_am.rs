@@ -774,10 +774,10 @@ unsafe extern "C" fn hnsw_build(
     // For ruvector(384), atttypmod == 384. Fixes #171 and #164.
     let dimensions = {
         let tupdesc = (*heap).rd_att;
-        let natts = (*index_info).ii_NumIndexAttrs as isize;
+        let natts = (*index_info).ii_NumIndexAttrs as usize;
         let mut dims: u32 = 0;
         if natts > 0 && !tupdesc.is_null() {
-            let attnum = *(*index_info).ii_IndexAttrNumbers.offset(0);
+            let attnum = (*index_info).ii_IndexAttrNumbers[0];
             if attnum > 0 && (attnum as isize) <= (*tupdesc).natts as isize {
                 let attr = (*tupdesc).attrs.as_ptr().offset((attnum - 1) as isize);
                 let typmod = (*attr).atttypmod;
