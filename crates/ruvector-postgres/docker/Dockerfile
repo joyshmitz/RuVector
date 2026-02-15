@@ -4,7 +4,7 @@
 # Note: PostgreSQL 18 requires pgrx 0.15.0+ (planned for future release)
 
 ARG PG_VERSION=17
-ARG RUST_VERSION=1.83
+ARG RUST_VERSION=1.85
 
 # ============================================================================
 # Stage 1: Base Builder with Rust and PostgreSQL dev dependencies
