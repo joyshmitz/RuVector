@@ -200,3 +200,7 @@ path = "examples/membership_filter.rs"
 [[example]]
 name = "snapshot_freeze"
 path = "examples/snapshot_freeze.rs"
+
+[[example]]
+name = "live_boot_proof"
+path = "examples/live_boot_proof.rs"

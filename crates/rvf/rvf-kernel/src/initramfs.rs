@@ -345,6 +345,70 @@ esac
     cpio.finish_gzipped()
 }
 
+/// Build an ultra-fast boot initramfs optimized for minimal startup time.
+///
+/// Compared to `build_initramfs`, this:
+/// - Skips network interface enumeration/DHCP
+/// - Mounts only /proc, /sys, /dev (no /dev/pts, /dev/shm, /tmp, /run)
+/// - No /etc setup (no passwd, resolv.conf, hostname)
+/// - Starts services immediately without probing
+/// - Uses minimal directory structure
+///
+/// Target: kernel-to-service in under 50ms of userspace init time.
+pub fn build_fast_initramfs(
+    services: &[&str],
+    extra_binaries: &[(&str, &[u8])],
+) -> Result<Vec<u8>, KernelError> {
+    let mut cpio = CpioBuilder::new();
+
+    // Minimal directory structure
+    let dirs = [".", "bin", "sbin", "dev", "proc", "sys", "tmp", "run"];
+    for dir in &dirs {
+        cpio.add_dir(dir);
+    }
+
+    // Essential device nodes only
+    cpio.add_device("dev/console", 0o020600, 5, 1);
+    cpio.add_device("dev/ttyS0", 0o020660, 4, 64);
+    cpio.add_device("dev/null", 0o020666, 1, 3);
+    cpio.add_device("dev/urandom", 0o020444, 1, 9);
+
+    // Ultra-fast /init script
+    let mut script = String::from(
+        "#!/bin/sh\n\
+         mount -t proc proc /proc\n\
+         mount -t sysfs sysfs /sys\n\
+         mount -t devtmpfs devtmpfs /dev\n",
+    );
+
+    for service in services {
+        match *service {
+            "sshd" | "dropbear" => {
+                script.push_str(
+                    "mkdir -p /etc/dropbear\n\
+                     dropbear -R -F -E -p 2222 &\n",
+                );
+            }
+            "rvf-server" => {
+                script.push_str("rvf-server --listen 0.0.0.0:8080 &\n");
+            }
+            other => {
+                script.push_str(&format!("{other} &\n"));
+            }
+        }
+    }
+
+    script.push_str("exec /bin/sh\n");
+    cpio.add_file("init", 0o100755, script.as_bytes());
+
+    // Add extra binaries
+    for (path, content) in extra_binaries {
+        cpio.add_file(path, 0o100755, content);
+    }
+
+    cpio.finish_gzipped()
+}
+
 /// Parse a cpio newc archive and return the list of entries.
 ///
 /// Each entry is returned as (path, mode, filesize, data_offset_in_archive).
@@ -543,6 +607,30 @@ mod tests {
         // First entry header should be exactly 110 ASCII chars
         let header_str = std::str::from_utf8(&archive[..110]).unwrap();
         assert!(header_str.starts_with(CPIO_NEWC_MAGIC));
+    }
+
+    #[test]
+    fn build_fast_initramfs_is_smaller() {
+        let normal = build_initramfs(&["sshd", "rvf-server"], &[]).unwrap();
+        let fast = build_fast_initramfs(&["sshd", "rvf-server"], &[]).unwrap();
+
+        // Fast initramfs should be smaller (fewer dirs, shorter init script)
+        assert!(fast.len() < normal.len(),
+            "fast ({}) should be smaller than normal ({})", fast.len(), normal.len());
+
+        // Both should be valid gzip
+        assert_eq!(fast[0], 0x1F);
+        assert_eq!(fast[1], 0x8B);
+
+        // Decompress and verify it has /init
+        use flate2::read::GzDecoder;
+        use std::io::Read;
+        let mut decoder = GzDecoder::new(&fast[..]);
+        let mut decompressed = Vec::new();
+        decoder.read_to_end(&mut decompressed).unwrap();
+        let entries = parse_cpio_entries(&decompressed).unwrap();
+        let has_init = entries.iter().any(|(name, _, _)| name == "init");
+        assert!(has_init, "fast initramfs must have /init");
     }
 
     #[test]

@@ -135,17 +135,30 @@ impl DockerBuildContext {
             )));
         }
 
-        // Create a temporary container and copy out the bzImage
+        // Clean up any leftover container from a previous run
+        let _ = Command::new("docker")
+            .args(["rm", "-f", "rvf-kernel-extract"])
+            .output();
+
+        // Create a temporary container to copy out the bzImage.
+        // The image is FROM scratch (no shell), so we pass a dummy
+        // entrypoint that won't be executed — docker create only
+        // creates the container filesystem, it doesn't run anything.
         let create_output = Command::new("docker")
-            .args(["create", "--name", "rvf-kernel-extract", &image_tag])
+            .args([
+                "create", "--name", "rvf-kernel-extract",
+                "--entrypoint", "",
+                &image_tag, "/bzImage",
+            ])
             .output()
             .map_err(|e| {
                 KernelError::DockerBuildFailed(format!("docker create failed: {e}"))
             })?;
 
         if !create_output.status.success() {
+            let stderr = String::from_utf8_lossy(&create_output.stderr);
             return Err(KernelError::DockerBuildFailed(
-                "docker create failed".into(),
+                format!("docker create failed: {stderr}"),
             ));
         }
 

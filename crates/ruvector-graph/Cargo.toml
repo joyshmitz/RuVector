@@ -69,7 +69,7 @@ pest_derive = { version = "2.7", optional = true }
 lalrpop-util = { version = "0.21", optional = true }
 
 # Cache
-lru = "0.12"
+lru = "0.16"
 moka = { version = "0.12", features = ["future"], optional = true }
 
 # Compression (for storage optimization, optional for WASM)

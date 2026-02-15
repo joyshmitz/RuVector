@@ -525,7 +525,7 @@ LANGUAGE C VOLATILE PARALLEL SAFE;
 
 -- List all agents
 CREATE OR REPLACE FUNCTION ruvector_list_agents()
-RETURNS SETOF jsonb
+RETURNS TABLE(name text, agent_type text, capabilities text[], cost_per_request real, avg_latency_ms real, quality_score real, success_rate real, total_requests bigint, is_active boolean)
 AS 'MODULE_PATHNAME', 'ruvector_list_agents_wrapper'
 LANGUAGE C VOLATILE PARALLEL SAFE;
 
@@ -537,7 +537,7 @@ LANGUAGE C VOLATILE PARALLEL SAFE;
 
 -- Find agents by capability
 CREATE OR REPLACE FUNCTION ruvector_find_agents_by_capability(capability text, max_results int DEFAULT 10)
-RETURNS SETOF jsonb
+RETURNS TABLE(name text, quality_score real, avg_latency_ms real, cost_per_request real)
 AS 'MODULE_PATHNAME', 'ruvector_find_agents_by_capability_wrapper'
 LANGUAGE C VOLATILE PARALLEL SAFE;
 

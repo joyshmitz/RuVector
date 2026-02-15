@@ -268,6 +268,261 @@ CONFIG_DEBUG_KERNEL=y
 # CONFIG_FTRACE is not set
 "#;
 
+/// Ultra-fast boot kernel configuration optimized for sub-100ms cold start.
+///
+/// Compared to the general-purpose `MICROVM_KERNEL_CONFIG`, this strips:
+/// - NUMA detection, memory hotplug, THP, KSM, compaction
+/// - cgroups, namespaces, audit, POSIX IPC
+/// - SCSI subsystem, loop/RAM block devices, ext4
+/// - Netfilter, bridge, VLAN, IPv6
+/// - All debug/tracing infrastructure
+/// - Reduced NR_CPUS (4 vs 64) for faster SMP init
+/// - LZ4 compression for fastest decompression
+/// - Optimized for performance (not size)
+///
+/// Trade-offs:
+/// - No container isolation (no cgroups/namespaces)
+/// - No persistent filesystem (initramfs-only boot)
+/// - No IPv6 networking
+/// - No firewall/NAT (no netfilter)
+/// - Slightly larger image (performance-optimized codegen)
+pub const ULTRAFAST_BOOT_CONFIG: &str = r#"#
+# RVF Ultra-Fast Boot Kernel Configuration
+# Target: Linux 6.8.x for sub-100ms cold start
+# Optimized for: minimal init path, fastest decompression, direct-to-service
+#
+
+#
+# General setup — stripped to bare minimum
+#
+CONFIG_LOCALVERSION="-rvf-fast"
+CONFIG_DEFAULT_HOSTNAME="rvf"
+# CONFIG_SWAP is not set
+# CONFIG_SYSVIPC is not set
+# CONFIG_POSIX_MQUEUE is not set
+# CONFIG_AUDIT is not set
+CONFIG_NO_HZ_FULL=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_PREEMPT_NONE=y
+CONFIG_TICK_CPU_ACCOUNTING=y
+# CONFIG_IKCONFIG is not set
+# CONFIG_IKCONFIG_PROC is not set
+CONFIG_LOG_BUF_SHIFT=12
+# CONFIG_CGROUPS is not set
+# CONFIG_NAMESPACES is not set
+# CONFIG_MODULES is not set
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+CONFIG_EXPERT=y
+CONFIG_MULTIUSER=y
+# CONFIG_SYSFS_SYSCALL is not set
+CONFIG_FHANDLE=y
+CONFIG_POSIX_TIMERS=y
+CONFIG_PRINTK=y
+CONFIG_BUG=y
+# CONFIG_ELF_CORE is not set
+# CONFIG_BASE_FULL is not set
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y
+CONFIG_AIO=y
+# CONFIG_IO_URING is not set
+# CONFIG_ADVISE_SYSCALLS is not set
+# CONFIG_KALLSYMS is not set
+CONFIG_EMBEDDED=y
+
+#
+# Processor — minimal SMP, no NUMA
+#
+CONFIG_64BIT=y
+CONFIG_SMP=y
+CONFIG_NR_CPUS=4
+# CONFIG_SCHED_SMT is not set
+CONFIG_X86_LOCAL_APIC=y
+CONFIG_X86_IO_APIC=y
+CONFIG_X86_TSC=y
+# CONFIG_MICROCODE is not set
+# CONFIG_X86_MSR is not set
+# CONFIG_X86_CPUID is not set
+# CONFIG_PARAVIRT is not set
+# CONFIG_KVM_GUEST is not set
+CONFIG_HYPERVISOR_GUEST=y
+CONFIG_RANDOMIZE_BASE=y
+# CONFIG_NUMA is not set
+# CONFIG_MTRR is not set
+
+#
+# Memory — no hotplug, no THP, no KSM
+#
+CONFIG_SPARSEMEM_VMEMMAP=y
+# CONFIG_MEMORY_HOTPLUG is not set
+# CONFIG_TRANSPARENT_HUGEPAGE is not set
+# CONFIG_COMPACTION is not set
+# CONFIG_KSM is not set
+
+#
+# Networking — minimal TCP/IP only
+#
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+CONFIG_TCP_CONG_CUBIC=y
+# CONFIG_IPV6 is not set
+# CONFIG_NETFILTER is not set
+CONFIG_VSOCKETS=y
+CONFIG_VIRTIO_VSOCKETS=y
+# CONFIG_BRIDGE is not set
+# CONFIG_VLAN_8021Q is not set
+
+#
+# Device drivers — VirtIO only
+#
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_VIRTIO_NET=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_HW_RANDOM_VIRTIO=y
+
+#
+# Block — no loop, no RAM disk, no SCSI
+#
+CONFIG_BLK_DEV=y
+# CONFIG_BLK_DEV_LOOP is not set
+# CONFIG_BLK_DEV_RAM is not set
+# CONFIG_SCSI is not set
+
+#
+# Serial / console — minimal
+#
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_HW_RANDOM=y
+CONFIG_TTY=y
+# CONFIG_VT is not set
+
+#
+# Filesystems — initramfs only, no persistent FS
+#
+CONFIG_TMPFS=y
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# CONFIG_EXT4_FS is not set
+# CONFIG_FUSE_FS is not set
+# CONFIG_NFS_FS is not set
+# CONFIG_CIFS is not set
+
+#
+# Initramfs compression — LZ4 for fastest decompression
+#
+CONFIG_RD_LZ4=y
+CONFIG_INITRAMFS_COMPRESSION_LZ4=y
+
+#
+# BPF subsystem
+#
+CONFIG_BPF=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_BPF_JIT=y
+CONFIG_BPF_JIT_ALWAYS_ON=y
+CONFIG_BPF_UNPRIV_DEFAULT_OFF=y
+
+#
+# Security — essential hardening only
+#
+CONFIG_SECURITY=y
+CONFIG_SECURITY_LOCKDOWN_LSM=y
+CONFIG_SECURITY_LOCKDOWN_LSM_EARLY=y
+CONFIG_LOCK_DOWN_KERNEL_FORCE_INTEGRITY=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+CONFIG_FORTIFY_SOURCE=y
+# CONFIG_SECURITY_SELINUX is not set
+# CONFIG_SECURITY_APPARMOR is not set
+# CONFIG_SECURITY_YAMA is not set
+# CONFIG_SECURITY_LANDLOCK is not set
+
+#
+# Crypto — minimal
+#
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_SHA256=y
+CONFIG_CRYPTO_AES=y
+CONFIG_CRYPTO_CHACHA20POLY1305=y
+
+#
+# Disabled subsystems
+#
+# CONFIG_SOUND is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_DRM is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_WLAN is not set
+# CONFIG_BLUETOOTH is not set
+# CONFIG_INPUT_JOYSTICK is not set
+# CONFIG_INPUT_TABLET is not set
+# CONFIG_INPUT_TOUCHSCREEN is not set
+# CONFIG_MEDIA_SUPPORT is not set
+# CONFIG_AGP is not set
+# CONFIG_PCMCIA is not set
+# CONFIG_INFINIBAND is not set
+# CONFIG_ISDN is not set
+# CONFIG_PARPORT is not set
+# CONFIG_PHONE is not set
+# CONFIG_ACCESSIBILITY is not set
+# CONFIG_LOGO is not set
+# CONFIG_FB is not set
+# CONFIG_BACKLIGHT_CLASS_DEVICE is not set
+
+#
+# Debugging — completely disabled for speed
+#
+CONFIG_PRINTK_TIME=y
+CONFIG_CONSOLE_LOGLEVEL_DEFAULT=1
+# CONFIG_MAGIC_SYSRQ is not set
+# CONFIG_DEBUG_KERNEL is not set
+# CONFIG_DEBUG_INFO_DWARF5 is not set
+# CONFIG_KPROBES is not set
+# CONFIG_FTRACE is not set
+"#;
+
+/// Required config options for the ultra-fast boot kernel.
+pub const ULTRAFAST_REQUIRED_OPTIONS: &[&str] = &[
+    "CONFIG_64BIT=y",
+    "CONFIG_SMP=y",
+    "CONFIG_VIRTIO_PCI=y",
+    "CONFIG_VIRTIO_BLK=y",
+    "CONFIG_VIRTIO_NET=y",
+    "CONFIG_BPF=y",
+    "CONFIG_BPF_JIT=y",
+    "CONFIG_BPF_SYSCALL=y",
+    "CONFIG_VSOCKETS=y",
+    "CONFIG_VIRTIO_VSOCKETS=y",
+    "CONFIG_SECURITY_LOCKDOWN_LSM=y",
+    "CONFIG_STACKPROTECTOR_STRONG=y",
+    "CONFIG_RANDOMIZE_BASE=y",
+    "CONFIG_PREEMPT_NONE=y",
+    "CONFIG_NO_HZ_FULL=y",
+    "# CONFIG_MODULES is not set",
+    "# CONFIG_SOUND is not set",
+    "# CONFIG_USB_SUPPORT is not set",
+    "# CONFIG_DRM is not set",
+    "# CONFIG_WIRELESS is not set",
+    "# CONFIG_CGROUPS is not set",
+    "# CONFIG_NUMA is not set",
+    "# CONFIG_EXT4_FS is not set",
+    "# CONFIG_DEBUG_KERNEL is not set",
+    "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y",
+];
+
 /// Required config options that MUST be present for a valid RVF microVM kernel.
 ///
 /// These are checked by `validate_config()` to ensure the config wasn't
@@ -375,6 +630,45 @@ mod tests {
         assert!(result.is_err());
         let missing = result.unwrap_err();
         assert!(missing.contains(&"CONFIG_VIRTIO_PCI=y"));
+    }
+
+    #[test]
+    fn ultrafast_config_has_all_required_options() {
+        let missing: Vec<&str> = ULTRAFAST_REQUIRED_OPTIONS
+            .iter()
+            .filter(|&&opt| !ULTRAFAST_BOOT_CONFIG.lines().any(|line| line.trim() == opt))
+            .copied()
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "ultrafast config missing required options: {:?}",
+            missing
+        );
+    }
+
+    #[test]
+    fn ultrafast_config_disables_heavy_subsystems() {
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_CGROUPS is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_NAMESPACES is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_NUMA is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_AUDIT is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_EXT4_FS is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_NETFILTER is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_IPV6 is not set"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("# CONFIG_DEBUG_KERNEL is not set"));
+    }
+
+    #[test]
+    fn ultrafast_config_optimizes_for_performance() {
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("CONFIG_NR_CPUS=4"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("CONFIG_RD_LZ4=y"));
+        assert!(ULTRAFAST_BOOT_CONFIG.contains("CONFIG_CONSOLE_LOGLEVEL_DEFAULT=1"));
+    }
+
+    #[test]
+    fn ultrafast_config_is_nonzero_length() {
+        assert!(ULTRAFAST_BOOT_CONFIG.len() > 500);
     }
 
     #[test]

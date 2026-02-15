@@ -17,6 +17,7 @@
 
 use rvf_runtime::{QueryOptions, RvfOptions, RvfStore};
 use rvf_runtime::options::DistanceMetric;
+use rvf_kernel;
 use rvf_types::kernel::{KernelArch, KernelHeader, KernelType, KERNEL_MAGIC};
 use rvf_crypto::{create_witness_chain, verify_witness_chain, shake256_256, WitnessEntry};
 use tempfile::TempDir;
@@ -77,16 +78,17 @@ fn main() {
     // ====================================================================
     println!("\n--- 2. Synthetic Kernel Image ---");
 
-    // Build a HermitOS unikernel binary with an ELF-like header
-    let mut kernel_image = Vec::with_capacity(4096);
-    // ELF magic (synthetic)
-    kernel_image.extend_from_slice(&[0x7F, b'E', b'L', b'F']);
-    // Padding to represent a real kernel
-    for i in 4..4096u32 {
-        kernel_image.push((i.wrapping_mul(0x1337) >> 8) as u8);
-    }
+    // Build a real kernel (Docker) or fall back to builtin stub
+    let tmpdir = std::env::temp_dir().join("rvf-self-boot-build");
+    std::fs::create_dir_all(&tmpdir).ok();
+    let built = rvf_kernel::KernelBuilder::new(KernelArch::X86_64)
+        .with_initramfs(&["rvf-server"])
+        .build(&tmpdir)
+        .expect("build kernel");
+    let kernel_image = built.bzimage;
+    let kernel_label = if kernel_image.len() > 8192 { "real bzImage" } else { "builtin stub" };
 
-    println!("  Kernel image size:  {} bytes", kernel_image.len());
+    println!("  Kernel image size:  {} bytes ({})", kernel_image.len(), kernel_label);
     println!("  Kernel type:        HermitOS (unikernel)");
     println!("  Target arch:        x86_64");
     println!("  API port:           8080");

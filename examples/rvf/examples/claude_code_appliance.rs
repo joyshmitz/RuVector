@@ -94,6 +94,9 @@ fn main() {
     let out_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("output");
     fs::create_dir_all(&out_dir).expect("create output dir");
     let store_path = out_dir.join("claude_code_appliance.rvf");
+    if store_path.exists() {
+        fs::remove_file(&store_path).expect("remove old file");
+    }
 
     // ================================================================
     // Phase 1: Define the software stack
@@ -186,13 +189,13 @@ fn main() {
     ).expect("build initramfs");
     println!("  Initramfs:        {} bytes (real gzipped cpio archive)", initramfs.len());
 
-    // In production, this would be a real bzImage from KernelBuilder::build_docker()
-    // or KernelBuilder::from_prebuilt(). Here we embed the initramfs as the kernel
-    // image to demonstrate the real cpio builder output. For actual booting, use:
-    //   let kernel = KernelBuilder::new(KernelArch::X86_64)
-    //       .kernel_version("6.8.12")
-    //       .build_docker(&context_dir)?;
-    let kernel_image = initramfs;
+    // Build real Linux kernel (Docker) or fall back to builtin stub
+    let tmpdir = std::env::temp_dir().join("rvf-appliance-build");
+    std::fs::create_dir_all(&tmpdir).ok();
+    let built = builder.build(&tmpdir).expect("build kernel");
+    let kernel_label = if built.bzimage.len() > 8192 { "real bzImage" } else { "builtin stub" };
+    println!("  Kernel built:     {} bytes ({})", built.bzimage.len(), kernel_label);
+    let kernel_image = built.bzimage;
 
     // The kernel cmdline configures the system on first boot:
     //   1. Enable networking

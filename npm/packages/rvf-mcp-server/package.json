@@ -1,6 +1,6 @@
 {
   "name": "@ruvector/rvf-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for RuVector Format (RVF) vector database — stdio and SSE transports",
   "type": "module",
   "main": "dist/index.js",
@@ -21,14 +21,20 @@
     "start:sse": "node dist/cli.js --transport sse --port 3100",
     "dev": "tsc --watch"
   },
-  "keywords": ["rvf", "ruvector", "mcp", "vector-database", "model-context-protocol"],
+  "keywords": [
+    "rvf",
+    "ruvector",
+    "mcp",
+    "vector-database",
+    "model-context-protocol"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@ruvector/rvf": "workspace:*",
+    "@ruvector/rvf": "^0.1.2",
     "express": "^4.18.0",
     "zod": "^3.22.0"
   },

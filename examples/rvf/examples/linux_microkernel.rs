@@ -173,13 +173,14 @@ fn main() {
     };
     let mut store = RvfStore::create(&image_path, options).expect("create store");
 
-    // Embed a microkernel image (constructed binary)
-    let mut kernel_image = Vec::with_capacity(8192);
-    kernel_image.extend_from_slice(&[0x7F, b'E', b'L', b'F']); // ELF magic
-    kernel_image.extend_from_slice(&[2, 1, 1, 0]); // 64-bit, LE, version, OS/ABI
-    for i in 8..8192u32 {
-        kernel_image.push((i.wrapping_mul(0xDEAD) >> 8) as u8);
-    }
+    // Build real Linux kernel (Docker) or fall back to builtin stub
+    let tmpdir = std::env::temp_dir().join("rvf-microkernel-build");
+    std::fs::create_dir_all(&tmpdir).ok();
+    let built = rvf_kernel::KernelBuilder::new(KernelArch::X86_64)
+        .with_initramfs(&["sshd", "rvf-server"])
+        .build(&tmpdir)
+        .expect("build kernel");
+    let kernel_image = built.bzimage;
 
     let kernel_seg_id = store
         .embed_kernel(

@@ -324,6 +324,11 @@ fn ruvector_create_rdf_store(name: &str) -> bool {
 /// ```
 #[pg_extern]
 fn ruvector_sparql(store_name: &str, query: &str, format: &str) -> Result<String, String> {
+    // Validate input to prevent panics
+    if query.trim().is_empty() {
+        return Err("SPARQL query cannot be empty".to_string());
+    }
+
     let store = get_store(store_name)
         .ok_or_else(|| format!("Triple store '{}' does not exist", store_name))?;
 
@@ -350,6 +355,11 @@ fn ruvector_sparql(store_name: &str, query: &str, format: &str) -> Result<String
 /// ```
 #[pg_extern]
 fn ruvector_sparql_json(store_name: &str, query: &str) -> Result<JsonB, String> {
+    // Validate input to prevent panics that would abort PostgreSQL
+    if query.trim().is_empty() {
+        return Err("SPARQL query cannot be empty".to_string());
+    }
+
     let result = ruvector_sparql(store_name, query, "json")?;
 
     let json_value: JsonValue =
