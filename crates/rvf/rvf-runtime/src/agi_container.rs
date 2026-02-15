@@ -51,6 +51,10 @@ pub struct AgiContainerBuilder {
     pub project_instructions: Option<Vec<u8>>,
     /// Dependency snapshot.
     pub dependency_snapshot: Option<Vec<u8>>,
+    /// Authority level and resource budget config.
+    pub authority_config: Option<Vec<u8>>,
+    /// Target domain profile.
+    pub domain_profile: Option<Vec<u8>>,
     /// Segment inventory.
     pub segments: ContainerSegments,
     /// Extra flags to OR in.
@@ -78,6 +82,8 @@ impl AgiContainerBuilder {
             coherence_config: None,
             project_instructions: None,
             dependency_snapshot: None,
+            authority_config: None,
+            domain_profile: None,
             segments: ContainerSegments::default(),
             extra_flags: 0,
         }
@@ -174,6 +180,18 @@ impl AgiContainerBuilder {
         self
     }
 
+    /// Set authority and resource budget configuration.
+    pub fn with_authority_config(mut self, config: &[u8]) -> Self {
+        self.authority_config = Some(config.to_vec());
+        self
+    }
+
+    /// Set the target domain profile.
+    pub fn with_domain_profile(mut self, profile: &[u8]) -> Self {
+        self.domain_profile = Some(profile.to_vec());
+        self
+    }
+
     /// Mark offline capability.
     pub fn offline_capable(mut self) -> Self {
         self.extra_flags |= AGI_OFFLINE_CAPABLE;
@@ -240,6 +258,12 @@ impl AgiContainerBuilder {
         }
         if let Some(ref ds) = self.dependency_snapshot {
             write_section(AGI_TAG_DEPENDENCY_SNAPSHOT, ds);
+        }
+        if let Some(ref ac) = self.authority_config {
+            write_section(AGI_TAG_AUTHORITY_CONFIG, ac);
+        }
+        if let Some(ref dp) = self.domain_profile {
+            write_section(AGI_TAG_DOMAIN_PROFILE, dp);
         }
 
         payload
@@ -336,6 +360,10 @@ pub struct ParsedAgiManifest<'a> {
     pub project_instructions: Option<&'a [u8]>,
     /// Dependency snapshot.
     pub dependency_snapshot: Option<&'a [u8]>,
+    /// Authority configuration.
+    pub authority_config: Option<&'a [u8]>,
+    /// Domain profile.
+    pub domain_profile: Option<&'a [u8]>,
 }
 
 impl<'a> ParsedAgiManifest<'a> {
@@ -360,6 +388,8 @@ impl<'a> ParsedAgiManifest<'a> {
             coherence_config: None,
             project_instructions: None,
             dependency_snapshot: None,
+            authority_config: None,
+            domain_profile: None,
         };
 
         // Parse TLV sections after header.
@@ -391,6 +421,8 @@ impl<'a> ParsedAgiManifest<'a> {
                 AGI_TAG_COHERENCE_CONFIG => result.coherence_config = Some(value),
                 AGI_TAG_PROJECT_INSTRUCTIONS => result.project_instructions = Some(value),
                 AGI_TAG_DEPENDENCY_SNAPSHOT => result.dependency_snapshot = Some(value),
+                AGI_TAG_AUTHORITY_CONFIG => result.authority_config = Some(value),
+                AGI_TAG_DOMAIN_PROFILE => result.domain_profile = Some(value),
                 _ => {} // forward-compat: ignore unknown tags
             }
 
@@ -543,6 +575,26 @@ mod tests {
         let parsed = ParsedAgiManifest::parse(&payload).unwrap();
         assert!(parsed.model_id.is_none());
         assert!(!parsed.is_autonomous_capable());
+    }
+
+    #[test]
+    fn authority_and_domain_round_trip() {
+        let authority = br#"{"max_authority":"ExecuteTools","budget":{"max_time_secs":600,"max_tokens":400000}}"#;
+        let domain = b"repo-automation-v1";
+
+        let builder = AgiContainerBuilder::new([0x50; 16], [0x60; 16])
+            .with_authority_config(authority)
+            .with_domain_profile(domain)
+            .with_segments(ContainerSegments {
+                kernel_present: true,
+                manifest_present: true,
+                ..Default::default()
+            });
+
+        let (payload, _header) = builder.build().unwrap();
+        let parsed = ParsedAgiManifest::parse(&payload).unwrap();
+        assert_eq!(parsed.authority_config.unwrap(), authority.as_slice());
+        assert_eq!(parsed.domain_profile.unwrap(), domain.as_slice());
     }
 
     #[test]
