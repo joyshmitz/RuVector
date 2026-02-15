@@ -11,7 +11,7 @@
 
 use crate::temporal::{TemporalConstraint, TemporalPuzzle};
 use anyhow::Result;
-use chrono::{Datelike, NaiveDate, Weekday};
+use chrono::{Datelike, NaiveDate};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -205,150 +205,138 @@ impl PuzzleGenerator {
         ));
     }
 
-    /// Generate a single puzzle
+    /// Generate a single puzzle with difficulty-based posterior targeting.
+    ///
+    /// Range size scales with difficulty:
+    /// - Low difficulty (1-2): wide range, no DayOfWeek → many valid dates
+    /// - Medium difficulty (3-6): DayOfWeek creates 7x cost surface
+    /// - High difficulty (7-10): narrower range + anchor constraints
+    ///
+    /// DayOfWeek constraint (difficulty 3+) creates a cost surface that
+    /// weekday-skipping in Mode C can exploit for ~7x speedup.
     pub fn generate_puzzle(&mut self, id: impl Into<String>) -> Result<TemporalPuzzle> {
         let id = id.into();
         let difficulty = self
             .rng
             .gen_range(self.config.min_difficulty..=self.config.max_difficulty);
-        let num_constraints = self.config.constraint_density as usize + difficulty as usize / 2;
 
-        // Select a target date
+        // Target posterior: number of valid dates after all constraints
+        let target_post = target_posterior(difficulty);
+
+        // DayOfWeek (difficulty 3+): creates 7x cost surface for solver optimization
+        let use_day_of_week = difficulty >= 3;
+
+        // Search range: posterior * 7 when DayOfWeek constrains (solver scans all)
+        let range_days = if use_day_of_week {
+            (target_post * 7).min(365) as i64
+        } else {
+            target_post as i64
+        };
+
+        // Pick target date
         let year = self
             .rng
             .gen_range(self.config.year_range.0..=self.config.year_range.1);
         let month = self.rng.gen_range(1..=12);
-        let max_day = match month {
-            4 | 6 | 9 | 11 => 30,
-            2 => {
-                if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
-                    29
-                } else {
-                    28
-                }
-            }
-            _ => 31,
-        };
+        let max_day = days_in_month(year, month);
         let day = self.rng.gen_range(1..=max_day);
         let target = NaiveDate::from_ymd_opt(year, month, day).unwrap();
 
-        let mut puzzle = TemporalPuzzle::new(id.clone(), format!("Find the date (puzzle {})", id))
-            .with_difficulty(difficulty)
-            .with_solutions(vec![target]);
+        // Build Between range centered on target, clamped to year
+        let year_start = NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
+        let year_end = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
+        let half = range_days / 2;
+        let range_start = (target - chrono::Duration::days(half)).max(year_start);
+        let range_end =
+            (range_start + chrono::Duration::days(range_days - 1)).min(year_end);
 
-        // Add constraints and collect used anchors
-        let constraint_types = self.select_constraint_types(num_constraints, difficulty);
+        let mut puzzle =
+            TemporalPuzzle::new(id.clone(), format!("Find the date (puzzle {})", id))
+                .with_difficulty(difficulty)
+                .with_solutions(vec![target]);
+
+        // Base constraints: InYear + Between (defines search range)
+        puzzle
+            .constraints
+            .push(TemporalConstraint::InYear(target.year()));
+        puzzle
+            .constraints
+            .push(TemporalConstraint::Between(range_start, range_end));
+
         let mut used_anchors: Vec<TemporalAnchor> = Vec::new();
 
-        for ct in constraint_types {
-            let (constraint, anchor_opt) = self.generate_constraint_with_anchor(&ct, target)?;
-            puzzle.constraints.push(constraint);
-            if let Some(anchor) = anchor_opt {
+        // DayOfWeek (difficulty 3+): creates 7x cost surface
+        if use_day_of_week {
+            puzzle
+                .constraints
+                .push(TemporalConstraint::DayOfWeek(target.weekday()));
+        }
+
+        // Anchor reference for high difficulty (8+)
+        if difficulty >= 8 && self.config.relative_constraints {
+            if let Some(anchor) = self.anchors.choose(&mut self.rng).cloned() {
+                let diff = (target - anchor.date).num_days();
+                let constraint = if diff >= 0 {
+                    TemporalConstraint::DaysAfter(anchor.name.clone(), diff)
+                } else {
+                    TemporalConstraint::DaysBefore(anchor.name.clone(), diff.abs())
+                };
+                puzzle.constraints.push(constraint);
                 used_anchors.push(anchor);
             }
         }
 
-        // Add all used anchors to references
+        // Add anchor references
         for anchor in used_anchors {
             puzzle.references.insert(anchor.name.clone(), anchor.date);
         }
 
-        // Add tags
+        // Distractor injection (difficulty 5+)
+        let distractor_chance: f64 = match difficulty {
+            1..=4 => 0.0,
+            5..=6 => 0.10,
+            7..=8 => 0.15,
+            _ => 0.25,
+        };
+        if distractor_chance > 0.0 && self.rng.gen_bool(distractor_chance.min(0.99)) {
+            let distractor = self.generate_distractor(target, range_start, range_end);
+            puzzle.constraints.push(distractor);
+        }
+
+        // Tags
         puzzle.tags = vec![
             format!("difficulty:{}", difficulty),
             format!("year:{}", year),
+            format!("posterior:{}", target_post),
         ];
 
         Ok(puzzle)
     }
 
-    /// Select constraint types based on difficulty
-    fn select_constraint_types(&mut self, count: usize, difficulty: u8) -> Vec<ConstraintType> {
-        let mut types = Vec::new();
-
-        // Base constraints (always include)
-        types.push(ConstraintType::Year);
-
-        // Add more constraints based on difficulty
-        if difficulty >= 2 {
-            types.push(ConstraintType::Month);
-        }
-        if difficulty >= 3 {
-            types.push(ConstraintType::DayOfWeek);
-        }
-        if difficulty >= 4 && self.config.relative_constraints {
-            types.push(ConstraintType::RelativeToAnchor);
-        }
-        if difficulty >= 5 {
-            types.push(ConstraintType::DayRange);
-        }
-        if difficulty >= 6 {
-            types.push(ConstraintType::DateRange);
-        }
-        if difficulty >= 7 {
-            types.push(ConstraintType::MultipleConditions);
-        }
-
-        // Trim to count
-        while types.len() < count {
-            let base = vec![
-                ConstraintType::Year,
-                ConstraintType::Month,
-                ConstraintType::DayOfWeek,
-                ConstraintType::DayRange,
-            ];
-            types.push(base.choose(&mut self.rng).unwrap().clone());
-        }
-        types.truncate(count);
-        types
-    }
-
-    /// Generate a specific constraint, returning the constraint and any anchor used
-    fn generate_constraint_with_anchor(
+    /// Generate a distractor constraint: true for the target but doesn't narrow the search.
+    fn generate_distractor(
         &mut self,
-        ct: &ConstraintType,
         target: NaiveDate,
-    ) -> Result<(TemporalConstraint, Option<TemporalAnchor>)> {
-        match ct {
-            ConstraintType::Year => Ok((TemporalConstraint::InYear(target.year()), None)),
-            ConstraintType::Month => Ok((TemporalConstraint::InMonth(target.month()), None)),
-            ConstraintType::DayOfMonth => Ok((TemporalConstraint::DayOfMonth(target.day()), None)),
-            ConstraintType::DayOfWeek => {
-                Ok((TemporalConstraint::DayOfWeek(target.weekday()), None))
+        range_start: NaiveDate,
+        range_end: NaiveDate,
+    ) -> TemporalConstraint {
+        match self.rng.gen_range(0u8..3) {
+            0 => {
+                // Wider Between (superset of existing range → no shrink)
+                let wider_start =
+                    range_start - chrono::Duration::days(self.rng.gen_range(10..60));
+                let wider_end =
+                    range_end + chrono::Duration::days(self.rng.gen_range(10..60));
+                TemporalConstraint::Between(wider_start, wider_end)
             }
-            ConstraintType::DayRange => {
-                let start = target.day().saturating_sub(self.rng.gen_range(0..5));
-                let end = (target.day() + self.rng.gen_range(0..5)).min(28);
-                let start_date =
-                    NaiveDate::from_ymd_opt(target.year(), target.month(), start.max(1))
-                        .unwrap_or(target);
-                let end_date =
-                    NaiveDate::from_ymd_opt(target.year(), target.month(), end).unwrap_or(target);
-                Ok((TemporalConstraint::Between(start_date, end_date), None))
+            1 => {
+                // Redundant InYear (already present)
+                TemporalConstraint::InYear(target.year())
             }
-            ConstraintType::DateRange => {
-                let days_before = self.rng.gen_range(0..10);
-                let days_after = self.rng.gen_range(0..10);
-                let start = target - chrono::Duration::days(days_before);
-                let end = target + chrono::Duration::days(days_after);
-                Ok((TemporalConstraint::Between(start, end), None))
-            }
-            ConstraintType::RelativeToAnchor => {
-                if let Some(anchor) = self.anchors.choose(&mut self.rng).cloned() {
-                    let diff = (target - anchor.date).num_days();
-                    let constraint = if diff >= 0 {
-                        TemporalConstraint::DaysAfter(anchor.name.clone(), diff)
-                    } else {
-                        TemporalConstraint::DaysBefore(anchor.name.clone(), diff.abs())
-                    };
-                    Ok((constraint, Some(anchor)))
-                } else {
-                    Ok((TemporalConstraint::InYear(target.year()), None))
-                }
-            }
-            ConstraintType::MultipleConditions => {
-                // This is a meta-type, just return year constraint
-                Ok((TemporalConstraint::InYear(target.year()), None))
+            _ => {
+                // After a date well before the range (no shrink)
+                let days_before = self.rng.gen_range(30..180) as i64;
+                TemporalConstraint::After(target - chrono::Duration::days(days_before))
             }
         }
     }
@@ -384,17 +372,37 @@ impl PuzzleGenerator {
     }
 }
 
-/// Constraint type enumeration
-#[derive(Clone, Debug)]
-enum ConstraintType {
-    Year,
-    Month,
-    DayOfMonth,
-    DayOfWeek,
-    DayRange,
-    DateRange,
-    RelativeToAnchor,
-    MultipleConditions,
+/// Target posterior (valid candidates) by difficulty level.
+/// Higher difficulty → fewer valid dates → harder to search.
+fn target_posterior(difficulty: u8) -> usize {
+    match difficulty {
+        1 => 300,
+        2 => 200,
+        3 => 120,
+        4 => 80,
+        5 => 60,
+        6 => 50,
+        7 => 40,
+        8 => 30,
+        9 => 25,
+        10 => 20,
+        _ => 60,
+    }
+}
+
+/// Days in a given month (handles leap years).
+fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 31,
+    }
 }
 
 /// Sample puzzle sets

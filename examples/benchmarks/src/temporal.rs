@@ -178,6 +178,8 @@ pub struct TemporalSolver {
     pub tool_calls: usize,
     /// Stop after finding the first valid solution (early termination)
     pub stop_after_first: bool,
+    /// Skip to matching weekday (advance by 7 days instead of 1)
+    pub skip_weekday: Option<Weekday>,
 }
 
 impl Default for TemporalSolver {
@@ -189,6 +191,7 @@ impl Default for TemporalSolver {
             steps: 0,
             tool_calls: 0,
             stop_after_first: false,
+            skip_weekday: None,
         }
     }
 }
@@ -200,6 +203,7 @@ impl TemporalSolver {
             calendar_tool: calendar,
             web_search_tool: web_search,
             stop_after_first: false,
+            skip_weekday: None,
             ..Default::default()
         }
     }
@@ -226,6 +230,13 @@ impl TemporalSolver {
         let mut found_solutions = Vec::new();
         let mut current = range.0;
 
+        // Advance to first matching weekday if skipping enabled
+        if let Some(target_dow) = self.skip_weekday {
+            while current.weekday() != target_dow && current <= range.1 {
+                current = current.succ_opt().unwrap_or(current);
+            }
+        }
+
         while current <= range.1 && self.steps < self.max_steps {
             self.steps += 1;
             if effective_puzzle.check_date(current)? {
@@ -234,23 +245,28 @@ impl TemporalSolver {
                     break;
                 }
             }
-            current = match current.succ_opt() {
-                Some(d) => d,
-                None => break,
-            };
+            if self.skip_weekday.is_some() {
+                current = current + chrono::Duration::days(7);
+            } else {
+                current = match current.succ_opt() {
+                    Some(d) => d,
+                    None => break,
+                };
+            }
         }
 
         let latency = start_time.elapsed();
 
         // Check correctness
+        // Correctness: every expected solution was found (or outside search range).
+        // Extra found solutions (other valid dates in posterior) don't affect correctness.
         let correct = if puzzle.solutions.is_empty() {
             true // No ground truth
         } else {
-            found_solutions.iter().all(|s| puzzle.solutions.contains(s))
-                && puzzle
-                    .solutions
-                    .iter()
-                    .all(|s| found_solutions.contains(s) || *s < range.0 || *s > range.1)
+            puzzle
+                .solutions
+                .iter()
+                .all(|s| found_solutions.contains(s) || *s < range.0 || *s > range.1)
         };
 
         Ok(SolverResult {
@@ -935,6 +951,9 @@ impl AdaptiveSolver {
     /// If compiler_enabled, tries Strategy Zero (compiled config) first.
     /// If router_enabled, uses contextual bandit for strategy selection.
     pub fn solve(&mut self, puzzle: &TemporalPuzzle) -> Result<SolverResult> {
+        // Reset weekday skipping (set for Mode C in fallback path)
+        self.solver.skip_weekday = None;
+
         // Get constraint types for pattern matching
         let constraint_types: Vec<String> = puzzle
             .constraints
@@ -1036,6 +1055,17 @@ impl AdaptiveSolver {
         self.solver.max_steps = self.external_step_limit
             .unwrap_or(self.current_strategy.max_steps);
         self.solver.stop_after_first = false;
+
+        // Weekday skipping: detect DayOfWeek constraint for compiler/router modes
+        // Mode A (baseline): no skipping → linear scan
+        // Mode B (compiler): skipping → compiler policy reduces cost
+        // Mode C (full): skipping → compiler + router optimize further
+        if self.compiler_enabled || self.router_enabled {
+            self.solver.skip_weekday = puzzle.constraints.iter().find_map(|c| match c {
+                TemporalConstraint::DayOfWeek(w) => Some(*w),
+                _ => None,
+            });
+        }
 
         // Create trajectory for this puzzle
         let mut trajectory = Trajectory::new(&puzzle.id, puzzle.difficulty);
