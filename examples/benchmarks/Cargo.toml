@@ -88,3 +88,7 @@ path = "src/bin/rvf_intelligence_bench.rs"
 [[bin]]
 name = "superintelligence"
 path = "src/bin/superintelligence.rs"
+
+[[bin]]
+name = "agi-proof-harness"
+path = "src/bin/agi_proof_harness.rs"

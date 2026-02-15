@@ -14,13 +14,12 @@
 //! ```
 
 use crate::intelligence_metrics::{DifficultyStats, EpisodeMetrics, IntelligenceCalculator, RawMetrics};
-use crate::reasoning_bank::{ReasoningBank, Strategy, Trajectory, Verdict};
-use crate::temporal::{AdaptiveSolver, SolverResult, TemporalConstraint, TemporalPuzzle, TemporalSolver};
+use crate::reasoning_bank::ReasoningBank;
+use crate::temporal::{AdaptiveSolver, SolverResult, TemporalConstraint, TemporalPuzzle};
 use crate::timepuzzles::{PuzzleGenerator, PuzzleGeneratorConfig};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -635,6 +634,20 @@ fn run_level_1(config: &SIConfig, bank: &mut ReasoningBank) -> Result<LevelRaw> 
                 }
             }
 
+            // Track noise, contradictions, rollbacks, policy violations
+            if is_noisy {
+                raw.noise_tasks_attempted += 1;
+                if result.correct { raw.noise_tasks_correct += 1; }
+                if !result.correct {
+                    raw.rollback_attempts += 1;
+                    if result.correct { raw.rollback_successes += 1; }
+                }
+            }
+            if result.solved && !result.correct {
+                raw.contradictions += 1;
+                raw.policy_violations += 1;
+            }
+
             if result.solved { raw.tasks_completed += 1; }
             if result.correct { raw.tasks_correct += 1; ep_correct += 1; total_correct += 1; }
             raw.total_steps += result.steps;
@@ -728,6 +741,21 @@ fn run_level_2(config: &SIConfig, bank: &mut ReasoningBank, meta: &mut MetaParam
 
             meta.learn_from_result(puzzle.difficulty, result.steps, result.correct, retried);
 
+            // Track noise, contradictions, rollbacks
+            if is_noisy {
+                raw.noise_tasks_attempted += 1;
+                if result.correct { raw.noise_tasks_correct += 1; }
+                if !result.correct && retried {
+                    raw.rollback_attempts += 1;
+                    // Check if retry succeeded (retry overwrites result)
+                    if result.correct { raw.rollback_successes += 1; }
+                }
+            }
+            if result.solved && !result.correct {
+                raw.contradictions += 1;
+                raw.policy_violations += 1;
+            }
+
             if result.solved { raw.tasks_completed += 1; }
             if result.correct { raw.tasks_correct += 1; ep_correct += 1; total_correct += 1; }
             raw.total_steps += result.steps;
@@ -788,10 +816,24 @@ fn run_level_3(config: &SIConfig, bank: &mut ReasoningBank, meta: &MetaParams) -
 
             let mut result = ensemble.solve_ensemble(&solve_p)?;
 
-            // If noisy and failed, retry with clean puzzle
+            // If noisy and failed, retry with clean puzzle (rollback)
             if !result.correct && is_noisy {
+                raw.rollback_attempts += 1;
                 let retry = ensemble.solve_ensemble(puzzle)?;
-                if retry.correct { result = retry; }
+                if retry.correct {
+                    result = retry;
+                    raw.rollback_successes += 1;
+                }
+            }
+
+            // Track noise, contradictions, policy
+            if is_noisy {
+                raw.noise_tasks_attempted += 1;
+                if result.correct { raw.noise_tasks_correct += 1; }
+            }
+            if result.solved && !result.correct {
+                raw.contradictions += 1;
+                raw.policy_violations += 1;
             }
 
             if result.solved { raw.tasks_completed += 1; }
@@ -878,11 +920,15 @@ fn run_level_4(
                 let mut result = solver.solve(&solve_p)?;
 
                 if !result.correct {
-                    // Retry: noisy → clean; non-noisy → more steps
+                    // Retry: noisy → clean (rollback); non-noisy → more steps
                     if is_noisy {
+                        raw.rollback_attempts += 1;
                         let retry = solver.solve(puzzle)?;
                         ep_retries += 1;
-                        if retry.correct { result = retry; }
+                        if retry.correct {
+                            result = retry;
+                            raw.rollback_successes += 1;
+                        }
                     } else {
                         let saved = solver.external_step_limit;
                         solver.external_step_limit = Some(saved.unwrap_or(100) * 2);
@@ -894,6 +940,16 @@ fn run_level_4(
                 }
 
                 meta.learn_from_result(puzzle.difficulty, result.steps, result.correct, ep_retries > 0);
+
+                // Track noise, contradictions, policy
+                if is_noisy {
+                    raw.noise_tasks_attempted += 1;
+                    if result.correct { raw.noise_tasks_correct += 1; }
+                }
+                if result.solved && !result.correct {
+                    raw.contradictions += 1;
+                    raw.policy_violations += 1;
+                }
 
                 if result.solved { raw.tasks_completed += 1; }
                 if result.correct { raw.tasks_correct += 1; ep_correct += 1; total_correct += 1; }
@@ -984,11 +1040,15 @@ fn run_level_5(
             // Cascade reasoning: multi-pass solve
             let mut result = cascade.cascade_solve(&mut solver, &solve_p, 3)?;
 
-            // Error recovery on noisy puzzles
+            // Error recovery on noisy puzzles (rollback)
             if !result.correct && is_noisy {
+                raw.rollback_attempts += 1;
                 let retry = cascade.cascade_solve(&mut solver, puzzle, 2)?;
                 ep_retries += 1;
-                if retry.correct { result = retry; }
+                if retry.correct {
+                    result = retry;
+                    raw.rollback_successes += 1;
+                }
             }
 
             // Track weaknesses for adversarial learning
@@ -997,6 +1057,16 @@ fn run_level_5(
                 .collect();
             adversary.learn_weakness(&ctypes, puzzle.difficulty, result.correct);
             meta.learn_from_result(puzzle.difficulty, result.steps, result.correct, ep_retries > 0);
+
+            // Track noise, contradictions, policy
+            if is_noisy {
+                raw.noise_tasks_attempted += 1;
+                if result.correct { raw.noise_tasks_correct += 1; }
+            }
+            if result.solved && !result.correct {
+                raw.contradictions += 1;
+                raw.policy_violations += 1;
+            }
 
             if result.solved { raw.tasks_completed += 1; }
             if result.correct { raw.tasks_correct += 1; ep_correct += 1; total_correct += 1; }
@@ -1072,6 +1142,7 @@ fn build_pathway(levels: Vec<LevelResult>, iq_progression: Vec<f64>, config: &SI
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::reasoning_bank::{Trajectory, Verdict};
 
     #[test]
     fn meta_params_learning() {
@@ -1130,6 +1201,7 @@ mod tests {
             recursive_cycles: 1,
             ensemble_size: 2,
             verbose: false,
+            target_iq: 200.0, // unreachable target so all 5 levels execute
             ..Default::default()
         };
         let result = run_pathway(&config);

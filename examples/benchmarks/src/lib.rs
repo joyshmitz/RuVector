@@ -14,6 +14,8 @@
 //! - Cognitive capability assessment frameworks
 //! - lean-agentic type theory for verified reasoning
 
+pub mod acceptance_test;
+pub mod agi_contract;
 pub mod intelligence_metrics;
 pub mod logging;
 pub mod reasoning_bank;

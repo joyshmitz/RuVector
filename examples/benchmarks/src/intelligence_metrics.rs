@@ -28,6 +28,10 @@ pub struct IntelligenceAssessment {
     pub tool_use: ToolUseMetrics,
     /// Meta-cognitive indicators
     pub meta_cognition: MetaCognitiveMetrics,
+    /// Cost efficiency metrics
+    pub cost: CostMetrics,
+    /// Robustness under noise
+    pub robustness: RobustnessMetrics,
     /// Raw performance data
     pub raw_data: RawMetrics,
 }
@@ -188,6 +192,54 @@ impl Default for MetaCognitiveMetrics {
     }
 }
 
+/// Cost efficiency metrics — first-class IQ dimension
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CostMetrics {
+    /// Steps per correct solve (lower = better)
+    pub steps_per_solve: f64,
+    /// Tool calls per correct solve (lower = better)
+    pub tools_per_solve: f64,
+    /// Cost efficiency score (0-1, higher = cheaper)
+    pub cost_efficiency: f64,
+    /// Cost trend over episodes (positive = improving)
+    pub cost_trend: f64,
+}
+
+impl Default for CostMetrics {
+    fn default() -> Self {
+        Self {
+            steps_per_solve: 100.0,
+            tools_per_solve: 10.0,
+            cost_efficiency: 0.0,
+            cost_trend: 0.0,
+        }
+    }
+}
+
+/// Robustness under adversarial conditions — first-class IQ dimension
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RobustnessMetrics {
+    /// Accuracy on noise-injected tasks
+    pub noise_accuracy: f64,
+    /// Accuracy drop from clean to noisy (lower = more robust)
+    pub noise_degradation: f64,
+    /// Per-episode accuracy consistency (higher = steadier)
+    pub consistency: f64,
+    /// Composite robustness score (0-1)
+    pub robustness_score: f64,
+}
+
+impl Default for RobustnessMetrics {
+    fn default() -> Self {
+        Self {
+            noise_accuracy: 0.0,
+            noise_degradation: 1.0,
+            consistency: 0.0,
+            robustness_score: 0.0,
+        }
+    }
+}
+
 /// Raw metrics from benchmarks
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RawMetrics {
@@ -207,6 +259,18 @@ pub struct RawMetrics {
     pub by_difficulty: HashMap<u8, DifficultyStats>,
     /// Episode-level metrics
     pub episodes: Vec<EpisodeMetrics>,
+    /// Tasks attempted under noise injection
+    pub noise_tasks_attempted: usize,
+    /// Tasks correct under noise injection
+    pub noise_tasks_correct: usize,
+    /// Policy violations (contradictions, budget overruns)
+    pub policy_violations: usize,
+    /// Solved-but-incorrect count (contradiction rate numerator)
+    pub contradictions: usize,
+    /// Successful rollbacks from noisy to clean
+    pub rollback_successes: usize,
+    /// Attempted rollbacks from noisy to clean
+    pub rollback_attempts: usize,
 }
 
 impl Default for RawMetrics {
@@ -220,6 +284,12 @@ impl Default for RawMetrics {
             total_latency_ms: 0,
             by_difficulty: HashMap::new(),
             episodes: Vec::new(),
+            noise_tasks_attempted: 0,
+            noise_tasks_correct: 0,
+            policy_violations: 0,
+            contradictions: 0,
+            rollback_successes: 0,
+            rollback_attempts: 0,
         }
     }
 }
@@ -271,14 +341,18 @@ impl IntelligenceCalculator {
         let learning = self.calculate_learning(raw);
         let tool_use = self.calculate_tool_use(raw);
         let meta_cognition = self.calculate_meta_cognition(raw);
+        let cost = self.calculate_cost(raw);
+        let robustness = self.calculate_robustness(raw);
 
-        // Overall score is weighted average of sub-scores
+        // Overall score: three equal pillars — graded outcomes, cost, robustness
         let overall_score = self.calculate_overall_score(
             &capabilities,
             &reasoning,
             &learning,
             &tool_use,
             &meta_cognition,
+            &cost,
+            &robustness,
         );
 
         IntelligenceAssessment {
@@ -288,6 +362,8 @@ impl IntelligenceCalculator {
             learning,
             tool_use,
             meta_cognition,
+            cost,
+            robustness,
             raw_data: raw.clone(),
         }
     }
@@ -585,6 +661,80 @@ impl IntelligenceCalculator {
         }
     }
 
+    fn calculate_cost(&self, raw: &RawMetrics) -> CostMetrics {
+        let steps_per_solve = if raw.tasks_correct > 0 {
+            raw.total_steps as f64 / raw.tasks_correct as f64
+        } else if raw.tasks_attempted > 0 {
+            raw.total_steps as f64
+        } else {
+            100.0
+        };
+
+        let tools_per_solve = if raw.tasks_correct > 0 {
+            raw.total_tool_calls as f64 / raw.tasks_correct as f64
+        } else {
+            10.0
+        };
+
+        // Efficiency: 1.0 at <=5 steps/solve, 0.0 at >=100 steps/solve
+        let cost_efficiency = (1.0 - (steps_per_solve - 5.0) / 95.0).clamp(0.0, 1.0);
+
+        // Cost trend: compare early vs late episode accuracy per step
+        let cost_trend = if raw.episodes.len() >= 4 {
+            let half = raw.episodes.len() / 2;
+            let early_acc: f64 = raw.episodes[..half].iter().map(|e| e.accuracy).sum::<f64>()
+                / half as f64;
+            let late_acc: f64 = raw.episodes[half..].iter().map(|e| e.accuracy).sum::<f64>()
+                / (raw.episodes.len() - half) as f64;
+            // If accuracy improves, effective cost per solve drops
+            if early_acc > 0.01 {
+                (late_acc - early_acc) / early_acc
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        CostMetrics { steps_per_solve, tools_per_solve, cost_efficiency, cost_trend }
+    }
+
+    fn calculate_robustness(&self, raw: &RawMetrics) -> RobustnessMetrics {
+        let noise_accuracy = if raw.noise_tasks_attempted > 0 {
+            raw.noise_tasks_correct as f64 / raw.noise_tasks_attempted as f64
+        } else {
+            0.5 // no noise data -> neutral prior
+        };
+
+        let clean_attempted = raw.tasks_attempted.saturating_sub(raw.noise_tasks_attempted);
+        let clean_correct = raw.tasks_correct.saturating_sub(raw.noise_tasks_correct);
+        let clean_accuracy = if clean_attempted > 0 {
+            clean_correct as f64 / clean_attempted as f64
+        } else {
+            0.0
+        };
+
+        let noise_degradation = (clean_accuracy - noise_accuracy).max(0.0);
+
+        let consistency = if raw.episodes.len() >= 2 {
+            let mean = raw.episodes.iter().map(|e| e.accuracy).sum::<f64>()
+                / raw.episodes.len() as f64;
+            let variance = raw.episodes.iter()
+                .map(|e| (e.accuracy - mean).powi(2))
+                .sum::<f64>() / raw.episodes.len() as f64;
+            (1.0 - variance.sqrt()).max(0.0)
+        } else {
+            0.5
+        };
+
+        let robustness_score =
+            noise_accuracy * 0.4
+            + (1.0 - noise_degradation.min(1.0)) * 0.3
+            + consistency * 0.3;
+
+        RobustnessMetrics { noise_accuracy, noise_degradation, consistency, robustness_score }
+    }
+
     fn calculate_overall_score(
         &self,
         capabilities: &CapabilityScores,
@@ -592,8 +742,10 @@ impl IntelligenceCalculator {
         learning: &LearningMetrics,
         tool_use: &ToolUseMetrics,
         meta_cognition: &MetaCognitiveMetrics,
+        cost: &CostMetrics,
+        robustness: &RobustnessMetrics,
     ) -> f64 {
-        // Weighted combination of all metrics
+        // Sub-scores (0-100 scale)
         let cap_score = capabilities.weighted_average(&self.capability_weights);
 
         let reasoning_score = (reasoning.logical_coherence
@@ -623,12 +775,18 @@ impl IntelligenceCalculator {
             / 3.0
             * 100.0;
 
-        // Weighted average
-        (cap_score * 0.3
-            + reasoning_score * 0.25
-            + learning_score * 0.2
-            + tool_score * 0.15
-            + meta_score * 0.1)
+        let cost_score = cost.cost_efficiency * 100.0;
+        let robustness_score = robustness.robustness_score * 100.0;
+
+        // Three equal pillars: graded outcomes (~0.34), cost (~0.33), robustness (~0.33)
+        // Graded outcomes = capabilities + reasoning + learning + tool + meta
+        (cap_score * 0.12
+            + reasoning_score * 0.10
+            + learning_score * 0.06
+            + tool_score * 0.03
+            + meta_score * 0.03
+            + cost_score * 0.33
+            + robustness_score * 0.33)
     }
 }
 
