@@ -77,6 +77,8 @@ members = [
     "crates/ruqu-algorithms",
     "crates/ruqu-wasm",
     "crates/ruqu-exotic",
+    "crates/ruvector-domain-expansion",
+    "crates/ruvector-domain-expansion-wasm",
     "examples/dna",
     "examples/OSpipe",
     "crates/rvf/rvf-adapters/rvlite",

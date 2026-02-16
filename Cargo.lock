@@ -8261,6 +8261,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-domain-expansion"
+version = "2.0.3"
+dependencies = [
+ "criterion 0.5.1",
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "ruvector-domain-expansion-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "rand 0.8.5",
+ "ruvector-domain-expansion",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "ruvector-economy-wasm"
 version = "0.1.0"
 dependencies = [
