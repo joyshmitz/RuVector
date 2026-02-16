@@ -10,6 +10,7 @@ members = [
     "rvf-runtime",
     "rvf-kernel",
     "rvf-wasm",
+    "rvf-solver-wasm",
     "rvf-node",
     "rvf-server",
     "rvf-import",

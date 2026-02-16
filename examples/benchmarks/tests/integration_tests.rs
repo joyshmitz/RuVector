@@ -370,9 +370,9 @@ fn test_full_benchmark_workflow() {
     let mut gen = PuzzleGenerator::new(config);
     let puzzles = gen.generate_batch(10).unwrap();
 
-    // Create solver
+    // Create solver (budget must cover wider posterior-based ranges)
     let mut solver = TemporalSolver::with_tools(true, false);
-    solver.max_steps = 50;
+    solver.max_steps = 400;
 
     // Run all puzzles
     let mut results = Vec::new();

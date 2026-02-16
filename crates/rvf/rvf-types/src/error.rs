@@ -103,6 +103,26 @@ pub enum ErrorCode {
     /// Lineage chain contains a cycle.
     LineageCyclic = 0x0603,
 
+    // ---- Category 0x08: Security Errors (ADR-033) ----
+    /// Level 0 manifest has no signature in Strict/Paranoid mode.
+    UnsignedManifest = 0x0800,
+    /// Content hash mismatch on a hotset-referenced segment.
+    ContentHashMismatch = 0x0801,
+    /// Manifest signer is not in the trust store.
+    UnknownSigner = 0x0802,
+    /// Centroid epoch drift exceeds maximum allowed.
+    EpochDriftExceeded = 0x0803,
+    /// Level 1 manifest signature invalid (Paranoid mode).
+    Level1InvalidSignature = 0x0804,
+
+    // ---- Category 0x09: Quality Errors (ADR-033) ----
+    /// Query result quality is below threshold and AcceptDegraded not set.
+    QualityBelowThreshold = 0x0900,
+    /// Per-connection budget tokens exhausted (DoS protection).
+    BudgetTokensExhausted = 0x0901,
+    /// Query signature is blacklisted (repeated degenerate queries).
+    QueryBlacklisted = 0x0902,
+
     // ---- Category 0x07: COW Errors ----
     /// COW cluster map is corrupt or unreadable.
     CowMapCorrupt = 0x0700,
@@ -141,6 +161,18 @@ impl ErrorCode {
     #[inline]
     pub const fn is_format_error(self) -> bool {
         self.category() == 0x01
+    }
+
+    /// Return true if this is a security error (category 0x08).
+    #[inline]
+    pub const fn is_security_error(self) -> bool {
+        self.category() == 0x08
+    }
+
+    /// Return true if this is a quality error (category 0x09).
+    #[inline]
+    pub const fn is_quality_error(self) -> bool {
+        self.category() == 0x09
     }
 }
 
@@ -196,6 +228,16 @@ impl TryFrom<u16> for ErrorCode {
             0x0602 => Ok(Self::LineageBroken),
             0x0603 => Ok(Self::LineageCyclic),
 
+            0x0800 => Ok(Self::UnsignedManifest),
+            0x0801 => Ok(Self::ContentHashMismatch),
+            0x0802 => Ok(Self::UnknownSigner),
+            0x0803 => Ok(Self::EpochDriftExceeded),
+            0x0804 => Ok(Self::Level1InvalidSignature),
+
+            0x0900 => Ok(Self::QualityBelowThreshold),
+            0x0901 => Ok(Self::BudgetTokensExhausted),
+            0x0902 => Ok(Self::QueryBlacklisted),
+
             0x0700 => Ok(Self::CowMapCorrupt),
             0x0701 => Ok(Self::ClusterNotFound),
             0x0702 => Ok(Self::ParentChainBroken),
@@ -228,6 +270,14 @@ pub enum RvfError {
         type_name: &'static str,
         value: u64,
     },
+    /// Security policy violation during file open (ADR-033 §4).
+    Security(crate::security::SecurityError),
+    /// Query result quality is below threshold (ADR-033 §2.4).
+    /// Contains the QualityEnvelope with partial results and diagnostics.
+    QualityBelowThreshold {
+        quality: crate::quality::ResponseQuality,
+        reason: &'static str,
+    },
 }
 
 impl core::fmt::Display for RvfError {
@@ -243,6 +293,10 @@ impl core::fmt::Display for RvfError {
             }
             Self::InvalidEnumValue { type_name, value } => {
                 write!(f, "invalid {type_name} value: {value}")
+            }
+            Self::Security(e) => write!(f, "security error: {e}"),
+            Self::QualityBelowThreshold { quality, reason } => {
+                write!(f, "quality below threshold ({quality:?}): {reason}")
             }
         }
     }
@@ -296,6 +350,14 @@ mod tests {
             (0x0601, ErrorCode::ParentHashMismatch),
             (0x0602, ErrorCode::LineageBroken),
             (0x0603, ErrorCode::LineageCyclic),
+            (0x0800, ErrorCode::UnsignedManifest),
+            (0x0801, ErrorCode::ContentHashMismatch),
+            (0x0802, ErrorCode::UnknownSigner),
+            (0x0803, ErrorCode::EpochDriftExceeded),
+            (0x0804, ErrorCode::Level1InvalidSignature),
+            (0x0900, ErrorCode::QualityBelowThreshold),
+            (0x0901, ErrorCode::BudgetTokensExhausted),
+            (0x0902, ErrorCode::QueryBlacklisted),
             (0x0700, ErrorCode::CowMapCorrupt),
             (0x0701, ErrorCode::ClusterNotFound),
             (0x0702, ErrorCode::ParentChainBroken),
@@ -327,6 +389,20 @@ mod tests {
         assert_eq!(ErrorCode::KeyNotFound.category(), 0x05);
         assert_eq!(ErrorCode::ParentNotFound.category(), 0x06);
         assert_eq!(ErrorCode::CowMapCorrupt.category(), 0x07);
+        assert_eq!(ErrorCode::UnsignedManifest.category(), 0x08);
+        assert_eq!(ErrorCode::QualityBelowThreshold.category(), 0x09);
+    }
+
+    #[test]
+    fn security_error_check() {
+        assert!(ErrorCode::UnsignedManifest.is_security_error());
+        assert!(!ErrorCode::Ok.is_security_error());
+    }
+
+    #[test]
+    fn quality_error_check() {
+        assert!(ErrorCode::QualityBelowThreshold.is_quality_error());
+        assert!(!ErrorCode::Ok.is_quality_error());
     }
 
     #[test]

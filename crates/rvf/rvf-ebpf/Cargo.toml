@@ -11,6 +11,6 @@ categories = ["network-programming", "os"]
 keywords = ["rvf", "ebpf", "xdp", "bpf", "vector-acceleration"]
 
 [dependencies]
-rvf-types = { version = "0.1.0", path = "../rvf-types" }
+rvf-types = { version = "0.2.0", path = "../rvf-types" }
 sha3 = "0.10"
 tempfile = "3"

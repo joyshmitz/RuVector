@@ -9,6 +9,7 @@
 extern crate alloc;
 
 mod alloc_setup;
+pub mod bootstrap;
 mod distance;
 mod memory;
 mod segment;
@@ -704,6 +705,60 @@ pub extern "C" fn rvf_verify_checksum(buf_ptr: i32, buf_len: i32) -> i32 {
     } else {
         0
     }
+}
+
+// =====================================================================
+// Witness Chain Verification
+// =====================================================================
+
+/// Verify a SHAKE-256 witness chain in memory.
+///
+/// `chain_ptr`: pointer to serialized witness chain (73 bytes per entry).
+/// `chain_len`: total byte length of the chain.
+///
+/// Returns the number of verified entries on success, or a negative error code:
+///   -1: invalid pointer/length
+///   -2: truncated chain (not a multiple of 73 bytes)
+///   -3: chain integrity failure (prev_hash mismatch)
+#[no_mangle]
+pub extern "C" fn rvf_witness_verify(chain_ptr: i32, chain_len: i32) -> i32 {
+    if chain_len < 0 {
+        return -1;
+    }
+    let len = chain_len as usize;
+    if len == 0 {
+        return 0;
+    }
+    let data = unsafe { core::slice::from_raw_parts(chain_ptr as *const u8, len) };
+    match rvf_crypto::verify_witness_chain(data) {
+        Ok(entries) => entries.len() as i32,
+        Err(e) => {
+            use rvf_types::RvfError;
+            match e {
+                RvfError::Code(rvf_types::ErrorCode::TruncatedSegment) => -2,
+                RvfError::Code(rvf_types::ErrorCode::InvalidChecksum) => -3,
+                _ => -1,
+            }
+        }
+    }
+}
+
+/// Count witness entries in a chain without full verification.
+///
+/// Returns the entry count (chain_len / 73), or -1 if not aligned.
+#[no_mangle]
+pub extern "C" fn rvf_witness_count(chain_len: i32) -> i32 {
+    if chain_len < 0 {
+        return -1;
+    }
+    let len = chain_len as usize;
+    if len == 0 {
+        return 0;
+    }
+    if len % 73 != 0 {
+        return -1;
+    }
+    (len / 73) as i32
 }
 
 // =====================================================================

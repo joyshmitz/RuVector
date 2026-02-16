@@ -7932,8 +7932,12 @@ dependencies = [
  "rayon",
  "reqwest 0.11.27",
  "ruvector-core 2.0.3",
+ "rvf-crypto",
+ "rvf-types",
+ "rvf-wire",
  "serde",
  "serde_json",
+ "sha2",
  "statistical",
  "tempfile",
  "thiserror 2.0.17",
@@ -8253,6 +8257,35 @@ dependencies = [
  "tracing-wasm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "ruvector-domain-expansion"
+version = "2.0.3"
+dependencies = [
+ "criterion 0.5.1",
+ "proptest",
+ "rand 0.8.5",
+ "rvf-crypto",
+ "rvf-types",
+ "rvf-wire",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "ruvector-domain-expansion-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "rand 0.8.5",
+ "ruvector-domain-expansion",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
  "wasm-bindgen-test",
 ]
 
@@ -9447,7 +9480,7 @@ dependencies = [
 
 [[package]]
 name = "rvf-crypto"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ed25519-dalek",
  "rand 0.8.5",
@@ -9503,7 +9536,7 @@ dependencies = [
 
 [[package]]
 name = "rvf-kernel"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "flate2",
  "rvf-types",
@@ -9513,7 +9546,7 @@ dependencies = [
 
 [[package]]
 name = "rvf-launch"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "rvf-runtime",
  "rvf-types",
@@ -9542,7 +9575,7 @@ dependencies = [
 
 [[package]]
 name = "rvf-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rand 0.8.5",
  "rvf-types",
@@ -9551,7 +9584,7 @@ dependencies = [
 
 [[package]]
 name = "rvf-server"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "axum-test 16.4.1",
@@ -9568,8 +9601,10 @@ dependencies = [
 
 [[package]]
 name = "rvf-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "ed25519-dalek",
+ "rand_core 0.6.4",
  "serde",
 ]
 

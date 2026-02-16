@@ -68,6 +68,17 @@ Parse and inspect `.rvf` file structure from raw bytes:
 | `rvf_segment_info(buf, len, idx, out)` | Get segment details by index |
 | `rvf_verify_checksum(buf, len)` | Verify CRC32C integrity |
 
+### Witness Chain Verification (2 exports)
+
+Verify SHAKE-256 witness chains from WITNESS_SEG payloads:
+
+| Export | Description |
+|--------|-------------|
+| `rvf_witness_verify(chain_ptr, chain_len) -> i32` | Verify full chain integrity; returns entry count or negative error (-2 = truncated, -3 = hash mismatch) |
+| `rvf_witness_count(chain_len) -> i32` | Count entries without full verification (chain_len / 73) |
+
+These exports enable browser-side verification of acceptance test artifacts and audit trails without any backend. See [ADR-037](../../docs/adr/ADR-037-publishable-rvf-acceptance-test.md).
+
 ### Memory Management (2 exports)
 
 | Export | Description |

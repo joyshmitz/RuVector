@@ -20,6 +20,14 @@ rvf-crypto = "0.1"
 ## Features
 
 - `std` (default) -- enable `std` support
+- `ed25519` (default) -- enable Ed25519 signing via `ed25519-dalek`
+
+For no_std or WASM targets that only need hashing and witness chains (no signing), disable defaults:
+
+```toml
+[dependencies]
+rvf-crypto = { version = "0.1", default-features = false }
+```
 
 ## Lineage Witness Functions
 

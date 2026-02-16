@@ -39,6 +39,15 @@ pub enum SegmentType {
     Kernel = 0x0E,
     /// Embedded eBPF program for kernel fast path.
     Ebpf = 0x0F,
+    /// Embedded WASM bytecode for self-bootstrapping execution.
+    ///
+    /// A WASM_SEG contains either a WASM microkernel (the RVF query engine
+    /// compiled to wasm32) or a minimal WASM interpreter that can execute
+    /// the microkernel. When both are present the file becomes fully
+    /// self-bootstrapping: any host with raw execution capability can run
+    /// the embedded interpreter, which in turn runs the microkernel, which
+    /// processes the RVF data segments.
+    Wasm = 0x10,
     /// COW cluster mapping.
     CowMap = 0x20,
     /// Cluster reference counts.
@@ -47,6 +56,12 @@ pub enum SegmentType {
     Membership = 0x22,
     /// Sparse delta patches.
     Delta = 0x23,
+    /// Serialized transfer prior (cross-domain posterior summaries + cost EMAs).
+    TransferPrior = 0x30,
+    /// Policy kernel configuration and performance history.
+    PolicyKernel = 0x31,
+    /// Cost curve convergence data for acceleration tracking.
+    CostCurve = 0x32,
 }
 
 impl TryFrom<u8> for SegmentType {
@@ -70,10 +85,14 @@ impl TryFrom<u8> for SegmentType {
             0x0D => Ok(Self::MetaIdx),
             0x0E => Ok(Self::Kernel),
             0x0F => Ok(Self::Ebpf),
+            0x10 => Ok(Self::Wasm),
             0x20 => Ok(Self::CowMap),
             0x21 => Ok(Self::Refcount),
             0x22 => Ok(Self::Membership),
             0x23 => Ok(Self::Delta),
+            0x30 => Ok(Self::TransferPrior),
+            0x31 => Ok(Self::PolicyKernel),
+            0x32 => Ok(Self::CostCurve),
             other => Err(other),
         }
     }
@@ -102,10 +121,14 @@ mod tests {
             SegmentType::MetaIdx,
             SegmentType::Kernel,
             SegmentType::Ebpf,
+            SegmentType::Wasm,
             SegmentType::CowMap,
             SegmentType::Refcount,
             SegmentType::Membership,
             SegmentType::Delta,
+            SegmentType::TransferPrior,
+            SegmentType::PolicyKernel,
+            SegmentType::CostCurve,
         ];
         for v in variants {
             let raw = v as u8;
@@ -116,13 +139,22 @@ mod tests {
     #[test]
     fn invalid_value_returns_err() {
         assert_eq!(SegmentType::try_from(0x24), Err(0x24));
+        assert_eq!(SegmentType::try_from(0x33), Err(0x33));
         assert_eq!(SegmentType::try_from(0xF0), Err(0xF0));
         assert_eq!(SegmentType::try_from(0xFF), Err(0xFF));
     }
 
     #[test]
-    fn kernel_and_ebpf_discriminants() {
+    fn domain_expansion_discriminants() {
+        assert_eq!(SegmentType::TransferPrior as u8, 0x30);
+        assert_eq!(SegmentType::PolicyKernel as u8, 0x31);
+        assert_eq!(SegmentType::CostCurve as u8, 0x32);
+    }
+
+    #[test]
+    fn kernel_ebpf_wasm_discriminants() {
         assert_eq!(SegmentType::Kernel as u8, 0x0E);
         assert_eq!(SegmentType::Ebpf as u8, 0x0F);
+        assert_eq!(SegmentType::Wasm as u8, 0x10);
     }
 }

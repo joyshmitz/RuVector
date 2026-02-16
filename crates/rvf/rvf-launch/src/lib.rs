@@ -425,6 +425,7 @@ impl MicroVm {
             .map(|r| rvf_runtime::SearchResult {
                 id: r.id,
                 distance: r.distance,
+                retrieval_quality: rvf_types::quality::RetrievalQuality::Full,
             })
             .collect())
     }

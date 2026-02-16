@@ -41,6 +41,14 @@ chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
+# Crypto for witness chains
+sha2 = "0.10"
+
+# RVF native format integration
+rvf-types = { path = "../../crates/rvf/rvf-types" }
+rvf-crypto = { path = "../../crates/rvf/rvf-crypto" }
+rvf-wire = { path = "../../crates/rvf/rvf-wire" }
+
 # Statistics
 statistical = "1.0"
 hdrhistogram = "7.5"
@@ -80,3 +88,23 @@ path = "src/bin/timepuzzle_runner.rs"
 [[bin]]
 name = "intelligence-assessment"
 path = "src/bin/intelligence_assessment.rs"
+
+[[bin]]
+name = "rvf-intelligence-bench"
+path = "src/bin/rvf_intelligence_bench.rs"
+
+[[bin]]
+name = "superintelligence"
+path = "src/bin/superintelligence.rs"
+
+[[bin]]
+name = "agi-proof-harness"
+path = "src/bin/agi_proof_harness.rs"
+
+[[bin]]
+name = "acceptance-rvf"
+path = "src/bin/acceptance_rvf.rs"
+
+[[bin]]
+name = "wasm-solver-bench"
+path = "src/bin/wasm_solver_bench.rs"

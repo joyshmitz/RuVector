@@ -280,6 +280,46 @@ impl SegmentWriter {
         Ok((seg_id, offset))
     }
 
+    /// Maximum WASM module size (8 MiB) to prevent DoS via oversized segments.
+    #[allow(dead_code)]
+    const MAX_WASM_MODULE_SIZE: usize = 8 * 1024 * 1024;
+
+    /// Write a WASM_SEG containing WASM bytecode for self-bootstrapping.
+    ///
+    /// Payload layout: `wasm_header_bytes` (64) + `wasm_bytecode`.
+    /// Returns the segment ID and byte offset where it was written.
+    ///
+    /// Returns an error if the bytecode exceeds 8 MiB.
+    #[allow(dead_code)]
+    pub(crate) fn write_wasm_seg<W: Write + Seek>(
+        &mut self,
+        writer: &mut W,
+        wasm_header_bytes: &[u8; 64],
+        wasm_bytecode: &[u8],
+    ) -> io::Result<(u64, u64)> {
+        if wasm_bytecode.len() > Self::MAX_WASM_MODULE_SIZE {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "WASM module too large: {} bytes (max {})",
+                    wasm_bytecode.len(),
+                    Self::MAX_WASM_MODULE_SIZE
+                ),
+            ));
+        }
+
+        let seg_id = self.alloc_seg_id();
+
+        let payload_size = 64 + wasm_bytecode.len();
+        let mut payload = Vec::with_capacity(payload_size);
+
+        payload.extend_from_slice(wasm_header_bytes);
+        payload.extend_from_slice(wasm_bytecode);
+
+        let offset = self.write_segment(writer, SegmentType::Wasm as u8, seg_id, &payload)?;
+        Ok((seg_id, offset))
+    }
+
     /// Write a WITNESS_SEG containing a serialized witness entry.
     ///
     /// Payload layout:

@@ -35,6 +35,10 @@ fn map_rvf_err(e: RvfError) -> napi::Error {
         RvfError::InvalidEnumValue { type_name, value } => {
             format!("Invalid {type_name} value: {value}")
         }
+        RvfError::Security(e) => format!("Security error: {e}"),
+        RvfError::QualityBelowThreshold { quality, reason } => {
+            format!("Quality below threshold ({quality:?}): {reason}")
+        }
     };
     napi::Error::from_reason(msg)
 }
@@ -504,6 +508,7 @@ impl RvfDatabase {
                     ef_search: opts.ef_search.unwrap_or(100) as u16,
                     filter,
                     timeout_ms: opts.timeout_ms.unwrap_or(0),
+                    ..RustQueryOptions::default()
                 }
             }
             None => RustQueryOptions::default(),

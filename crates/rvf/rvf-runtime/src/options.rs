@@ -1,6 +1,11 @@
 //! Configuration types for the RVF runtime.
 
 use crate::filter::FilterExpr;
+use rvf_types::quality::{
+    BudgetReport, DegradationReport, QualityPreference, ResponseQuality,
+    SafetyNetBudget, SearchEvidenceSummary,
+};
+use rvf_types::security::SecurityPolicy;
 
 /// Distance metric used for vector similarity search.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -72,6 +77,8 @@ pub struct RvfOptions {
     pub ef_construction: u16,
     /// Witness auto-generation configuration.
     pub witness: WitnessConfig,
+    /// Security policy for manifest signature verification (ADR-033 §4).
+    pub security_policy: SecurityPolicy,
 }
 
 impl Default for RvfOptions {
@@ -86,6 +93,7 @@ impl Default for RvfOptions {
             m: 16,
             ef_construction: 200,
             witness: WitnessConfig::default(),
+            security_policy: SecurityPolicy::Strict,
         }
     }
 }
@@ -99,6 +107,11 @@ pub struct QueryOptions {
     pub filter: Option<FilterExpr>,
     /// Query timeout in milliseconds (0 = no timeout).
     pub timeout_ms: u32,
+    /// Quality vs latency preference (ADR-033).
+    pub quality_preference: QualityPreference,
+    /// Safety net budget caps. Callers may tighten but not loosen
+    /// beyond the mode default (unless PreferQuality, which extends to 4x).
+    pub safety_net_budget: SafetyNetBudget,
 }
 
 impl Default for QueryOptions {
@@ -107,6 +120,8 @@ impl Default for QueryOptions {
             ef_search: 100,
             filter: None,
             timeout_ms: 0,
+            quality_preference: QualityPreference::Auto,
+            safety_net_budget: SafetyNetBudget::LAYER_A,
         }
     }
 }
@@ -118,6 +133,27 @@ pub struct SearchResult {
     pub id: u64,
     /// Distance from the query vector (lower = more similar).
     pub distance: f32,
+    /// Per-candidate retrieval quality (ADR-033).
+    pub retrieval_quality: rvf_types::quality::RetrievalQuality,
+}
+
+/// The mandatory outer return type for all query APIs (ADR-033 §2.4).
+///
+/// This is not optional. This is not a nested field.
+/// JSON flattening cannot discard it. gRPC serialization cannot drop it.
+/// MCP tool responses must include it.
+#[derive(Clone, Debug)]
+pub struct QualityEnvelope {
+    /// The search results.
+    pub results: Vec<SearchResult>,
+    /// Top-level quality signal. Consumers MUST inspect this.
+    pub quality: ResponseQuality,
+    /// Structured evidence for why the quality is what it is.
+    pub evidence: SearchEvidenceSummary,
+    /// Resource consumption report for this query.
+    pub budgets: BudgetReport,
+    /// If quality is degraded, the structured reason.
+    pub degradation: Option<DegradationReport>,
 }
 
 /// Result of a batch ingest operation.

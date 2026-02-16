@@ -15,6 +15,7 @@ use rvf_types::{
 use rvf_types::kernel::{KernelHeader, KERNEL_MAGIC};
 use rvf_types::kernel_binding::KernelBinding;
 use rvf_types::ebpf::{EbpfHeader, EBPF_MAGIC};
+use rvf_types::wasm_bootstrap::{WasmHeader, WasmRole, WASM_MAGIC};
 
 use crate::cow::{CowEngine, CowStats};
 use crate::deletion::DeletionBitmap;
@@ -354,10 +355,140 @@ impl RvfStore {
         // Drain the max-heap into sorted results (closest first).
         let mut results: Vec<SearchResult> = heap
             .into_iter()
-            .map(|(OrderedFloat(dist), id)| SearchResult { id, distance: dist })
+            .map(|(OrderedFloat(dist), id)| SearchResult {
+                id,
+                distance: dist,
+                retrieval_quality: rvf_types::quality::RetrievalQuality::Full,
+            })
             .collect();
         results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
         Ok(results)
+    }
+
+    /// Query the store and return a full QualityEnvelope (ADR-033 §2.4).
+    ///
+    /// This is the preferred query API. The QualityEnvelope is the mandatory
+    /// outer return type — consumers MUST inspect the `quality` field before
+    /// using results.
+    pub fn query_with_envelope(
+        &self,
+        vector: &[f32],
+        k: usize,
+        options: &QueryOptions,
+    ) -> Result<QualityEnvelope, RvfError> {
+        use rvf_types::quality::*;
+        use std::time::Instant;
+
+        let start = Instant::now();
+        let dim = self.options.dimension as usize;
+        if vector.len() != dim {
+            return Err(err(ErrorCode::DimensionMismatch));
+        }
+
+        // Determine effective budget based on quality preference.
+        let budget = match options.quality_preference {
+            QualityPreference::PreferQuality => options.safety_net_budget.extended_4x(),
+            QualityPreference::PreferLatency => SafetyNetBudget::DISABLED,
+            _ => options.safety_net_budget,
+        };
+
+        // Execute the base query.
+        let results = self.query(vector, k, options)?;
+        let hnsw_candidate_count = results.len() as u32;
+
+        // Determine if safety net should activate.
+        let needs_safety_net = crate::safety_net::should_activate_safety_net(results.len(), k)
+            && !budget.is_disabled();
+
+        let mut all_results = results;
+        let mut safety_net_candidate_count = 0u32;
+        let mut budget_report = BudgetReport::default();
+        let mut degradation: Option<DegradationReport> = None;
+
+        if needs_safety_net && self.vectors.len() > 0 {
+            // Build vector refs for safety net scan.
+            let vec_refs: Vec<(u64, &[f32])> = self.vectors.ids()
+                .filter_map(|&id| {
+                    if self.deletion_bitmap.is_deleted(id) {
+                        return None;
+                    }
+                    self.vectors.get(id).map(|v| (id, v))
+                })
+                .collect();
+
+            let base_results: Vec<crate::options::SearchResult> = all_results.clone();
+            let scan_result = crate::safety_net::selective_safety_net_scan(
+                vector,
+                k,
+                &base_results,
+                &vec_refs,
+                &budget,
+                self.vectors.len() as u64,
+            );
+
+            safety_net_candidate_count = scan_result.candidates.len() as u32;
+            budget_report = scan_result.budget_report;
+            degradation = scan_result.degradation;
+
+            // Merge safety net candidates into results.
+            for candidate in scan_result.candidates {
+                all_results.push(SearchResult {
+                    id: candidate.id,
+                    distance: candidate.distance,
+                    retrieval_quality: RetrievalQuality::BruteForceBudgeted,
+                });
+            }
+
+            // Re-sort and take top-k.
+            all_results.sort_by(|a, b| {
+                a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            all_results.truncate(k);
+        }
+
+        let elapsed_us = start.elapsed().as_micros() as u64;
+        budget_report.total_us = elapsed_us;
+
+        // Derive response quality from all candidate qualities.
+        let retrieval_qualities: Vec<RetrievalQuality> = all_results
+            .iter()
+            .map(|r| r.retrieval_quality)
+            .collect();
+        let quality = derive_response_quality(&retrieval_qualities);
+
+        let evidence = SearchEvidenceSummary {
+            layers_used: IndexLayersUsed {
+                layer_a: true,
+                layer_b: false,
+                layer_c: false,
+                hot_cache: needs_safety_net,
+            },
+            n_probe_effective: 0,
+            degenerate_detected: false,
+            centroid_distance_cv: 0.0,
+            hnsw_candidate_count,
+            safety_net_candidate_count,
+        };
+
+        let envelope = QualityEnvelope {
+            results: all_results,
+            quality,
+            evidence,
+            budgets: budget_report,
+            degradation,
+        };
+
+        // Enforce quality threshold policy.
+        if matches!(quality, ResponseQuality::Degraded | ResponseQuality::Unreliable)
+            && !matches!(options.quality_preference, QualityPreference::AcceptDegraded)
+        {
+            return Err(RvfError::QualityBelowThreshold {
+                quality,
+                reason: "result quality below threshold; set AcceptDegraded to use partial results",
+            });
+        }
+
+        Ok(envelope)
     }
 
     /// Query the store with optional audit witness.
@@ -950,6 +1081,167 @@ impl RvfStore {
         let ebpf_bytecode = payload[64..].to_vec();
 
         Ok(Some((ebpf_header, ebpf_bytecode)))
+    }
+
+    /// Embed a WASM module into this RVF file as a WASM_SEG.
+    ///
+    /// Builds a 64-byte WasmHeader, serializes it, then delegates to
+    /// the write path. Returns the segment_id of the new WASM_SEG.
+    ///
+    /// For self-bootstrapping, embed two WASM_SEGs:
+    /// 1. `role = Interpreter` (a minimal WASM interpreter, ~50 KB)
+    /// 2. `role = Microkernel` (the RVF query engine, ~5.5 KB)
+    ///
+    /// The file then carries both its runtime and its data.
+    pub fn embed_wasm(
+        &mut self,
+        role: u8,
+        target: u8,
+        required_features: u16,
+        wasm_bytecode: &[u8],
+        export_count: u16,
+        bootstrap_priority: u8,
+        interpreter_type: u8,
+    ) -> Result<u64, RvfError> {
+        if self.read_only {
+            return Err(err(ErrorCode::ReadOnly));
+        }
+
+        let bytecode_hash = simple_shake256_256(wasm_bytecode);
+        let header = WasmHeader {
+            wasm_magic: WASM_MAGIC,
+            header_version: 1,
+            role,
+            target,
+            required_features,
+            export_count,
+            bytecode_size: wasm_bytecode.len() as u32,
+            compressed_size: 0,
+            compression: 0,
+            min_memory_pages: 2,
+            max_memory_pages: 0,
+            table_count: 0,
+            bytecode_hash,
+            bootstrap_priority,
+            interpreter_type,
+            reserved: [0; 6],
+        };
+        let header_bytes = header.to_bytes();
+
+        let writer = self.seg_writer.as_mut()
+            .ok_or_else(|| err(ErrorCode::InvalidManifest))?;
+        let (seg_id, seg_offset) = {
+            let mut buf_writer = BufWriter::new(&self.file);
+            buf_writer.seek(SeekFrom::End(0))
+                .map_err(|_| err(ErrorCode::FsyncFailed))?;
+            writer.write_wasm_seg(
+                &mut buf_writer, &header_bytes, wasm_bytecode,
+            ).map_err(|_| err(ErrorCode::FsyncFailed))?
+        };
+
+        let payload_len = (64 + wasm_bytecode.len()) as u64;
+        self.segment_dir.push((
+            seg_id, seg_offset, payload_len, SegmentType::Wasm as u8,
+        ));
+
+        self.file.sync_all().map_err(|_| err(ErrorCode::FsyncFailed))?;
+        self.epoch += 1;
+        self.write_manifest()?;
+
+        Ok(seg_id)
+    }
+
+    /// Extract the first WASM module from this RVF file.
+    ///
+    /// Scans the segment directory for a WASM_SEG (type 0x10) and returns
+    /// the first 64 bytes (serialized WasmHeader) plus the remainder
+    /// (WASM bytecode). Returns None if no WASM_SEG.
+    #[allow(clippy::type_complexity)]
+    pub fn extract_wasm(&self) -> Result<Option<(Vec<u8>, Vec<u8>)>, RvfError> {
+        let entry = self.segment_dir.iter()
+            .find(|&&(_, _, _, stype)| stype == SegmentType::Wasm as u8);
+
+        let entry = match entry {
+            Some(e) => e,
+            None => return Ok(None),
+        };
+
+        let (_header, payload) = {
+            let mut reader = BufReader::new(&self.file);
+            read_path::read_segment_payload(&mut reader, entry.1)
+                .map_err(|_| err(ErrorCode::InvalidChecksum))?
+        };
+
+        if payload.len() < 64 {
+            return Err(err(ErrorCode::TruncatedSegment));
+        }
+
+        let wasm_header = payload[..64].to_vec();
+        let wasm_bytecode = payload[64..].to_vec();
+
+        Ok(Some((wasm_header, wasm_bytecode)))
+    }
+
+    /// Extract all WASM modules from this RVF file, ordered by bootstrap_priority.
+    ///
+    /// Returns a vector of (WasmHeader bytes, bytecode) tuples for each WASM_SEG,
+    /// sorted by the `bootstrap_priority` field (lowest first). This ordering
+    /// determines the bootstrap chain: interpreter first, then microkernel.
+    pub fn extract_wasm_all(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, RvfError> {
+        let entries: Vec<_> = self.segment_dir.iter()
+            .filter(|&&(_, _, _, stype)| stype == SegmentType::Wasm as u8)
+            .collect();
+
+        let mut results = Vec::with_capacity(entries.len());
+
+        for entry in entries {
+            let (_header, payload) = {
+                let mut reader = BufReader::new(&self.file);
+                read_path::read_segment_payload(&mut reader, entry.1)
+                    .map_err(|_| err(ErrorCode::InvalidChecksum))?
+            };
+
+            if payload.len() < 64 {
+                return Err(err(ErrorCode::TruncatedSegment));
+            }
+
+            let wasm_header = payload[..64].to_vec();
+            let wasm_bytecode = payload[64..].to_vec();
+            results.push((wasm_header, wasm_bytecode));
+        }
+
+        // Sort by bootstrap_priority (byte offset 0x38 in WasmHeader)
+        results.sort_by_key(|(hdr, _)| hdr[0x38]);
+
+        Ok(results)
+    }
+
+    /// Check if this RVF file is self-bootstrapping.
+    ///
+    /// A file is self-bootstrapping if it contains at least one WASM_SEG
+    /// with role=Interpreter or role=Combined. This means the file carries
+    /// its own execution runtime and can run on any host with raw compute.
+    pub fn is_self_bootstrapping(&self) -> bool {
+        for &(_, offset, _, stype) in &self.segment_dir {
+            if stype != SegmentType::Wasm as u8 {
+                continue;
+            }
+            // Read the WasmHeader role byte (offset 0x06 within the payload)
+            let result = (|| -> Result<bool, RvfError> {
+                let mut reader = BufReader::new(&self.file);
+                let (_header, payload) = read_path::read_segment_payload(&mut reader, offset)
+                    .map_err(|_| err(ErrorCode::InvalidChecksum))?;
+                if payload.len() < 64 {
+                    return Ok(false);
+                }
+                let role = payload[0x06];
+                Ok(role == WasmRole::Interpreter as u8 || role == WasmRole::Combined as u8)
+            })();
+            if result.unwrap_or(false) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Get the segment directory.
