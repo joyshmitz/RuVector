@@ -1,10 +1,17 @@
 {
   "name": "@ruvector/rvf-wasm",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "RuVector Format WASM microkernel for browser and edge vector operations",
-  "type": "module",
   "main": "pkg/rvf_wasm.js",
   "types": "pkg/rvf_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/rvf_wasm.d.ts",
+      "import": "./pkg/rvf_wasm.mjs",
+      "require": "./pkg/rvf_wasm.js",
+      "default": "./pkg/rvf_wasm.js"
+    }
+  },
   "files": [
     "pkg/"
   ],
@@ -15,5 +22,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ruvnet/ruvector"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   }
 }
