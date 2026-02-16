@@ -51,6 +51,12 @@ pub mod rust_synthesis;
 pub mod tool_orchestration;
 pub mod transfer;
 
+/// RVF format integration: segment serialization, witness chains, AGI packaging.
+///
+/// Requires the `rvf` feature to be enabled.
+#[cfg(feature = "rvf")]
+pub mod rvf_bridge;
+
 // Re-export core types.
 pub use cost_curve::{
     AccelerationEntry, AccelerationScoreboard, ConvergenceThresholds, CostCurve, CostCurvePoint,

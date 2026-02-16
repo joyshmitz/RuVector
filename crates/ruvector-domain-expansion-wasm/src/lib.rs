@@ -3,6 +3,10 @@
 //! Provides JavaScript-accessible interfaces for cross-domain transfer learning,
 //! Meta Thompson Sampling, PolicyKernel population search, and the acceleration
 //! scoreboard. All domain operations run at native speed in the browser/edge.
+//!
+//! With the `rvf` feature (default), includes RVF segment serialization for
+//! packaging transfer priors, policy kernels, and cost curves into the
+//! RuVector Format wire protocol.
 
 use ruvector_domain_expansion::{
     AccelerationScoreboard, ArmId, ContextBucket, CostCurve,
@@ -370,5 +374,151 @@ impl WasmScoreboard {
     pub fn summary(&self) -> JsValue {
         let s = self.inner.summary();
         serde_wasm_bindgen::to_value(&s).unwrap_or(JsValue::NULL)
+    }
+}
+
+// ─── RVF Bridge Exports ─────────────────────────────────────────────────────
+
+/// WASM-exported RVF bridge for segment serialization and witness chains.
+///
+/// Enables packaging domain expansion artifacts into RVF wire format
+/// for embedding in RVF files and AGI containers.
+#[cfg(feature = "rvf")]
+#[wasm_bindgen]
+pub struct WasmRvfBridge;
+
+#[cfg(feature = "rvf")]
+#[wasm_bindgen]
+impl WasmRvfBridge {
+    /// Create a new RVF bridge instance.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Serialize a TransferPrior (JSON) into an RVF TRANSFER_PRIOR segment.
+    /// Returns the raw segment bytes.
+    #[wasm_bindgen(js_name = transferPriorToSegment)]
+    pub fn transfer_prior_to_segment(
+        &self,
+        prior_json: &str,
+        segment_id: u64,
+    ) -> Result<Vec<u8>, JsValue> {
+        let prior: ruvector_domain_expansion::TransferPrior =
+            serde_json::from_str(prior_json)
+                .map_err(|e| JsValue::from_str(&format!("JSON parse error: {e}")))?;
+        Ok(ruvector_domain_expansion::rvf_bridge::transfer_prior_to_segment(
+            &prior, segment_id,
+        ))
+    }
+
+    /// Deserialize a TransferPrior from RVF segment bytes. Returns JSON.
+    #[wasm_bindgen(js_name = transferPriorFromSegment)]
+    pub fn transfer_prior_from_segment(&self, data: &[u8]) -> Result<String, JsValue> {
+        let prior = ruvector_domain_expansion::rvf_bridge::transfer_prior_from_segment(data)
+            .map_err(|e| JsValue::from_str(&format!("RVF decode error: {e}")))?;
+        serde_json::to_string(&prior)
+            .map_err(|e| JsValue::from_str(&format!("JSON serialize error: {e}")))
+    }
+
+    /// Serialize a PolicyKernel (JSON) into an RVF POLICY_KERNEL segment.
+    #[wasm_bindgen(js_name = policyKernelToSegment)]
+    pub fn policy_kernel_to_segment(
+        &self,
+        kernel_json: &str,
+        segment_id: u64,
+    ) -> Result<Vec<u8>, JsValue> {
+        let kernel: ruvector_domain_expansion::PolicyKernel =
+            serde_json::from_str(kernel_json)
+                .map_err(|e| JsValue::from_str(&format!("JSON parse error: {e}")))?;
+        Ok(ruvector_domain_expansion::rvf_bridge::policy_kernel_to_segment(
+            &kernel, segment_id,
+        ))
+    }
+
+    /// Serialize a CostCurve (JSON) into an RVF COST_CURVE segment.
+    #[wasm_bindgen(js_name = costCurveToSegment)]
+    pub fn cost_curve_to_segment(
+        &self,
+        curve_json: &str,
+        segment_id: u64,
+    ) -> Result<Vec<u8>, JsValue> {
+        let curve: ruvector_domain_expansion::CostCurve =
+            serde_json::from_str(curve_json)
+                .map_err(|e| JsValue::from_str(&format!("JSON parse error: {e}")))?;
+        Ok(ruvector_domain_expansion::rvf_bridge::cost_curve_to_segment(
+            &curve, segment_id,
+        ))
+    }
+
+    /// Compute the SHAKE-256 witness hash for a TransferPrior.
+    /// Returns 32 bytes (hex-encoded string).
+    #[wasm_bindgen(js_name = computeWitnessHash)]
+    pub fn compute_witness_hash(&self, prior_json: &str) -> Result<String, JsValue> {
+        let prior: ruvector_domain_expansion::TransferPrior =
+            serde_json::from_str(prior_json)
+                .map_err(|e| JsValue::from_str(&format!("JSON parse error: {e}")))?;
+        let hash = ruvector_domain_expansion::rvf_bridge::compute_transfer_witness_hash(&prior);
+        Ok(hash.iter().map(|b| format!("{b:02x}")).collect())
+    }
+
+    /// Assemble multiple domain expansion artifacts into a concatenated
+    /// RVF segment byte stream. Input: JSON object with `priors`, `kernels`,
+    /// `curves` arrays and `base_segment_id`.
+    #[wasm_bindgen(js_name = assembleSegments)]
+    pub fn assemble_segments(
+        &self,
+        priors_json: &str,
+        kernels_json: &str,
+        curves_json: &str,
+        base_segment_id: u64,
+    ) -> Result<Vec<u8>, JsValue> {
+        let priors: Vec<ruvector_domain_expansion::TransferPrior> =
+            serde_json::from_str(priors_json)
+                .map_err(|e| JsValue::from_str(&format!("priors parse error: {e}")))?;
+        let kernels: Vec<ruvector_domain_expansion::PolicyKernel> =
+            serde_json::from_str(kernels_json)
+                .map_err(|e| JsValue::from_str(&format!("kernels parse error: {e}")))?;
+        let curves: Vec<ruvector_domain_expansion::CostCurve> =
+            serde_json::from_str(curves_json)
+                .map_err(|e| JsValue::from_str(&format!("curves parse error: {e}")))?;
+
+        Ok(ruvector_domain_expansion::rvf_bridge::assemble_domain_expansion_segments(
+            &priors,
+            &kernels,
+            &curves,
+            base_segment_id,
+        ))
+    }
+
+    /// Extract solver-compatible prior exchange data from a TransferPrior JSON.
+    /// Returns JSON array of SolverPriorExchange objects.
+    #[wasm_bindgen(js_name = extractSolverPriors)]
+    pub fn extract_solver_priors(
+        &self,
+        domain_id: &str,
+        prior_json: &str,
+    ) -> Result<String, JsValue> {
+        // Build a temporary Thompson engine with the prior
+        let prior: ruvector_domain_expansion::TransferPrior =
+            serde_json::from_str(prior_json)
+                .map_err(|e| JsValue::from_str(&format!("JSON parse error: {e}")))?;
+
+        let arms: Vec<String> = prior
+            .bucket_priors
+            .values()
+            .flat_map(|arms| arms.keys().map(|a| a.0.clone()))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        let mut engine = ruvector_domain_expansion::MetaThompsonEngine::new(arms);
+        let domain = DomainId(domain_id.to_string());
+        engine.init_domain_with_transfer(domain.clone(), &prior);
+
+        let exchanges =
+            ruvector_domain_expansion::rvf_bridge::extract_solver_priors(&engine, &domain);
+        serde_json::to_string(&exchanges)
+            .map_err(|e| JsValue::from_str(&format!("JSON serialize error: {e}")))
     }
 }

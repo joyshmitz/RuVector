@@ -45,6 +45,8 @@ pub const AGI_OFFLINE_CAPABLE: u16 = 1 << 9;
 pub const AGI_HAS_TOOLS: u16 = 1 << 10;
 /// Container includes coherence gate configuration.
 pub const AGI_HAS_COHERENCE_GATES: u16 = 1 << 11;
+/// Container includes cross-domain transfer learning data.
+pub const AGI_HAS_DOMAIN_EXPANSION: u16 = 1 << 12;
 
 // --- TLV tags for the manifest payload ---
 
@@ -84,6 +86,14 @@ pub const AGI_TAG_DEPENDENCY_SNAPSHOT: u16 = 0x010F;
 pub const AGI_TAG_AUTHORITY_CONFIG: u16 = 0x0110;
 /// Target domain profile identifier.
 pub const AGI_TAG_DOMAIN_PROFILE: u16 = 0x0111;
+/// Cross-domain transfer prior (posterior summaries).
+pub const AGI_TAG_TRANSFER_PRIOR: u16 = 0x0112;
+/// Policy kernel configuration and performance history.
+pub const AGI_TAG_POLICY_KERNEL: u16 = 0x0113;
+/// Cost curve convergence and acceleration data.
+pub const AGI_TAG_COST_CURVE: u16 = 0x0114;
+/// Counterexample archive (failed solutions for future decisions).
+pub const AGI_TAG_COUNTEREXAMPLES: u16 = 0x0115;
 
 // --- Execution mode ---
 
@@ -398,6 +408,11 @@ impl AgiContainerHeader {
         self.flags & AGI_HAS_COHERENCE_GATES != 0
     }
 
+    /// Check if the container has domain expansion data.
+    pub const fn has_domain_expansion(&self) -> bool {
+        self.flags & AGI_HAS_DOMAIN_EXPANSION != 0
+    }
+
     /// Serialize header to a 64-byte array.
     pub fn to_bytes(&self) -> [u8; AGI_HEADER_SIZE] {
         let mut buf = [0u8; AGI_HEADER_SIZE];
@@ -479,6 +494,8 @@ pub struct ContainerSegments {
     pub orchestrator_present: bool,
     /// World model data present (VEC + INDEX segments).
     pub world_model_present: bool,
+    /// Domain expansion (transfer priors, policy kernels, cost curves) present.
+    pub domain_expansion_present: bool,
     /// Total container size in bytes.
     pub total_size: u64,
 }
@@ -551,6 +568,9 @@ impl ContainerSegments {
             || self.index_segment_count > 0
         {
             flags |= AGI_HAS_WORLD_MODEL;
+        }
+        if self.domain_expansion_present {
+            flags |= AGI_HAS_DOMAIN_EXPANSION;
         }
         flags
     }

@@ -11,6 +11,10 @@ keywords = ["wasm", "transfer-learning", "domain-expansion", "generalization"]
 categories = ["wasm", "algorithms", "science"]
 rust-version = "1.70"
 
+[features]
+default = ["rvf"]
+rvf = ["ruvector-domain-expansion/rvf"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
