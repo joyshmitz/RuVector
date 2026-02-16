@@ -72,10 +72,20 @@ jobs:
         run: npm install -g @napi-rs/cli@^2.18.0
 
       - name: Build rvf-node native module
+        shell: bash
         working-directory: crates/rvf/rvf-node
-        run: napi build --platform --release --target ${{ matrix.settings.target }}
+        run: |
+          napi build --platform --release --target ${{ matrix.settings.target }}
+          # NAPI CLI may output as index.<platform>.node; rename to rvf-node.<platform>.node
+          BUILT=$(ls -1 *.*.node 2>/dev/null | head -1)
+          EXPECTED="rvf-node.${{ matrix.settings.platform }}.node"
+          if [ -n "$BUILT" ] && [ "$BUILT" != "$EXPECTED" ]; then
+            mv -v "$BUILT" "$EXPECTED"
+          fi
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-C link-arg=-undefined -C link-arg=dynamic_lookup"
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS: "-C link-arg=-undefined -C link-arg=dynamic_lookup"
 
       - name: List built artifacts
         shell: bash
