@@ -30,11 +30,12 @@ Most vector databases are static — they store embeddings and search them. That
 | 💰 **Cost** | Per-query pricing | ✅ Free forever — open source (MIT) |
 | 📈 **Scales horizontally** | 💰 Paid tiers | ✅ Add nodes freely, no per-vector fees |
 | 🌿 **Git-like branching** | ❌ | ✅ Branch your data like code — only changes are copied |
+| ⚡ **Sublinear Solvers** | ❌ | ✅ O(log n) sparse linear systems, PageRank, spectral methods |
 
 **One package. Everything included:** vector search, graph queries, GNN learning, distributed clustering, local LLMs, 40+ attention mechanisms, cognitive containers ([RVF](./crates/rvf/README.md) — self-booting `.rvf` files with eBPF, witness chains, and COW branching), and WASM support.
 
 <details>
-<summary>📋 See Full Capabilities (42 features)</summary>
+<summary>📋 See Full Capabilities (43 features)</summary>
 
 **Core Vector Database**
 | # | Capability | What It Does |
@@ -84,31 +85,32 @@ Most vector databases are static — they store embeddings and search them. That
 | 27 | **Cognitum Gate** | Cognitive AI gateway with TileZero acceleration |
 | 28 | **FPGA transformer** | Hardware-accelerated transformer inference |
 | 29 | **Quantum coherence** | ruQu for quantum error correction via dynamic min-cut |
+| 30 | **Sublinear Solvers** | 8 algorithms: Neumann, CG, Forward Push, TRUE, BMSSP — O(log n) to O(√n) |
 
 **Genomics & Health**
 | # | Capability | What It Does |
 |---|------------|--------------|
-| 30 | **rvDNA genomic analysis** | Variant calling, protein translation, HNSW k-mer search in 12 ms |
-| 31 | **`.rvdna` file format** | AI-native binary with pre-computed vectors, tensors, and embeddings |
-| 32 | **Instant diagnostics** | Sickle cell, cancer mutations, drug dosing — runs on any device |
-| 33 | **Privacy-first WASM** | Browser-based genomics, data never leaves the device |
+| 31 | **rvDNA genomic analysis** | Variant calling, protein translation, HNSW k-mer search in 12 ms |
+| 32 | **`.rvdna` file format** | AI-native binary with pre-computed vectors, tensors, and embeddings |
+| 33 | **Instant diagnostics** | Sickle cell, cancer mutations, drug dosing — runs on any device |
+| 34 | **Privacy-first WASM** | Browser-based genomics, data never leaves the device |
 
 **Platform & Integration**
 | # | Capability | What It Does |
 |---|------------|--------------|
-| 34 | **Run anywhere** | Node.js, browser (WASM), edge (rvLite), HTTP server, Rust, bare metal |
-| 35 | **Drop into Postgres** | pgvector-compatible extension with SIMD acceleration |
-| 36 | **MCP integration** | Model Context Protocol server for AI assistant tools |
-| 37 | **Cloud deployment** | One-click deploy to Cloud Run, Kubernetes |
-| 38 | **13 Rust crates + 4 npm packages** | [RVF SDK](./crates/rvf/README.md) published on [crates.io](https://crates.io/crates/rvf-runtime) and [npm](https://www.npmjs.com/package/@ruvector/rvf) |
+| 35 | **Run anywhere** | Node.js, browser (WASM), edge (rvLite), HTTP server, Rust, bare metal |
+| 36 | **Drop into Postgres** | pgvector-compatible extension with SIMD acceleration |
+| 37 | **MCP integration** | Model Context Protocol server for AI assistant tools |
+| 38 | **Cloud deployment** | One-click deploy to Cloud Run, Kubernetes |
+| 39 | **13 Rust crates + 4 npm packages** | [RVF SDK](./crates/rvf/README.md) published on [crates.io](https://crates.io/crates/rvf-runtime) and [npm](https://www.npmjs.com/package/@ruvector/rvf) |
 
 **Self-Learning & Adaptation**
 | # | Capability | What It Does |
 |---|------------|--------------|
-| 39 | **Self-learning hooks** | Q-learning, neural patterns, HNSW memory |
-| 40 | **ReasoningBank** | Trajectory learning with verdict judgment |
-| 41 | **Economy system** | Tokenomics, CRDT-based distributed state |
-| 42 | **Agentic synthesis** | Multi-agent workflow composition |
+| 40 | **Self-learning hooks** | Q-learning, neural patterns, HNSW memory |
+| 41 | **ReasoningBank** | Trajectory learning with verdict judgment |
+| 42 | **Economy system** | Tokenomics, CRDT-based distributed state |
+| 43 | **Agentic synthesis** | Multi-agent workflow composition |
 
 </details>
 
@@ -234,6 +236,38 @@ npx @ruvector/rvf-mcp-server --transport stdio # MCP server for AI agents
 
 </details>
 
+<details>
+<summary><strong>Sublinear-Time Solver</strong> — O(log n) sparse linear systems for graph analytics and AI</summary>
+
+**[ruvector-solver](./crates/ruvector-solver/README.md)** provides 8 iterative algorithms for sparse linear systems, achieving O(log n) to O(√n) complexity — orders of magnitude faster than dense O(n³) solvers. Powers Prime Radiant coherence, GNN message passing, spectral methods, and PageRank computation.
+
+```bash
+cargo add ruvector-solver --features all-algorithms
+```
+
+| Algorithm | Complexity | Best For |
+|-----------|-----------|----------|
+| **Neumann Series** | O(k · nnz) | Diagonally dominant, fast convergence |
+| **Conjugate Gradient** | O(√κ · log(1/ε) · nnz) | Gold-standard SPD solver |
+| **Forward Push** | O(1/ε) | Single-source PageRank |
+| **Backward Push** | O(1/ε) | Reverse relevance computation |
+| **Hybrid Random Walk** | O(√n/ε) | Pairwise relevance, Monte Carlo |
+| **TRUE** | O(log n) amortized | Large-scale Laplacian systems |
+| **BMSSP** | O(nnz · log n) | Multigrid hierarchical solve |
+| **Auto Router** | Automatic | Selects optimal algorithm |
+
+**Key optimizations**: AVX2 SIMD SpMV, fused residual kernels, bounds-check elimination, arena allocator
+
+**Supporting crates**:
+- [`ruvector-attn-mincut`](./crates/ruvector-attn-mincut/README.md) — Min-cut gating as alternative to softmax attention
+- [`ruvector-coherence`](./crates/ruvector-coherence/README.md) — Coherence measurement for attention comparison
+- [`ruvector-profiler`](./crates/ruvector-profiler/README.md) — Memory, power, and latency benchmarking
+
+- **177 tests** | 5 Criterion benchmarks | WASM + NAPI bindings
+- **ADR documentation**: [docs/research/sublinear-time-solver/](./docs/research/sublinear-time-solver/)
+
+</details>
+
 ---
 
 ## How the GNN Works
@@ -301,6 +335,8 @@ npx ruvector
 | **SPARQL/RDF** | ✅ W3C 1.1 | ❌ | ❌ | ❌ | ❌ |
 | **Hyperedges** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Dynamic Min-Cut** | ✅ n^0.12 | ❌ | ❌ | ❌ | ❌ |
+| **Sublinear Solvers** | ✅ 8 algorithms | ❌ | ❌ | ❌ | ❌ |
+| **O(log n) Graph Solve** | ✅ TRUE+BMSSP | ❌ | ❌ | ❌ | ❌ |
 | **Self-Learning (GNN)** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Runtime Adaptation (SONA)** | ✅ LoRA+EWC++ | ❌ | ❌ | ❌ | ❌ |
 | **AI Agent Routing** | ✅ Tiny Dancer | ❌ | ❌ | ❌ | ❌ |
@@ -443,6 +479,7 @@ cargo add ruvector-raft ruvector-cluster ruvector-replication
 | **ruQu Quantum** | Quantum error correction via min-cut | Future-proof algorithms |
 | **Mincut-Gated Transformer** | Dynamic attention via graph optimization | **50% compute reduction** |
 | **Sparse Inference** | Efficient sparse matrix operations | 10x faster for sparse data |
+| **Sublinear Solver** | 8 sparse algorithms, O(log n) | Powers coherence, GNN, spectral |
 
 ### Self-Learning & Adaptation
 

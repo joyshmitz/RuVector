@@ -1,0 +1,261 @@
+# ruvector-solver
+
+[![Crates.io](https://img.shields.io/crates/v/ruvector-solver.svg)](https://crates.io/crates/ruvector-solver)
+[![docs.rs](https://docs.rs/ruvector-solver/badge.svg)](https://docs.rs/ruvector-solver)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Sublinear-time solver for **RuVector**: O(log n) to O(sqrt(n)) algorithms for
+sparse linear systems, Personalized PageRank, and spectral methods. All solvers
+operate on a shared CSR (Compressed Sparse Row) matrix representation and
+expose a uniform `SolverEngine` trait for seamless algorithm swapping and
+automatic routing.
+
+## Algorithms
+
+| Algorithm | Module | Complexity | Applicable to |
+|-----------|--------|------------|---------------|
+| Jacobi-preconditioned Neumann series | `neumann` | O(nnz * log(1/eps)) | Diagonally dominant Ax = b |
+| Conjugate Gradient (Hestenes-Stiefel) | `cg` | O(nnz * sqrt(kappa)) | Symmetric positive-definite Ax = b |
+| Forward Push (Andersen-Chung-Lang) | `forward_push` | O(1/epsilon) | Single-source Personalized PageRank |
+| Backward Push | `backward_push` | O(1/epsilon) | Reverse relevance / target-centric PPR |
+| Hybrid Random Walk | `random_walk` | O(sqrt(n)/epsilon) | Large-graph PPR with push initialisation |
+| TRUE (JL + sparsification + Neumann) | `true_solver` | O(nnz * log n) | Batch linear systems with shared A |
+| BMSSP Multigrid (V-cycle + Jacobi) | `bmssp` | O(n log n) | Ill-conditioned / graph Laplacian systems |
+
+## Quick Start
+
+Add the crate to your `Cargo.toml`:
+
+```toml
+[dependencies]
+ruvector-solver = "0.1"
+```
+
+Solve a diagonally dominant 3x3 system with the Neumann solver:
+
+```rust
+use ruvector_solver::types::CsrMatrix;
+use ruvector_solver::neumann::NeumannSolver;
+
+// Build a diagonally dominant 3x3 matrix in COO format
+//     [ 2.0  -0.5   0.0]
+// A = [-0.5   2.0  -0.5]
+//     [ 0.0  -0.5   2.0]
+let a = CsrMatrix::<f32>::from_coo(3, 3, vec![
+    (0, 0, 2.0_f32), (0, 1, -0.5),
+    (1, 0, -0.5),    (1, 1, 2.0),  (1, 2, -0.5),
+    (2, 1, -0.5),    (2, 2, 2.0),
+]);
+let b = vec![1.0_f32, 0.0, 1.0];
+
+let solver = NeumannSolver::new(1e-6, 500);
+let result = solver.solve(&a, &b).unwrap();
+
+println!("solution: {:?}", result.solution);
+println!("iterations: {}", result.iterations);
+println!("residual:   {:.2e}", result.residual_norm);
+assert!(result.residual_norm < 1e-4);
+```
+
+Use the `SolverEngine` trait for algorithm-agnostic code:
+
+```rust
+use ruvector_solver::types::{ComputeBudget, CsrMatrix};
+use ruvector_solver::traits::SolverEngine;
+use ruvector_solver::neumann::NeumannSolver;
+
+let engine: Box<dyn SolverEngine> = Box::new(NeumannSolver::new(1e-6, 500));
+let a = CsrMatrix::<f64>::from_coo(3, 3, vec![
+    (0, 0, 2.0), (0, 1, -0.5),
+    (1, 0, -0.5), (1, 1, 2.0), (1, 2, -0.5),
+    (2, 1, -0.5), (2, 2, 2.0),
+]);
+let b = vec![1.0_f64, 0.0, 1.0];
+let budget = ComputeBudget::default();
+
+let result = engine.solve(&a, &b, &budget).unwrap();
+assert!(result.residual_norm < 1e-4);
+```
+
+## Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `neumann` | Yes | Jacobi-preconditioned Neumann series solver |
+| `cg` | Yes | Conjugate Gradient (Hestenes-Stiefel) solver |
+| `forward-push` | Yes | Forward push for single-source PPR |
+| `backward-push` | No | Backward push for reverse relevance computation |
+| `hybrid-random-walk` | No | Hybrid random walk with push initialisation (enables `getrandom`) |
+| `true-solver` | No | TRUE batch solver (implies `neumann`) |
+| `bmssp` | No | BMSSP multigrid solver (V-cycle with Jacobi smoothing) |
+| `all-algorithms` | No | Enables every algorithm above |
+| `simd` | No | AVX2 SIMD-accelerated SpMV (x86_64 only) |
+| `wasm` | No | WebAssembly target support |
+| `parallel` | No | Multi-threaded SpMV and solver loops (enables `rayon`, `crossbeam`) |
+| `full` | No | All algorithms + `parallel` + `nalgebra-backend` |
+
+Enable all algorithms:
+
+```toml
+[dependencies]
+ruvector-solver = { version = "0.1", features = ["all-algorithms"] }
+```
+
+## Performance Optimisations
+
+### Bounds-check-free SpMV (`spmv_unchecked`)
+
+The inner SpMV loop is the single hottest path in every iterative solver. The
+`spmv_unchecked` method on `CsrMatrix<f32>` and `CsrMatrix<f64>` uses raw
+pointers to eliminate per-element bounds checks, relying on a one-time CSR
+structural validation (`validation::validate_csr_matrix`) performed before
+entering the solve loop.
+
+### Fused residual + norm computation (`fused_residual_norm_sq`)
+
+Standard implementations compute the residual `r = b - Ax` and its squared norm
+`||r||^2` in separate passes (SpMV, vector subtraction, dot product -- three
+full memory traversals). `fused_residual_norm_sq` computes both in a single
+pass, reducing memory traffic by roughly 3x per iteration.
+
+### AVX2 8-wide SIMD SpMV
+
+When the `simd` feature is enabled on x86_64, `spmv_simd` dispatches to an
+AVX2 kernel that processes 8 `f32` values per instruction using `_mm256`
+intrinsics with a horizontal sum reduction at the end of each row. Falls back
+to a portable scalar loop on other architectures.
+
+### 4-wide unrolled Jacobi update
+
+The Neumann iteration's update step `x[j] += d_inv[j] * r[j]` is manually
+unrolled 4-wide for instruction-level parallelism, with a scalar remainder loop
+for dimensions not divisible by 4.
+
+### Arena allocator
+
+`SolverArena` provides bump allocation for per-solve scratch buffers. All
+temporary vectors are allocated from a single contiguous backing buffer and
+reclaimed in O(1) via `arena.reset()`, eliminating heap allocation overhead
+inside the iteration loop.
+
+## Architecture
+
+```text
+                          +-------------------+
+                          |   SolverRouter    |
+                          | (algorithm select)|
+                          +--------+----------+
+                                   |
+            +----------+-----------+-----------+----------+
+            |          |           |           |          |
+       +----v---+ +----v---+ +----v------+ +--v----+ +---v----+
+       |Neumann | |   CG   | |ForwardPush| | TRUE  | | BMSSP  |
+       |Solver  | | Solver | |  Solver   | |Solver | |Solver  |
+       +----+---+ +----+---+ +-----+-----+ +--+----+ +---+----+
+            |          |            |          |          |
+            +-----+----+-----+-----+-----+----+-----+---+
+                  |          |           |           |
+             +----v---+ +---v----+ +----v----+ +----v-----+
+             |types.rs| |simd.rs | |arena.rs | |budget.rs |
+             |CsrMatrix| |AVX2   | |Bump     | |ComputeBudget|
+             +--------+ |SpMV   | |Alloc    | |enforcement|
+                         +-------+ +--------+ +----------+
+                  |          |           |
+             +----v---+ +---v------+ +--v---------+
+             |traits.rs| |validate.rs| |error.rs    |
+             |SolverEngine| |CSR check| |SolverError |
+             +--------+ +---------+ +-----------+
+```
+
+The `SolverRouter` analyses the matrix `SparsityProfile` and `QueryType`
+to select the optimal algorithm. When the selected algorithm fails,
+`SolverOrchestrator::solve_with_fallback` tries a deterministic fallback
+chain: **selected -> CG -> Dense**.
+
+## API Overview
+
+### Core types (`types.rs`)
+
+| Type | Description |
+|------|-------------|
+| `CsrMatrix<T>` | Compressed Sparse Row matrix with `spmv`, `spmv_unchecked`, `from_coo`, `transpose` |
+| `SolverResult` | Solution vector, iteration count, residual norm, wall time, convergence history |
+| `ComputeBudget` | Maximum time, max iterations, target tolerance |
+| `Algorithm` | Enum of all solver algorithms (Neumann, CG, ForwardPush, ...) |
+| `SparsityProfile` | Matrix structural analysis (density, diagonal dominance, spectral radius estimate) |
+| `QueryType` | What the caller wants to solve (LinearSystem, PageRankSingle, Batch, ...) |
+| `ComplexityEstimate` | Predicted flops, iterations, memory, and complexity class |
+
+### Traits (`traits.rs`)
+
+| Trait | Description |
+|-------|-------------|
+| `SolverEngine` | Core trait: `solve(matrix, rhs, budget) -> SolverResult` |
+| `SparseLaplacianSolver` | Extension for graph Laplacian systems and effective resistance |
+| `SublinearPageRank` | Extension for sublinear PPR: `ppr(matrix, source, alpha, epsilon)` |
+
+### Error hierarchy (`error.rs`)
+
+| Error | Cause |
+|-------|-------|
+| `SolverError::NonConvergence` | Iteration budget exhausted without reaching tolerance |
+| `SolverError::NumericalInstability` | NaN/Inf or residual growth > 2x detected |
+| `SolverError::SpectralRadiusExceeded` | Spectral radius >= 1.0 (Neumann series would diverge) |
+| `SolverError::BudgetExhausted` | Wall-clock time limit exceeded |
+| `SolverError::InvalidInput` | Dimension mismatch, non-finite values, index out of bounds |
+| `SolverError::BackendError` | Backend-specific failure (nalgebra, BLAS) |
+
+### Infrastructure modules
+
+| Module | Description |
+|--------|-------------|
+| `router.rs` | `SolverRouter` for automatic algorithm selection; `SolverOrchestrator` with fallback |
+| `simd.rs` | AVX2-accelerated SpMV with runtime feature detection |
+| `validation.rs` | CSR structural validation (index bounds, monotonic row_ptr, NaN/Inf) |
+| `arena.rs` | `SolverArena` bump allocator for zero per-iteration heap allocation |
+| `budget.rs` | `ComputeBudget` enforcement during solve |
+| `audit.rs` | Audit logging for solver invocations |
+| `events.rs` | Event system for solver lifecycle hooks |
+
+## Testing
+
+The crate includes **177 tests** (138 unit tests + 39 integration/doctests):
+
+```bash
+# Run all tests
+cargo test -p ruvector-solver
+
+# Run tests with all algorithms enabled
+cargo test -p ruvector-solver --features all-algorithms
+
+# Run a specific test module
+cargo test -p ruvector-solver -- neumann::tests
+```
+
+### Benchmarks
+
+Five Criterion benchmark groups are provided:
+
+```bash
+# Run all benchmarks
+cargo bench -p ruvector-solver
+
+# Run a specific benchmark
+cargo bench -p ruvector-solver --bench solver_neumann
+```
+
+| Benchmark | Description |
+|-----------|-------------|
+| `solver_baseline` | Baseline SpMV and vector operations |
+| `solver_neumann` | Neumann solver convergence on tridiagonal systems |
+| `solver_cg` | Conjugate Gradient on SPD matrices |
+| `solver_push` | Forward/backward push on graph adjacency matrices |
+| `solver_e2e` | End-to-end solve through the router with algorithm selection |
+
+## Minimum Supported Rust Version
+
+Rust **1.77** or later.
+
+## License
+
+Licensed under the [MIT License](../../LICENSE).
