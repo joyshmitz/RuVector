@@ -9101,6 +9101,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-solver"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "criterion 0.5.1",
+ "crossbeam",
+ "dashmap 6.1.0",
+ "getrandom 0.2.16",
+ "nalgebra 0.33.2",
+ "parking_lot 0.12.5",
+ "proptest",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "ruvector-solver-node"
+version = "2.0.3"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "ruvector-solver",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "ruvector-solver-wasm"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.16",
+ "js-sys",
+ "ruvector-solver",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "web-sys",
+]
+
+[[package]]
 name = "ruvector-sona"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
