@@ -322,7 +322,16 @@ fn is_pid_alive(pid: u32) -> bool {
 #[cfg(unix)]
 extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+extern "C" {
     fn __errno_location() -> *mut i32;
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+extern "C" {
+    fn __error() -> *mut i32;
 }
 
 #[cfg(unix)]
@@ -330,9 +339,14 @@ unsafe fn libc_kill(pid: i32, sig: i32) -> i32 {
     unsafe { kill(pid, sig) }
 }
 
-#[cfg(unix)]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 unsafe fn errno_location() -> *mut i32 {
     unsafe { __errno_location() }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+unsafe fn errno_location() -> *mut i32 {
+    unsafe { __error() }
 }
 
 #[cfg(test)]
