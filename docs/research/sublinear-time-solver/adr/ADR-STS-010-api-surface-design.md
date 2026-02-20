@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -1351,6 +1351,21 @@ never removed; deprecated tools return a warning header.
 - **Pros**: Each layer uses its idiomatic tooling (wasm-bindgen, napi-rs, axum, MCP
   JSON-RPC); no forced dependencies; best ergonomics per platform.
 - **Cons**: More surface area to maintain; requires a disciplined release process.
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
+
+---
+
+## Implementation Status
+
+Clean trait-based API: SolverEngine trait with `fn solve(&self, matrix: &CsrMatrix<f64>, rhs: &[f64], budget: &ComputeBudget) -> Result<SolverResult, SolverError>`. Each algorithm also exposes a direct f32 `solve(&self, matrix: &CsrMatrix<f32>, rhs: &[f32]) -> Result<SolverResult, SolverError>` for zero-conversion hot paths. CsrMatrix<T> generic over numeric type with from_coo constructor, identity factory, spmv/spmv_unchecked/fused_residual_norm_sq methods. Router selects optimal algorithm automatically.
+
+---
 
 ## Related Decisions
 

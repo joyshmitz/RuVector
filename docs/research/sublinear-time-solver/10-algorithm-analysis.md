@@ -779,6 +779,45 @@ ruvector-gnn (GNN layers, training, EWC)
 
 ---
 
+## Implementation Notes
+
+The following documents the actual implementation approach for each algorithm in the `ruvector-solver` crate, noting where the implementation diverges from or refines the theoretical descriptions in Section 2.
+
+### Neumann Series -- Jacobi-Preconditioned
+
+The implementation uses **Jacobi preconditioning** with a D^{-1} splitting rather than the raw (I - A) expansion described in the literature. The matrix A is decomposed as A = D - B where D is the diagonal. The iteration computes x_{k+1} = D^{-1} * B * x_k + D^{-1} * b, which is equivalent to the Neumann series on D^{-1}A but with guaranteed convergence for all diagonally dominant systems. The diagonal inverse is precomputed once at solver setup. This approach is strictly superior to the raw Neumann series for graph Laplacian systems where diagonal dominance is inherent.
+
+### Conjugate Gradient -- Hestenes-Stiefel with Residual Monitoring
+
+The CG implementation follows the standard **Hestenes-Stiefel** formulation with explicit residual monitoring. The residual norm ||r_k|| / ||b|| is tracked at every iteration and compared against the convergence tolerance. If the residual increases for 5 consecutive iterations (indicating loss of orthogonality or numerical instability), the solver logs a warning and terminates with the best solution found. The implementation uses the fused kernel optimization to compute the matvec and residual update in a single pass.
+
+### Forward Push -- Queue-Based with Epsilon Threshold
+
+The Forward Push algorithm uses a **queue-based** implementation with an epsilon threshold for push activation. Vertices with |r[v]| / deg(v) > epsilon are maintained in a priority queue (max-heap by residual magnitude). This avoids scanning all vertices for push candidates and ensures O(1/epsilon) total work. The queue is implemented with a `BinaryHeap` and lazy deletion for efficiency.
+
+### TRUE -- JL Projection, Sparsification, Neumann Solve
+
+The TRUE solver implements the three-stage pipeline: (1) **Johnson-Lindenstrauss projection** to reduce dimension to O(log(n) / eps^2) using sparse random projection matrices, (2) **spectral sparsification** to reduce the graph to O(n * log(n) / eps^2) edges while preserving cut structure, and (3) **adaptive Neumann solve** on the sparsified system using the Jacobi-preconditioned Neumann iteration. The JL projection uses a sparse Rademacher matrix for efficiency.
+
+### BMSSP -- V-Cycle Multigrid with Jacobi Smoothing
+
+The BMSSP implementation uses a **V-cycle multigrid** scheme with Jacobi smoothing at each level. Coarsening is performed via heavy-edge matching, which groups vertices connected by the strongest edges into supernodes. The coarsest level (< 64 vertices) is solved directly. Prolongation uses piecewise constant interpolation from supernode to constituent vertices. Two Jacobi smoothing sweeps are applied at each level (pre- and post-smoothing) to reduce high-frequency error components.
+
+### Router -- Characteristic-Based Selection
+
+The algorithm router selects the optimal solver based on **matrix characteristics**: system size (n), density (nnz / n^2), symmetry (SPD detection), and diagonal dominance ratio (min(D_ii / sum(|A_ij|, j != i))). The selection rules are:
+
+| Characteristic | Selected Solver |
+|---|---|
+| n < 64 | Direct (dense) solve |
+| Diagonally dominant, sparse | Neumann (Jacobi-preconditioned) |
+| SPD, well-conditioned (kappa < 1000) | Conjugate Gradient |
+| SPD, ill-conditioned, n > 50K | BMSSP (multigrid) |
+| Graph Laplacian, n > 100K, batch RHS | TRUE (JL + sparsify + Neumann) |
+| Single-source graph query | Forward Push |
+
+---
+
 ## Appendix A: Notation Reference
 
 | Symbol | Meaning |

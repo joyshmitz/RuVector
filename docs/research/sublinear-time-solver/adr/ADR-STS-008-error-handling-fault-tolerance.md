@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -1503,6 +1503,21 @@ impl SolverObserver for PrimeRadiantObserver {
 
 - **Pros**: Can wrap existing code without modifying it. Catches panics from third-party code.
 - **Cons**: `catch_unwind` does not catch all panics (e.g., `panic = "abort"`). Performance overhead of unwinding. Does not provide structured diagnostics. Not idiomatic Rust for expected error conditions.
+
+---
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
+
+---
+
+## Implementation Status
+
+Comprehensive error hierarchy via thiserror: SolverError with variants for SpectralRadiusExceeded, NonConvergence, NumericalInstability, BudgetExhausted, InvalidInput, ArenaExhausted, and Internal. All variants carry diagnostic context (algorithm, iteration, residual). Results use standard Rust Result<T, SolverError>. Convergence history tracked per-iteration in SolverResult.
 
 ---
 

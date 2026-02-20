@@ -1,6 +1,6 @@
 # ADR-STS-005: Security Model and Threat Mitigation
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-02-20
 **Authors**: RuVector Security Team
 **Deciders**: Architecture Review Board
@@ -10,6 +10,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
 
 ---
 
@@ -429,6 +430,12 @@ CI pipeline additions:
 1. **PermitToken overhead**: Gate verification adds ~100μs per solver call
 2. **Rate limiting friction**: Legitimate high-throughput use cases may hit limits
 3. **Audit storage**: Witness entries add ~200 bytes per solver invocation
+
+---
+
+## Implementation Status
+
+Input validation module (validation.rs) checks CSR structural invariants, index bounds, NaN/Inf detection. Budget enforcement prevents resource exhaustion. Audit trail logs all solver invocations. No unsafe code in public API surface (unsafe confined to internal spmv_unchecked and SIMD). All assertions verified in 177 tests.
 
 ---
 

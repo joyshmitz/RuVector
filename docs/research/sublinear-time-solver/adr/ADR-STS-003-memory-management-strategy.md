@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Proposed |
+| **Status** | Accepted |
 | **Date** | 2026-02-20 |
 | **Authors** | RuVector Architecture Team |
 | **Deciders** | Architecture Review Board |
@@ -1414,6 +1414,12 @@ Comprehensive memory consumption for all solver components at representative sca
 
 ---
 
+## Implementation Status
+
+Arena allocator delivered for zero-allocation solver iterations. Fused residual_norm_sq kernel reduces memory passes from 3 to 1. spmv_unchecked eliminates bounds-check overhead. ComputeBudget system enforces memory caps. Workspace reuse across iterations via pre-allocated buffers.
+
+---
+
 ## 8. References
 
 1. S-LoRA: Serving Thousands of Concurrent LoRA Adapters (arXiv:2311.03285) --
@@ -1438,3 +1444,4 @@ Comprehensive memory consumption for all solver components at representative sca
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-20 | RuVector Architecture Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |

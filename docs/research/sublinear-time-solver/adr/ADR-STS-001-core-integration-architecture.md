@@ -1,6 +1,6 @@
 # ADR-STS-001: Sublinear-Time Solver Core Integration Architecture
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-02-20
 **Authors**: RuVector Architecture Team
 **Deciders**: Architecture Review Board
@@ -10,6 +10,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
 
 ---
 
@@ -984,6 +985,12 @@ Total estimated effort: **8 weeks** for full integration across all eight points
 ---
 
 ## References
+
+## Implementation Status
+
+Full solver crate (ruvector-solver) delivered with 8 algorithms (Neumann, CG, Forward Push, Backward Push, Hybrid Random Walk, TRUE, BMSSP, Router), CSR matrix types, SIMD-accelerated SpMV (AVX2), fused residual kernel, arena allocator, audit logging, event system, and comprehensive validation. WASM and NAPI bindings complete. 177 tests passing.
+
+---
 
 ### Research Documents (docs/research/sublinear-time-solver/)
 

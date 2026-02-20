@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -22,6 +22,7 @@ Architecture Review Board
 |---------|------|--------|---------|
 | 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
 | 0.2 | 2026-02-20 | RuVector Team | Comprehensive rewrite: crossover analysis, error budget decomposition, SONA/EWC integration, full decision matrix |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
 
 ---
 
@@ -978,6 +979,12 @@ documents all three tiers as the target architecture.
 9. Johnson, W.B., Lindenstrauss, J. (1984). "Extensions of Lipschitz mappings into a Hilbert space." Contemporary Mathematics.
 
 10. Kirkpatrick, J., et al. (2017). "Overcoming catastrophic forgetting in neural networks." PNAS.
+
+---
+
+## Implementation Status
+
+Algorithm router implemented with crossover analysis: Neumann for diag-dominant (fastest for well-conditioned), CG as gold-standard SPD fallback, Forward/Backward Push for PageRank, TRUE for large-scale Laplacian, BMSSP for multigrid. Router uses matrix characterization (size, density, diagonal dominance, symmetry) for automatic algorithm selection.
 
 ---
 

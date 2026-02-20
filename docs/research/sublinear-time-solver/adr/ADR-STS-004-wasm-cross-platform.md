@@ -1,6 +1,6 @@
 # ADR-STS-004: WASM and Cross-Platform Compilation Strategy
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-02-20
 **Authors**: RuVector Architecture Team
 **Deciders**: Architecture Review Board
@@ -10,6 +10,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
 
 ---
 
@@ -445,6 +446,12 @@ Optimization: Use `opt-level = "s"` and `wasm-opt -Oz` for size-constrained depl
 
 1. nalgebra compiles to WASM with `default-features = false` — no code changes needed
 2. WASM SIMD128 support is universal in modern browsers (Chrome 91+, Firefox 89+, Safari 16.4+)
+
+---
+
+## Implementation Status
+
+WASM bindings complete via wasm-bindgen in ruvector-solver-wasm crate. All 7 algorithms exposed to JavaScript. TypedArray zero-copy for matrix data. Feature-gated compilation (wasm feature). Scalar SpMV fallback when SIMD unavailable. 32-bit index support for wasm32 memory model.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -1131,6 +1131,21 @@ Based on existing ruvector benchmark data and the solver's algorithmic propertie
 | 100x Neumann (128x128) | 0.8 ms | 0.25 ms | 3.2x | ~100us postMessage |
 | 100x Neumann (SAB zero-copy) | 0.8 ms | 0.22 ms | 3.6x | ~10us shared read |
 | WASM SIMD vs scalar | - | - | 2-4x | Per-operation |
+
+---
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
+
+---
+
+## Implementation Status
+
+Parallel feature gate enables rayon for data-parallel SpMV and crossbeam for concurrent solver pipeline. Thread-safe types via Send + Sync bounds. DashMap for concurrent solver registry. parking_lot for low-overhead locking. Arena allocator is thread-local. ComputeBudget checked atomically. WASM target uses single-threaded fallback.
 
 ---
 

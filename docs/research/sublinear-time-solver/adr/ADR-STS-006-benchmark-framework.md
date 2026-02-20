@@ -1,6 +1,6 @@
 # ADR-STS-006: Benchmark Framework and Performance Validation
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-02-20
 **Authors**: RuVector Performance Team
 **Deciders**: Architecture Review Board
@@ -10,6 +10,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
 
 ---
 
@@ -486,6 +487,12 @@ Following existing BENCHMARK_RESULTS.md conventions:
 1. **Benchmark maintenance**: 6 new benchmark files to maintain
 2. **CI time**: Nightly full suite adds ~30 minutes to CI
 3. **Flaky thresholds**: Regression thresholds may need periodic recalibration
+
+---
+
+## Implementation Status
+
+Complete Criterion benchmark suite delivered with 5 benchmark groups: solver_baseline (dense reference), solver_neumann (Neumann series profiling), solver_cg (conjugate gradient scaling), solver_push (push algorithm comparison), solver_e2e (end-to-end pipeline). Min-cut gating benchmark script (scripts/run_mincut_bench.sh) with 1k-sample grid search over lambda/tau parameters. Profiler crate (ruvector-profiler) provides memory, latency, power measurement with CSV output.
 
 ---
 

@@ -2,12 +2,13 @@
 
 ## Status
 
-**Proposed**
+**Accepted**
 
 ## Metadata
 
 | Field       | Value                                          |
 |-------------|------------------------------------------------|
+| Version     | 1.0                                            |
 | Date        | 2026-02-20                                     |
 | Authors     | RuVector Architecture Team                     |
 | Deciders    | Architecture Review Board                      |
@@ -916,6 +917,21 @@ with `sublinear-*` flags, workspace-level aggregates for convenience.
   via compile-time guards.
 - **ADR-STS-004**: Performance Benchmarks -- defines the benchmarking framework used to
   validate Phase 4 promotion criteria.
+
+---
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-02-20 | RuVector Team | Initial proposal |
+| 1.0 | 2026-02-20 | RuVector Team | Accepted: full implementation complete |
+
+---
+
+## Implementation Status
+
+Feature flag system fully operational: `neumann`, `cg`, `forward-push`, `backward-push`, `hybrid-random-walk`, `true-solver`, `bmssp` as individual flags. `all-algorithms` meta-flag enables all. `simd` for AVX2 acceleration. `wasm` for WebAssembly target. `parallel` for rayon/crossbeam concurrency. Default features: neumann, cg, forward-push. Conditional compilation throughout with `#[cfg(feature = ...)]`.
 
 ---
 
