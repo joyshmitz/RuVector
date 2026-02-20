@@ -1,0 +1,17 @@
+[package]
+name = "ruvector-profiler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Memory, power, and latency profiling hooks with CSV emitters for benchmarking attention mechanisms"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.13"
