@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'eventemitter3';
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import pino from 'pino';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -71,6 +72,7 @@ export class RuvBot extends EventEmitter<RuvBotEvents> {
   private isRunning: boolean = false;
   private startTime?: Date;
   private llmProvider: LLMProvider | null = null;
+  private httpServer: Server | null = null;
 
   constructor(options: RuvBotOptions = {}) {
     super();
@@ -539,16 +541,151 @@ export class RuvBot extends EventEmitter<RuvBotEvents> {
   }
 
   private async startApiServer(config: BotConfig): Promise<void> {
-    this.logger.info(
-      { port: config.api.port, host: config.api.host },
-      'Starting API server...'
-    );
-    // TODO: Initialize Fastify server
+    const port = config.api.port || 3000;
+    const host = config.api.host || '0.0.0.0';
+
+    this.httpServer = createServer((req, res) => {
+      this.handleApiRequest(req, res).catch((error) => {
+        this.logger.error({ err: error }, 'Unhandled API request error');
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Internal server error' }));
+        }
+      });
+    });
+
+    return new Promise<void>((resolve, reject) => {
+      this.httpServer!.on('error', (err) => {
+        this.logger.error({ err, port, host }, 'API server failed to start');
+        reject(err);
+      });
+
+      this.httpServer!.listen(port, host, () => {
+        this.logger.info({ port, host }, 'API server listening');
+        resolve();
+      });
+    });
   }
 
   private async stopApiServer(): Promise<void> {
-    this.logger.debug('Stopping API server...');
-    // TODO: Stop Fastify server
+    if (!this.httpServer) return;
+
+    return new Promise<void>((resolve) => {
+      this.httpServer!.close(() => {
+        this.logger.debug('API server stopped');
+        this.httpServer = null;
+        resolve();
+      });
+    });
+  }
+
+  private async handleApiRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const path = url.pathname;
+    const method = req.method || 'GET';
+
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const json = (status: number, data: unknown) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    };
+
+    // Health check
+    if (path === '/health' || path === '/healthz') {
+      json(200, {
+        status: 'healthy',
+        uptime: this.startTime ? Math.floor((Date.now() - this.startTime.getTime()) / 1000) : 0,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // Readiness check
+    if (path === '/ready' || path === '/readyz') {
+      if (this.isRunning) {
+        json(200, { status: 'ready' });
+      } else {
+        json(503, { status: 'not ready' });
+      }
+      return;
+    }
+
+    // Status
+    if (path === '/api/status') {
+      json(200, this.getStatus());
+      return;
+    }
+
+    // Chat endpoint
+    if (path === '/api/chat' && method === 'POST') {
+      const body = await this.parseRequestBody(req);
+      const message = body?.message as string;
+      const agentId = (body?.agentId as string) || 'default-agent';
+
+      if (!message) {
+        json(400, { error: 'Missing "message" field' });
+        return;
+      }
+
+      // Create or reuse a session
+      let sessionId = body?.sessionId as string;
+      if (!sessionId || !this.sessions.has(sessionId)) {
+        const session = await this.createSession(agentId);
+        sessionId = session.id;
+      }
+
+      const response = await this.chat(sessionId, message);
+      json(200, { sessionId, agentId, response });
+      return;
+    }
+
+    // List agents
+    if (path === '/api/agents' && method === 'GET') {
+      json(200, { agents: this.listAgents() });
+      return;
+    }
+
+    // List sessions
+    if (path === '/api/sessions' && method === 'GET') {
+      json(200, { sessions: this.listSessions() });
+      return;
+    }
+
+    // Root — simple landing page
+    if (path === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!DOCTYPE html><html><head><title>RuvBot</title>
+        <style>body{font-family:system-ui;background:#0a0a0f;color:#f0f0f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+        .c{text-align:center}h1{font-size:3rem}p{color:#a0a0b0}a{color:#6366f1;text-decoration:none;padding:12px 24px;border:1px solid #6366f1;border-radius:8px;display:inline-block}a:hover{background:#6366f1;color:#fff}</style>
+        </head><body><div class="c"><h1>RuvBot</h1><p>Enterprise-grade AI Assistant</p><a href="/api/status">API Status</a></div></body></html>`);
+      return;
+    }
+
+    // 404
+    json(404, { error: 'Not found' });
+  }
+
+  private parseRequestBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        if (chunks.length === 0) { resolve(null); return; }
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8'))); }
+        catch { reject(new Error('Invalid JSON')); }
+      });
+      req.on('error', reject);
+    });
   }
 
   private async generateResponse(
