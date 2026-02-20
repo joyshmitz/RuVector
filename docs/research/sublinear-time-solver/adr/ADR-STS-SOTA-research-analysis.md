@@ -510,63 +510,34 @@ Relevant to RuVector's future development:
 ## 11. Bibliography
 
 1. Spielman, D.A., Teng, S.-H. (2004). "Nearly-Linear Time Algorithms for Graph Partitioning, Graph Sparsification, and Solving Linear Systems." STOC 2004.
-
 2. Koutis, I., Miller, G.L., Peng, R. (2011). "A Nearly-m log n Time Solver for SDD Linear Systems." FOCS 2011.
-
 3. Cohen, M.B., Kyng, R., Miller, G.L., Pachocki, J.W., Peng, R., Rao, A.B., Xu, S.C. (2014). "Solving SDD Linear Systems in Nearly m log^{1/2} n Time." STOC 2014.
-
 4. Kyng, R., Sachdeva, S. (2016). "Approximate Gaussian Elimination for Laplacians." FOCS 2016.
-
 5. Chen, L., Kyng, R., Liu, Y.P., Peng, R., Gutenberg, M.P., Sachdeva, S. (2022). "Maximum Flow and Minimum-Cost Flow in Almost-Linear Time." FOCS 2022. arXiv:2203.00671.
-
 6. Andersen, R., Chung, F., Lang, K. (2006). "Local Graph Partitioning using PageRank Vectors." FOCS 2006.
-
 7. Lofgren, P., Banerjee, S., Goel, A., Seshadhri, C. (2014). "FAST-PPR: Scaling Personalized PageRank Estimation for Large Graphs." KDD 2014.
-
 8. Spielman, D.A., Srivastava, N. (2011). "Graph Sparsification by Effective Resistances." SIAM J. Comput.
-
 9. Benczur, A.A., Karger, D.R. (2015). "Randomized Approximation Schemes for Cuts and Flows in Capacitated Graphs." SIAM J. Comput.
-
 10. Johnson, W.B., Lindenstrauss, J. (1984). "Extensions of Lipschitz mappings into a Hilbert space." Contemporary Mathematics.
-
 11. Larsen, K.G., Nelson, J. (2017). "Optimality of the Johnson-Lindenstrauss Lemma." FOCS 2017.
-
 12. Tang, E. (2019). "A Quantum-Inspired Classical Algorithm for Recommendation Systems." STOC 2019.
-
 13. Hestenes, M.R., Stiefel, E. (1952). "Methods of Conjugate Gradients for Solving Linear Systems." J. Res. Nat. Bur. Standards.
-
 14. Kirkpatrick, J., et al. (2017). "Overcoming catastrophic forgetting in neural networks." PNAS.
-
 15. Hamilton, W.L., Ying, R., Leskovec, J. (2017). "Inductive Representation Learning on Large Graphs." NeurIPS 2017.
-
 16. Cuturi, M. (2013). "Sinkhorn Distances: Lightspeed Computation of Optimal Transport." NeurIPS 2013.
-
 17. arXiv:2512.13105 (2024). "Subpolynomial-Time Dynamic Minimum Cut."
-
 18. Defferrard, M., Bresson, X., Vandergheynst, P. (2016). "Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering." NeurIPS 2016.
-
 19. Shewchuk, J.R. (1994). "An Introduction to the Conjugate Gradient Method Without the Agonizing Pain." Technical Report.
-
 20. Briggs, W.L., Henson, V.E., McCormick, S.F. (2000). "A Multigrid Tutorial." SIAM.
-
 21. Martinsson, P.G., Tropp, J.A. (2020). "Randomized Numerical Linear Algebra: Foundations and Algorithms." Acta Numerica.
-
 22. Musco, C., Musco, C. (2024). "Sublinear Spectral Density Estimation." STOC 2024.
-
 23. Durfee, D., Kyng, R., Peebles, J., Rao, A.B., Sachdeva, S. (2023). "Sampling Random Spanning Trees Faster than Matrix Multiplication." STOC 2023.
-
 24. Nakatsukasa, Y., Tropp, J.A. (2024). "Fast and Accurate Randomized Algorithms for Linear Algebra and Eigenvalue Problems." Found. Comput. Math.
-
 25. Liberty, E. (2013). "Simple and Deterministic Matrix Sketching." KDD 2013.
-
 26. Kitaev, N., Kaiser, L., Levskaya, A. (2020). "Reformer: The Efficient Transformer." ICLR 2020.
-
 27. Galhotra, S., Mazumdar, A., Pal, S., Rajaraman, R. (2024). "Distributed Laplacian Solvers via Communication-Efficient Iterative Methods." PODC 2024.
-
 28. Cohen, M.B., Nelson, J., Woodruff, D.P. (2022). "Optimal Approximate Matrix Product in Terms of Stable Rank." ICALP 2022.
-
 29. Nemirovski, A., Yudin, D. (1983). "Problem Complexity and Method Efficiency in Optimization." Wiley.
-
 30. Clarkson, K.L., Woodruff, D.P. (2017). "Low-Rank Approximation and Regression in Input Sparsity Time." J. ACM.
 
 ---
