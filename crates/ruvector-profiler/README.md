@@ -1,7 +1,15 @@
 # ruvector-profiler
 
-Memory, power, and latency profiling hooks with CSV emitters for benchmarking
-attention mechanisms.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**Memory, power, and latency profiling hooks with CSV emitters — the observability layer for attention benchmarking.**
+
+| Dimension | What It Measures | Output |
+|-----------|-----------------|--------|
+| **Memory** | RSS, KV-cache, activations, temp buffers | `MemoryReport` + CSV |
+| **Power** | Wattage samples, trapezoidal energy integration | `EnergyResult` + CSV |
+| **Latency** | p50/p95/p99, mean, std | `LatencyStats` + CSV |
+| **Config** | SHA-256 fingerprint of all parameters | Reproducibility hash |
 
 ## Overview
 
@@ -163,20 +171,95 @@ run_mincut_bench.sh
 CSV files follow the schemas above. Use `config_hash` to link results back to
 their exact configuration.
 
-## Architecture Notes
+<details>
+<summary><strong>Tutorial: Running a Complete Min-Cut Benchmark</strong></summary>
 
-This crate is designed for composition with:
+### Step 1: Set up config and trackers
 
-- **ruvector-attn-mincut** -- provides the attention operators being profiled
-- **ruvector-coherence** -- measures output quality (fed into `ResultRow`)
+```rust
+use ruvector_profiler::*;
 
-All public types implement `Debug`, `Clone`, `Serialize`, and `Deserialize`.
+let config = BenchConfig {
+    model_commit: "abc1234".into(),
+    weights_hash: "def5678".into(),
+    lambda: 0.5, tau: 2, eps: 0.01,
+    compiler_flags: "-O3 -mavx2".into(),
+};
+println!("Config fingerprint: {}", config_hash(&config));
 
-## Dependencies
+let mut mem_tracker = MemoryTracker::new("mincut_l0.5_t2");
+let power_source = MockPowerSource { watts: 75.0 };
+let mut power_tracker = PowerTracker::new("gpu");
+```
 
-- `serde` / `serde_json` -- serialization for all structs and config hashing
-- `tempfile` (dev) -- temporary directories in tests
+### Step 2: Run benchmark loop
+
+```rust
+let mut latencies = Vec::new();
+for i in 0..1000 {
+    mem_tracker.snapshot();
+    power_tracker.sample(&power_source);
+    let start = std::time::Instant::now();
+    // ... run attn_mincut() ...
+    latencies.push(LatencyRecord {
+        sample_id: i,
+        wall_time_us: start.elapsed().as_micros() as u64,
+        kernel_time_us: start.elapsed().as_micros() as u64,
+        seq_len: 128,
+    });
+}
+```
+
+### Step 3: Export results
+
+```rust
+let stats = compute_latency_stats(&latencies);
+let report = mem_tracker.report();
+let energy = power_tracker.energy();
+
+write_latency_csv("results/latency.csv", &latencies).unwrap();
+write_memory_csv("results/memory.csv", &mem_tracker.snapshots).unwrap();
+
+println!("Peak RSS: {} | p95: {}us | Energy: {:.3}J",
+    report.peak_rss, stats.p95_us, energy.total_joules);
+```
+
+### Step 4: Use the benchmark script
+
+```bash
+# Full grid search: 1000 samples x 6 settings
+./scripts/run_mincut_bench.sh --samples 1000
+
+# Custom grid
+./scripts/run_mincut_bench.sh --lambda "0.3 0.5 0.7" --tau "0 2" --seed 42
+```
+
+### Expected output structure
+
+```
+results/mincut-bench/
+  csv/
+    baseline.csv           # Softmax reference
+    mincut_l0.3_t0.csv     # Per-setting results
+    mincut_l0.3_t2.csv
+    ...
+    results.csv            # Aggregate comparison
+  witness/
+    mincut_l0.3_t0.jsonl   # SHA-256 witness chains
+    witness.rvf            # RVF-packed bundle
+  figs/                    # Generated plots
+```
+
+</details>
+
+## Related Crates
+
+| Crate | Role |
+|-------|------|
+| [`ruvector-attn-mincut`](../ruvector-attn-mincut/README.md) | Attention operators being profiled |
+| [`ruvector-coherence`](../ruvector-coherence/README.md) | Quality metrics fed into `ResultRow` |
+| [`ruvector-solver`](../ruvector-solver/README.md) | Sublinear solvers for graph analytics |
 
 ## License
 
-MIT -- see workspace root for details.
+Licensed under the [MIT License](../../LICENSE).

@@ -1,6 +1,19 @@
 # ruvector-coherence
 
-Coherence measurement proxies for comparing attention mechanisms.
+[![Crates.io](https://img.shields.io/crates/v/ruvector-coherence.svg)](https://crates.io/crates/ruvector-coherence)
+[![docs.rs](https://docs.rs/ruvector-coherence/badge.svg)](https://docs.rs/ruvector-coherence)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**Quantitative coherence metrics for comparing attention mechanisms — measure what gating costs and what it preserves.**
+
+| Metric | What It Measures | Use Case |
+|--------|-----------------|----------|
+| `contradiction_rate` | Semantic inversion (negative dot product) | Detect gating failures |
+| `entailment_consistency` | Adjacent-output alignment (cosine) | Detect erratic swings |
+| `delta_behavior` | Direction + magnitude drift | Full coherence profile |
+| `jaccard_similarity` | Mask overlap (intersection/union) | Compare sparsity patterns |
+| `quality_check` | Cosine similarity pass/fail gate | CI/CD quality guardrail |
+| `evaluate_batch` | Aggregate stats with 95% CI | Statistical significance |
 
 ## Overview
 
@@ -166,19 +179,66 @@ println!("Pass rate:  {:.1}%", batch.pass_rate * 100.0);
 6. Export via ruvector-profiler CSV emitters
 ```
 
-## Integration
+<details>
+<summary><strong>Tutorial: Full Coherence Evaluation Pipeline</strong></summary>
 
-This crate is designed to work alongside:
+### Step 1: Run baseline and gated attention
 
-- **ruvector-attn-mincut** -- provides the gated attention operator
-- **ruvector-profiler** -- exports results to CSV for analysis pipelines
+```rust
+use ruvector_attn_mincut::{attn_softmax, attn_mincut};
 
-All result types implement `Serialize` / `Deserialize` for JSON interop.
+let (seq_len, d) = (32, 64);
+let q = vec![0.1f32; seq_len * d];
+let k = vec![0.1f32; seq_len * d];
+let v = vec![1.0f32; seq_len * d];
 
-## Dependencies
+let baseline = attn_softmax(&q, &k, &v, d, seq_len);
+let gated = attn_mincut(&q, &k, &v, d, seq_len, 0.5, 2, 0.01);
+```
 
-- `serde` / `serde_json` -- serialization for all result structs
+### Step 2: Individual metrics
+
+```rust
+use ruvector_coherence::*;
+
+let delta = delta_behavior(&baseline.output, &gated.output);
+println!("Coherence delta: {:.6}", delta.coherence_delta);
+println!("Decision flips:  {}", delta.decision_flips);
+
+let quality = quality_check(&baseline.output, &gated.output, 0.99);
+println!("Passes: {} (cosine={:.4})", quality.passes_threshold, quality.cosine_sim);
+```
+
+### Step 3: Batch evaluation with confidence intervals
+
+```rust
+let baselines = vec![baseline.output.clone(); 100];
+let gateds = vec![gated.output.clone(); 100];
+
+let batch = evaluate_batch(&baselines, &gateds, 0.99);
+println!("Mean delta: {:.6} +/- {:.6}", batch.mean_coherence_delta, batch.std_coherence_delta);
+println!("95% CI: [{:.6}, {:.6}]", batch.ci_95_lower, batch.ci_95_upper);
+println!("Pass rate: {:.1}%", batch.pass_rate * 100.0);
+```
+
+### Step 4: Success criteria
+
+| Criterion | Threshold | Check |
+|-----------|-----------|-------|
+| Coherence delta | < 5% | `batch.mean_coherence_delta < 0.05` |
+| Accuracy loss | < 1% | `batch.pass_rate > 0.99` |
+| Contradiction rate | < 0.1% | `contradiction_rate(...) < 0.001` |
+
+</details>
+
+## Related Crates
+
+| Crate | Role |
+|-------|------|
+| [`ruvector-attn-mincut`](../ruvector-attn-mincut/README.md) | Provides gated attention operators |
+| [`ruvector-profiler`](../ruvector-profiler/README.md) | Exports results to CSV for analysis |
+| [`ruvector-solver`](../ruvector-solver/README.md) | Sublinear solvers for graph analytics |
 
 ## License
 
-MIT -- see workspace root for details.
+Licensed under the [MIT License](../../LICENSE).

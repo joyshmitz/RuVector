@@ -3,10 +3,20 @@
 [![Crates.io](https://img.shields.io/crates/v/ruvector-solver.svg)](https://crates.io/crates/ruvector-solver)
 [![docs.rs](https://docs.rs/ruvector-solver/badge.svg)](https://docs.rs/ruvector-solver)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-177_passing-brightgreen.svg)]()
 
-Sublinear-time solver for **RuVector**: O(log n) to O(sqrt(n)) algorithms for
-sparse linear systems, Personalized PageRank, and spectral methods. All solvers
-operate on a shared CSR (Compressed Sparse Row) matrix representation and
+**Sublinear-time sparse solvers for RuVector — O(log n) to O(sqrt(n)) algorithms that power graph analytics, spectral methods, and AI coherence.**
+
+| | Dense Solvers (nalgebra) | ruvector-solver |
+|---|---|---|
+| **Complexity** | O(n^3) | O(nnz * log n) to O(log n) |
+| **Memory** | O(n^2) dense | O(nnz) sparse CSR |
+| **SIMD** | Partial | AVX2 8-wide + fused kernels |
+| **Algorithms** | LU, QR | 7 specialized + auto router |
+| **WASM** | No | Full wasm-bindgen bindings |
+| **PageRank** | Not supported | 3 sublinear algorithms |
+
+All solvers operate on a shared CSR (Compressed Sparse Row) matrix representation and
 expose a uniform `SolverEngine` trait for seamless algorithm swapping and
 automatic routing.
 
@@ -251,6 +261,101 @@ cargo bench -p ruvector-solver --bench solver_neumann
 | `solver_cg` | Conjugate Gradient on SPD matrices |
 | `solver_push` | Forward/backward push on graph adjacency matrices |
 | `solver_e2e` | End-to-end solve through the router with algorithm selection |
+
+<details>
+<summary><strong>Tutorial: Solving a Sparse Linear System</strong></summary>
+
+### Step 1: Build a CSR matrix
+
+```rust
+use ruvector_solver::types::CsrMatrix;
+
+// 4x4 tridiagonal system (diagonally dominant)
+let a = CsrMatrix::<f32>::from_coo(4, 4, vec![
+    (0, 0, 3.0), (0, 1, -1.0),
+    (1, 0, -1.0), (1, 1, 3.0), (1, 2, -1.0),
+    (2, 1, -1.0), (2, 2, 3.0), (2, 3, -1.0),
+    (3, 2, -1.0), (3, 3, 3.0),
+]);
+let b = vec![2.0f32, 1.0, 1.0, 2.0];
+```
+
+### Step 2: Choose a solver
+
+```rust
+use ruvector_solver::neumann::NeumannSolver;
+
+let solver = NeumannSolver::new(1e-6, 500);
+let result = solver.solve(&a, &b).unwrap();
+
+println!("Solution:   {:?}", result.solution);
+println!("Iterations: {}", result.iterations);
+println!("Residual:   {:.2e}", result.residual_norm);
+```
+
+### Step 3: Use the automatic router
+
+```rust
+use ruvector_solver::router::{SolverRouter, QueryType};
+use ruvector_solver::types::{CsrMatrix, ComputeBudget};
+
+let a64 = CsrMatrix::<f64>::from_coo(4, 4, vec![/* ... */]);
+let b64 = vec![2.0, 1.0, 1.0, 2.0];
+let budget = ComputeBudget::default();
+
+let router = SolverRouter::new();
+let (algo, result) = router.solve(&a64, &b64, &budget, QueryType::LinearSystem).unwrap();
+println!("Router selected: {:?}", algo);
+```
+
+### Step 4: Validate input
+
+```rust
+use ruvector_solver::validation::validate_csr_matrix;
+
+let errors = validate_csr_matrix(&a);
+assert!(errors.is_empty(), "CSR validation failed: {:?}", errors);
+```
+
+### Step 5: Benchmark
+
+```bash
+cargo bench -p ruvector-solver --bench solver_neumann
+cargo bench -p ruvector-solver --bench solver_e2e
+```
+
+</details>
+
+<details>
+<summary><strong>Tutorial: PageRank with Forward Push</strong></summary>
+
+```rust
+use ruvector_solver::forward_push::ForwardPushSolver;
+use ruvector_solver::types::CsrMatrix;
+
+// Build adjacency matrix for a small graph
+let adj = CsrMatrix::<f32>::from_coo(4, 4, vec![
+    (0, 1, 1.0), (1, 0, 1.0),
+    (1, 2, 1.0), (2, 1, 1.0),
+    (2, 3, 1.0), (3, 2, 1.0),
+    (0, 3, 1.0), (3, 0, 1.0),
+]);
+
+let solver = ForwardPushSolver::new(0.85, 1e-6);  // alpha=0.85
+let ppr = solver.ppr(&adj, 0);  // PPR from node 0
+
+println!("PPR scores: {:?}", ppr);
+```
+
+</details>
+
+## Related Crates
+
+| Crate | Role |
+|-------|------|
+| [`ruvector-attn-mincut`](../ruvector-attn-mincut/README.md) | Min-cut gating using graph solvers |
+| [`ruvector-coherence`](../ruvector-coherence/README.md) | Coherence metrics for attention comparison |
+| [`ruvector-profiler`](../ruvector-profiler/README.md) | Benchmarking memory, power, latency |
 
 ## Minimum Supported Rust Version
 
