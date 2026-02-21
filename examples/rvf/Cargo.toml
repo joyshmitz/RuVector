@@ -240,3 +240,7 @@ path = "examples/causal_atlas_sealed.rs"
 [[example]]
 name = "causal_atlas_dashboard"
 path = "examples/causal_atlas_dashboard.rs"
+
+[[example]]
+name = "security_hardened"
+path = "examples/security_hardened.rs"
