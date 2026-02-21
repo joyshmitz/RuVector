@@ -175,10 +175,10 @@ Coherence Gate thresholds (PolicyKernel segment):
 | 3 | Hardened kernel boot | KERNEL_SEG | Flags: SIGNED, REQUIRES_TEE, MEASURED |
 | 4 | eBPF packet filter | EBPF_SEG | XDP drop except allowlisted ports |
 | 5 | eBPF syscall filter | EBPF_SEG | Seccomp allowlist enforcement |
-| 6 | AIDefence prompt injection | WASM_SEG | 30+ pattern detection |
-| 7 | AIDefence jailbreak detect | WASM_SEG | DAN, role manipulation patterns |
-| 8 | AIDefence PII scanning | WASM_SEG | 6 PII types with masking |
-| 9 | AIDefence behavioral analysis | WASM_SEG | EMA deviation detection |
+| 6 | AIDefence prompt injection | WASM_SEG | 12 pattern detection |
+| 7 | AIDefence jailbreak detect | WASM_SEG | DAN, role manipulation, 8 patterns |
+| 8 | AIDefence PII scanning | WASM_SEG | Email, SSN, credit card, API keys |
+| 9 | AIDefence code/encoding attack | WASM_SEG | XSS, eval, base64, unicode tricks |
 | 10 | Ed25519 segment signing | CRYPTO_SEG | Per-segment cryptographic proof |
 | 11 | Witness chain audit trail | WITNESS_SEG | 30-entry HMAC-SHA256 chain |
 | 12 | Content hash hardening | MANIFEST_SEG | SHAKE-256 content verification |
@@ -186,10 +186,12 @@ Coherence Gate thresholds (PolicyKernel segment):
 | 14 | RBAC access control | META_SEG | 6 roles with permission matrix |
 | 15 | Coherence Gate authorization | PolicyKernel | Anytime-valid decision with witness receipts |
 | 16 | Key rotation | CRYPTO_SEG + WITNESS | Old key → rejected, new key → active |
-| 17 | Tamper detection | WITNESS_SEG | Modified payload → rejected |
+| 17 | Tamper detection | WITNESS_SEG | 3/3 attacks rejected |
 | 18 | Multi-tenant isolation | Store derivation | Lineage-linked derived stores |
-| 19 | Threat vector similarity | VEC_SEG + INDEX | k-NN search over threat embeddings |
-| 20 | Domain profile | PROFILE_SEG | RVSecurity profile declaration |
+| 19 | COW branching | Store branching | Forensic-grade immutable snapshots |
+| 20 | Audited k-NN queries | WITNESS_SEG | Witness entry on every search |
+| 21 | Threat vector similarity | VEC_SEG + INDEX | k-NN over 1000 threat embeddings |
+| 22 | Data exfiltration detection | WASM_SEG | curl/wget/fetch/webhook patterns |
 
 ## MCP Tools (Security Container)
 

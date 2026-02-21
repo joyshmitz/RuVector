@@ -229,9 +229,11 @@ npx @ruvector/rvf-mcp-server --transport stdio # MCP server for AI agents
 
 **npm packages** (4): [`@ruvector/rvf`](https://www.npmjs.com/package/@ruvector/rvf) [`@ruvector/rvf-node`](https://www.npmjs.com/package/@ruvector/rvf-node) [`@ruvector/rvf-wasm`](https://www.npmjs.com/package/@ruvector/rvf-wasm) [`@ruvector/rvf-mcp-server`](https://www.npmjs.com/package/@ruvector/rvf-mcp-server)
 
+- **Security Hardened RVF** ([`examples/security_hardened.rvf`](./examples/security_hardened.rvf)) — 2.1 MB sealed artifact with 22 verified capabilities: TEE attestation (SGX/SEV-SNP/TDX/ARM CCA), AIDefence (injection/jailbreak/PII/exfil), hardened Linux microkernel, eBPF firewall, Ed25519 signing, 6-role RBAC, Coherence Gate, 30-entry witness chain, Paranoid policy, COW branching, audited k-NN. See [ADR-042](./docs/adr/ADR-042-Security-RVF-AIDefence-TEE.md).
 - **Full documentation**: [crates/rvf/README.md](./crates/rvf/README.md)
 - **ADR-030**: [Cognitive Container Architecture](./docs/adr/ADR-030-rvf-cognitive-container.md)
 - **ADR-031**: [COW Branching & Real Containers](./docs/adr/ADR-031-rvcow-branching-and-real-cognitive-containers.md)
+- **ADR-042**: [Security RVF — AIDefence + TEE](./docs/adr/ADR-042-Security-RVF-AIDefence-TEE.md)
 - **46 runnable examples**: [examples/rvf/examples/](./examples/rvf/examples/)
 
 </details>
@@ -4451,6 +4453,7 @@ curl -X POST http://localhost:8080/search \
 
 | Example | Description | Type |
 |---------|-------------|------|
+| [**security_hardened.rvf**](./examples/security_hardened.rvf) | **Security RVF: 22 capabilities — TEE, AIDefence, eBPF, RBAC, Paranoid policy** | Rust/RVF |
 | [agentic-jujutsu](./examples/agentic-jujutsu) | Quantum-resistant version control for AI agents (23x faster than Git) | Rust |
 | [mincut](./examples/mincut) | 6 self-organizing network demos: strange loops, time crystals, causal discovery | Rust |
 | [subpolynomial-time](./examples/subpolynomial-time) | n^0.12 subpolynomial algorithm demos | Rust |
