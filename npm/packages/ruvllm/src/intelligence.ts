@@ -16,6 +16,21 @@
  * ```
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
+/** Maximum signal file size (10 MiB) */
+const MAX_SIGNAL_FILE_SIZE = 10 * 1024 * 1024;
+
+/** Maximum number of signals per file */
+const MAX_SIGNALS_PER_FILE = 10_000;
+
+/** Valid outcome values */
+const VALID_OUTCOMES = new Set(['success', 'partial_success', 'failure']);
+
+/** Valid human verdict values */
+const VALID_VERDICTS = new Set(['approved', 'rejected']);
+
 /**
  * A quality signal from an external system.
  *
@@ -100,6 +115,43 @@ export interface IntelligenceProvider {
   qualityWeights?(): ProviderQualityWeights | undefined;
 }
 
+function asOptionalNumber(val: unknown): number | undefined {
+  if (val === undefined || val === null) return undefined;
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+}
+
+function validateOutcome(val: unknown): QualitySignal['outcome'] {
+  const s = String(val ?? 'failure');
+  return VALID_OUTCOMES.has(s) ? s as QualitySignal['outcome'] : 'failure';
+}
+
+function validateVerdict(val: unknown): QualitySignal['humanVerdict'] | undefined {
+  if (val === undefined || val === null) return undefined;
+  const s = String(val);
+  return VALID_VERDICTS.has(s) ? s as QualitySignal['humanVerdict'] : undefined;
+}
+
+function validateScore(val: unknown): number {
+  const n = Number(val ?? 0);
+  if (!Number.isFinite(n) || n < 0 || n > 1) return 0;
+  return n;
+}
+
+function mapQualityFactors(raw: Record<string, unknown>): QualityFactors {
+  return {
+    acceptanceCriteriaMet: asOptionalNumber(raw.acceptance_criteria_met),
+    testsPassing: asOptionalNumber(raw.tests_passing),
+    noRegressions: asOptionalNumber(raw.no_regressions),
+    lintClean: asOptionalNumber(raw.lint_clean),
+    typeCheckClean: asOptionalNumber(raw.type_check_clean),
+    followsPatterns: asOptionalNumber(raw.follows_patterns),
+    contextRelevance: asOptionalNumber(raw.context_relevance),
+    reasoningCoherence: asOptionalNumber(raw.reasoning_coherence),
+    executionEfficiency: asOptionalNumber(raw.execution_efficiency),
+  };
+}
+
 /**
  * Built-in file-based intelligence provider.
  *
@@ -110,7 +162,7 @@ export class FileSignalProvider implements IntelligenceProvider {
   private readonly filePath: string;
 
   constructor(filePath: string) {
-    this.filePath = filePath;
+    this.filePath = path.resolve(filePath);
   }
 
   name(): string {
@@ -118,43 +170,51 @@ export class FileSignalProvider implements IntelligenceProvider {
   }
 
   loadSignals(): QualitySignal[] {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fs = require('fs');
-      if (!fs.existsSync(this.filePath)) {
-        return [];
-      }
-      const raw = fs.readFileSync(this.filePath, 'utf-8');
-      const data = JSON.parse(raw);
-      if (!Array.isArray(data)) {
-        return [];
-      }
-      return data.map((item: Record<string, unknown>) => ({
-        id: String(item.id ?? ''),
-        taskDescription: String(item.task_description ?? item.taskDescription ?? ''),
-        outcome: String(item.outcome ?? 'failure') as QualitySignal['outcome'],
-        qualityScore: Number(item.quality_score ?? item.qualityScore ?? 0),
-        humanVerdict: item.human_verdict ?? item.humanVerdict
-          ? String(item.human_verdict ?? item.humanVerdict) as QualitySignal['humanVerdict']
-          : undefined,
-        qualityFactors: (item.quality_factors || item.qualityFactors)
-          ? mapQualityFactors((item.quality_factors ?? item.qualityFactors) as Record<string, unknown>)
-          : undefined,
-        completedAt: String(item.completed_at ?? item.completedAt ?? new Date().toISOString()),
-      }));
-    } catch {
+    if (!fs.existsSync(this.filePath)) {
       return [];
     }
+
+    // Check file size before reading (prevent OOM)
+    const stat = fs.statSync(this.filePath);
+    if (stat.size > MAX_SIGNAL_FILE_SIZE) {
+      throw new Error(
+        `Signal file exceeds max size (${stat.size} bytes, limit ${MAX_SIGNAL_FILE_SIZE})`
+      );
+    }
+
+    const raw = fs.readFileSync(this.filePath, 'utf-8');
+    const data: unknown = JSON.parse(raw);
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    // Check signal count
+    if (data.length > MAX_SIGNALS_PER_FILE) {
+      throw new Error(
+        `Signal file contains ${data.length} signals, max is ${MAX_SIGNALS_PER_FILE}`
+      );
+    }
+
+    return data.map((item: Record<string, unknown>) => {
+      const qfRaw = (item.quality_factors ?? item.qualityFactors) as Record<string, unknown> | undefined;
+      return {
+        id: String(item.id ?? ''),
+        taskDescription: String(item.task_description ?? item.taskDescription ?? ''),
+        outcome: validateOutcome(item.outcome),
+        qualityScore: validateScore(item.quality_score ?? item.qualityScore),
+        humanVerdict: validateVerdict(item.human_verdict ?? item.humanVerdict),
+        qualityFactors: qfRaw ? mapQualityFactors(qfRaw) : undefined,
+        completedAt: String(item.completed_at ?? item.completedAt ?? new Date().toISOString()),
+      };
+    });
   }
 
   qualityWeights(): ProviderQualityWeights | undefined {
     try {
-      const fs = require('fs');
-      const path = require('path');
       const weightsPath = path.join(path.dirname(this.filePath), 'quality-weights.json');
       if (!fs.existsSync(weightsPath)) return undefined;
       const raw = fs.readFileSync(weightsPath, 'utf-8');
-      const data = JSON.parse(raw);
+      const data = JSON.parse(raw) as Record<string, unknown>;
       return {
         taskCompletion: Number(data.task_completion ?? data.taskCompletion ?? 0.5),
         codeQuality: Number(data.code_quality ?? data.codeQuality ?? 0.3),
@@ -164,20 +224,6 @@ export class FileSignalProvider implements IntelligenceProvider {
       return undefined;
     }
   }
-}
-
-function mapQualityFactors(raw: Record<string, unknown>): QualityFactors {
-  return {
-    acceptanceCriteriaMet: raw.acceptance_criteria_met as number | undefined,
-    testsPassing: raw.tests_passing as number | undefined,
-    noRegressions: raw.no_regressions as number | undefined,
-    lintClean: raw.lint_clean as number | undefined,
-    typeCheckClean: raw.type_check_clean as number | undefined,
-    followsPatterns: raw.follows_patterns as number | undefined,
-    contextRelevance: raw.context_relevance as number | undefined,
-    reasoningCoherence: raw.reasoning_coherence as number | undefined,
-    executionEfficiency: raw.execution_efficiency as number | undefined,
-  };
 }
 
 /**

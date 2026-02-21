@@ -673,11 +673,18 @@ impl TaskComplexityAnalyzer {
             return 0.0;
         }
 
-        let sum: f32 = with_feedback
+        let diffs: Vec<f32> = with_feedback
             .iter()
             .map(|r| r.predicted - r.actual.unwrap())
-            .sum();
-        sum / with_feedback.len() as f32
+            .filter(|v| v.is_finite())
+            .collect();
+
+        if diffs.is_empty() {
+            return 0.0;
+        }
+
+        let sum: f32 = diffs.iter().sum();
+        sum / diffs.len() as f32
     }
 
     /// Get accuracy statistics

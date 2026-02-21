@@ -1,6 +1,6 @@
 [package]
 name = "ruvector-attention"
-version = "0.1.31"
+version = "0.1.32"
 edition = "2021"
 authors = ["ruvector contributors"]
 description = "Attention mechanisms for ruvector - geometric, graph, and sparse attention"
@@ -31,7 +31,7 @@ napi = { version = "2", optional = true }
 napi-derive = { version = "2", optional = true }
 
 # Advanced math primitives for OT, mixed-curvature, and topology-gated attention
-ruvector-math = { path = "../ruvector-math", optional = true }
+ruvector-math = { version = "2.0", path = "../ruvector-math", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"

@@ -419,8 +419,8 @@ pub use ruvector_integration::{
 
 // Intelligence provider exports
 pub use intelligence::{
-    FileSignalProvider, IntelligenceLoader, IntelligenceProvider, ProviderError,
-    ProviderQualityWeights, ProviderResult, QualityFactors, QualitySignal,
+    FileSignalProvider, HumanVerdict, IntelligenceLoader, IntelligenceProvider, Outcome,
+    ProviderError, ProviderQualityWeights, ProviderResult, QualityFactors, QualitySignal,
 };
 
 // Quality scoring exports

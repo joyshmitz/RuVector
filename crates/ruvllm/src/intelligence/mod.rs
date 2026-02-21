@@ -48,6 +48,34 @@ use std::path::{Path, PathBuf};
 // Core types
 // ---------------------------------------------------------------------------
 
+/// Maximum signal file size (10 MiB)
+const MAX_SIGNAL_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Maximum number of signals per file
+const MAX_SIGNALS_PER_FILE: usize = 10_000;
+
+/// Execution outcome for a task signal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    /// Task completed successfully
+    Success,
+    /// Task partially completed
+    PartialSuccess,
+    /// Task failed
+    Failure,
+}
+
+/// Human review verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HumanVerdict {
+    /// Human approved the output
+    Approved,
+    /// Human rejected the output
+    Rejected,
+}
+
 /// A quality signal from an external system.
 ///
 /// Represents one completed task with quality assessment data
@@ -61,15 +89,15 @@ pub struct QualitySignal {
     /// Human-readable task description (used for embedding generation)
     pub task_description: String,
 
-    /// Execution outcome: `"success"`, `"partial_success"`, `"failure"`
-    pub outcome: String,
+    /// Execution outcome
+    pub outcome: Outcome,
 
     /// Composite quality score (0.0 - 1.0)
     pub quality_score: f32,
 
-    /// Optional human verdict: `"approved"`, `"rejected"`, or `None`
+    /// Optional human verdict
     #[serde(default)]
-    pub human_verdict: Option<String>,
+    pub human_verdict: Option<HumanVerdict>,
 
     /// Optional structured quality factors for detailed analysis
     #[serde(default)]
@@ -242,14 +270,50 @@ impl IntelligenceProvider for FileSignalProvider {
             return Ok(vec![]); // No file = no signals, not an error
         }
 
-        let contents = std::fs::read_to_string(&self.path)?;
-        let signals: Vec<QualitySignal> = serde_json::from_str(&contents).map_err(|e| {
-            crate::error::RuvLLMError::Serialization(format!(
-                "Failed to parse signal file {}: {}",
+        // Check file size before reading (S02: prevent OOM)
+        let metadata = std::fs::metadata(&self.path)?;
+        if metadata.len() > MAX_SIGNAL_FILE_SIZE {
+            return Err(crate::error::RuvLLMError::InvalidOperation(format!(
+                "Signal file {} exceeds max size ({} bytes, limit {})",
                 self.path.display(),
-                e
-            ))
-        })?;
+                metadata.len(),
+                MAX_SIGNAL_FILE_SIZE
+            )));
+        }
+
+        // Use BufReader for streaming parse (P2: avoid double allocation)
+        let file = std::fs::File::open(&self.path)?;
+        let reader = std::io::BufReader::new(file);
+        let signals: Vec<QualitySignal> =
+            serde_json::from_reader(reader).map_err(|e| {
+                crate::error::RuvLLMError::Serialization(format!(
+                    "Failed to parse signal file {}: {}",
+                    self.path.display(),
+                    e
+                ))
+            })?;
+
+        // Check signal count (S03: prevent resource exhaustion)
+        if signals.len() > MAX_SIGNALS_PER_FILE {
+            return Err(crate::error::RuvLLMError::InvalidOperation(format!(
+                "Signal file contains {} signals, max is {}",
+                signals.len(),
+                MAX_SIGNALS_PER_FILE
+            )));
+        }
+
+        // Validate score ranges (S04: prevent NaN/Inf propagation)
+        for signal in &signals {
+            if !signal.quality_score.is_finite()
+                || signal.quality_score < 0.0
+                || signal.quality_score > 1.0
+            {
+                return Err(crate::error::RuvLLMError::InvalidOperation(format!(
+                    "Signal '{}' has invalid quality_score: {}",
+                    signal.id, signal.quality_score
+                )));
+            }
+        }
 
         Ok(signals)
     }
@@ -438,7 +502,7 @@ mod tests {
         QualitySignal {
             id: id.to_string(),
             task_description: format!("Task {}", id),
-            outcome: "success".to_string(),
+            outcome: Outcome::Success,
             quality_score: score,
             human_verdict: None,
             quality_factors: None,
@@ -582,9 +646,9 @@ mod tests {
         let signal = QualitySignal {
             id: "rt1".to_string(),
             task_description: "Test roundtrip".to_string(),
-            outcome: "success".to_string(),
+            outcome: Outcome::Success,
             quality_score: 0.88,
-            human_verdict: Some("approved".to_string()),
+            human_verdict: Some(HumanVerdict::Approved),
             quality_factors: Some(QualityFactors {
                 tests_passing: Some(1.0),
                 lint_clean: Some(0.9),
