@@ -100,7 +100,7 @@ Most vector databases are static — they store embeddings and search them. That
 | 38 | **`.rvdna` file format** | AI-native binary with pre-computed vectors, tensors, and embeddings |
 | 39 | **Instant diagnostics** | Sickle cell, cancer mutations, drug dosing — runs on any device |
 | 40 | **Privacy-first WASM** | Browser-based genomics, data never leaves the device |
-| 41 | **Health biomarker engine** | Composite polygenic risk scoring (17 SNPs, 6 gene-gene interactions, 2 us) |
+| 41 | **Health biomarker engine** | Composite polygenic risk scoring (20 SNPs, 6 gene-gene interactions, 2 us) |
 | 42 | **Streaming biomarkers** | Real-time anomaly detection, CUSUM changepoints, trend analysis (>100k readings/sec) |
 
 **Platform & Integration**
@@ -199,7 +199,7 @@ npm install @ruvector/rvdna  # JavaScript / TypeScript
 | Translate DNA to protein | Full codon table + GNN contact graphs |
 | Predict biological age | Horvath clock, 353 CpG sites |
 | Recommend drug doses | CYP2D6 star alleles + CPIC guidelines |
-| Score health risks | 17 SNPs, 6 gene-gene interactions, composite risk scoring in 2 us |
+| Score health risks | 20 SNPs, 6 gene-gene interactions, composite risk scoring in 2 us |
 | Stream biomarker data | Real-time anomaly detection, CUSUM changepoints, >100k readings/sec |
 | Search genomes by similarity | HNSW k-mer vectors, O(log N) |
 | Store pre-computed AI features | `.rvdna` binary format — open and instant |
