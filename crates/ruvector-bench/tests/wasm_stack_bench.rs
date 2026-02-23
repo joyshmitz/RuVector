@@ -53,6 +53,8 @@ fn bench_canonical_mincut_100v() {
     // --- Canonical cut extraction (100 iterations) ---
     let mut cactus = CactusGraph::build_from_graph(&graph);
     cactus.root_at_lex_smallest();
+    println!("  Cactus: {} vertices, {} edges, {} cycles",
+             cactus.n_vertices, cactus.n_edges, cactus.cycles.len());
     let start = Instant::now();
     for _ in 0..n_iter {
         let result = cactus.canonical_cut();
