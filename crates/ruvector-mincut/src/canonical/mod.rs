@@ -32,13 +32,11 @@
 #[cfg(test)]
 mod tests;
 
-use crate::algorithm::{self, AlgorithmStats, MinCutConfig};
-use crate::graph::{DynamicGraph, Edge, VertexId, Weight};
-use crate::wrapper::MinCutWrapper;
+use crate::algorithm::{self, MinCutConfig};
+use crate::graph::{DynamicGraph, VertexId, Weight};
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ---------------------------------------------------------------------------
@@ -528,7 +526,8 @@ impl CactusGraph {
 
             // Merge last into prev
             active[last] = false;
-            merged[prev].extend(merged[last].clone());
+            let last_merged = merged[last].clone();
+            merged[prev].extend(last_merged);
 
             for j in 0..n {
                 w[prev][j] += w[last][j];

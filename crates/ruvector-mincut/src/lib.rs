@@ -223,6 +223,9 @@ mod core;
 #[cfg(feature = "monitoring")]
 pub mod monitoring;
 
+#[cfg(feature = "canonical")]
+pub mod canonical;
+
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
@@ -381,6 +384,12 @@ pub use snn::{
 #[cfg(feature = "agentic")]
 pub use integration::AgenticAnalyzer;
 
+#[cfg(feature = "canonical")]
+pub use canonical::{
+    CactusGraph, CactusCycle, CactusEdge, CactusVertex, CanonicalCutResult, CanonicalMinCut,
+    CanonicalMinCutImpl, FixedWeight, WitnessReceipt,
+};
+
 #[cfg(feature = "monitoring")]
 pub use monitoring::{
     EventType, MinCutEvent, MinCutMonitor, MonitorBuilder, MonitorConfig, MonitorMetrics, Threshold,
@@ -496,6 +505,12 @@ pub mod prelude {
 
     #[cfg(feature = "monitoring")]
     pub use crate::{EventType, MinCutEvent, MinCutMonitor, MonitorBuilder};
+
+    #[cfg(feature = "canonical")]
+    pub use crate::{
+        CactusGraph, CactusCycle, CactusEdge, CactusVertex, CanonicalCutResult, CanonicalMinCut,
+        CanonicalMinCutImpl, FixedWeight, WitnessReceipt,
+    };
 
     #[cfg(feature = "jtree")]
     pub use crate::{

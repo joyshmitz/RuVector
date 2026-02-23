@@ -118,6 +118,14 @@ pub mod evidence;
 pub mod report;
 pub mod shard;
 
+#[cfg(feature = "canonical-witness")]
+pub mod canonical_witness;
+
+#[cfg(feature = "canonical-witness")]
+pub use canonical_witness::{
+    ArenaCactus, CanonicalPartition, CanonicalWitnessFragment, CactusNode, FixedPointWeight,
+};
+
 use crate::delta::{Delta, DeltaTag};
 use crate::evidence::EvidenceAccumulator;
 use crate::report::{TileReport, TileStatus, WitnessFragment};
@@ -399,6 +407,31 @@ impl TileState {
     #[inline]
     pub fn is_error(&self) -> bool {
         self.status & Self::STATUS_ERROR != 0
+    }
+
+    /// Compute a canonical witness fragment for the current tile state.
+    ///
+    /// This produces a reproducible, hash-stable 16-byte witness by:
+    /// 1. Building a cactus tree from the `CompactGraph`
+    /// 2. Deriving a canonical (lex-smallest) min-cut partition
+    /// 3. Packing the result into a `CanonicalWitnessFragment`
+    ///
+    /// Temporary stack usage: ~2.1KB (fits in the 14.5KB remaining headroom).
+    #[cfg(feature = "canonical-witness")]
+    pub fn canonical_witness(&self) -> canonical_witness::CanonicalWitnessFragment {
+        let cactus = canonical_witness::ArenaCactus::build_from_compact_graph(&self.graph);
+        let partition = cactus.canonical_partition();
+
+        canonical_witness::CanonicalWitnessFragment {
+            tile_id: self.tile_id,
+            epoch: (self.tick & 0xFF) as u8,
+            cardinality_a: partition.cardinality_a,
+            cardinality_b: partition.cardinality_b,
+            cut_value: cactus.min_cut_value.to_u16(),
+            canonical_hash: partition.canonical_hash,
+            boundary_edges: self.graph.num_edges,
+            cactus_digest: cactus.digest(),
+        }
     }
 }
 
