@@ -35,8 +35,7 @@ mod tests;
 use crate::algorithm::{self, MinCutConfig};
 use crate::graph::{DynamicGraph, VertexId, Weight};
 
-use std::cmp::Ordering;
-use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -458,9 +457,8 @@ impl CactusGraph {
 
         // Track which original vertices are merged into each super-node
         let mut merged: Vec<Vec<usize>> = node_ids.iter().map(|&v| vec![v]).collect();
-        // Use a compact active-list (swap-remove for O(1) removal)
+        // Compact active-list (only iterate active nodes)
         let mut active_list: Vec<usize> = (0..n).collect();
-        let mut active_pos: Vec<usize> = (0..n).collect(); // index in active_list
         let mut n_active = n;
 
         let mut global_min = f64::INFINITY;
@@ -489,7 +487,7 @@ impl CactusGraph {
             let first_row = first * n;
             for k in 0..n_active {
                 let j = active_list[k];
-                key[j] = unsafe { *w.get_unchecked(first_row + j) };
+                key[j] = w[first_row + j];
             }
 
             let mut prev = first;
@@ -501,12 +499,9 @@ impl CactusGraph {
                 let mut best_key = -1.0f64;
                 for k in 0..n_active {
                     let j = active_list[k];
-                    if !in_a[j] {
-                        let kj = unsafe { *key.get_unchecked(j) };
-                        if kj > best_key {
-                            best_key = kj;
-                            best = j;
-                        }
+                    if !in_a[j] && key[j] > best_key {
+                        best_key = key[j];
+                        best = j;
                     }
                 }
 
@@ -523,9 +518,7 @@ impl CactusGraph {
                 for k in 0..n_active {
                     let j = active_list[k];
                     if !in_a[j] {
-                        unsafe {
-                            *key.get_unchecked_mut(j) += *w.get_unchecked(best_row + j);
-                        }
+                        key[j] += w[best_row + j];
                     }
                 }
             }
@@ -563,10 +556,8 @@ impl CactusGraph {
             for k in 0..n_active {
                 let j = active_list[k];
                 if j != last {
-                    unsafe {
-                        *w.get_unchecked_mut(prev_row + j) += *w.get_unchecked(last_row + j);
-                        *w.get_unchecked_mut(j * n + prev) += *w.get_unchecked(j * n + last);
-                    }
+                    w[prev_row + j] += w[last_row + j];
+                    w[j * n + prev] += w[j * n + last];
                 }
             }
 

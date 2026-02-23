@@ -36,6 +36,10 @@ path = "src/bin/profiling_benchmark.rs"
 
 [dependencies]
 ruvector-core = {path = "../ruvector-core" }
+ruvector-mincut = { path = "../ruvector-mincut", features = ["canonical"] }
+ruvector-coherence = { path = "../ruvector-coherence", features = ["spectral"] }
+ruvector-cognitive-container = { path = "../ruvector-cognitive-container" }
+cognitum-gate-kernel = { path = "../cognitum-gate-kernel", default-features = true, features = ["canonical-witness"] }
 
 # Benchmarking
 criterion = { workspace = true }
