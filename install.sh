@@ -161,8 +161,8 @@ install_cli() {
     fi
 
     # Install with visible output so users can see progress/errors
-    echo "  Running: cargo install ruvector-cli@0.1.2"
-    if cargo install ruvector-cli@0.1.2 2>&1 | while read -r line; do echo "    $line"; done; then
+    echo "  Running: cargo install ruvector-cli"
+    if cargo install ruvector-cli 2>&1 | while read -r line; do echo "    $line"; done; then
         if command_exists ruvector-cli; then
             print_success "ruvector-cli installed"
             return 0
@@ -200,8 +200,8 @@ install_npm() {
     print_success "Node.js ${NODE_VERSION} detected"
 
     # Install with visible output
-    echo "  Running: npm install -g ruvector@0.1.23"
-    if npm install -g ruvector@0.1.23 2>&1 | while read -r line; do echo "    $line"; done; then
+    echo "  Running: npm install -g ruvector"
+    if npm install -g ruvector 2>&1 | while read -r line; do echo "    $line"; done; then
         print_success "ruvector npm package installed"
     else
         print_warning "npm install had issues (may need sudo on some systems)"
@@ -218,22 +218,22 @@ show_crates() {
     echo -e "${GREEN}Add to your Cargo.toml with 'cargo add':${NC}"
     echo ""
     echo "  # Core (vector database)"
-    echo "  cargo add ruvector-core@0.1.2"
+    echo "  cargo add ruvector-core"
     echo ""
     echo "  # Graph database with Cypher"
-    echo "  cargo add ruvector-graph@0.1.2"
+    echo "  cargo add ruvector-graph"
     echo ""
     echo "  # Graph Neural Networks"
-    echo "  cargo add ruvector-gnn@0.1.2"
+    echo "  cargo add ruvector-gnn"
     echo ""
     echo "  # Distributed systems"
-    echo "  cargo add ruvector-cluster@0.1.2"
-    echo "  cargo add ruvector-raft@0.1.2"
-    echo "  cargo add ruvector-replication@0.1.2"
+    echo "  cargo add ruvector-cluster"
+    echo "  cargo add ruvector-raft"
+    echo "  cargo add ruvector-replication"
     echo ""
     echo "  # AI routing"
-    echo "  cargo add ruvector-tiny-dancer-core@0.1.2"
-    echo "  cargo add ruvector-router-core@0.1.2"
+    echo "  cargo add ruvector-tiny-dancer-core"
+    echo "  cargo add ruvector-router-core"
     echo ""
     echo -e "${YELLOW}Note: These are library crates. Use 'cargo add' in your project.${NC}"
     echo ""
@@ -364,7 +364,7 @@ main() {
     fi
 
     # Install CLI
-    if [ "$INSTALL_CLI" = true ] && [ "$INSTALLED_RUST" = true ] || command_exists cargo; then
+    if [ "$INSTALL_CLI" = true ] && { [ "$INSTALLED_RUST" = true ] || command_exists cargo; }; then
         if install_cli; then
             INSTALLED_CLI=true
         fi
