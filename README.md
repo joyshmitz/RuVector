@@ -33,7 +33,9 @@ Most vector databases are static — they store embeddings and search them. That
 | ⚡ **Sublinear Solvers** | ❌ | ✅ O(log n) sparse linear systems, PageRank, spectral methods |
 | 🔬 **Proof-Gated Graph Transformers** | ❌ | ✅ 8 verified modules: physics, bio, manifold, temporal, economic |
 
-**One package. Everything included:** vector search, graph queries, GNN learning, [proof-gated graph transformers](./crates/ruvector-graph-transformer) (8 verified modules — physics, biological, manifold, temporal, economic), distributed clustering, local LLMs, 46 attention mechanisms, cognitive containers ([RVF](./crates/rvf/README.md) — self-booting `.rvf` files with eBPF, witness chains, and COW branching), and WASM support.
+**One package. Everything included:** vector search, graph queries, a [PostgreSQL extension](./crates/ruvector-postgres) (230+ SQL functions — drop-in pgvector replacement), GNN-based learning, [proof-gated graph transformers](./crates/ruvector-graph-transformer) (8 verified modules), distributed clustering, local LLM inference, 46 attention mechanisms, cognitive containers ([RVF](./crates/rvf/README.md)), and WASM support.
+
+**Already use PostgreSQL?** RuVector [drops into your existing database](./crates/ruvector-postgres) as an extension — 230+ SQL functions covering vector search, graph queries, GNN learning, attention mechanisms, and sublinear solvers. No migration required. See the [PostgreSQL docs](./docs/postgres/).
 
 <details>
 <summary>📋 See Full Capabilities (53 features)</summary>
@@ -125,9 +127,64 @@ Most vector databases are static — they store embeddings and search them. That
 
 </details>
 
-*Think of it as: **Pinecone + Neo4j + PyTorch + llama.cpp + postgres + etcd + Docker** — in one Rust package.*
+*Think of it as: **Pinecone** (vector search) + **Neo4j** (graph queries) + **PyTorch** (neural networks) + **llama.cpp** (local AI models) + **PostgreSQL** (SQL database) + **etcd** (distributed coordination) + **Docker** (packaging and deployment) — combined into one Rust package.*
 
-*The [RVF cognitive container](./crates/rvf/README.md) is the Docker part: a single `.rvf` file that stores vectors, ships models, boots as a Linux microservice in 125 ms, accelerates queries via eBPF, branches like Git at cluster granularity, and proves every operation through a cryptographic witness chain — all without external dependencies.*
+*The [RVF cognitive container](./crates/rvf/README.md) is the Docker part: a single `.rvf` file that packages your vectors, models, and data together. Drop it on any machine and it boots into a running service in 125 ms — no install, no dependencies. It branches like Git (only changes are copied), logs every operation in a tamper-proof chain, and runs anywhere from a browser to bare metal.*
+
+---
+
+## How the GNN Works
+
+Traditional vector search:
+```
+Query → HNSW Index → Top K Results
+```
+
+RuVector with GNN:
+```
+Query → HNSW Index → GNN Layer → Enhanced Results
+                ↑                      │
+                └──── learns from ─────┘
+```
+
+The GNN layer:
+1. Takes your query and its nearest neighbors
+2. Applies multi-head attention to weigh which neighbors matter
+3. Updates representations based on graph structure
+4. Returns better-ranked results
+
+Over time, frequently-accessed paths get reinforced, making common queries faster and more accurate.
+
+
+## Quick Start
+
+### One-Line Install
+
+```bash
+# Interactive installer - lists all packages
+npx ruvector install
+
+# Or install directly
+npm install ruvector
+npx ruvector
+
+# Self-learning hooks for Claude Code
+npx @ruvector/cli hooks init
+npx @ruvector/cli hooks install
+
+# LLM runtime (SONA learning, HNSW memory)
+npm install @ruvector/ruvllm
+```
+
+### Node.js / Browser
+
+```bash
+# Install
+npm install ruvector
+
+# Or try instantly
+npx ruvector
+```
 
 ---
 
@@ -284,60 +341,6 @@ cargo add ruvector-solver --features all-algorithms
 </details>
 
 ---
-
-## How the GNN Works
-
-Traditional vector search:
-```
-Query → HNSW Index → Top K Results
-```
-
-RuVector with GNN:
-```
-Query → HNSW Index → GNN Layer → Enhanced Results
-                ↑                      │
-                └──── learns from ─────┘
-```
-
-The GNN layer:
-1. Takes your query and its nearest neighbors
-2. Applies multi-head attention to weigh which neighbors matter
-3. Updates representations based on graph structure
-4. Returns better-ranked results
-
-Over time, frequently-accessed paths get reinforced, making common queries faster and more accurate.
-
-
-## Quick Start
-
-### One-Line Install
-
-```bash
-# Interactive installer - lists all packages
-npx ruvector install
-
-# Or install directly
-npm install ruvector
-npx ruvector
-
-# Self-learning hooks for Claude Code
-npx @ruvector/cli hooks init
-npx @ruvector/cli hooks install
-
-# LLM runtime (SONA learning, HNSW memory)
-npm install @ruvector/ruvllm
-```
-
-### Node.js / Browser
-
-```bash
-# Install
-npm install ruvector
-
-# Or try instantly
-npx ruvector
-```
-
 
 <details>
 <summary>📊 Comparison with Other Vector Databases</summary>
