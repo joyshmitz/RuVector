@@ -14,9 +14,11 @@
 npx ruvector
 ```
 
-###  Most vector databases store your data and search it — the same way, every time. 
+####  Most vector databases store your data and search it — the same way, every time. 
 
-### **RuVector** is fundamentally different. It watches how you use it and gets smarter: search results improve automatically, the system tunes itself to your workload, and it runs AI models right on your hardware — no cloud APIs, no per-query bills, GPUs optional, CPUs preferred. It drops into PostgreSQL, runs in browsers, and ships as a single file. Open source. Free forever.
+#### **RuVector** is fundamentally different. It watches how you use it and gets smarter: search results improve automatically, the system tunes itself to your workload, and it runs AI models right on your hardware — no cloud APIs, no per-query bills, GPUs optional, CPUs preferred. It drops into PostgreSQL, runs in browsers, and ships as a single file. 
+
+❤️ Open source. Free forever.
 
 ```
 User Query → [SONA Engine] → Model Response → User Feedback
