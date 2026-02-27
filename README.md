@@ -1,4 +1,4 @@
-# RuVector
+# RuVector — A Self-Learning, Agentic Operating System
 [![CES 2026 Innovation Award](https://img.shields.io/badge/🏅_CES_2026-Innovation_Award-gold.svg)](https://cognitum.one)
 [![GitHub Trending](https://img.shields.io/badge/🔥_GitHub-Trending-orange.svg)](https://github.com/ruvnet/ruvector)
 
@@ -195,7 +195,7 @@ User Query → [SONA Engine] → Model Response → User Feedback
 
 </details>
 
-### A Complete AI Operating System
+### A Complete Agentic AI Operating System
 
 RuVector isn't a database you add to your stack — it's the entire stack. Self-learning, self-optimizing, and self-deploying. Everything an AI application needs to run, from bare metal hardware up to the application layer, in one package:
 
