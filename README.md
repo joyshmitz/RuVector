@@ -182,21 +182,22 @@ User Query → [SONA Engine] → Model Response → User Feedback
 
 ### A Complete AI Operating System
 
-RuVector isn't a database you add to your stack — it's the entire stack. Everything an AI application needs to run, from bare metal hardware up to the application layer, in one package:
+RuVector isn't a database you add to your stack — it's the entire stack. Self-learning, self-optimizing, and self-deploying. Everything an AI application needs to run, from bare metal hardware up to the application layer, in one package:
 
-| Layer | What RuVector Replaces | What It Does |
-|-------|----------------------|--------------|
-| **Hardware** | CUDA toolkit, driver configs | Talks directly to your GPU, Neural Engine, or FPGA — Metal, CUDA, WebGPU, AVX-512 |
-| **Kernel** | Linux + Docker + eBPF tools | A single `.rvf` file boots its own Linux kernel in 125 ms — eBPF accelerates hot paths |
-| **Storage** | PostgreSQL + Redis + S3 | Vector store, graph database, key-value cache, and 230+ SQL functions built in |
-| **Search** | Pinecone, Weaviate, Qdrant | HNSW indexing that learns from every query — results improve automatically |
-| **Graph** | Neo4j, Amazon Neptune | Full Cypher query engine with hyperedges, SPARQL, and graph transformers |
-| **AI Runtime** | llama.cpp, vLLM, Ollama | Run GGUF models locally on your hardware — no cloud APIs, no per-query costs |
-| **ML Framework** | PyTorch, TensorFlow | 46 attention mechanisms, spiking networks, transfer learning, verified training |
-| **Coordination** | etcd, ZooKeeper, Consul | Raft consensus, multi-master replication, CRDT delta sync, auto-sharding |
-| **Packaging** | Docker, Kubernetes | One `.rvf` file = your entire service. Runs on servers, browsers, phones, and IoT |
-| **Security** | Vault, manual audit logs | Post-quantum crypto (ML-DSA-65), witness chains, tamper-proof audit trail |
-| **Optimization** | Manual tuning, MLOps | SONA self-optimizes routing, ranking, and compression to your workload in <1 ms |
+| | Layer | What RuVector Replaces | What It Does |
+|---|-------|----------------------|--------------|
+| 🔧 | **Hardware** | CUDA toolkit, driver configs | Talks directly to your GPU, Neural Engine, or FPGA — Metal, CUDA, WebGPU, AVX-512 |
+| 🐧 | **Kernel** | Linux + Docker + eBPF tools | A single `.rvf` file boots its own Linux kernel in 125 ms — eBPF accelerates hot paths |
+| 🗄️ | **Storage** | PostgreSQL + Redis + S3 | Vector store, graph database, key-value cache, and 230+ SQL functions built in |
+| 🔍 | **Search** | Pinecone, Weaviate, Qdrant | Self-learning HNSW — a GNN watches every query and improves results automatically |
+| 🔗 | **Graph** | Neo4j, Amazon Neptune | Full Cypher query engine with hyperedges, SPARQL, and 8 verified graph transformer modules |
+| 🤖 | **AI Runtime** | llama.cpp, vLLM, Ollama | Run GGUF models locally on your hardware — no cloud APIs, no per-query costs |
+| 🧠 | **ML Framework** | PyTorch, TensorFlow | 46 attention mechanisms, spiking networks, transfer learning, verified training |
+| 🔄 | **Self-Learning** | Manual retraining, MLOps | SONA adapts in <1 ms — LoRA fine-tuning + EWC++ memory preservation on every request |
+| ⚡ | **Self-Optimizing** | Manual tuning, config files | Auto-tunes routing, ranking, compression, and index parameters to your workload |
+| 🌐 | **Coordination** | etcd, ZooKeeper, Consul | Raft consensus, multi-master replication, CRDT delta sync, auto-sharding |
+| 📦 | **Packaging** | Docker, Kubernetes | One `.rvf` file = your entire service. Runs on servers, browsers, phones, and IoT |
+| 🔐 | **Security** | Vault, manual audit logs | Post-quantum crypto (ML-DSA-65), witness chains, tamper-proof audit trail |
 
 The [RVF cognitive container](./crates/rvf/README.md) ties it all together: a single file that packages your vectors, models, data, and a bootable kernel. Drop it on any machine and it starts serving in 125 ms — no install, no dependencies. It branches like Git (only changes are copied), logs every operation in a tamper-proof chain, and runs anywhere from a browser to bare metal.
 
