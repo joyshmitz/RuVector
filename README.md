@@ -195,22 +195,54 @@ User Query → [SONA Engine] → Model Response → User Feedback
 RuVector isn't a database you add to your stack — it's the entire stack. Self-learning, self-optimizing, and self-deploying. Everything an AI application needs to run, from bare metal hardware up to the application layer, in one package:
 
 
+**Intelligence**
+
 | | Layer | Replaces | What It Does |
 |---|-------|----------|--------------|
 | 🔄 | **Self-Learning** | Manual retraining, MLOps | SONA adapts in <1 ms — LoRA fine-tuning + EWC++ memory on every request |
-| ⚡ | **Self-Optimizing** | Manual tuning, config files | Auto-tunes routing, ranking, compression, and index parameters to your workload |
-| 🔧 | **Hardware** | CUDA toolkit, driver configs | Optimized for sparse/spiking CPU (AVX-512, NEON) — GPU for bursts (Metal, CUDA, ANE, WebGPU, FPGA) |
-| 🐧 | **Kernel** | Linux + Docker + eBPF | `.rvf` file boots its own Linux kernel in 125 ms — eBPF accelerates hot paths |
-| 🗄️ | **Storage** | Separate database + cache | Vector store, graph DB, key-value cache, and 230+ SQL functions (drops into PostgreSQL) |
-| 🔍 | **Search** | Pinecone, Weaviate, Qdrant | Self-learning HNSW — GNN improves results from every query automatically |
-| 🔗 | **Graph** | Separate graph database | Cypher (Neo4j-compatible), W3C SPARQL 1.1, hyperedges — all built in |
-| 🤖 | **AI Runtime** | llama.cpp, vLLM, Ollama | ruvllm — GGUF models, MicroLoRA tuning (<1 ms), speculative decoding, continuous batching, WASM |
-| 🎯 | **Embeddings** | OpenAI API, Cohere, static models | Contrastive training (triplet loss, InfoNCE), real-time fine-tuning, hard negative mining — embeddings improve as you use them |
-| 🧠 | **ML Framework** | PyTorch, TensorFlow | 46 attention types, 8 graph transformer modules, spiking networks, sparse inference, sublinear solvers, hyperbolic embeddings, domain expansion, quantum coherence |
-| ✅ | **Verified Training** | Manual validation, hope | Every training step is checked with formal proofs and statistical tests — gradients only apply if invariants pass, with a cryptographic certificate |
+| ⚡ | **Self-Optimizing** | Manual tuning, config files | Auto-tunes routing, ranking, compression, and index parameters |
+| 🎯 | **Embeddings** | OpenAI API, Cohere, static models | Contrastive training, triplet loss, real-time fine-tuning — embeddings improve as you use them |
+| ✅ | **Verified Training** | Manual validation | Formal proofs + statistical tests on every training step — gradients only apply if invariants pass |
+
+**Data & Search**
+
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🔍 | **Search** | Pinecone, Weaviate, Qdrant | Self-learning HNSW — GNN improves results from every query |
+| 🗄️ | **Storage** | Separate database + cache | Vector store, graph DB, key-value cache, 230+ SQL functions (drops into PostgreSQL) |
+| 🔗 | **Graph** | Neo4j, Amazon Neptune | Cypher, W3C SPARQL 1.1, hyperedges — all built in |
+
+**AI & ML**
+
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🤖 | **AI Runtime** | llama.cpp, vLLM, Ollama | ruvllm — GGUF models, MicroLoRA (<1 ms), speculative decoding, continuous batching, WASM |
+| 🧠 | **ML Framework** | PyTorch, TensorFlow | 46 attention types, 8 graph transformers, spiking networks, sparse inference, sublinear solvers |
+| 🧬 | **Domain Models** | Custom ML pipelines | Genomics (DNA variant calling), physics simulation, economic modeling, biological networks |
+
+**Infrastructure**
+
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🔧 | **Hardware** | CUDA toolkit, driver configs | Sparse/spiking CPU (AVX-512, NEON) — GPU for bursts (Metal, CUDA, ANE, WebGPU, FPGA) |
+| 🐧 | **Kernel** | Linux + Docker + eBPF | `.rvf` file boots its own kernel in 125 ms — eBPF accelerates hot paths |
 | 🌐 | **Coordination** | etcd, ZooKeeper, Consul | Raft consensus, multi-master replication, CRDT delta sync, auto-sharding |
 | 📦 | **Packaging** | Docker, Kubernetes | One `.rvf` file = your entire service — servers, browsers, phones, IoT, bare metal |
-| 🔐 | **Security** | Vault, manual audit logs | Post-quantum crypto (ML-DSA-65, Ed25519), SHAKE-256, witness chains, hardware attestation, formal verification, cryptographic lineage |
+
+**Routing & Observability**
+
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🚦 | **Routing** | API gateways, LLM routers | Semantic routing (Tiny Dancer), MCP protocol gateway, agent-to-agent discovery |
+| 📊 | **Observability** | Datadog, Prometheus | Latency/power/memory profiling, coherence scoring, real-time metrics |
+| 🛡️ | **Safety** | Manual review, guardrails | Cognitum Gate — 256-tile WASM fabric, Permit/Defer/Deny in <1 ms, witness receipts |
+
+**Security & Trust**
+
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🔐 | **Crypto** | Vault, manual audit logs | Post-quantum (ML-DSA-65, Ed25519), SHAKE-256, witness chains, hardware attestation |
+| 📜 | **Lineage** | No equivalent | Every operation recorded in a tamper-proof chain — full provenance from creation to deployment |
 
 The [RVF cognitive container](./crates/rvf/README.md) ties it all together: a single file that packages your vectors, models, data, and a bootable kernel. Drop it on any machine and it starts serving in 125 ms — no install, no dependencies. It branches like Git (only changes are copied), logs every operation in a tamper-proof chain, and runs anywhere from a browser to bare metal.
 
