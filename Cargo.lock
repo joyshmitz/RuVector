@@ -9028,8 +9028,11 @@ dependencies = [
  "criterion 0.5.1",
  "rand 0.8.5",
  "ruvector-domain-expansion",
+ "rvf-runtime",
+ "rvf-types",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
 ]
 

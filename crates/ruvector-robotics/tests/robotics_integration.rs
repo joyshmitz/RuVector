@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use ruvector_robotics::bridge::{
-    GaussianConfig, Point3D, PointCloud, RobotState, SceneObject, SpatialIndex,
+    GaussianConfig, Point3D, PointCloud, SceneObject, SpatialIndex,
 };
 use ruvector_robotics::bridge::gaussian::gaussians_from_cloud;
 use ruvector_robotics::cognitive::behavior_tree::{
@@ -19,7 +19,7 @@ use ruvector_robotics::cognitive::behavior_tree::{
 use ruvector_robotics::cognitive::{
     ActionOption, DecisionConfig, DecisionEngine, Demonstration, EpisodicMemory,
     Episode, SkillLibrary, SwarmConfig, SwarmCoordinator, SwarmTask, RobotCapabilities,
-    TrackedObject, WorldModel, WorkingMemory, MemoryItem,
+    TrackedObject, WorldModel,
 };
 use ruvector_robotics::mcp::{RoboticsToolRegistry, ToolRequest};
 use ruvector_robotics::mcp::executor::ToolExecutor;

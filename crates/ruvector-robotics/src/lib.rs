@@ -40,6 +40,14 @@ pub mod planning;
 #[cfg(feature = "domain-expansion")]
 pub mod domain_expansion;
 
+/// RVF packaging for robotics data.
+///
+/// Bridges point clouds, scene graphs, trajectories, Gaussian splats, and
+/// obstacles into the RuVector Format (`.rvf`) for persistence and similarity
+/// search.  Requires the `rvf` feature flag.
+#[cfg(feature = "rvf")]
+pub mod rvf;
+
 // Convenience re-exports of the most commonly used types.
 pub use bridge::{
     BridgeConfig, DistanceMetric, OccupancyGrid, Obstacle as BridgeObstacle, Point3D, PointCloud,

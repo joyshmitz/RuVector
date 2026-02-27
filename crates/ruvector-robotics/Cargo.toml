@@ -8,6 +8,7 @@ description = "Cognitive robotics platform: bridge types, perception pipeline, c
 [features]
 default = []
 domain-expansion = ["dep:ruvector-domain-expansion", "dep:rand"]
+rvf = ["dep:rvf-runtime", "dep:rvf-types", "dep:tempfile"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -15,6 +16,9 @@ serde_json = "1.0"
 thiserror = "2.0"
 ruvector-domain-expansion = { path = "../ruvector-domain-expansion", optional = true }
 rand = { version = "0.8", optional = true }
+rvf-runtime = { path = "../rvf/rvf-runtime", optional = true }
+rvf-types = { path = "../rvf/rvf-types", features = ["std"], optional = true }
+tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
