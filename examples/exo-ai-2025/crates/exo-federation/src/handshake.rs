@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use crate::{
     Result, FederationError, PeerAddress,
-    crypto::{PostQuantumKeypair, EncryptedChannel, SharedSecret},
+    crypto::{PostQuantumKeypair, EncryptedChannel},
 };
 
 /// Capabilities supported by a federation node
@@ -95,11 +95,11 @@ impl FederationToken {
 ///     RETURN token
 /// ```
 pub async fn join_federation(
-    local_keys: &PostQuantumKeypair,
+    _local_keys: &PostQuantumKeypair,
     peer: &PeerAddress,
 ) -> Result<FederationToken> {
     // Step 1: Post-quantum key exchange
-    let (shared_secret, ciphertext) = PostQuantumKeypair::encapsulate(&peer.public_key)?;
+    let (shared_secret, _ciphertext) = PostQuantumKeypair::encapsulate(&peer.public_key)?;
 
     // Step 2: Establish encrypted channel
     // In real implementation, we would:

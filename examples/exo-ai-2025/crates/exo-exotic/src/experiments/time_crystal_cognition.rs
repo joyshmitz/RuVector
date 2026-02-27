@@ -9,7 +9,6 @@
 //! hot-tier patterns in the tiered compression scheme.
 
 use exo_core::backends::neuromorphic::NeuromorphicBackend;
-use exo_core::backends::SubstrateBackend as _;
 
 /// Cognitive time crystal: periodic attractor in spiking network
 pub struct TimeCrystalExperiment {

@@ -7,7 +7,6 @@
 //! - Proof generation
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use crate::{Result, FederationError, PeerId, StateUpdate};
 
 /// Consensus message types
@@ -134,7 +133,7 @@ pub async fn byzantine_commit(
     };
 
     // Broadcast pre-prepare (simulated)
-    let pre_prepare = ConsensusMessage::PrePrepare {
+    let _pre_prepare = ConsensusMessage::PrePrepare {
         proposal: proposal.clone(),
     };
 

@@ -61,6 +61,7 @@ impl From<String> for ExoError {
     }
 }
 
+#[allow(dead_code)]
 type ExoResult<T> = Result<T, ExoError>;
 
 /// Configuration for EXO substrate

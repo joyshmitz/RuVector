@@ -89,6 +89,7 @@ impl Default for HypergraphConfig {
 /// - Sheaf-theoretic consistency checks
 pub struct HypergraphSubstrate {
     /// Configuration
+    #[allow(dead_code)]
     config: HypergraphConfig,
     /// Entity storage (placeholder - could integrate with actual graph DB)
     entities: Arc<DashMap<EntityId, EntityRecord>>,

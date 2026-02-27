@@ -124,6 +124,7 @@ impl Default for HorvathClock {
 /// Pharmacogenomic weight modifiers for IIT Φ computation.
 /// Maps gene variants to synaptic weight scaling factors.
 pub struct PharmacogenomicWeights {
+    #[allow(dead_code)]
     clock: HorvathClock,
 }
 

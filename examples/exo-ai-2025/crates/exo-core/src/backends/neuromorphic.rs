@@ -52,7 +52,8 @@ struct NeuromorphicState {
     hd_dim: usize,
     /// Spiking neuron membrane potentials
     membrane: Vec<f32>,
-    /// Synaptic weights (n_neurons × n_neurons)
+    /// Synaptic weights (n_neurons × n_neurons) — reserved for STDP Hebbian learning
+    #[allow(dead_code)]
     weights: Vec<f32>,
     n_neurons: usize,
     /// Kuramoto phase per neuron (radians)
@@ -120,39 +121,61 @@ impl NeuromorphicState {
     }
 
     /// K-WTA competition: keep top-K membrane potentials, zero rest.
+    /// O(n + k log k) via partial selection rather than full sort.
+    #[allow(dead_code)]
+    #[inline]
     fn k_wta(&mut self, k: usize) {
+        let n = self.membrane.len();
+        if k == 0 || k >= n {
+            return;
+        }
+        // Partial select: pivot the k-th largest to index k-1, O(n) average
         let mut indexed: Vec<(usize, f32)> = self.membrane.iter()
             .copied()
             .enumerate()
             .collect();
-        indexed.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        // Zero all neurons, then restore exactly the top-K by original index
+        // select_nth_unstable_by puts kth element in correct position
+        indexed.select_nth_unstable_by(k - 1, |a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        // Threshold = value at pivot position
+        let threshold = indexed[k - 1].1;
         for m in self.membrane.iter_mut() {
-            *m = 0.0;
-        }
-        for (orig_idx, val) in indexed.iter().take(k) {
-            self.membrane[*orig_idx] = *val;
+            if *m < threshold {
+                *m = 0.0;
+            }
         }
     }
 
     /// Kuramoto step: update phases and compute order parameter R.
     /// dφ_i/dt = ω_i + (K/N) Σ_j sin(φ_j - φ_i)
+    ///
+    /// Optimized from O(n²) to O(n) using the identity:
+    ///   sin(φ_j - φ_i) = sin(φ_j)cos(φ_i) - cos(φ_j)sin(φ_i)
+    /// So coupling_i = (K/N)[cos(φ_i)·Σsin(φ_j) - sin(φ_i)·Σcos(φ_j)]
+    #[inline]
     fn kuramoto_step(&mut self, dt: f32, omega: f32, k: f32) {
         let n = self.phases.len();
-        let mut new_phases = self.phases.clone();
-        let mut sum_sin = 0.0f32;
-        let mut sum_cos = 0.0f32;
-        for i in 0..n {
-            let coupling: f32 = self.phases.iter()
-                .map(|&pj| (pj - self.phases[i]).sin())
-                .sum::<f32>() * k / n as f32;
-            new_phases[i] = self.phases[i] + dt * (omega + coupling);
-            sum_sin += new_phases[i].sin();
-            sum_cos += new_phases[i].cos();
+        if n == 0 {
+            return;
         }
-        self.phases = new_phases;
+        // Single O(n) pass: accumulate sin/cos sums
+        let (sum_sin, sum_cos) = self.phases.iter().fold((0.0f32, 0.0f32), |(ss, sc), &p| {
+            (ss + p.sin(), sc + p.cos())
+        });
+        let k_over_n = k / n as f32;
+        let mut new_sum_sin = 0.0f32;
+        let mut new_sum_cos = 0.0f32;
+        for phi in self.phases.iter_mut() {
+            // coupling = (K/N)[cos(φ_i)·S - sin(φ_i)·C]
+            let coupling = k_over_n * (phi.cos() * sum_sin - phi.sin() * sum_cos);
+            *phi += dt * (omega + coupling);
+            new_sum_sin += phi.sin();
+            new_sum_cos += phi.cos();
+        }
         // Order parameter R = |Σ e^{iφ}| / N
-        self.order_parameter = (sum_sin * sum_sin + sum_cos * sum_cos).sqrt() / n as f32;
+        self.order_parameter =
+            (new_sum_sin * new_sum_sin + new_sum_cos * new_sum_cos).sqrt() / n as f32;
         self.tick += 1;
     }
 }

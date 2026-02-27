@@ -41,7 +41,6 @@ pub use onion::{onion_query, OnionHeader};
 pub use crdt::{GSet, LWWRegister, reconcile_crdt};
 pub use consensus::{byzantine_commit, CommitProof};
 
-use crate::crypto::SharedSecret;
 
 /// Errors that can occur in federation operations
 #[derive(Debug, thiserror::Error)]
@@ -222,7 +221,7 @@ impl FederatedMesh {
             }
             FederationScope::Global { max_hops } => {
                 // Use onion routing for privacy
-                let relay_nodes: Vec<_> = self.peers.iter()
+                let _relay_nodes: Vec<_> = self.peers.iter()
                     .take(max_hops)
                     .map(|e| e.key().clone())
                     .collect();

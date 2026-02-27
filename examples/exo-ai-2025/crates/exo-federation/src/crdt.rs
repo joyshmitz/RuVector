@@ -5,7 +5,7 @@
 //! - LWW-Register (Last-Writer-Wins Register)
 //! - Reconciliation algorithms
 
-use crate::{FederationError, Result};
+use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

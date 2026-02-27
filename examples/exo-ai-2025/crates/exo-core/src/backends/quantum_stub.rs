@@ -37,6 +37,7 @@ impl Default for DecoherenceParams {
 
 /// Quantum interference state (2^n basis states, compressed representation)
 struct InterferenceState {
+    #[allow(dead_code)]
     n_qubits: usize,
     /// State amplitudes (real, imaginary) — only track non-negligible amplitudes
     amplitudes: Vec<(u64, f64, f64)>, // (basis_state, re, im)
@@ -101,6 +102,7 @@ impl InterferenceState {
     }
 
     /// Measure: collapse to basis states, return top-k by probability.
+    #[allow(dead_code)]
     fn measure_top_k(&self, k: usize) -> Vec<QuantumMeasurement> {
         let mut measurements: Vec<QuantumMeasurement> = self.amplitudes.iter()
             .map(|&(basis_state, re, im)| QuantumMeasurement {
