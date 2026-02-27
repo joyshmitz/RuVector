@@ -5,6 +5,10 @@
 
 **Tamper-proof hashing and signing for every RVF segment -- SHA-3 digests, Ed25519 signatures, and lineage witness chains.**
 
+```toml
+rvf-crypto = "0.1"
+```
+
 Every operation on an RVF file gets recorded in a cryptographic witness chain. `rvf-crypto` provides the primitives that make this possible: SHA-3 (SHAKE-256) content hashing for segment identity, Ed25519 digital signatures for provenance, and lineage verification functions that ensure no record in the chain has been altered. If you are building tools that read, write, or transform `.rvf` files, this crate handles all the cryptography so you do not have to.
 
 | | rvf-crypto | Manual hashing + signing | No integrity checks |
@@ -15,11 +19,6 @@ Every operation on an RVF file gets recorded in a cryptographic witness chain. `
 | **no_std / WASM** | Hashing works without std; signing is feature-gated | Varies by library | N/A |
 
 ## Quick Start
-
-```toml
-[dependencies]
-rvf-crypto = "0.1"
-```
 
 ```rust
 use rvf_crypto::lineage::{lineage_record_to_bytes, lineage_record_from_bytes, verify_lineage_chain};

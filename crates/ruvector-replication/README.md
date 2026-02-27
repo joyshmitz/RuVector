@@ -7,10 +7,6 @@
 
 **Multi-master vector replication with quorum writes, vector clocks, and automatic conflict resolution.**
 
-```toml
-ruvector-replication = "0.1.1"
-```
-
 When your vector database runs on more than one node, you need a way to keep data in sync without losing writes or slowing down queries. ruvector-replication handles that: it replicates vectors across nodes, resolves conflicts automatically, and lets you trade off consistency versus speed per-write. It plugs into the [RuVector](https://github.com/ruvnet/ruvector) ecosystem alongside Raft consensus and auto-sharding.
 
 | | Single-node vector DB | ruvector-replication |
@@ -23,6 +19,11 @@ When your vector database runs on more than one node, you need a way to keep dat
 | **Recovery** | Manual restore from backup | Automatic replica recovery |
 
 ## Quick Start
+
+```toml
+[dependencies]
+ruvector-replication = "0.1.1"
+```
 
 ```rust
 use ruvector_replication::{Replicator, ReplicationConfig, ConsistencyLevel};
