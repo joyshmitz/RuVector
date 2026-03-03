@@ -95,6 +95,71 @@ function sanitizeNumericArg(arg, defaultVal) {
   return Number.isFinite(n) && n > 0 ? n : (defaultVal || 0);
 }
 
+// ── Proxy-aware fetch wrapper ───────────────────────────────────────────────
+let _proxyDispatcherSet = false;
+
+function getProxyUrl(targetUrl) {
+  const NO_PROXY = process.env.NO_PROXY || process.env.no_proxy || '';
+  if (NO_PROXY === '*') return null;
+  if (NO_PROXY) {
+    try {
+      const host = new URL(targetUrl).hostname.toLowerCase();
+      const patterns = NO_PROXY.split(',').map(p => p.trim().toLowerCase());
+      for (const p of patterns) {
+        if (!p) continue;
+        if (host === p || host.endsWith(p.startsWith('.') ? p : '.' + p)) return null;
+      }
+    } catch {}
+  }
+  return process.env.HTTPS_PROXY || process.env.https_proxy
+      || process.env.HTTP_PROXY  || process.env.http_proxy
+      || process.env.ALL_PROXY   || process.env.all_proxy
+      || null;
+}
+
+async function proxyFetch(url, opts) {
+  const target = typeof url === 'string' ? url : url.toString();
+  const proxy = getProxyUrl(target);
+  if (!proxy) return fetch(url, opts);
+
+  if (!_proxyDispatcherSet) {
+    try {
+      const undici = require('undici');
+      if (undici.ProxyAgent && undici.setGlobalDispatcher) {
+        undici.setGlobalDispatcher(new undici.ProxyAgent(proxy));
+        _proxyDispatcherSet = true;
+      }
+    } catch {}
+  }
+  if (_proxyDispatcherSet) return fetch(url, opts);
+
+  const { execFileSync } = require('child_process');
+  const args = ['-sS', '-L', '--max-time', '30'];
+  if (opts && opts.method) { args.push('-X', opts.method); }
+  if (opts && opts.headers) {
+    for (const [k, v] of Object.entries(opts.headers)) {
+      args.push('-H', `${k}: ${v}`);
+    }
+  }
+  if (opts && opts.body) { args.push('-d', typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)); }
+  args.push(target);
+  try {
+    const stdout = execFileSync('curl', args, { encoding: 'utf8', timeout: 35000 });
+    const body = stdout.trim();
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () => body,
+      json: async () => JSON.parse(body),
+      headers: new Map(),
+    };
+  } catch (e) {
+    const msg = e.stderr ? e.stderr.toString().trim() : e.message;
+    throw new Error(`Proxy curl failed: ${msg}`);
+  }
+}
+
 // Try to load the full IntelligenceEngine
 let IntelligenceEngine = null;
 let engineAvailable = false;
@@ -363,7 +428,7 @@ class Intelligence {
 const server = new Server(
   {
     name: 'ruvector',
-    version: '0.2.6',
+    version: '0.2.10',
   },
   {
     capabilities: {
@@ -1330,7 +1395,10 @@ const TOOLS = [
       type: 'object',
       properties: {
         category: { type: 'string', description: 'Filter by category' },
-        limit: { type: 'number', description: 'Max results (default 20)' }
+        limit: { type: 'number', description: 'Max results (default 20)' },
+        offset: { type: 'number', description: 'Skip first N results for pagination (default 0)' },
+        sort: { type: 'string', description: 'Sort by: updated_at, quality, votes (default updated_at)' },
+        tags: { type: 'string', description: 'Filter by tags (comma-separated)' }
       }
     }
   },
@@ -1426,6 +1494,117 @@ const TOOLS = [
     name: 'brain_flags',
     description: 'Show backend feature flag state (RVF, AGI, midstream flags)',
     inputSchema: { type: 'object', properties: {} }
+  },
+  // ── Brainpedia Page Tools (5) ── Knowledge page management ──
+  {
+    name: 'brain_page_list',
+    description: 'List Brainpedia knowledge pages with pagination and status filter',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max pages to return (default 20)' },
+        offset: { type: 'number', description: 'Skip first N pages for pagination (default 0)' },
+        status: { type: 'string', description: 'Filter by status: draft, canonical, contested, archived' }
+      }
+    }
+  },
+  {
+    name: 'brain_page_get',
+    description: 'Get a Brainpedia page by ID with delta log and evidence links',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Page ID (UUID or slug)' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'brain_page_create',
+    description: 'Create a new Brainpedia knowledge page (requires reputation >= 0.5)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Page title' },
+        content: { type: 'string', description: 'Page content body' },
+        category: { type: 'string', description: 'Category (pattern, solution, architecture, convention, security, performance, tooling)' },
+        tags: { type: 'string', description: 'Comma-separated tags' },
+        code_snippet: { type: 'string', description: 'Optional code snippet' }
+      },
+      required: ['title', 'content', 'category']
+    }
+  },
+  {
+    name: 'brain_page_update',
+    description: 'Submit a delta (correction, extension, evidence) to a Brainpedia page',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page_id: { type: 'string', description: 'Page ID to update' },
+        delta_type: { type: 'string', description: 'Delta type: correction, extension, evidence, deprecation' },
+        content_diff: { type: 'string', description: 'Content diff or new content' },
+        evidence_links: { type: 'string', description: 'JSON array of evidence links' }
+      },
+      required: ['page_id', 'content_diff']
+    }
+  },
+  {
+    name: 'brain_page_delete',
+    description: 'Delete a Brainpedia page by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Page ID to delete' }
+      },
+      required: ['id']
+    }
+  },
+  // ── WASM Node Tools (4) ── Executable compute node management ──
+  {
+    name: 'brain_node_list',
+    description: 'List published WASM compute nodes',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max nodes to return (default 20)' }
+      }
+    }
+  },
+  {
+    name: 'brain_node_get',
+    description: 'Get WASM compute node metadata and conformance vectors',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Node ID' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'brain_node_publish',
+    description: 'Publish a WASM compute node to the shared brain network',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Node name' },
+        wasm_base64: { type: 'string', description: 'Base64-encoded WASM binary' },
+        description: { type: 'string', description: 'Node description' },
+        conformance_vectors: { type: 'string', description: 'JSON array of conformance test vectors' }
+      },
+      required: ['name', 'wasm_base64']
+    }
+  },
+  {
+    name: 'brain_node_revoke',
+    description: 'Revoke a published WASM compute node',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Node ID to revoke' }
+      },
+      required: ['id']
+    }
   },
   // ── Midstream Tools (6) ── Real-time streaming analysis platform ──
   {
@@ -3122,7 +3301,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Fetch from GCS if no fresh cache
         if (!manifest) {
           try {
-            const resp = await fetch(GCS_MANIFEST);
+            const resp = await proxyFetch(GCS_MANIFEST, { signal: AbortSignal.timeout(15000) });
             if (resp.ok) {
               manifest = await resp.json();
               try {
@@ -3320,6 +3499,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               const p = new URLSearchParams();
               if (args.category) p.set('category', args.category);
               p.set('limit', String(args.limit || 20));
+              if (args.offset) p.set('offset', String(args.offset));
+              if (args.sort) p.set('sort', args.sort);
+              if (args.tags) p.set('tags', args.tags);
               url = `${brainUrl}/v1/memories/list?${p}`;
               break;
             }
@@ -3348,15 +3530,122 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               fetchOpts.body = JSON.stringify({ source_domain: args.source_domain, target_domain: args.target_domain });
               break;
             }
-            case 'sync': url = `${brainUrl}/v1/lora/latest`; break;
+            case 'sync': {
+              const p = new URLSearchParams();
+              if (args.direction) p.set('direction', args.direction);
+              url = `${brainUrl}/v1/lora/latest${p.toString() ? '?' + p : ''}`;
+              break;
+            }
           }
-          const resp = await fetch(url, fetchOpts);
+          const resp = await proxyFetch(url, fetchOpts);
           if (!resp.ok) {
             const errText = await resp.text().catch(() => resp.statusText);
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
           }
-          const result = await resp.json();
+          const result = (resp.status === 204 || resp.headers.get('content-length') === '0') ? {} : await resp.json();
           return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...result }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      // ── Brainpedia Page Tool Handlers ────────────────────────────────────
+      case 'brain_page_list':
+      case 'brain_page_get':
+      case 'brain_page_create':
+      case 'brain_page_update':
+      case 'brain_page_delete': {
+        try {
+          const brainUrl = process.env.BRAIN_URL || 'https://pi.ruv.io';
+          const brainKey = process.env.PI;
+          const hdrs = { 'Content-Type': 'application/json' };
+          if (brainKey) hdrs['Authorization'] = `Bearer ${brainKey}`;
+          let url, fetchOpts = { headers: hdrs, signal: AbortSignal.timeout(30000) };
+          const subCmd = name.replace('brain_page_', '');
+          switch (subCmd) {
+            case 'list': {
+              const p = new URLSearchParams();
+              if (args.limit) p.set('limit', String(args.limit));
+              if (args.offset) p.set('offset', String(args.offset));
+              if (args.status) p.set('status', args.status);
+              url = `${brainUrl}/v1/pages${p.toString() ? '?' + p : ''}`;
+              break;
+            }
+            case 'get': url = `${brainUrl}/v1/pages/${args.id}`; break;
+            case 'create': {
+              url = `${brainUrl}/v1/pages`;
+              fetchOpts.method = 'POST';
+              fetchOpts.body = JSON.stringify({ title: args.title, content: args.content, category: args.category, tags: args.tags ? args.tags.split(',').map(t => t.trim()) : [], code_snippet: args.code_snippet, evidence_links: [], embedding: [], witness_hash: '' });
+              break;
+            }
+            case 'update': {
+              url = `${brainUrl}/v1/pages/${args.page_id}/deltas`;
+              fetchOpts.method = 'POST';
+              let evidence = [];
+              try { if (args.evidence_links) evidence = JSON.parse(args.evidence_links); } catch {}
+              fetchOpts.body = JSON.stringify({ delta_type: args.delta_type || 'extension', content_diff: args.content_diff, evidence_links: evidence, witness_hash: '' });
+              break;
+            }
+            case 'delete': {
+              url = `${brainUrl}/v1/pages/${args.id}`;
+              fetchOpts.method = 'DELETE';
+              break;
+            }
+          }
+          const resp = await proxyFetch(url, fetchOpts);
+          if (!resp.ok) {
+            const errText = await resp.text().catch(() => resp.statusText);
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
+          }
+          const result = (resp.status === 204 || resp.headers.get('content-length') === '0') ? {} : await resp.json();
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...result }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
+        }
+      }
+
+      // ── WASM Node Tool Handlers ────────────────────────────────────────────
+      case 'brain_node_list':
+      case 'brain_node_get':
+      case 'brain_node_publish':
+      case 'brain_node_revoke': {
+        try {
+          const brainUrl = process.env.BRAIN_URL || 'https://pi.ruv.io';
+          const brainKey = process.env.PI;
+          const hdrs = { 'Content-Type': 'application/json' };
+          if (brainKey) hdrs['Authorization'] = `Bearer ${brainKey}`;
+          let url, fetchOpts = { headers: hdrs, signal: AbortSignal.timeout(30000) };
+          const subCmd = name.replace('brain_node_', '');
+          switch (subCmd) {
+            case 'list': {
+              const p = new URLSearchParams();
+              if (args.limit) p.set('limit', String(args.limit));
+              url = `${brainUrl}/v1/nodes${p.toString() ? '?' + p : ''}`;
+              break;
+            }
+            case 'get': url = `${brainUrl}/v1/nodes/${args.id}`; break;
+            case 'publish': {
+              url = `${brainUrl}/v1/nodes`;
+              fetchOpts.method = 'POST';
+              let vectors = [];
+              try { if (args.conformance_vectors) vectors = JSON.parse(args.conformance_vectors); } catch {}
+              fetchOpts.body = JSON.stringify({ name: args.name, wasm_base64: args.wasm_base64, description: args.description || '', conformance_vectors: vectors });
+              break;
+            }
+            case 'revoke': {
+              url = `${brainUrl}/v1/nodes/${args.id}/revoke`;
+              fetchOpts.method = 'POST';
+              fetchOpts.body = JSON.stringify({});
+              break;
+            }
+          }
+          const resp = await proxyFetch(url, fetchOpts);
+          if (!resp.ok) {
+            const errText = await resp.text().catch(() => resp.statusText);
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
+          }
+          const result = (resp.status === 204 || resp.headers.get('content-length') === '0') ? {} : await resp.json();
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, ...(Array.isArray(result) ? { items: result, count: result.length } : result) }, null, 2) }] };
         } catch (e) {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }, null, 2) }], isError: true };
         }
@@ -3384,7 +3673,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             brain_flags: '/v1/status',
           };
           const endpoint = endpointMap[name];
-          const resp = await fetch(`${brainUrl}${endpoint}`, { headers: hdrs });
+          const resp = await proxyFetch(`${brainUrl}${endpoint}`, { headers: hdrs, signal: AbortSignal.timeout(30000) });
           if (!resp.ok) {
             const errText = await resp.text().catch(() => resp.statusText);
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
@@ -3428,7 +3717,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const hdrs = { 'Content-Type': 'application/json' };
           if (brainKey) hdrs['Authorization'] = `Bearer ${brainKey}`;
 
-          const resp = await fetch(`${brainUrl}/v1/midstream`, { headers: hdrs });
+          const resp = await proxyFetch(`${brainUrl}/v1/midstream`, { headers: hdrs, signal: AbortSignal.timeout(30000) });
           if (!resp.ok) {
             const errText = await resp.text().catch(() => resp.statusText);
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
@@ -3458,7 +3747,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           async function timeFetch(url) {
             const start = performance.now();
-            const resp = await fetch(url, { headers: hdrs });
+            const resp = await proxyFetch(url, { headers: hdrs });
             return { status: resp.status, elapsed: performance.now() - start };
           }
 
@@ -3511,7 +3800,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           if (brainKey) hdrs['Authorization'] = `Bearer ${brainKey}`;
           const limit = Math.min(Math.max(parseInt(args.limit) || 10, 1), 100);
           const q = encodeURIComponent(args.query);
-          const resp = await fetch(`${brainUrl}/v1/memories/search?q=${q}&limit=${limit}`, { headers: hdrs });
+          const resp = await proxyFetch(`${brainUrl}/v1/memories/search?q=${q}&limit=${limit}`, { headers: hdrs, signal: AbortSignal.timeout(30000) });
           if (!resp.ok) {
             const errText = await resp.text().catch(() => resp.statusText);
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `${resp.status} ${errText}` }, null, 2) }], isError: true };
@@ -3531,8 +3820,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           if (brainKey) hdrs['Authorization'] = `Bearer ${brainKey}`;
 
           const [healthResp, midResp] = await Promise.all([
-            fetch(`${brainUrl}/v1/health`, { headers: hdrs }).then(r => r.json()).catch(e => ({ error: e.message })),
-            fetch(`${brainUrl}/v1/midstream`, { headers: hdrs }).then(r => r.json()).catch(e => ({ error: e.message })),
+            proxyFetch(`${brainUrl}/v1/health`, { headers: hdrs, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(e => ({ error: e.message })),
+            proxyFetch(`${brainUrl}/v1/midstream`, { headers: hdrs, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(e => ({ error: e.message })),
           ]);
 
           return { content: [{ type: 'text', text: JSON.stringify({
@@ -3560,7 +3849,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case 'balance': { const ps = process.env.PI ? require('crypto').createHash('shake256', { outputLength: 16 }).update(process.env.PI).digest('hex') : 'anonymous'; endpoint = `/balance/${ps}`; break; }
             case 'tasks': endpoint = `/tasks?limit=${args.limit || 20}`; break;
           }
-          const resp = await fetch(`${genesisUrl}${endpoint}`, {
+          const resp = await proxyFetch(`${genesisUrl}${endpoint}`, {
             method,
             headers: { 'Content-Type': 'application/json', ...(process.env.PI ? { 'Authorization': `Bearer ${process.env.PI}` } : {}) },
             ...(body ? { body } : {})
@@ -3831,7 +4120,7 @@ async function main() {
           transport: 'sse',
           sessions: sessions.size,
           tools: 91,
-          version: '0.2.6'
+          version: '0.2.10'
         }));
 
       } else {
