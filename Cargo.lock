@@ -5142,6 +5142,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "neural-trader-coherence"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "neural-trader-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "neural-trader-replay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "neural-trader-coherence",
+ "neural-trader-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "neural-trader-wasm"
+version = "0.1.1"
+dependencies = [
+ "console_error_panic_hook",
+ "neural-trader-coherence",
+ "neural-trader-core",
+ "neural-trader-replay",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

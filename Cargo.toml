@@ -98,6 +98,10 @@ members = [
     "crates/ruvector-dither",
     "crates/ruvector-robotics",
     "examples/robotics",
+    "crates/neural-trader-core",
+    "crates/neural-trader-coherence",
+    "crates/neural-trader-replay",
+    "crates/neural-trader-wasm",
 ]
 resolver = "2"
 

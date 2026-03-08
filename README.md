@@ -502,7 +502,7 @@ npx @ruvector/rvf-mcp-server --transport stdio # MCP server for AI agents
 
 **Rust crates** (23): [`rvf-types`](https://crates.io/crates/rvf-types) `rvf-wire` `rvf-manifest` `rvf-quant` `rvf-index` `rvf-crypto` [`rvf-runtime`](https://crates.io/crates/rvf-runtime) `rvf-kernel` `rvf-ebpf` [`rvf-federation`](./crates/rvf/rvf-federation) `rvf-launch` `rvf-server` `rvf-import` [`rvf-cli`](https://crates.io/crates/rvf-cli) `rvf-wasm` `rvf-solver-wasm` `rvf-node` + 6 adapters (claude-flow, agentdb, ospipe, agentic-flow, rvlite, sona)
 
-**npm packages** (5): [`@ruvector/rvf`](https://www.npmjs.com/package/@ruvector/rvf) [`@ruvector/rvf-node`](https://www.npmjs.com/package/@ruvector/rvf-node) [`@ruvector/rvf-wasm`](https://www.npmjs.com/package/@ruvector/rvf-wasm) [`@ruvector/rvf-mcp-server`](https://www.npmjs.com/package/@ruvector/rvf-mcp-server) [`@ruvector/ruvllm-wasm`](https://www.npmjs.com/package/@ruvector/ruvllm-wasm)
+**npm packages** (6): [`@ruvector/rvf`](https://www.npmjs.com/package/@ruvector/rvf) [`@ruvector/rvf-node`](https://www.npmjs.com/package/@ruvector/rvf-node) [`@ruvector/rvf-wasm`](https://www.npmjs.com/package/@ruvector/rvf-wasm) [`@ruvector/rvf-mcp-server`](https://www.npmjs.com/package/@ruvector/rvf-mcp-server) [`@ruvector/ruvllm-wasm`](https://www.npmjs.com/package/@ruvector/ruvllm-wasm) [`@ruvector/neural-trader-wasm`](https://www.npmjs.com/package/@ruvector/neural-trader-wasm)
 
 - **Security Hardened RVF** ([`examples/security_hardened.rvf`](./examples/security_hardened.rvf)) — 2.1 MB sealed artifact with 22 verified capabilities: TEE attestation (SGX/SEV-SNP/TDX/ARM CCA), AIDefence (injection/jailbreak/PII/exfil), hardened Linux microkernel, eBPF firewall, Ed25519 signing, 6-role RBAC, Coherence Gate, 30-entry witness chain, Paranoid policy, COW branching, audited k-NN. See [ADR-042](./docs/adr/ADR-042-Security-RVF-AIDefence-TEE.md).
 - **Full documentation**: [crates/rvf/README.md](./crates/rvf/README.md)
@@ -1440,7 +1440,7 @@ RuVector runs on Node.js, Rust, browsers, PostgreSQL, and Docker. Pick the packa
 </details>
 
 <details>
-<summary>🦀 Rust Crates (83 Packages)</summary>
+<summary>🦀 Rust Crates (87 Packages)</summary>
 
 All crates are published to [crates.io](https://crates.io) under the `ruvector-*` and `rvf-*` namespaces.
 
@@ -1534,6 +1534,17 @@ wget https://huggingface.co/ruv/ruvltra/resolve/main/ruvltra-small-0.5b-q4_k_m.g
 | [ruvector-router-wasm](./crates/ruvector-router-wasm) | WASM bindings for browser routing | [![crates.io](https://img.shields.io/crates/v/ruvector-router-wasm.svg)](https://crates.io/crates/ruvector-router-wasm) |
 
 **Hybrid Routing** achieves **90% accuracy** for agent routing using keyword-first strategy with embedding fallback. See [Issue #122](https://github.com/ruvnet/ruvector/issues/122) for benchmarks and the [training tutorials](#-ruvllm-training--fine-tuning-tutorials) for fine-tuning guides.
+
+### Neural Trader
+
+| Crate | Description | crates.io |
+|-------|-------------|-----------|
+| [neural-trader-core](./crates/neural-trader-core) | Market event types, ingest pipeline, graph schema | `publish = false` |
+| [neural-trader-coherence](./crates/neural-trader-coherence) | MinCut coherence gate with CUSUM drift detection | `publish = false` |
+| [neural-trader-replay](./crates/neural-trader-replay) | Reservoir replay store with proof-gated writes | `publish = false` |
+| [neural-trader-wasm](./crates/neural-trader-wasm) | WASM bindings for browser coherence gates & replay | `publish = false` |
+
+Six-layer pipeline treating the limit order book as a dynamic heterogeneous typed graph. See [ADR-085](./docs/adr/ADR-085-neural-trader-ruvector.md) for architecture, [ADR-086](./docs/adr/ADR-086-neural-trader-wasm.md) for WASM bindings.
 
 ### Dynamic Min-Cut (December 2025 Breakthrough)
 

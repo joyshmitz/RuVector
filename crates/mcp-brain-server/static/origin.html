@@ -297,14 +297,93 @@ function makeGlyphTex(ch, sz) {
   return t;
 }
 
+// ── Persistent dot-matrix field (survives scene transitions) ──
+const GRID = isMobile ? 24 : 40;
+const GRID_SP = isMobile ? 2.0 : 1.5;
+const GRID_HALF = (GRID - 1) * GRID_SP * 0.5;
+const dotCount = GRID * GRID;
+const dotPos = new Float32Array(dotCount * 3);
+const dotCol = new Float32Array(dotCount * 3);
+const dotBase = [];
+
+for (let ix = 0; ix < GRID; ix++) {
+  for (let iz = 0; iz < GRID; iz++) {
+    const idx = ix * GRID + iz;
+    const x = ix * GRID_SP - GRID_HALF;
+    const z = iz * GRID_SP - GRID_HALF;
+    dotPos[idx * 3] = x;
+    dotPos[idx * 3 + 1] = -12;
+    dotPos[idx * 3 + 2] = z;
+    dotBase.push({ x, z });
+    const edgeDist = Math.sqrt(x * x + z * z) / GRID_HALF;
+    const c = warm.clone().lerp(blue, edgeDist * 0.5).multiplyScalar(0.5 + (1 - edgeDist) * 0.5);
+    dotCol[idx * 3] = c.r; dotCol[idx * 3 + 1] = c.g; dotCol[idx * 3 + 2] = c.b;
+  }
+}
+const dotGeo = new THREE.BufferGeometry();
+dotGeo.setAttribute('position', new THREE.BufferAttribute(dotPos, 3));
+dotGeo.setAttribute('color', new THREE.BufferAttribute(dotCol, 3));
+const dotMat = new THREE.PointsMaterial({
+  size: isMobile ? 0.3 : 0.22, vertexColors: true, transparent: true,
+  opacity: 0.15, blending: THREE.AdditiveBlending, sizeAttenuation: true, depthWrite: false,
+});
+const dotMatrix = new THREE.Points(dotGeo, dotMat);
+threeScene.add(dotMatrix);
+
+let mouseWorldX = 0, mouseWorldZ = 0;
+let matrixIntensity = 0.5; // varies per scene
+let matrixMode = 'calm'; // calm, surge, split, spiral, shield, radiant
+
+// Scene-specific matrix behaviors
+const matrixModes = {
+  noise:       { mode: 'calm',    intensity: 0.3, opacity: 0.10 },
+  singularity: { mode: 'surge',   intensity: 0.6, opacity: 0.15 },
+  birth:       { mode: 'radiant', intensity: 0.8, opacity: 0.20 },
+  containers:  { mode: 'grid',    intensity: 0.5, opacity: 0.15 },
+  cut:         { mode: 'split',   intensity: 0.7, opacity: 0.18 },
+  graph:       { mode: 'spiral',  intensity: 0.6, opacity: 0.16 },
+  attention:   { mode: 'surge',   intensity: 0.9, opacity: 0.22 },
+  shield:      { mode: 'shield',  intensity: 0.7, opacity: 0.18 },
+  transfer:    { mode: 'split',   intensity: 0.6, opacity: 0.16 },
+  collective:  { mode: 'spiral',  intensity: 0.8, opacity: 0.20 },
+  exo:         { mode: 'surge',   intensity: 0.7, opacity: 0.18 },
+  radiant:     { mode: 'radiant', intensity: 1.0, opacity: 0.25 },
+};
+
+let targetOpacity = 0.15;
+let transitionWave = 0; // spike on scene change
+
+function setMatrixForScene(vizType) {
+  const cfg = matrixModes[vizType] || matrixModes.noise;
+  matrixMode = cfg.mode;
+  matrixIntensity = cfg.intensity;
+  targetOpacity = cfg.opacity;
+  transitionWave = 1.0; // trigger a transition burst
+}
+
 // ── Build visualization per scene type ──
 function clearViz() {
-  while (threeScene.children.length) threeScene.remove(threeScene.children[0]);
+  // Remove everything EXCEPT the dot matrix
+  const keep = [dotMatrix];
+  while (threeScene.children.length) {
+    const child = threeScene.children[0];
+    if (keep.includes(child)) {
+      if (threeScene.children.length === keep.length) break;
+      // Move to end to process others
+      threeScene.remove(child);
+      threeScene.add(child);
+      continue;
+    }
+    threeScene.remove(child);
+  }
+  // Re-add matrix if it was removed
+  if (!threeScene.children.includes(dotMatrix)) threeScene.add(dotMatrix);
   particles = null; sprites = []; particleVels = [];
 }
 
 function buildViz(type) {
   clearViz();
+  setMatrixForScene(type);
   const n = isMobile ? 80 : 200;
   pCount = n;
 
@@ -515,6 +594,78 @@ function animate() {
     s.sp.material.opacity = s.baseOp * (0.5 + Math.sin(time * s.speed * 3 + s.phase) * 0.5);
     s.sp.material.rotation = Math.sin(time * 0.2 + s.phase) * 0.1;
   }
+
+  // ── Dot-matrix wave field (persistent, varies per scene) ──
+  mouseWorldX += (mouseX * GRID_HALF * 0.7 - mouseWorldX) * 0.06;
+  mouseWorldZ += (mouseY * GRID_HALF * 0.5 - mouseWorldZ) * 0.06;
+  // Smooth opacity transitions
+  dotMat.opacity += (targetOpacity - dotMat.opacity) * 0.04;
+  // Decay transition wave
+  transitionWave *= 0.97;
+
+  const dp = dotMatrix.geometry.attributes.position.array;
+  const mi = matrixIntensity;
+  for (let i = 0; i < dotCount; i++) {
+    const bx = dotBase[i].x;
+    const bz = dotBase[i].z;
+    const dx = bx - mouseWorldX;
+    const dz = bz - mouseWorldZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const centerDist = Math.sqrt(bx * bx + bz * bz);
+
+    // Mouse anti-gravity dome
+    const repulse = Math.max(0, 1 - dist / (GRID_HALF * 0.4));
+    const lift = repulse * repulse * 10 * mi;
+
+    // Transition shockwave — expanding ring on scene change
+    const twR = (1 - transitionWave) * GRID_HALF * 1.5;
+    const twDist = Math.abs(centerDist - twR);
+    const twLift = transitionWave * Math.max(0, 1 - twDist / 8) * 6;
+
+    let y = -12;
+    if (matrixMode === 'calm') {
+      y += Math.sin(bx * 0.15 + time * 1.5) * Math.cos(bz * 0.15 + time * 1.2) * 0.5 * mi;
+      y += Math.sin(centerDist * 0.2 - time * 2) * 0.3 * mi;
+    } else if (matrixMode === 'surge') {
+      y += Math.sin(centerDist * 0.25 - time * 5) * 1.0 * mi;
+      y += Math.sin(bx * 0.2 + time * 2.5) * Math.cos(bz * 0.2 + time * 2) * 0.6 * mi;
+      y += Math.sin(dist * 0.3 - time * 6) * 0.8 * repulse * mi;
+    } else if (matrixMode === 'split') {
+      const side = bx > 0 ? 1 : -1;
+      y += Math.sin(Math.abs(bx) * 0.3 - time * 3) * 0.8 * mi;
+      y += side * Math.sin(bz * 0.2 + time * 2) * 0.5 * mi;
+      y += Math.cos(bx * 0.15 + bz * 0.15 + time * 4) * 0.3 * mi;
+    } else if (matrixMode === 'spiral') {
+      const angle = Math.atan2(bz, bx);
+      y += Math.sin(angle * 3 + centerDist * 0.2 - time * 4) * 0.8 * mi;
+      y += Math.sin(centerDist * 0.15 - time * 3) * 0.6 * mi;
+    } else if (matrixMode === 'shield') {
+      for (let r = 1; r <= 7; r++) {
+        const ringR = 3 + r * 2.5;
+        const ringDist = Math.abs(centerDist - ringR * 0.6);
+        y += Math.max(0, 1 - ringDist / 2.5) * Math.sin(time * 3 + r) * 0.5 * mi;
+      }
+    } else if (matrixMode === 'grid') {
+      y += Math.sin(bx * 0.5) * Math.sin(bz * 0.5) * Math.sin(time * 2) * 0.6 * mi;
+      y += Math.cos(bx * 0.3 + bz * 0.3 + time * 3) * 0.3 * mi;
+    } else if (matrixMode === 'radiant') {
+      y += Math.sin(centerDist * 0.3 - time * 5) * 1.2 * mi;
+      y += Math.sin(bx * 0.2 + time * 3) * Math.cos(bz * 0.2 + time * 2.5) * 0.8 * mi;
+      y += Math.cos(dist * 0.25 - time * 4) * 0.6 * repulse * mi;
+      const angle = Math.atan2(bz, bx);
+      y += Math.sin(angle * 4 + time * 2) * 0.3 * mi;
+    }
+
+    y += lift + twLift;
+    dp[i * 3 + 1] = y;
+
+    // XZ displacement — vortex near cursor
+    const angle2 = Math.atan2(dz, dx);
+    const spiral2 = repulse * repulse * 1.0 * mi;
+    dp[i * 3] = bx + Math.sin(angle2 + time * 3) * spiral2;
+    dp[i * 3 + 2] = bz + Math.cos(angle2 + time * 3) * spiral2;
+  }
+  dotMatrix.geometry.attributes.position.needsUpdate = true;
 
   // Camera with mouse parallax
   camera.position.x = Math.sin(time * 0.1) * 2 + mouseX * 5;
