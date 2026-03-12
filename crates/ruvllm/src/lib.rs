@@ -130,6 +130,7 @@ pub mod memory_pool;
 #[cfg(all(target_os = "macos", feature = "metal-compute"))]
 pub mod metal;
 pub mod models;
+pub mod moe;
 pub mod optimization;
 pub mod paged_attention;
 pub mod policy_store;
@@ -321,6 +322,11 @@ pub use memory_pool::{
     ArenaStats, BufferPool, BufferPoolStats, BufferSize, InferenceArena, MemoryManager,
     MemoryManagerConfig, MemoryManagerStats, PooledBuffer, ScratchSpace, ScratchSpaceManager,
     ScratchStats, CACHE_LINE_SIZE, DEFAULT_ALIGNMENT,
+};
+// MoE (Mixture of Experts) - ADR-092
+pub use moe::{
+    AffinityConfig, ExpertAffinity, ExpertId, ExpertPrecision, MoeMetrics, MoeMetricsSummary,
+    PrecisionAllocator, PrecisionConfig,
 };
 pub use optimization::{
     AdaptationResult, BatchSizeStrategy, ConsolidationStrategy, InferenceMetrics,
