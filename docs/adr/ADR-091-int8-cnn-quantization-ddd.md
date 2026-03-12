@@ -1,6 +1,6 @@
 # ADR-091: INT8 CNN Quantization — Domain-Driven Design Architecture
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-03-12
 **Authors**: RuVector Architecture Team
 **Deciders**: ruv
@@ -12,6 +12,21 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-03-12 | RuVector Team | Initial proposal based on INT8 quantization design |
+| 0.2 | 2026-03-12 | RuVector Team | Added decision statement, invariants, operator coverage, acceptance gates |
+
+---
+
+## Decision Statement
+
+**ADR-091 chooses INT8 PTQ (post-training quantization) as the default production quantization path for CNN inference in ruvector-cnn.**
+
+This decision prioritizes:
+- Near-term shipping velocity over research novelty
+- Standard, validated INT8 PTQ over experimental ultra-low-bit approaches
+- Per-channel symmetric weights + per-tensor asymmetric activations as the quantization scheme
+- AVX2 as the primary SIMD target with NEON and WASM as secondary
+
+**Acceptance Benchmark**: MobileNetV3-Small INT8 must achieve ≥2.5x latency improvement with cosine similarity ≥0.995 versus FP32 on embedding validation set.
 
 ---
 
@@ -357,6 +372,77 @@ pub fn fuse_conv_bn(conv: &Conv2d, bn: &BatchNorm) -> Conv2d {
 | `_mm256_max_epu8` | max(u8, u8) | Quantized ReLU |
 | `_mm256_min_epu8` | min(u8, u8) | Quantized clamp |
 | `_mm256_cvtepi32_ps` | i32→f32 | Dequantization |
+
+### 3.6 System Invariants
+
+**These invariants MUST be enforced throughout the implementation:**
+
+| Invariant | Rule | Rationale |
+|-----------|------|-----------|
+| **INV-1: Accumulator Type** | Accumulator is always `i32` | Prevents overflow in dot products |
+| **INV-2: Bias Domain** | Bias is always stored in accumulator domain (`i32`) | Enables single fused MAC operation |
+| **INV-3: Zero-Point Fusion** | Zero-point correction is always fused into bias before runtime | Eliminates per-inference subtraction |
+| **INV-4: Dequant Boundaries** | Dequantization only occurs at defined graph boundaries | Prevents precision loss from repeated quant/dequant |
+| **INV-5: Provenance** | Quantized tensors always carry scale/zero_point metadata | Enables correct dequantization and debugging |
+| **INV-6: Scalar Oracle** | Every SIMD kernel has a scalar reference with bit-exact or bounded equivalence | Validates kernel correctness |
+| **INV-7: Calibration Versioning** | Calibration artifacts are versioned and checksummed | Reproducibility and audit trail |
+| **INV-8: Export Config** | Model export records exact quantization config | Enables model provenance tracking |
+
+### 3.7 Activation Format Rules
+
+| Context | Tensor Format | Domain | Rationale |
+|---------|---------------|--------|-----------|
+| **Pre-ReLU activations** | `i32` (accumulator) | Signed | May contain negative values before activation |
+| **Post-ReLU activations** | `u8` | Unsigned [0, 255] | ReLU output is non-negative; asymmetric uses full range |
+| **Post-ReLU6 activations** | `u8` | Unsigned [zp, zp+6/scale] | Clamped to [0, 6] in float domain |
+| **Post-HardSwish activations** | `u8` | Unsigned | Output range depends on input; asymmetric |
+| **Residual add inputs** | `u8` | Unsigned | Both branches requantized to common scale |
+| **Residual add output** | `i32` → `u8` | Accumulator → Unsigned | Add in i32, then requantize |
+
+### 3.8 Operator Coverage
+
+| Operator | Support Status | INT8 Strategy | Notes |
+|----------|----------------|---------------|-------|
+| **Conv2d (standard)** | ✅ Supported | Per-channel weights, u8 activations | Core operator |
+| **Conv2d (depthwise)** | ✅ Supported | Per-channel weights, u8 activations | Critical for MobileNet |
+| **Conv2d (pointwise 1×1)** | ✅ Supported | Per-channel weights, u8 activations | Highly memory-bound |
+| **BatchNorm** | ✅ Fused | Absorbed into preceding Conv2d | Graph transform, no runtime cost |
+| **ReLU** | ✅ Supported | `max(x, zero_point)` in u8 domain | Single SIMD instruction |
+| **ReLU6** | ✅ Supported | Clamp to [zp, zp+6/scale] | Two SIMD instructions |
+| **HardSwish** | ✅ Supported | LUT or piecewise linear in u8 | MobileNetV3 requirement |
+| **Linear (FC)** | ✅ Supported | Per-channel weights | Final classifier layer |
+| **Average Pooling** | ✅ Supported | Sum in i32, divide, requantize | Maintains precision |
+| **Max Pooling** | ✅ Supported | Direct u8 max operation | No precision change |
+| **Global Average Pool** | ✅ Supported | Sum in i32, divide, requantize | Final pooling layer |
+| **Residual Add** | ✅ Supported | Requantize both branches, add in i32 | Requires scale alignment |
+| **Concatenate** | ⚠️ Deferred | Requires scale alignment | Lower priority |
+| **Squeeze-Excite** | ⚠️ Deferred | Complex scale handling | Phase 2 |
+
+### 3.9 Graph Rewrite Passes
+
+**BatchNorm fusion is a graph transform, not just a method.** The quantization pipeline includes these rewrite passes:
+
+| Pass | Order | Description |
+|------|-------|-------------|
+| **FuseBatchNorm** | 1 | Merge BatchNorm params into preceding Conv2d weights/bias |
+| **FuseActivation** | 2 | Fold ReLU/ReLU6 bounds into requantization clamp |
+| **FuseZeroPoint** | 3 | Pre-compute and fold zero-point correction into bias |
+| **AlignResidualScales** | 4 | Insert requantize ops to align residual branch scales |
+| **InsertRequantize** | 5 | Add requantization ops at graph boundaries |
+| **PackWeights** | 6 | Reorder weights to SIMD-optimal layout |
+
+```rust
+/// Graph rewrite pipeline
+pub fn prepare_for_int8(graph: &mut ComputeGraph) -> Result<()> {
+    FuseBatchNormPass::run(graph)?;
+    FuseActivationPass::run(graph)?;
+    FuseZeroPointPass::run(graph)?;
+    AlignResidualScalesPass::run(graph)?;
+    InsertRequantizePass::run(graph)?;
+    PackWeightsPass::run(graph)?;
+    Ok(())
+}
+```
 
 ---
 
@@ -809,32 +895,172 @@ calibration = ["int8"]      # Calibration infrastructure
 
 ## 10. Success Criteria
 
-### 10.1 Quantitative Targets
+### 10.1 Correctness Criteria
 
-| Metric | Target | Method |
-|--------|--------|--------|
-| MobileNetV3-Small speedup | ≥2.5x vs FP32 | Criterion benchmark |
-| MobileNetV3-Small latency | <5 ms (M4) | Criterion benchmark |
-| Top-1 accuracy drop | <1% | ImageNet validation subset |
-| Embedding cosine similarity | >0.995 vs FP32 | Test suite |
-| INT8 3×3 conv throughput | >20 GOPS | Criterion benchmark |
-| Calibration time (100 images) | <30 s | Integration test |
-| WASM binary size increase | <50 KB | Build measurement |
-| Memory reduction | ≥3x vs FP32 | Model size comparison |
+| Criterion | Requirement | Validation Method |
+|-----------|-------------|-------------------|
+| **Scalar-SIMD parity** | AVX2/NEON/WASM output matches scalar within ε=1e-5 | Unit tests with random inputs |
+| **Quantize-dequantize round-trip** | MSE < 1e-4 for representative inputs | Property-based tests |
+| **Graph invariant preservation** | Output shape identical to FP32 | Integration tests |
+| **Overflow prevention** | No i32 overflow in accumulator | Fuzzing with extreme values |
+| **Bounds enforcement** | All weights ∈ [-127, 127], activations ∈ [0, 255] | Assertions in debug builds |
 
-### 10.2 Qualitative Criteria
+### 10.2 Performance Criteria
 
-- All existing FP32 tests continue to pass
-- INT8 model produces identical output structure as FP32
-- Calibration workflow is documented with examples
-- SIMD kernels have scalar fallbacks for all platforms
-- No unsafe code without safety documentation
+| Metric | Target | Method | Rollback Threshold |
+|--------|--------|--------|-------------------|
+| MobileNetV3-Small speedup | ≥2.5x vs FP32 | Criterion benchmark | <1.8x |
+| MobileNetV3-Small latency | <5 ms (M4) | Criterion benchmark | >8 ms |
+| INT8 3×3 conv throughput | >20 GOPS | Criterion benchmark | <15 GOPS |
+| Calibration time (100 images) | <30 s | Integration test | >60 s |
+| WASM binary size increase | <50 KB | Build measurement | >100 KB |
+| Memory reduction | ≥3x vs FP32 | Model size comparison | <2x |
+
+### 10.3 Model Quality Criteria
+
+| Metric | Target | Method | Rollback Threshold |
+|--------|--------|--------|-------------------|
+| Top-1 accuracy drop | <1% | ImageNet validation subset | >2% |
+| Embedding cosine similarity | >0.995 vs FP32 | Test suite | <0.992 |
+| Per-layer MSE | <0.01 | Layer-wise comparison | >0.05 |
+| Calibration stability | <1% variance across runs | Repeated calibration | >5% |
+
+### 10.4 Rollout Readiness Criteria
+
+| Criterion | Requirement |
+|-----------|-------------|
+| All existing FP32 tests pass | No regressions |
+| INT8 model produces identical output structure | API compatibility |
+| Calibration workflow documented | User guide with examples |
+| SIMD kernels have scalar fallbacks | All platforms supported |
+| No unsafe code without safety docs | Audit trail |
+| CI benchmarks pass | Automated regression detection |
+| Calibration data versioned | Reproducibility |
 
 ---
 
-## 11. Consequences
+## 11. Deployment Policy
 
-### 11.1 Positive
+### 11.1 Platform Support Matrix
+
+| Platform | INT8 Support | Kernel | Status |
+|----------|--------------|--------|--------|
+| **Server (x86_64 AVX2)** | ✅ Full | `avx2.rs` | Primary target |
+| **Server (x86_64 AVX-512)** | ⚠️ Optional | `avx512.rs` | Phase 2 |
+| **Desktop (x86_64)** | ✅ Full | `avx2.rs` with fallback | Primary target |
+| **Mobile (ARM64 NEON)** | ✅ Full | `neon.rs` | Primary target |
+| **Browser (WASM SIMD)** | ✅ Full | `wasm.rs` | Primary target |
+| **Browser (WASM scalar)** | ✅ Fallback | `scalar.rs` | Compatibility |
+| **Edge (ARM Cortex-M)** | ⚠️ Deferred | N/A | Phase 2 |
+| **Microcontroller** | ❌ Not supported | N/A | Out of scope |
+
+### 11.2 Deployment Constraints
+
+| Context | Constraint | Rationale |
+|---------|------------|-----------|
+| **Production inference** | INT8 allowed | Performance-critical path |
+| **Model training** | FP32 only | INT8 PTQ, not QAT |
+| **Calibration** | FP32 forward pass | Requires full precision activations |
+| **Accuracy-critical** | FP32 fallback available | User choice |
+| **Offline secure** | Checksum validation required | Tamper detection |
+
+---
+
+## 12. Acceptance Gates
+
+### 12.1 Gate 1: Core Types (Week 1)
+
+**Entry**: ADR-091 accepted
+**Exit Criteria**:
+- [ ] `QuantParams`, `QuantizedTensor<T>`, `QuantConfig` implemented
+- [ ] `quantize()`, `dequantize()` with property tests
+- [ ] Scale computation algorithms validated
+
+**Rollback**: If types cannot represent MobileNetV3 layer diversity.
+
+### 12.2 Gate 2: AVX2 Kernels (Week 2)
+
+**Entry**: Gate 1 passed
+**Exit Criteria**:
+- [ ] `dot_product_int8_avx2` matches scalar within ε=1e-5
+- [ ] `conv_3x3_int8_avx2` passes layer-wise accuracy tests
+- [ ] Throughput >30 GB/s on dot product benchmark
+
+**Rollback**: If AVX2 kernel accuracy below threshold or <1.5x FP32 speedup.
+
+### 12.3 Gate 3: Quantized Layers (Week 3-4)
+
+**Entry**: Gate 2 passed
+**Exit Criteria**:
+- [ ] `QuantizedConv2d` with per-channel weights
+- [ ] BatchNorm fusion via graph rewrite pass
+- [ ] INT8 ReLU, ReLU6, HardSwish working
+
+**Rollback**: If fused layer accuracy drops >2% vs unfused.
+
+### 12.4 Gate 4: Calibration (Week 5)
+
+**Entry**: Gate 3 passed
+**Exit Criteria**:
+- [ ] MinMax calibration working
+- [ ] Percentile calibration working
+- [ ] Calibration time <30s for 100 images
+
+**Rollback**: If calibration produces worse results than naive min/max.
+
+### 12.5 Gate 5: End-to-End Model (Week 6)
+
+**Entry**: Gate 4 passed
+**Exit Criteria**:
+- [ ] `QuantizedMobileNetV3` end-to-end inference
+- [ ] Cosine similarity ≥0.995 vs FP32
+- [ ] Latency <5ms on M4
+
+**Rollback Condition**: Cosine similarity <0.992 OR latency improvement <1.8x.
+
+### 12.6 Gate 6: Platform Kernels (Week 7)
+
+**Entry**: Gate 5 passed
+**Exit Criteria**:
+- [ ] NEON INT8 kernels passing accuracy tests
+- [ ] WASM SIMD INT8 kernels passing accuracy tests
+- [ ] Scalar fallback for all operations
+
+**Rollback**: If any platform <1.5x speedup vs FP32.
+
+### 12.7 Gate 7: Production Ready (Week 8)
+
+**Entry**: Gate 6 passed
+**Exit Criteria**:
+- [ ] Criterion benchmark suite complete
+- [ ] Accuracy validation suite complete
+- [ ] Documentation complete
+- [ ] CI integration complete
+
+**Rollback**: If any acceptance benchmark fails.
+
+---
+
+## 13. Rollback Conditions
+
+**Immediate rollback triggers:**
+
+| Condition | Action |
+|-----------|--------|
+| Cosine similarity < 0.992 | Revert to FP32, investigate calibration |
+| Latency improvement < 1.8x | Profile, optimize, or revert |
+| Accuracy drop > 2% | Revert to FP32, consider QAT (ADR-090) |
+| SIMD kernel produces NaN/Inf | Revert to scalar, fix overflow |
+| Memory usage > FP32 | Investigate padding/alignment issues |
+| CI benchmark regression > 10% | Block merge, investigate |
+
+**Recovery path**: FP32 remains the default; INT8 is opt-in via feature flag.
+
+---
+
+## 14. Consequences
+
+### 14.1 Positive
 
 - **2-4x inference speedup**: Significant performance improvement for real-time applications
 - **4x memory reduction**: INT8 weights/activations are 1 byte vs 4 bytes
@@ -842,14 +1068,14 @@ calibration = ["int8"]      # Calibration infrastructure
 - **Edge deployment**: Enables deployment on memory-constrained devices
 - **Standard approach**: INT8 PTQ is well-understood, low risk
 
-### 11.2 Negative
+### 14.2 Negative
 
 - **Calibration requirement**: Need representative data for accurate quantization
 - **Slight accuracy loss**: <1% but non-zero degradation
 - **Maintenance burden**: Additional kernel implementations per platform
 - **Testing complexity**: Need to validate both FP32 and INT8 paths
 
-### 11.3 Mitigations
+### 14.3 Mitigations
 
 - **Calibration data**: Provide default calibration from ImageNet subset
 - **Accuracy validation**: Automated accuracy regression tests in CI
@@ -858,7 +1084,7 @@ calibration = ["int8"]      # Calibration infrastructure
 
 ---
 
-## 12. Related Decisions
+## 15. Related Decisions
 
 - **ADR-090**: Ultra-Low-Bit QAT & Pi-Quantization (LLM quantization patterns)
 - **ADR-003**: SIMD Optimization Strategy (existing SIMD infrastructure)
@@ -867,7 +1093,7 @@ calibration = ["int8"]      # Calibration infrastructure
 
 ---
 
-## 13. References
+## 16. References
 
 - `crates/ruvector-cnn/docs/INT8_QUANTIZATION_DESIGN.md` — Detailed implementation design
 - "Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference" (Google, 2018)

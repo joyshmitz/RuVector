@@ -1,17 +1,114 @@
 # ADR-090: Ultra-Low-Bit QAT & Pi-Quantization — Domain-Driven Design Architecture
 
-**Status**: Proposed
+**Status**: Accepted (Staged Implementation)
 **Date**: 2026-03-12
 **Authors**: RuVector Architecture Team
 **Deciders**: ruv
 **Technical Area**: 2-Bit/3-Bit Quantization / QAT / Pi-Constant Scaling / Edge Deployment / WASM
-**Related**: ADR-024 (Craftsman Ultra 30b 1bit BitNet), ADR-084 (ruvllm-wasm Publish), ADR-016 (Delta-Behavior DDD), ADR-002 (RuvLLM Integration)
+**Related**: ADR-024 (Craftsman Ultra 30b 1bit BitNet), ADR-084 (ruvllm-wasm Publish), ADR-016 (Delta-Behavior DDD), ADR-002 (RuvLLM Integration), ADR-091 (INT8 CNN Quantization), ADR-092 (MoE Memory-Aware Routing — split from this ADR)
 
 ## Version History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-03-12 | RuVector Team | Initial proposal based on quantization-edge research |
+| 0.2 | 2026-03-12 | RuVector Team | Added decision statement, staged phases, validation plan, rollback gates. Split MoE routing to ADR-092. |
+
+---
+
+## Decision Statement
+
+**ADR-090 chooses LoRA-QAT as the first implementation path for 2-bit and 3-bit experimentation in ruvLLM, with full-model QAT explicitly deferred to a later phase.**
+
+This decision prioritizes:
+- Research differentiation over near-term production (see ADR-091 for production INT8)
+- Pi-constant quantization as a novel, potentially publishable approach
+- LoRA-QAT for memory efficiency (50 MB vs 114 GB for full QAT on 7B)
+- Staged evidence gathering before committing to full QAT infrastructure
+
+**Scope Control**: MoE memory-aware routing is split to **ADR-092** as it affects scheduling/cache policy, not just representation.
+
+**Acceptance Benchmark**: PiQ3 PTQ must beat uniform 3-bit on at least two quality metrics (MSE, spectral distortion, perplexity, or reasoning retention) before proceeding to LoRA-QAT phase.
+
+---
+
+## Staged Implementation Phases
+
+| Phase | Scope | Duration | Entry Gate | Exit Gate |
+|-------|-------|----------|------------|-----------|
+| **Phase 1: PiQ3 PTQ** | Pi-constant 3-bit post-training quantization | Weeks 1-3 | ADR accepted | PiQ3 beats uniform Q3 on ≥2 metrics |
+| **Phase 2: PiQ3 + LoRA-QAT** | Add quantization-aware LoRA training | Weeks 4-7 | Phase 1 passed | LoRA-QAT converges within memory budget |
+| **Phase 3: PiQ2 + Incoherence** | 2-bit with Hadamard decorrelation | Weeks 8-10 | Phase 2 passed | PiQ2 viable without full QAT |
+| **Phase 4: MoE Routing** | Memory-aware expert routing (ADR-092) | Weeks 11-14 | Quantization baselines proven | See ADR-092 |
+
+**Phase decisions are explicit go/no-go gates.** Failure at any gate triggers rollback evaluation.
+
+---
+
+## Validation Plan: What "Better" Means
+
+**Pi-quantization claims superiority over uniform quantization.** This section defines how we validate that claim.
+
+### Quantization Quality Metrics (Phase 1-3)
+
+| Metric | Formula | Target (PiQ3 vs Q3) | Measurement |
+|--------|---------|---------------------|-------------|
+| **MSE** | Σ(w - w_q)² / n | ≤0.95x uniform Q3 | Per-layer, aggregated |
+| **Spectral Distortion (dB)** | 10 log₁₀(Σ(w - w_q)² / Σw²) | ≤-0.5 dB vs uniform | FFT of weight matrices |
+| **Cosine Similarity** | (w · w_q) / (\|w\| \|w_q\|) | ≥0.998 (vs ≥0.995 uniform) | Per-layer embeddings |
+| **Outlier Retention** | % of top-1% weights within ±1 step | ≥85% (vs ≤70% uniform) | Salient weight analysis |
+
+**Validation rule**: PiQ3 must beat uniform Q3 on **at least 2 of 4 metrics** to proceed to Phase 2.
+
+### Reasoning Preservation Metrics (Phase 2+)
+
+| Metric | Description | Acceptable Delta from FP16 | Failure Threshold |
+|--------|-------------|----------------------------|-------------------|
+| **Perplexity (WikiText-2)** | Language modeling quality | ≤+20% | >+35% |
+| **GSM8K Accuracy** | Math reasoning | ≤-15 points | >-25 points |
+| **HumanEval pass@1** | Code generation | ≤-10 points | >-20 points |
+| **Tool Use Success** | MCP tool invocation | ≤-5 points | >-15 points |
+| **Long Context (32K→8K)** | Needle-in-haystack @ 8K tokens | ≤-5 points | >-15 points |
+
+**Validation rule**: LoRA-QAT model must pass **all 5 metrics within acceptable delta** before Phase 3.
+
+---
+
+## System Invariants
+
+| Invariant | Rule | Rationale |
+|-----------|------|-----------|
+| **INV-1: STE Gradient Flow** | Gradient passes through quantization via STE; no zero-gradient regions except explicit clipping | Training convergence |
+| **INV-2: Scale Positivity** | Pi-quant scale α is always positive (α > 0) | Mathematical validity |
+| **INV-3: Step Size Constraint** | Step size = α × π / k where k ∈ {2, 3, 4, 5} | Pi-constant property |
+| **INV-4: Hadamard Orthogonality** | Hadamard matrix H satisfies H × H^T = n × I | Invertibility |
+| **INV-5: Calibration Provenance** | Calibration artifacts include dataset hash, sample count, timestamp | Reproducibility |
+| **INV-6: Teacher Immutability** | Teacher model weights are frozen during distillation | Stable supervision |
+| **INV-7: GGUF Format Compliance** | PiQ3/PiQ2 use reserved type IDs (40, 41) with proper metadata | Interoperability |
+| **INV-8: Scalar Reference** | Every SIMD kernel has scalar reference with bounded equivalence (≤1 ULP) | Kernel correctness |
+
+---
+
+## Acceptance Gates
+
+| Gate | Phase | Entry Criteria | Exit Criteria | Rollback Trigger |
+|------|-------|----------------|---------------|------------------|
+| **G1: PiQ3 PTQ Quality** | 1→2 | ADR accepted | PiQ3 beats uniform Q3 on ≥2/4 quality metrics | PiQ3 fails all 4 metrics |
+| **G2: LoRA-QAT Convergence** | 2→3 | Phase 1 passed | Training loss converges, memory ≤2 GB, all 5 reasoning metrics pass | Non-convergence after 10 epochs or OOM |
+| **G3: PiQ2 Viability** | 3→4 | Phase 2 passed | PiQ2 + incoherence achieves acceptable quality without full QAT | PiQ2 requires full QAT (scope explosion) |
+| **G4: Benchmark Regression** | Any | Any code change | Existing Q4_K_M / BitNet benchmarks show <5% regression | >5% regression on any existing benchmark |
+| **G5: Security Validation** | Pre-merge | All code complete | Zero unsafe without bounds assertion, SHA-256 checksums functional | Any unvalidated unsafe block |
+| **G6: WASM Build** | Pre-release | All code complete | wasm-pack build succeeds, binary <+50 KB delta, in-browser tests pass | Build failure or >100 KB delta |
+
+### Rollback Conditions
+
+| Condition | Detection | Action |
+|-----------|-----------|--------|
+| **PiQ3 ≤ Uniform** | Gate G1 fails | Investigate step size tuning; if still fails, de-scope to research paper only |
+| **LoRA-QAT OOM** | Training crashes | Reduce rank from 16→8→4; if still OOM, defer to GPU cluster |
+| **Reasoning collapse** | >25 point GSM8K drop | Increase distillation weight λ_KD; if still fails, revert to PTQ-only |
+| **SIMD kernel divergence** | >1 ULP vs scalar | Fix kernel bug; block merge until resolved |
+| **Benchmark regression** | CI benchmark alerts | Bisect and fix; block merge until resolved |
 
 ---
 
@@ -990,29 +1087,58 @@ No changes needed:
 
 ## 10. Success Criteria
 
-### 10.1 Quantitative Targets
+### 10.1 Correctness Criteria
 
-| Metric | Target | Method |
-|--------|--------|--------|
-| 2-bit model size (0.5B params) | < 130 MB | `estimate_memory_*` functions |
-| Pi-Q3 PPL (WikiText-2) | < 14.5 (vs 12.3 FP16) | evaluation harness |
-| Pi-Q2 + QAT PPL | < 16.0 (vs 21.5 naive Q2) | evaluation harness |
-| GSM8K accuracy at 2-bit QAT | > 35% (vs ~45% FP16) | evaluation harness |
-| Pi-quant NEON throughput | > 10 GB/s dequantize | criterion benchmark |
-| Pi-quant WASM throughput | > 2 GB/s dequantize | in-browser benchmark |
-| Hadamard 4096-dim latency | < 50 us | criterion benchmark |
-| QAT training (0.5B, 3 epochs) | < 4 hours on single GPU | training loop |
-| LoRA-QAT memory (0.5B) | < 2 GB total | profiling |
-| MoE cache hit rate | > 70% | expert_cache metrics |
-| WASM binary size delta | < 50 KB increase | wasm-pack build |
-| Security validation | 0 unsafe without assert | cargo clippy |
+| Criterion | Target | Validation Method |
+|-----------|--------|-------------------|
+| Scalar-SIMD equivalence | ≤1 ULP difference | Automated fuzz testing |
+| STE gradient correctness | Matches PyTorch reference | Reference implementation comparison |
+| Hadamard invertibility | H × H^T = n × I to machine precision | Property test |
+| Calibration determinism | Same input → identical output | Seeded RNG + hash comparison |
+| GGUF format compliance | Type IDs 40/41 parse correctly | llama.cpp interop test |
 
-### 10.2 Qualitative Criteria
+**Gate**: All correctness criteria must pass before any performance testing.
 
-- All existing tests continue to pass (`cargo test -p ruvllm`)
-- No regression in existing Q4_K_M / BitNet benchmarks
-- WASM builds without codegen workarounds degrading quality
-- Documentation updated in crate-level rustdoc
+### 10.2 Performance Criteria
+
+| Metric | Target | Method | Regression Threshold |
+|--------|--------|--------|---------------------|
+| Pi-quant NEON throughput | >10 GB/s dequantize | criterion benchmark | -5% |
+| Pi-quant WASM throughput | >2 GB/s dequantize | in-browser benchmark | -10% |
+| Hadamard 4096-dim latency | <50 μs | criterion benchmark | +10% |
+| QAT step time (0.5B) | <500 ms/step | training loop | +20% |
+| LoRA-QAT memory (0.5B) | <2 GB total | profiling | +50% |
+| WASM binary size delta | <+50 KB | wasm-pack build | +100 KB |
+| Existing Q4_K_M throughput | No regression | criterion comparison | -5% |
+| Existing BitNet throughput | No regression | criterion comparison | -5% |
+
+**Gate**: No existing benchmark may regress beyond threshold.
+
+### 10.3 Model Quality Criteria
+
+| Metric | FP16 Baseline | PiQ3 PTQ Target | PiQ3 + QAT Target | PiQ2 + QAT Target |
+|--------|---------------|-----------------|-------------------|-------------------|
+| WikiText-2 PPL | 12.3 | <14.5 (+18%) | <13.5 (+10%) | <16.0 (+30%) |
+| GSM8K Accuracy | 45% | >30% (-15pt) | >38% (-7pt) | >32% (-13pt) |
+| HumanEval pass@1 | 28% | >18% (-10pt) | >24% (-4pt) | >20% (-8pt) |
+| Tool Use Success | 92% | >82% (-10pt) | >88% (-4pt) | >85% (-7pt) |
+| Model Size (0.5B) | 1 GB | 190 MB | 195 MB | 130 MB |
+
+**Gate**: PTQ targets are Phase 1 exit criteria; QAT targets are Phase 2+ exit criteria.
+
+### 10.4 Rollout Readiness Criteria
+
+| Criterion | Requirement | Validation |
+|-----------|-------------|------------|
+| Documentation | All public APIs documented | cargo doc --no-deps passes |
+| Examples | One example per WASM export | examples/ directory check |
+| Error messages | User-actionable error strings | Manual review |
+| CI integration | All phases in CI pipeline | GitHub Actions check |
+| Security review | Weight integrity validation functional | Security test suite |
+| Benchmark baselines | Criterion baselines saved | benches/baselines/ populated |
+| CHANGELOG | Release notes prepared | CHANGELOG.md entry |
+
+**Gate**: All rollout criteria must pass before merge to main.
 
 ---
 
