@@ -23,7 +23,7 @@
 //! use ruvllm::gguf::GgufQuantType;
 //!
 //! let config = PrecisionConfig::default();
-//! let mut allocator = PrecisionAllocator::new(8, config);
+//! let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 //!
 //! // Record activations as experts are used
 //! allocator.record_activation(2);
@@ -201,7 +201,7 @@ impl PrecisionConfig {
 /// use ruvllm::moe::precision_allocator::{PrecisionAllocator, PrecisionConfig};
 ///
 /// let config = PrecisionConfig::default();
-/// let mut allocator = PrecisionAllocator::new(8, config);
+/// let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 ///
 /// // Simulate expert activations
 /// for _ in 0..100 { allocator.record_activation(0); } // Hot
@@ -243,21 +243,28 @@ impl PrecisionAllocator {
     /// * `num_experts` - Total number of experts to track.
     /// * `config` - Configuration for precision allocation.
     ///
-    /// # Panics
+    /// # Returns
     ///
-    /// Panics if the configuration is invalid.
-    pub fn new(num_experts: usize, config: PrecisionConfig) -> Self {
-        config
-            .validate()
-            .expect("PrecisionConfig validation failed");
+    /// Returns `Err` if the configuration is invalid.
+    pub fn new(num_experts: usize, config: PrecisionConfig) -> Result<Self, &'static str> {
+        config.validate()?;
 
-        Self {
+        Ok(Self {
             num_experts,
             counts: vec![0; num_experts],
             config,
             hot_threshold: 0,
             cold_threshold: 0,
-        }
+        })
+    }
+
+    /// Create a new precision allocator, panicking on invalid config.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the configuration is invalid.
+    pub fn new_unchecked(num_experts: usize, config: PrecisionConfig) -> Self {
+        Self::new(num_experts, config).expect("PrecisionConfig validation failed")
     }
 
     /// Record an activation for the given expert.
@@ -513,7 +520,7 @@ mod tests {
     #[test]
     fn test_allocator_creation() {
         let config = PrecisionConfig::default();
-        let allocator = PrecisionAllocator::new(8, config);
+        let allocator = PrecisionAllocator::new(8, config).unwrap();
 
         assert_eq!(allocator.num_experts(), 8);
         assert_eq!(allocator.total_activations(), 0);
@@ -537,7 +544,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(8, config);
+        let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 
         // Expert 0 gets 100 activations (max)
         for _ in 0..100 {
@@ -569,7 +576,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(8, config);
+        let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 
         // Expert 0 gets 100 activations (max)
         for _ in 0..100 {
@@ -599,7 +606,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(8, config);
+        let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 
         // Expert 0 gets 100 activations (max)
         for _ in 0..100 {
@@ -629,7 +636,7 @@ mod tests {
             cold_percentile: 0.2,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // Set up activation counts: 100, 75, 25, 5
         for _ in 0..100 {
@@ -677,7 +684,7 @@ mod tests {
     #[test]
     fn test_activation_recording() {
         let config = PrecisionConfig::default();
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // Record individual activations
         allocator.record_activation(0);
@@ -715,7 +722,7 @@ mod tests {
             warm_format: GgufQuantType::Q4_K,
             cold_format: GgufQuantType::Q3_K,
         };
-        let mut allocator = PrecisionAllocator::new(3, config);
+        let mut allocator = PrecisionAllocator::new(3, config).unwrap();
 
         // Set up: 100 (hot), 50 (warm), 10 (cold)
         for _ in 0..100 {
@@ -746,7 +753,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // Initially all zeros
         allocator.recompute_thresholds();
@@ -787,7 +794,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         for _ in 0..100 {
             allocator.record_activation(0);
@@ -823,7 +830,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(8, config);
+        let mut allocator = PrecisionAllocator::new(8, config).unwrap();
 
         // 2 hot, 3 warm, 3 cold
         for _ in 0..100 {
@@ -865,7 +872,7 @@ mod tests {
     #[test]
     fn test_reset() {
         let config = PrecisionConfig::default();
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // Add activations
         for _ in 0..100 {
@@ -898,7 +905,7 @@ mod tests {
             cold_percentile: 0.3,
             ..Default::default()
         };
-        let mut allocator = PrecisionAllocator::new(6, config);
+        let mut allocator = PrecisionAllocator::new(6, config).unwrap();
 
         // Set up known distribution
         for _ in 0..100 {
@@ -937,7 +944,7 @@ mod tests {
     #[test]
     fn test_compute_percentile() {
         let config = PrecisionConfig::default();
-        let mut allocator = PrecisionAllocator::new(4, config);
+        let mut allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // No activations -> 0.0 percentile
         assert_eq!(allocator.compute_percentile(0), 0.0);
@@ -1020,7 +1027,7 @@ mod tests {
     #[test]
     fn test_out_of_bounds_expert_id() {
         let config = PrecisionConfig::default();
-        let allocator = PrecisionAllocator::new(4, config);
+        let allocator = PrecisionAllocator::new(4, config).unwrap();
 
         // Out-of-bounds should return Cold
         assert_eq!(allocator.allocate(100), ExpertPrecision::Cold);
@@ -1068,7 +1075,7 @@ mod tests {
     #[test]
     fn test_saturating_add_for_counts() {
         let config = PrecisionConfig::default();
-        let mut allocator = PrecisionAllocator::new(1, config);
+        let mut allocator = PrecisionAllocator::new(1, config).unwrap();
 
         // Set count close to max
         allocator.counts[0] = u64::MAX - 1;

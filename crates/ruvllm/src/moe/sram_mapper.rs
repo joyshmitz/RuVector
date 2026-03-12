@@ -156,7 +156,14 @@ impl SramExpertAffinity {
         // - Recency is important for temporal locality
         // - Router weight indicates model preference
         let freq_factor = (self.access_count as f32 + 1.0).ln();
-        let recency_factor = 1.0 / (1.0 + (self.last_access as f32).recip() * 0.001);
+
+        // Guard against division by zero when last_access is 0
+        let recency_factor = if self.last_access == 0 {
+            0.0
+        } else {
+            1.0 / (1.0 + 0.001 / self.last_access as f32)
+        };
+
         let weight_factor = self.avg_router_weight * 2.0;
 
         freq_factor + recency_factor + weight_factor
@@ -466,11 +473,13 @@ impl SramMapper {
     /// * `expert_id` - Expert to assign
     /// * `tier` - Target memory tier
     ///
-    /// # Panics
+    /// # Returns
     ///
-    /// Panics if `expert_id >= num_experts`.
-    pub fn assign_tier(&mut self, expert_id: ExpertId, tier: MemoryTier) {
-        assert!(expert_id < self.num_experts, "Expert ID out of range");
+    /// Returns `false` if `expert_id >= num_experts`, `true` otherwise.
+    pub fn assign_tier(&mut self, expert_id: ExpertId, tier: MemoryTier) -> bool {
+        if expert_id >= self.num_experts {
+            return false;
+        }
 
         let old_tier = self.tier_map[expert_id];
 
@@ -497,6 +506,7 @@ impl SramMapper {
         }
 
         self.tier_map[expert_id] = tier;
+        true
     }
 
     /// Get the current memory tier for an expert.

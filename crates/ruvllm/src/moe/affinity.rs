@@ -238,11 +238,19 @@ impl ExpertAffinity {
 
     /// Get experts sorted by affinity score (highest first)
     ///
-    /// Useful for prefetching decisions.
+    /// Useful for prefetching decisions. NaN values are treated as lowest priority.
     pub fn top_k_by_affinity(&self, k: usize) -> Vec<ExpertId> {
-        let mut indexed: Vec<(ExpertId, f32)> =
-            self.scores.iter().copied().enumerate().collect();
-        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut indexed: Vec<(ExpertId, f32)> = self
+            .scores
+            .iter()
+            .enumerate()
+            .map(|(id, &s)| (id, if s.is_finite() { s } else { f32::NEG_INFINITY }))
+            .collect();
+        indexed.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0)) // Deterministic tie-breaking by ID
+        });
         indexed.into_iter().take(k).map(|(id, _)| id).collect()
     }
 
@@ -258,7 +266,7 @@ impl ExpertAffinity {
 
     /// Get the least-affinity expert from a set of candidates
     ///
-    /// Useful for eviction decisions.
+    /// Useful for eviction decisions. NaN values are treated as lowest (evict first).
     pub fn least_affinity(&self, candidates: &[ExpertId]) -> Option<ExpertId> {
         candidates
             .iter()
@@ -266,7 +274,12 @@ impl ExpertAffinity {
             .min_by(|&a, &b| {
                 let score_a = self.score(a);
                 let score_b = self.score(b);
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                // NaN handling: treat NaN as NEG_INFINITY for eviction priority
+                let sa = if score_a.is_finite() { score_a } else { f32::NEG_INFINITY };
+                let sb = if score_b.is_finite() { score_b } else { f32::NEG_INFINITY };
+                sa.partial_cmp(&sb)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.cmp(&b)) // Deterministic tie-breaking
             })
     }
 

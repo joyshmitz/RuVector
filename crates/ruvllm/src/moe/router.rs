@@ -216,22 +216,26 @@ impl MemoryAwareRouter {
     /// * `config` - Router configuration
     /// * `affinity` - Expert affinity tracker (can be shared)
     ///
-    /// # Panics
+    /// # Returns
     ///
-    /// Panics if the configuration is invalid.
-    pub fn new(config: RouterConfig, affinity: ExpertAffinity) -> Self {
-        config.validate().expect("RouterConfig validation failed");
+    /// Returns `Err` if the configuration is invalid.
+    pub fn new(config: RouterConfig, affinity: ExpertAffinity) -> Result<Self, &'static str> {
+        config.validate()?;
 
-        Self {
+        Ok(Self {
             cache_resident: vec![false; config.num_experts],
             config,
             affinity,
             metrics: MoeMetrics::new(),
-        }
+        })
     }
 
     /// Create router with default affinity tracker
-    pub fn with_default_affinity(config: RouterConfig) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// Returns `Err` if the configuration is invalid.
+    pub fn with_default_affinity(config: RouterConfig) -> Result<Self, &'static str> {
         let affinity = ExpertAffinity::new(
             super::AffinityConfig::with_num_experts(config.num_experts)
         );
@@ -294,45 +298,88 @@ impl MemoryAwareRouter {
         (selected, paging_requests)
     }
 
-    /// Apply cache residency bonus to scores
+    /// Apply cache residency bonus to scores (in-place mutation for P0 optimization)
+    ///
+    /// For each expert currently in cache, adds `cache_bonus` to its score.
+    /// This biases the selection toward cached experts without completely
+    /// overriding the gate network's decisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `scores` - Mutable slice of scores to modify in-place
+    pub fn apply_cache_bonus_inplace(&self, scores: &mut [f32]) {
+        for (id, score) in scores.iter_mut().enumerate() {
+            // Validate score is not NaN/Inf before processing
+            if !score.is_finite() {
+                *score = 0.0;
+                continue;
+            }
+            if self.cache_resident.get(id).copied().unwrap_or(false) {
+                *score += self.config.cache_bonus;
+            }
+        }
+    }
+
+    /// Apply cache residency bonus to scores (allocating version for API compatibility)
     ///
     /// For each expert currently in cache, adds `cache_bonus` to its score.
     /// This biases the selection toward cached experts without completely
     /// overriding the gate network's decisions.
     pub fn apply_cache_bonus(&self, scores: &[f32]) -> Vec<f32> {
-        scores
-            .iter()
-            .enumerate()
-            .map(|(id, &score)| {
-                let bonus = if self.cache_resident.get(id).copied().unwrap_or(false) {
-                    self.config.cache_bonus
-                } else {
-                    0.0
-                };
-                score + bonus
-            })
-            .collect()
+        let mut result = scores.to_vec();
+        self.apply_cache_bonus_inplace(&mut result);
+        result
     }
 
     /// Select top-K experts by score
     ///
     /// Returns expert IDs sorted by descending score.
     /// Ties are broken by expert ID (lower ID wins) for determinism.
+    ///
+    /// Uses partial sort (P0 optimization) for better performance when
+    /// top_k << num_experts.
     pub fn select_top_k(&self, scores: &[f32]) -> Vec<ExpertId> {
-        // Create indexed scores
-        let mut indexed: Vec<(ExpertId, f32)> = scores.iter().copied().enumerate().collect();
+        let n = scores.len();
+        let k = self.config.top_k.min(n);
 
-        // Sort by score descending, then by ID ascending (for determinism)
-        indexed.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.cmp(&b.0))
-        });
+        if k == 0 || n == 0 {
+            return Vec::new();
+        }
+
+        // Create indexed scores, handling NaN/Inf values
+        let mut indexed: Vec<(ExpertId, f32)> = scores
+            .iter()
+            .enumerate()
+            .map(|(id, &s)| (id, if s.is_finite() { s } else { f32::NEG_INFINITY }))
+            .collect();
+
+        // Use partial sort for better performance when k << n
+        if k < n / 2 {
+            // Partition to get top-k elements (unordered)
+            indexed.select_nth_unstable_by(k - 1, |a, b| {
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+            // Sort only the top-k portion
+            indexed[..k].sort_by(|a, b| {
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+        } else {
+            // Full sort when k is close to n
+            indexed.sort_by(|a, b| {
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+        }
 
         // Take top-K
         indexed
             .into_iter()
-            .take(self.config.top_k)
+            .take(k)
             .map(|(id, _)| id)
             .collect()
     }
@@ -457,7 +504,7 @@ mod tests {
 
     fn make_router(num_experts: usize, top_k: usize, cache_bonus: f32) -> MemoryAwareRouter {
         let config = RouterConfig::new(num_experts, top_k).with_cache_bonus(cache_bonus);
-        MemoryAwareRouter::with_default_affinity(config)
+        MemoryAwareRouter::with_default_affinity(config).expect("test config should be valid")
     }
 
     // ---------------------------------------------------------------
@@ -688,7 +735,7 @@ mod tests {
     #[test]
     fn test_memory_aware_disabled() {
         let config = RouterConfig::new(4, 2).with_memory_aware(false).with_cache_bonus(0.5);
-        let mut router = MemoryAwareRouter::with_default_affinity(config);
+        let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
 
         // Even with high cache bonus, should not apply it when disabled
         router.update_cache_state(&[3]); // Expert 3 resident
@@ -734,7 +781,7 @@ mod tests {
         let config = RouterConfig::new(4, 2).with_cache_bonus(0.0);
         let affinity_config = AffinityConfig::with_num_experts(4).with_decay(1.0);
         let affinity = ExpertAffinity::new(affinity_config);
-        let mut router = MemoryAwareRouter::new(config, affinity);
+        let mut router = MemoryAwareRouter::new(config, affinity).unwrap();
 
         // Build affinity
         let gate_logits = vec![0.4, 0.3, 0.5, 0.2];
