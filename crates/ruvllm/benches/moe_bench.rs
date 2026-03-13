@@ -782,6 +782,170 @@ fn bench_eviction_policies(c: &mut Criterion) {
 }
 
 // ============================================================================
+// Memory-Aware Router Benchmarks (P1-P4 Optimizations)
+// ============================================================================
+
+/// Benchmark: MemoryAwareRouter performance (ADR-092)
+fn bench_memory_aware_router(c: &mut Criterion) {
+    use ruvllm::moe::{MemoryAwareRouter, RouterConfig, AffinityConfig, ExpertAffinity};
+
+    let mut group = c.benchmark_group("memory_aware_router");
+    group.measurement_time(Duration::from_secs(5));
+
+    // Test various expert counts
+    for num_experts in [8, 16, 32, 64] {
+        // P4: Top-2 unrolled optimization
+        group.bench_with_input(
+            BenchmarkId::new("route_top2", num_experts),
+            &num_experts,
+            |b, &n| {
+                let config = RouterConfig::new(n, 2).with_cache_bonus(0.15);
+                let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+                // Set half experts as resident
+                let resident: Vec<usize> = (0..n / 2).collect();
+                router.update_cache_state(&resident);
+
+                // Generate gate logits
+                let gate_logits: Vec<f32> = (0..n).map(|i| 0.1 + (i as f32) * 0.01).collect();
+
+                b.iter(|| {
+                    let (selected, _paging) = router.route(black_box(&gate_logits));
+                    black_box(selected)
+                });
+            },
+        );
+
+        // P2: Batch routing optimization
+        group.bench_with_input(
+            BenchmarkId::new("route_batch_8", num_experts),
+            &num_experts,
+            |b, &n| {
+                let config = RouterConfig::new(n, 2).with_cache_bonus(0.15);
+                let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+                let resident: Vec<usize> = (0..n / 2).collect();
+                router.update_cache_state(&resident);
+
+                // Generate batch of 8 tokens
+                let batch_logits: Vec<Vec<f32>> = (0..8)
+                    .map(|t| (0..n).map(|i| 0.1 + (i as f32 + t as f32) * 0.01).collect())
+                    .collect();
+                let batch_refs: Vec<&[f32]> = batch_logits.iter().map(|v| v.as_slice()).collect();
+
+                b.iter(|| {
+                    let results = router.route_batch(black_box(&batch_refs));
+                    black_box(results)
+                });
+            },
+        );
+    }
+
+    // P1: Bitmask cache check overhead
+    group.bench_function("cache_mask_check_64", |b| {
+        let config = RouterConfig::new(64, 2);
+        let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+        // Set alternating experts as resident
+        let resident: Vec<usize> = (0..64).step_by(2).collect();
+        router.update_cache_state(&resident);
+
+        let mut id = 0usize;
+        b.iter(|| {
+            id = (id + 1) % 64;
+            black_box(router.is_resident(id))
+        });
+    });
+
+    // P1: Large expert count (>64, uses extended bitmask)
+    group.bench_function("cache_mask_check_128", |b| {
+        let config = RouterConfig::new(128, 4);
+        let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+        let resident: Vec<usize> = (0..128).step_by(2).collect();
+        router.update_cache_state(&resident);
+
+        let mut id = 0usize;
+        b.iter(|| {
+            id = (id + 1) % 128;
+            black_box(router.is_resident(id))
+        });
+    });
+
+    // Compare top-2 vs top-4 selection
+    group.bench_function("select_top2_vs_sort", |b| {
+        let config = RouterConfig::new(64, 2).with_cache_bonus(0.15);
+        let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+        let gate_logits: Vec<f32> = (0..64).map(|i| (i as f32 * 0.7).sin()).collect();
+
+        b.iter(|| {
+            black_box(router.select_top_k(black_box(&gate_logits)))
+        });
+    });
+
+    group.bench_function("select_top4_partial_sort", |b| {
+        let config = RouterConfig::new(64, 4).with_cache_bonus(0.15);
+        let mut router = MemoryAwareRouter::with_default_affinity(config).unwrap();
+
+        let gate_logits: Vec<f32> = (0..64).map(|i| (i as f32 * 0.7).sin()).collect();
+
+        b.iter(|| {
+            black_box(router.select_top_k(black_box(&gate_logits)))
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark: SIMD affinity decay (P1 optimization)
+fn bench_simd_affinity_decay(c: &mut Criterion) {
+    use ruvllm::moe::{ExpertAffinity, AffinityConfig};
+
+    let mut group = c.benchmark_group("simd_affinity_decay");
+
+    for num_experts in [8, 16, 32, 64, 128, 256] {
+        group.throughput(Throughput::Elements(num_experts as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("decay_all", num_experts),
+            &num_experts,
+            |b, &n| {
+                let config = AffinityConfig::with_num_experts(n).with_decay(0.95);
+                let mut affinity = ExpertAffinity::new(config);
+
+                // Activate all experts initially
+                let all: Vec<usize> = (0..n).collect();
+                affinity.update(&all);
+
+                b.iter(|| {
+                    affinity.update(&[]);  // Decay-only update
+                    black_box(affinity.score(0))
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("update_with_activation", num_experts),
+            &num_experts,
+            |b, &n| {
+                let config = AffinityConfig::with_num_experts(n).with_decay(0.95);
+                let mut affinity = ExpertAffinity::new(config);
+
+                let activated = vec![0, 1];  // Activate 2 experts per call
+
+                b.iter(|| {
+                    affinity.update(&activated);
+                    black_box(affinity.score(0))
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+// ============================================================================
 // Criterion Groups
 // ============================================================================
 
@@ -796,6 +960,8 @@ criterion_group!(
     bench_memory_footprint,
     bench_prefetch_decision,
     bench_eviction_policies,
+    bench_memory_aware_router,
+    bench_simd_affinity_decay,
 );
 
 criterion_main!(benches);
