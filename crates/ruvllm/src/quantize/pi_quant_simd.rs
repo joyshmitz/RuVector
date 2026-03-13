@@ -621,8 +621,8 @@ pub unsafe fn pi_quantize_avx512(weights: &[f32], scale: f32, output: &mut [u8])
     let min_vec = _mm512_set1_epi32(0);
     let max_vec = _mm512_set1_epi32(7);
 
-    // Rounding mode constant (nearest)
-    let rounding = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    // Rounding mode constant (nearest) - must be const for AVX-512 intrinsics
+    const ROUNDING: i32 = 0x08; // _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC
 
     // Process 2 groups (16 values) at a time
     let simd_groups = num_groups / 2;
@@ -637,7 +637,7 @@ pub unsafe fn pi_quantize_avx512(weights: &[f32], scale: f32, output: &mut [u8])
 
         // Quantize: q = round(w * inv_scale)
         let scaled_vec = _mm512_mul_ps(weights_vec, inv_scale_vec);
-        let rounded_vec = _mm512_roundscale_ps(scaled_vec, rounding as i32);
+        let rounded_vec = _mm512_roundscale_ps(scaled_vec, ROUNDING);
         let quantized_vec = _mm512_cvtps_epi32(rounded_vec);
 
         // Add bias: [−4, +3] -> [0, 7]
