@@ -515,6 +515,76 @@ npx @ruvector/rvf-mcp-server --transport stdio # MCP server for AI agents
 </details>
 
 <details>
+<summary><strong>RuVix Cognition Kernel</strong> — an operating system for AI agents</summary>
+
+**[RuVix](./crates/ruvix/README.md)** is a cognition kernel designed for agentic workloads. Where Linux thinks in files, processes, and POSIX syscalls, RuVix thinks in vectors, graphs, proofs, and capabilities. Every mutation is proof-gated — no cryptographic proof, no state change. Every resource access goes through unforgeable capability tokens. The result: a kernel that understands AI workloads natively.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    AGENT CONTROL PLANE                          │
+│  Claude Code │ AgentDB │ Custom Agents │ RuVLLM Inference       │
+├─────────────────────────────────────────────────────────────────┤
+│                    RVF COMPONENT SPACE                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+│  │ RuView   │ │ AgentDB  │ │ RuVLLM   │ │ Network  │ ...       │
+│  │ Percept. │ │ Intelli. │ │ Infer.   │ │ Stack    │           │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
+│       │queue       │queue       │queue       │queue             │
+├───────┴────────────┴────────────┴────────────┴──────────────────┤
+│                    RUVIX COGNITION KERNEL                       │
+│  Capability Manager │ Queue IPC │ Coherence-Aware Scheduler     │
+│  Region Memory │ Proof Engine │ Vector/Graph Kernel Objects     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Primitive | Purpose | Status |
+|-----------|---------|--------|
+| **Task** | Concurrent execution with capability set | ✅ Implemented |
+| **Capability** | Unforgeable access token (seL4-inspired) | ✅ Implemented |
+| **Region** | Memory with policy (immutable/append/slab) | ✅ Implemented |
+| **Queue** | io_uring-style lock-free IPC | ✅ Implemented |
+| **Timer** | Deadline-driven scheduling | ✅ Implemented |
+| **Proof** | Cryptographic attestation for mutations | ✅ Implemented |
+
+**Phases A-F complete**: 20+ crates, 1,200+ tests, 12 syscalls, full deterministic replay.
+
+| Phase | Components | Description |
+|-------|------------|-------------|
+| **A** | Core Kernel | 9 crates: types, cap, region, queue, proof, sched, boot, vecgraph, nucleus |
+| **B** | Bare Metal | AArch64 boot, MMU, exception vectors, HAL, physical memory allocator |
+| **C** | Multi-Core | SMP support (256 cores), ticket spinlocks, IPIs, DMA, Device Tree |
+| **D** | Raspberry Pi | BCM2711/2712 drivers, GPIO, VideoCore mailbox, config.txt parsing |
+| **E** | Network/FS | Ethernet/IPv4/UDP stack, VFS layer, FAT32, RamFS |
+| **F** | Tooling | CLI, kernel shell, QEMU swarm simulation with PBFT consensus |
+
+**Developer Tools**:
+
+| Tool | Purpose |
+|------|---------|
+| `ruvix build` | Cross-compile kernel for AArch64 targets |
+| `ruvix flash` | Flash kernel to SD card or network boot |
+| `ruvix keys` | Ed25519 key management for secure boot |
+| `ruvix dtb` | Device tree validation, comparison, decompilation |
+| `ruvix monitor` | Real-time kernel metrics dashboard |
+| `ruvix security` | Security audit and CVE scanning |
+| `rvsh` (kernel) | In-kernel debug shell with 13 commands |
+
+**Distributed Testing (QEMU Swarm)**:
+
+| Feature | Description |
+|---------|-------------|
+| Multi-node clusters | Spawn N QEMU instances as cluster nodes |
+| PBFT consensus | Byzantine fault-tolerant consensus (f < n/3) |
+| Virtual networking | Mesh, ring, star topologies |
+| Fault injection | Network partitions, node crashes, latency |
+| Console multiplexing | Aggregate output from all nodes |
+
+- **Full documentation**: [crates/ruvix/README.md](./crates/ruvix/README.md)
+- **ADR-087**: [RuVix Cognition Kernel Architecture](./docs/adr/ADR-087-ruvix-cognition-kernel.md)
+
+</details>
+
+<details>
 <summary><strong>Sublinear-Time Solver</strong> — math that gets faster as your data gets bigger</summary>
 
 **[ruvector-solver](./crates/ruvector-solver/README.md)** solves large math problems (like ranking pages, finding connections in graphs, or computing AI attention) in a fraction of the time traditional solvers need. Where standard approaches slow down dramatically with scale (doubling data = 8x slower), RuVector's 8 specialized algorithms barely notice the increase (doubling data = barely any slower). This is what powers the self-learning engine — fast graph math is what lets search improve in real time instead of waiting minutes to retrain.

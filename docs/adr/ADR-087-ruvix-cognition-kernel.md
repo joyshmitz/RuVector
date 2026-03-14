@@ -2,11 +2,455 @@
 
 ## Status
 
-Proposed
+**Accepted** — Phase A Implemented
 
 ## Date
 
-2026-03-08
+2026-03-08 (Proposed)
+2026-03-14 (Phase A Implemented)
+
+## Implementation Status
+
+### Phase A: Linux-Hosted Nucleus ✅ COMPLETE
+
+| Crate | Status | Tests | Description |
+|-------|--------|-------|-------------|
+| `ruvix-types` | ✅ | 63 | Core types: 6 primitives, handles, proof tokens, capabilities |
+| `ruvix-region` | ✅ | 51 | Memory regions: Immutable, AppendOnly, Slab policies |
+| `ruvix-queue` | ✅ | 47 | io_uring-style ring buffers, zero-copy IPC |
+| `ruvix-cap` | ✅ | 54 | seL4-inspired capability manager, derivation trees |
+| `ruvix-proof` | ✅ | 73 | 3-tier proof engine: Reflex <100ns, Standard <100μs, Deep <10ms |
+| `ruvix-sched` | ✅ | 39 | Coherence-aware scheduler with novelty boosting |
+| `ruvix-boot` | ✅ | 59 | 5-stage RVF boot loader with ML-DSA-65 signatures |
+| `ruvix-vecgraph` | ✅ | 55 | Kernel-resident vector/graph stores with HNSW |
+| `ruvix-nucleus` | ✅ | 319 | Unified kernel: 12 syscalls, checkpoint/replay |
+
+**Total: 760 tests passing**
+
+### Security Invariants Implemented
+
+- **SEC-001**: Boot signature failure → PANIC (no fallback)
+- **SEC-002**: Proof cache with 100ms TTL, single-use nonces, max 64 entries
+- **SEC-003**: Capability delegation depth limit (max 8)
+- **SEC-004**: TOCTOU protection for zero-copy IPC
+
+### Phase B: Bare Metal AArch64 — Pending
+
+Target: QEMU virt, Raspberry Pi 4/5
+
+---
+
+## Phase B: Bare Metal AArch64 Port
+
+### B.1 Objectives
+
+Phase B transforms the Linux-hosted nucleus into a true bare metal microkernel running natively on AArch64 hardware. Key objectives:
+
+1. **Remove all Linux/std dependencies** — Eliminate libc, pthreads, mmap, and all Linux syscalls
+2. **Native AArch64 boot** — Boot directly on QEMU virt machine and Raspberry Pi 4/5 hardware
+3. **Hardware capability enforcement** — Use MMU page tables for region protection and capability boundaries
+4. **Real interrupt handling** — GIC-400 interrupt controller integration for device drivers
+5. **Hardware timer integration** — ARM Generic Timer for scheduling and `timer_wait` syscall
+
+### B.2 New Crates
+
+| Crate | Purpose | Dependencies | Lines of Code (Est.) |
+|-------|---------|--------------|---------------------|
+| **`ruvix-hal`** | Hardware Abstraction Layer traits | `ruvix-types` | ~500 |
+| **`ruvix-aarch64`** | AArch64 boot, MMU, exceptions | `ruvix-hal`, `ruvix-types` | ~2,000 |
+| **`ruvix-drivers`** | PL011 UART, GIC-400, ARM Timer | `ruvix-hal`, `ruvix-aarch64` | ~1,500 |
+| **`ruvix-physmem`** | Physical memory allocator | `ruvix-types`, `ruvix-aarch64` | ~800 |
+
+These join the Phase A primitives table:
+
+| Crate | Status | Tests | Description |
+|-------|--------|-------|-------------|
+| `ruvix-hal` | ⏳ Phase B | TBD | HAL traits for UART, timer, interrupt controller, MMU |
+| `ruvix-aarch64` | ⏳ Phase B | TBD | Exception vectors, MMU tables, boot sequence |
+| `ruvix-drivers` | ⏳ Phase B | TBD | PL011 UART, GIC-400, ARM Timer drivers |
+| `ruvix-physmem` | ⏳ Phase B | TBD | Buddy allocator for physical page frames |
+
+### B.3 Memory Map (QEMU virt)
+
+The QEMU AArch64 virt machine provides the following memory layout:
+
+| Region | Start Address | End Address | Size | Purpose |
+|--------|--------------|-------------|------|---------|
+| **Flash** | `0x0000_0000` | `0x0800_0000` | 128 MB | Boot ROM, RVF package location |
+| **GIC Distributor** | `0x0800_0000` | `0x0801_0000` | 64 KB | GIC-400 distributor registers |
+| **GIC CPU Interface** | `0x0801_0000` | `0x0802_0000` | 64 KB | GIC-400 CPU interface registers |
+| **UART** | `0x0900_0000` | `0x0900_1000` | 4 KB | PL011 UART registers |
+| **RTC** | `0x0901_0000` | `0x0901_1000` | 4 KB | PL031 Real-Time Clock |
+| **GPIO** | `0x0903_0000` | `0x0903_1000` | 4 KB | PL061 GPIO controller |
+| **PCIe Config** | `0x4000_0000` | `0x4010_0000` | 256 MB | PCIe ECAM configuration space |
+| **RAM** | `0x4000_0000` | `0x8000_0000` | 1 GB | Main system memory (default) |
+
+**Raspberry Pi 4/5 Differences:**
+- Base RAM starts at `0x0000_0000` (not `0x4000_0000`)
+- GIC base at `0xFF84_0000` (BCM2711 interrupt controller)
+- UART0 at `0xFE20_1000` (mini UART) or UART2 at `0xFE20_1400` (PL011)
+- Device tree required for full peripheral discovery
+
+### B.4 Boot Sequence
+
+The bare metal boot sequence consists of five stages:
+
+#### Stage 1: Assembly Entry (_start)
+
+```
+_start:
+    // Executed at EL1 (kernel mode)
+    // x0 = DTB address (from bootloader)
+
+    1. Check execution level (ensure EL1)
+    2. Set up exception vector table (VBAR_EL1)
+    3. Initialize stack pointer (SP_EL1 = kernel_stack_top)
+    4. Clear BSS segment (zero-fill static data)
+    5. Save DTB address to known location
+    6. Jump to Rust entry point (kernel_entry)
+```
+
+**Registers on entry:**
+- `x0` — Device Tree Blob (DTB) address
+- `x1-x3` — Reserved (bootloader-specific)
+- `PC` — Entry point (`_start` in boot ROM or RAM)
+
+**Assembly file:** `ruvix-aarch64/src/boot.S` (~150 lines)
+
+#### Stage 2: MMU Initialization
+
+Before Rust code can execute, the kernel must set up virtual memory:
+
+```rust
+// ruvix-aarch64/src/mmu.rs
+pub unsafe fn init_mmu() {
+    // 1. Identity map kernel code/data (VA = PA)
+    //    0x4000_0000 - 0x4010_0000 (16 MB)
+    //    Read-only for code, RW for data, no user access
+
+    // 2. Map kernel heap region
+    //    VA: 0xFFFF_FF00_0000_0000 (canonical high)
+    //    PA: (allocated physical pages)
+    //    RW, no user access
+
+    // 3. Map device MMIO regions
+    //    GIC, UART, timers — uncacheable, device memory
+
+    // 4. Enable MMU (SCTLR_EL1.M = 1)
+}
+```
+
+**Page table structure:**
+- 4 KB pages, 4-level translation (TTBR0_EL1 for user, TTBR1_EL1 for kernel)
+- Kernel mappings in top canonical half (`0xFFFF_FF00_0000_0000+`)
+- Physical memory allocator initialized from DTB memory nodes
+
+#### Stage 3: Exception Vectors and GIC Initialization
+
+```rust
+// ruvix-aarch64/src/exceptions.rs
+#[repr(C, align(2048))]
+pub struct ExceptionVectorTable {
+    sync_el1_sp0:  extern "C" fn(),  // Synchronous from EL1 using SP_EL0
+    irq_el1_sp0:   extern "C" fn(),  // IRQ from EL1 using SP_EL0
+    fiq_el1_sp0:   extern "C" fn(),  // FIQ from EL1 using SP_EL0
+    serror_el1_sp0: extern "C" fn(), // SError from EL1 using SP_EL0
+    // ... (16 total vectors for all EL/SP combinations)
+}
+
+pub unsafe fn init_exceptions() {
+    let vector_table = &EXCEPTION_VECTORS as *const _ as u64;
+    asm!("msr VBAR_EL1, {}", in(reg) vector_table);
+}
+```
+
+**GIC-400 initialization:**
+```rust
+// ruvix-drivers/src/gic400.rs
+pub unsafe fn init_gic() {
+    // 1. Enable distributor (GICD_CTLR)
+    // 2. Configure interrupt priorities (GICD_IPRIORITYR)
+    // 3. Set interrupt targets (GICD_ITARGETSR) — all to CPU0
+    // 4. Enable CPU interface (GICC_CTLR)
+    // 5. Set priority mask (GICC_PMR) — allow all priorities
+    // 6. Enable specific interrupts (GICD_ISENABLER)
+    //    - UART RX interrupt (IRQ 33)
+    //    - Timer interrupt (IRQ 27 for secure physical timer)
+}
+```
+
+#### Stage 4: Kernel Entry and Capability Table Initialization
+
+```rust
+// ruvix-nucleus/src/main.rs
+#[no_mangle]
+pub extern "C" fn kernel_entry(dtb_addr: usize) -> ! {
+    // 1. Parse device tree to discover memory layout
+    let dtb = unsafe { DeviceTree::from_addr(dtb_addr) };
+    let memory_nodes = dtb.memory_nodes();
+
+    // 2. Initialize physical memory allocator
+    let mut phys_allocator = PhysicalAllocator::new(memory_nodes);
+
+    // 3. Initialize region manager (convert mmap to physical pages)
+    let region_mgr = RegionManager::new(&mut phys_allocator);
+
+    // 4. Initialize capability manager
+    let cap_mgr = CapabilityManager::new();
+
+    // 5. Create root task with all initial capabilities
+    let root_task = Task::new_root(&cap_mgr, &region_mgr);
+
+    // 6. Initialize queue manager
+    let queue_mgr = QueueManager::new(&mut phys_allocator);
+
+    // 7. Initialize proof engine
+    let proof_engine = ProofEngine::new(&cap_mgr);
+
+    // 8. Initialize vector/graph kernel objects
+    let vecgraph_mgr = VecGraphManager::new(&mut phys_allocator, &proof_engine);
+
+    // 9. Initialize scheduler
+    let scheduler = Scheduler::new();
+    scheduler.add_task(root_task);
+
+    // 10. Load boot RVF and jump to first component
+    load_boot_rvf_and_start(&cap_mgr, &region_mgr, &queue_mgr);
+
+    // 11. Enter scheduler loop (never returns)
+    scheduler.run()
+}
+```
+
+#### Stage 5: First RVF Component Load
+
+```rust
+// ruvix-boot/src/loader.rs
+pub fn load_boot_rvf_and_start(
+    cap_mgr: &CapabilityManager,
+    region_mgr: &RegionManager,
+    queue_mgr: &QueueManager,
+) {
+    // 1. Read RVF from flash at 0x0000_0000
+    let rvf_bytes = unsafe { read_flash(0x0000_0000, RVF_MAX_SIZE) };
+
+    // 2. Verify ML-DSA-65 signature (Stage 1 from Phase A)
+    let manifest = rvf::verify_and_parse(&rvf_bytes)
+        .expect("Boot RVF signature verification failed");
+
+    // 3. Create regions per memory schema
+    for region_spec in manifest.memory_schema {
+        region_mgr.create_region(region_spec.size, region_spec.policy);
+    }
+
+    // 4. Load WASM components into executable regions
+    for component in manifest.components {
+        let code_region = region_mgr.map_immutable(&component.wasm_bytes);
+        // WASM runtime initialization happens here (Wasmtime or wasm-micro-runtime)
+    }
+
+    // 5. Wire queues per manifest
+    for queue_spec in manifest.queue_wiring {
+        queue_mgr.create_queue(queue_spec.size, queue_spec.schema);
+    }
+
+    // 6. Spawn initial tasks
+    for entry_point in manifest.entry_points {
+        let task = Task::spawn(
+            entry_point.component_id,
+            entry_point.caps,
+            TaskPriority::Normal,
+            None, // no deadline
+        );
+        scheduler.add_task(task);
+    }
+
+    // 7. Emit boot attestation
+    kernel.attest_emit(
+        &AttestPayload::Boot {
+            rvf_hash: manifest.hash,
+            timestamp: timer.now(),
+        },
+        &ProofToken::trusted_boot(),
+    );
+}
+```
+
+### B.5 Security Model Enhancements
+
+#### MMU-Enforced Capability Boundaries
+
+In Phase A (Linux-hosted), region protection relied on `mprotect()`. In Phase B, the kernel directly controls page table entries:
+
+```rust
+// ruvix-region/src/region.rs (Phase B version)
+impl RegionManager {
+    pub fn map_region(&mut self, policy: RegionPolicy, size: usize) -> Result<RegionHandle> {
+        let phys_pages = self.phys_allocator.allocate_pages(pages_for(size))?;
+
+        let pte_flags = match policy {
+            RegionPolicy::Immutable => {
+                // User-accessible, read-only, cacheable
+                PTE_USER | PTE_RO | PTE_CACHEABLE
+            }
+            RegionPolicy::AppendOnly { .. } => {
+                // Kernel-only, write-append enforced via capability checks
+                PTE_KERNEL_RW | PTE_CACHEABLE
+            }
+            RegionPolicy::Slab { .. } => {
+                // Kernel-only, full RW
+                PTE_KERNEL_RW | PTE_CACHEABLE
+            }
+        };
+
+        // Map into kernel address space with appropriate permissions
+        let virt_addr = self.mmu.map_pages(phys_pages, pte_flags)?;
+
+        Ok(RegionHandle {
+            virt_addr,
+            phys_pages,
+            policy,
+            size,
+        })
+    }
+}
+```
+
+**Page table entry flags:**
+```rust
+const PTE_VALID:      u64 = 1 << 0;   // Valid entry
+const PTE_USER:       u64 = 1 << 6;   // User-accessible (EL0)
+const PTE_RO:         u64 = 1 << 7;   // Read-only (AP[2])
+const PTE_KERNEL_RW:  u64 = 0 << 6;   // Kernel-only, RW
+const PTE_CACHEABLE:  u64 = 0b11 << 2; // Normal memory, write-back
+const PTE_DEVICE:     u64 = 0b00 << 2; // Device memory, strongly-ordered
+```
+
+#### EL1/EL0 Separation for Kernel/User
+
+- **EL1 (Kernel mode):** All kernel code, syscall handlers, interrupt handlers, scheduler
+- **EL0 (User mode):** All RVF components, WASM runtime, AgentDB, RuView
+
+Syscalls trigger synchronous exceptions (SVC instruction) and transition EL0 → EL1. The exception handler validates capabilities before dispatching to syscall implementation.
+
+```rust
+// ruvix-aarch64/src/syscall.rs
+#[no_mangle]
+pub extern "C" fn svc_handler(syscall_num: u64, args: &SyscallArgs) -> SyscallResult {
+    let current_task = scheduler::current_task();
+
+    match syscall_num {
+        0 => task_spawn(current_task, args),
+        1 => cap_grant(current_task, args),
+        2 => region_map(current_task, args),
+        // ... (12 total syscalls)
+        _ => Err(KernelError::InvalidSyscall),
+    }
+}
+```
+
+#### Secure Monitor Calls for Attestation
+
+On hardware with Arm TrustZone (Raspberry Pi 4/5), the kernel can invoke Secure Monitor calls (SMC instruction) to request cryptographic operations from the Trusted Execution Environment (TEE):
+
+```rust
+// ruvix-aarch64/src/smc.rs
+pub fn secure_hash(data: &[u8]) -> [u8; 32] {
+    // SMC call to Secure World for hardware-backed SHA-256
+    let result = unsafe {
+        smc_call(SMC_HASH_SHA256, data.as_ptr(), data.len())
+    };
+    result.hash
+}
+
+pub fn secure_sign_attestation(attestation: &ProofAttestation) -> Signature {
+    // SMC call to Secure World for ML-DSA-65 signing using device key
+    unsafe {
+        smc_call(SMC_SIGN_MLDSA65, attestation as *const _, size_of::<ProofAttestation>())
+    }.signature
+}
+```
+
+**Use cases:**
+- Boot attestation signed by device-unique key (burned into eFUSE)
+- Witness log entries signed by TEE to prevent kernel compromise from tampering
+- Remote attestation for distributed RuVix mesh (Demo 5)
+
+### B.6 Build Path (Weeks 19-42)
+
+| Week | Milestone | Deliverables | Tests |
+|------|-----------|--------------|-------|
+| **19-20** | AArch64 bootstrap | `boot.S`, exception vectors, minimal UART output | QEMU boots, prints "RuVix" |
+| **21-22** | MMU setup | 4-level page tables, identity + kernel mappings | Virtual memory functional |
+| **23-24** | Physical allocator | Buddy allocator for 4KB pages from DTB | Unit tests, fuzz tests |
+| **25-26** | Region → MMU | `RegionManager` using page tables, not mmap | Phase A region tests pass |
+| **27-28** | GIC-400 driver | Interrupt enable/disable, IRQ routing | Timer IRQ delivered to kernel |
+| **29-30** | UART driver | PL011 TX/RX with interrupt support | Console I/O functional |
+| **31-32** | ARM Timer driver | Generic Timer for `timer_wait`, scheduler ticks | Deadline scheduling works |
+| **33-34** | Queue → interrupts | Device interrupts delivered as queue messages | `sensor_subscribe` functional |
+| **35-36** | WASM runtime port | Wasmtime or wasm-micro-runtime on bare metal | "Hello World" WASM executes |
+| **37-38** | Scheduler on hardware | Coherence-aware scheduler using timer IRQs | Multi-task preemption works |
+| **39-40** | RVF boot on QEMU | Full boot sequence from flash RVF | Phase A acceptance test (QEMU) |
+| **41-42** | Raspberry Pi 4 port | Device tree parsing, BCM2711 peripherals | Acceptance test (real hardware) |
+
+### B.7 Testing Strategy
+
+#### QEMU Integration Tests
+
+```bash
+# ruvix-test/qemu_integration.sh
+qemu-system-aarch64 \
+  -machine virt,gic-version=3 \
+  -cpu cortex-a72 \
+  -m 1G \
+  -kernel target/aarch64-unknown-none/release/ruvix-kernel \
+  -drive file=boot.rvf,format=raw,if=pflash \
+  -nographic \
+  -semihosting-config enable=on,target=native
+```
+
+**Test cases:**
+1. Boot sequence completes without panic
+2. MMU maps kernel and user regions correctly
+3. Timer interrupt fires at 100 Hz
+4. UART TX/RX works (loopback test)
+5. GIC delivers interrupts to correct handlers
+6. RVF signature verification passes/fails as expected
+7. Phase A acceptance test (vector mutation + replay)
+
+#### Raspberry Pi 4 Hardware Tests
+
+```bash
+# Copy kernel to SD card FAT32 partition
+cp target/aarch64-unknown-none/release/ruvix-kernel /media/boot/kernel8.img
+cp boot.rvf /media/boot/
+
+# config.txt
+arm_64bit=1
+kernel=kernel8.img
+enable_uart=1
+```
+
+**Test cases:**
+1. UART console output appears on GPIO 14/15
+2. LED blink test using GPIO driver
+3. USB keyboard input via queue subscription
+4. Network packet reception via queue (if Ethernet driver implemented)
+5. Thermal monitoring via RPi-specific sensors
+
+### B.8 Known Limitations
+
+1. **No symmetric multiprocessing (SMP)** — Phase B targets single-core. Multi-core support requires per-CPU interrupt handling and scheduler affinity (future ADR).
+
+2. **No DMA** — Device drivers use programmed I/O. DMA requires IOMMU configuration and physical address constraints (future enhancement).
+
+3. **No floating-point in kernel** — AArch64 NEON/SVE disabled in kernel mode. Vector distance computations may use integer quantized formats or userspace WASM components (decision pending).
+
+4. **Fixed memory layout** — No dynamic memory expansion. All regions declared at boot in RVF manifest.
+
+5. **No power management** — No CPU idle states, frequency scaling, or suspend/resume. Target: always-on edge devices.
+
+---
 
 ## Deciders
 
@@ -1018,3 +1462,1532 @@ This ADR proposes RuVix as a new architectural layer in the RuVector ecosystem. 
 The build path is intentionally conservative: Phase A delivers a Linux-hosted prototype with the full syscall surface. Phase B delivers bare metal. There is no Phase C because POSIX compatibility would compromise every design principle.
 
 The acceptance test is the single measure of success: a signed RVF boots, consumes an event, performs a proof-gated mutation, emits an attestation, and replays deterministically.
+
+---
+
+## Phase C: Multi-Core and DMA Support
+
+### C.1 Objectives
+
+Phase C extends the bare metal kernel with symmetric multi-processing (SMP) and DMA capabilities, enabling parallel execution across multiple CPU cores and zero-copy I/O operations.
+
+1. **Symmetric Multi-Processing (SMP)** — Support up to 256 cores with per-CPU data structures, spinlocks, and inter-processor interrupts (IPIs)
+2. **DMA Controller Abstraction** — Zero-copy I/O for high-bandwidth peripherals (network, storage, sensors)
+3. **Device Tree Parsing** — Runtime hardware discovery for portable multi-platform support
+4. **Memory Coherence** — Proper cache and memory barrier usage for SMP correctness
+5. **Per-CPU Scheduling** — Load balancing with coherence-aware task migration
+
+### C.2 New Crates
+
+| Crate | Purpose | Dependencies | Lines of Code (Est.) |
+|-------|---------|--------------|---------------------|
+| **`ruvix-smp`** | Multi-core boot, per-CPU data, spinlocks, IPIs | `ruvix-aarch64`, `ruvix-types` | ~1,000 |
+| **`ruvix-dma`** | DMA controller abstraction for zero-copy I/O | `ruvix-hal`, `ruvix-physmem` | ~500 |
+| **`ruvix-dtb`** | Device tree blob (DTB) parser for hardware discovery | `ruvix-types` | ~600 |
+
+Updated primitives table:
+
+| Crate | Status | Tests | Description |
+|-------|--------|-------|-------------|
+| `ruvix-smp` | Phase C | TBD | SMP boot, per-CPU data, spinlocks, IPIs |
+| `ruvix-dma` | Phase C | TBD | DMA controller abstraction, scatter-gather lists |
+| `ruvix-dtb` | Phase C | TBD | Flattened Device Tree parser, memory/peripheral discovery |
+
+### C.3 SMP Boot Sequence
+
+Secondary CPU bring-up follows the ARM PSCI (Power State Coordination Interface) v0.2 specification, with spin-table fallback for platforms without PSCI.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SMP BOOT SEQUENCE                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  PRIMARY CPU (CPU 0)                    SECONDARY CPUs (1..N)            │
+│  ═════════════════                      ═══════════════════════          │
+│                                                                          │
+│  1. Execute _start                      1. Held in firmware/spin-table   │
+│     │                                                                    │
+│  2. Initialize MMU, GIC                                                  │
+│     │                                                                    │
+│  3. Parse DTB → discover CPUs                                            │
+│     │                                                                    │
+│  4. Allocate per-CPU data                                                │
+│     │                                                                    │
+│  5. For each secondary CPU:             2. PSCI: CPU_ON or spin-release  │
+│     │   ┌──────────────────────────────────────────────────────────┐     │
+│     └──▶│ smc #0 (PSCI CPU_ON)  OR  write spin-table release addr │     │
+│         └──────────────────────────────────────────────────────────┘     │
+│                                              │                           │
+│                                         3. Jump to secondary_entry       │
+│                                              │                           │
+│                                         4. Initialize per-CPU state      │
+│                                              │                           │
+│                                         5. Enable local GIC interface    │
+│                                              │                           │
+│                                         6. Signal ready via IPI          │
+│  6. Wait for all CPUs ready                  │                           │
+│     ◀────────────────────────────────────────┘                           │
+│     │                                                                    │
+│  7. Enter scheduler                     7. Enter scheduler               │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### PSCI-Based Boot (Preferred)
+
+```rust
+// ruvix-smp/src/boot.rs
+pub unsafe fn boot_secondary_psci(cpu_id: usize, entry_point: usize) -> Result<(), PsciError> {
+    let result = smc_call(
+        PSCI_CPU_ON,           // Function ID
+        cpu_id as u64,         // Target CPU MPIDR
+        entry_point as u64,    // Entry point address
+        0,                     // Context ID (passed in x0)
+    );
+
+    match result {
+        0 => Ok(()),                          // SUCCESS
+        PSCI_E_ALREADY_ON => Ok(()),          // Already running
+        PSCI_E_ON_PENDING => Ok(()),          // Boot in progress
+        err => Err(PsciError::from(err)),
+    }
+}
+```
+
+#### Spin-Table Boot (Fallback)
+
+```rust
+// ruvix-smp/src/boot.rs
+pub unsafe fn boot_secondary_spintable(
+    cpu_id: usize,
+    spin_table_addr: *mut u64,
+    entry_point: usize,
+) {
+    // Write entry point to spin-table release address
+    core::ptr::write_volatile(spin_table_addr, entry_point as u64);
+
+    // Data synchronization barrier ensures write is visible
+    asm!("dsb sy");
+
+    // Send event to wake sleeping CPUs
+    asm!("sev");
+}
+```
+
+#### Per-CPU Data Structure
+
+```rust
+// ruvix-smp/src/percpu.rs
+#[repr(C, align(64))]  // Cache-line aligned to prevent false sharing
+pub struct PerCpuData {
+    /// CPU identifier (MPIDR_EL1 affinity)
+    pub cpu_id: u64,
+
+    /// Current running task (if any)
+    pub current_task: Option<TaskHandle>,
+
+    /// Per-CPU scheduler run queue
+    pub run_queue: RunQueue,
+
+    /// Per-CPU timer state
+    pub timer: TimerState,
+
+    /// Per-CPU GIC interface state
+    pub gic_cpu: GicCpuState,
+
+    /// Per-CPU exception stack pointer
+    pub exception_stack: *mut u8,
+
+    /// Boot synchronization flag
+    pub ready: AtomicBool,
+
+    /// Padding to fill cache line
+    _pad: [u8; 16],
+}
+
+impl PerCpuData {
+    /// Access current CPU's data via TPIDR_EL1 register
+    pub fn current() -> &'static mut PerCpuData {
+        let ptr: *mut PerCpuData;
+        unsafe {
+            asm!("mrs {}, TPIDR_EL1", out(reg) ptr);
+            &mut *ptr
+        }
+    }
+}
+```
+
+### C.4 Memory Barriers and Synchronization
+
+SMP correctness requires careful use of AArch64 memory barriers. The kernel enforces these invariants:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    MEMORY BARRIER USAGE GUIDE                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  BARRIER        │ INSTRUCTION │ USE CASE                                 │
+│  ═══════════════│═════════════│══════════════════════════════════════    │
+│                 │             │                                          │
+│  DMB (Data      │ dmb sy      │ Before reading shared data after         │
+│  Memory         │ dmb ish     │ acquiring a lock. After writing          │
+│  Barrier)       │ dmb ishst   │ shared data before releasing a lock.     │
+│                 │             │                                          │
+│  DSB (Data      │ dsb sy      │ Before executing WFI/WFE (wait for       │
+│  Synchronization│ dsb ish     │ interrupt/event). After memory-mapped    │
+│  Barrier)       │ dsb ishst   │ I/O writes to ensure completion.         │
+│                 │             │                                          │
+│  ISB (Instr.    │ isb         │ After modifying system registers         │
+│  Synchronization│             │ (TTBR, VBAR, etc.). After self-          │
+│  Barrier)       │             │ modifying code or cache maintenance.     │
+│                 │             │                                          │
+│  Shareability   │             │                                          │
+│  Domains:       │             │                                          │
+│    sy  = Full   │             │ All observers in the system              │
+│    ish = Inner  │             │ Inner-shareable (all CPUs)               │
+│    osh = Outer  │             │ Outer-shareable (clusters + DMA)         │
+│                 │             │                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Spinlock Implementation
+
+```rust
+// ruvix-smp/src/spinlock.rs
+
+/// Ticket spinlock with proper memory ordering
+pub struct SpinLock<T> {
+    next_ticket: AtomicU32,
+    now_serving: AtomicU32,
+    data: UnsafeCell<T>,
+}
+
+impl<T> SpinLock<T> {
+    pub fn lock(&self) -> SpinLockGuard<'_, T> {
+        // Acquire ticket atomically
+        let ticket = self.next_ticket.fetch_add(1, Ordering::Relaxed);
+
+        // Spin until our ticket is served
+        while self.now_serving.load(Ordering::Acquire) != ticket {
+            // WFE: wait for event, reduces power consumption
+            unsafe { asm!("wfe") };
+        }
+
+        // Acquired — DMB ensures all prior writes are visible
+        SpinLockGuard { lock: self }
+    }
+}
+
+impl<T> Drop for SpinLockGuard<'_, T> {
+    fn drop(&mut self) {
+        // Release: increment now_serving with Release ordering
+        self.lock.now_serving.fetch_add(1, Ordering::Release);
+
+        // SEV: signal event to wake waiting CPUs
+        unsafe { asm!("sev") };
+    }
+}
+```
+
+#### Inter-Processor Interrupts (IPIs)
+
+```rust
+// ruvix-smp/src/ipi.rs
+
+/// IPI types used by the kernel
+#[repr(u8)]
+pub enum IpiType {
+    /// Reschedule request — target CPU should check run queue
+    Reschedule = 0,
+
+    /// TLB shootdown — invalidate TLB entries for an address range
+    TlbInvalidate = 1,
+
+    /// Stop CPU — for kernel panic or shutdown
+    Stop = 2,
+
+    /// Function call — execute a closure on target CPU
+    Call = 3,
+}
+
+pub fn send_ipi(target_cpu: usize, ipi_type: IpiType) {
+    let gic = GicDistributor::get();
+
+    // Use SGI (Software Generated Interrupt) for IPIs
+    // SGI ID 0-15 are available for software use
+    let sgi_id = ipi_type as u8;
+
+    gic.send_sgi(target_cpu, sgi_id);
+}
+
+pub fn broadcast_ipi(ipi_type: IpiType, include_self: bool) {
+    let gic = GicDistributor::get();
+    let target = if include_self {
+        SgiTarget::AllIncludingSelf
+    } else {
+        SgiTarget::AllExcludingSelf
+    };
+
+    gic.send_sgi_broadcast(target, ipi_type as u8);
+}
+```
+
+### C.5 DMA Controller Abstraction
+
+```rust
+// ruvix-dma/src/lib.rs
+
+/// DMA transfer descriptor
+pub struct DmaDescriptor {
+    /// Source physical address (for mem-to-dev)
+    pub src_addr: PhysAddr,
+
+    /// Destination physical address (for dev-to-mem)
+    pub dst_addr: PhysAddr,
+
+    /// Transfer length in bytes
+    pub length: usize,
+
+    /// Transfer direction
+    pub direction: DmaDirection,
+
+    /// Completion callback (optional)
+    pub callback: Option<fn(DmaResult)>,
+}
+
+#[derive(Clone, Copy)]
+pub enum DmaDirection {
+    MemToDevice,
+    DeviceToMem,
+    MemToMem,
+}
+
+/// DMA controller trait implemented by platform-specific drivers
+pub trait DmaController {
+    /// Allocate a DMA channel
+    fn allocate_channel(&self) -> Result<DmaChannel, DmaError>;
+
+    /// Submit a scatter-gather list for transfer
+    fn submit_sg(
+        &self,
+        channel: DmaChannel,
+        descriptors: &[DmaDescriptor],
+    ) -> Result<DmaTransferId, DmaError>;
+
+    /// Poll for completion (non-blocking)
+    fn poll(&self, transfer_id: DmaTransferId) -> DmaStatus;
+
+    /// Wait for completion (blocking)
+    fn wait(&self, transfer_id: DmaTransferId) -> DmaResult;
+
+    /// Cancel a pending transfer
+    fn cancel(&self, transfer_id: DmaTransferId);
+}
+```
+
+#### Scatter-Gather DMA for Zero-Copy Queue IPC
+
+```rust
+// Integration with ruvix-queue for zero-copy network packet reception
+
+pub fn receive_packet_zero_copy(
+    dma: &dyn DmaController,
+    queue: &KernelQueue,
+    device: &NetworkDevice,
+) -> Result<(), DmaError> {
+    // Allocate receive buffer from queue's shared region
+    let buffer = queue.ring_region.allocate_slot()?;
+
+    // Build DMA descriptor pointing directly to queue buffer
+    let desc = DmaDescriptor {
+        src_addr: device.rx_fifo_addr(),  // Device FIFO address
+        dst_addr: buffer.phys_addr(),      // Queue buffer physical address
+        length: MTU,
+        direction: DmaDirection::DeviceToMem,
+        callback: Some(|result| {
+            // On completion, advance queue tail
+            queue.advance_cq_tail(result.bytes_transferred);
+        }),
+    };
+
+    // Submit DMA transfer — no CPU copying involved
+    dma.submit_sg(channel, &[desc])?;
+
+    Ok(())
+}
+```
+
+### C.6 Device Tree Parser
+
+```rust
+// ruvix-dtb/src/lib.rs
+
+/// Parsed device tree structure
+pub struct DeviceTree<'a> {
+    root: DtNode<'a>,
+    strings_block: &'a [u8],
+    reserved_memory: Vec<MemoryRange>,
+}
+
+impl<'a> DeviceTree<'a> {
+    /// Parse DTB from a raw pointer (passed by bootloader in x0)
+    pub unsafe fn from_ptr(ptr: *const u8) -> Result<Self, DtbError> {
+        let header = &*(ptr as *const FdtHeader);
+
+        // Validate magic number
+        if u32::from_be(header.magic) != FDT_MAGIC {
+            return Err(DtbError::InvalidMagic);
+        }
+
+        // Parse structure block, strings block, reserved memory
+        // ...
+    }
+
+    /// Enumerate all CPUs from /cpus node
+    pub fn cpus(&self) -> impl Iterator<Item = CpuNode> + '_ {
+        self.root
+            .find_node("/cpus")
+            .into_iter()
+            .flat_map(|cpus| cpus.children())
+            .filter(|n| n.name().starts_with("cpu@"))
+            .map(CpuNode::from)
+    }
+
+    /// Enumerate memory regions from /memory nodes
+    pub fn memory_regions(&self) -> impl Iterator<Item = MemoryRange> + '_ {
+        self.root
+            .find_nodes_by_type("memory")
+            .flat_map(|n| n.reg_property())
+    }
+
+    /// Find a device by compatible string
+    pub fn find_compatible(&self, compat: &str) -> Option<DtNode<'a>> {
+        self.root.find_by_compatible(compat)
+    }
+}
+
+/// CPU node information
+pub struct CpuNode {
+    pub cpu_id: u64,           // reg property
+    pub enable_method: EnableMethod,
+    pub spin_table_addr: Option<PhysAddr>,
+    pub psci_method: Option<PsciMethod>,
+}
+
+pub enum EnableMethod {
+    Psci,
+    SpinTable,
+}
+```
+
+### C.7 Build Path (Weeks 43-54)
+
+| Week | Milestone | Deliverables | Tests |
+|------|-----------|--------------|-------|
+| **43-44** | DTB parser | `ruvix-dtb` crate, CPU/memory enumeration | Unit tests with real Pi4/Pi5 DTBs |
+| **45-46** | Per-CPU data | TPIDR_EL1 setup, per-CPU allocator | Each CPU accesses correct data |
+| **47-48** | Spinlocks | Ticket spinlock, reader-writer locks | Stress test across all CPUs |
+| **49-50** | Secondary boot | PSCI CPU_ON, spin-table fallback | All CPUs reach scheduler |
+| **51-52** | IPIs | SGI-based IPIs, TLB shootdown | Cross-CPU reschedule, TLB invalidate |
+| **53-54** | DMA controller | GICv3 DMA, scatter-gather | Zero-copy packet reception |
+
+---
+
+## Phase D: Raspberry Pi 4/5 Support
+
+### D.1 Hardware Differences
+
+Phase D provides dedicated support for Raspberry Pi 4 (BCM2711) and Raspberry Pi 5 (BCM2712) hardware. These platforms differ significantly from the QEMU virt machine.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    RASPBERRY PI 4 vs PI 5 COMPARISON                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  FEATURE            │ Raspberry Pi 4 (BCM2711)  │ Raspberry Pi 5 (BCM2712)│
+│  ═══════════════════│═══════════════════════════│═════════════════════════│
+│  CPU                │ 4x Cortex-A72 @ 1.8GHz    │ 4x Cortex-A76 @ 2.4GHz   │
+│  RAM                │ 1/2/4/8 GB LPDDR4         │ 4/8 GB LPDDR4X           │
+│  GPU                │ VideoCore VI              │ VideoCore VII            │
+│                     │                           │                          │
+│  PERIPHERAL BASE    │ 0xFE00_0000               │ 0x1F00_0000_0000         │
+│  RAM BASE           │ 0x0000_0000               │ 0x0000_0000              │
+│                     │                           │                          │
+│  INTERRUPT          │ GIC-400 (GICv2)           │ GIC-500 (GICv3)          │
+│  CONTROLLER         │ @ 0xFF84_0000             │ @ 0x10_7FFF_0000         │
+│                     │                           │                          │
+│  UART               │ PL011 @ 0xFE20_1000       │ PL011 @ 0x1F00_0003_0000 │
+│                     │ Mini @ 0xFE21_5000        │                          │
+│                     │                           │                          │
+│  GPIO               │ @ 0xFE20_0000             │ @ 0x1F00_00D0_0000       │
+│                     │                           │                          │
+│  MAILBOX            │ @ 0xFE00_B880             │ @ 0x1F00_0000_0880       │
+│  (VideoCore IPC)    │                           │                          │
+│                     │                           │                          │
+│  PCIe               │ 1x Gen 2.0 lane           │ 1x Gen 3.0 lane          │
+│                     │                           │ (M.2 NVMe support)       │
+│                     │                           │                          │
+│  BOOT               │ Start4.elf → kernel8.img │ RP1 chip → kernel_2712.img│
+│                     │                           │                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Memory Maps
+
+**Raspberry Pi 4 (BCM2711):**
+
+| Region | Start Address | End Address | Size | Purpose |
+|--------|--------------|-------------|------|---------|
+| **RAM (Low)** | `0x0000_0000` | `0x3C00_0000` | 960 MB | Main memory (below GPU split) |
+| **Mailbox** | `0xFE00_B880` | `0xFE00_B8BF` | 64 B | VideoCore mailbox registers |
+| **GPIO** | `0xFE20_0000` | `0xFE20_00F4` | 244 B | GPIO registers |
+| **UART0** | `0xFE20_1000` | `0xFE20_1FFF` | 4 KB | PL011 UART |
+| **Mini UART** | `0xFE21_5000` | `0xFE21_507F` | 128 B | Aux mini UART |
+| **GIC Dist** | `0xFF84_1000` | `0xFF84_1FFF` | 4 KB | GIC-400 distributor |
+| **GIC CPU** | `0xFF84_2000` | `0xFF84_2FFF` | 4 KB | GIC-400 CPU interface |
+| **Local Periph** | `0xFF80_0000` | `0xFF80_0FFF` | 4 KB | Per-core timers, mailboxes |
+
+**Raspberry Pi 5 (BCM2712):**
+
+| Region | Start Address | End Address | Size | Purpose |
+|--------|--------------|-------------|------|---------|
+| **RAM** | `0x0000_0000` | `0x1_0000_0000` | 4 GB | Main memory |
+| **High Periph** | `0x1F00_0000_0000` | `0x1F00_FFFF_FFFF` | 4 GB | Peripheral space |
+| **GIC-500** | `0x10_7FFF_0000` | `0x10_7FFF_FFFF` | 64 KB | GICv3 |
+| **RP1 Periph** | `0x1F00_0000_0000` | varies | varies | RP1 south bridge (USB, Ethernet) |
+
+### D.2 New Crates
+
+| Crate | Purpose | Dependencies | Lines of Code (Est.) |
+|-------|---------|--------------|---------------------|
+| **`ruvix-bcm2711`** | BCM2711/2712 SoC drivers (GPIO, mailbox, UART) | `ruvix-hal`, `ruvix-aarch64` | ~1,200 |
+| **`ruvix-rpi-boot`** | RPi-specific boot support (config.txt parsing, stub) | `ruvix-aarch64`, `ruvix-dtb` | ~400 |
+
+### D.3 Boot Process
+
+Raspberry Pi boot differs significantly from QEMU:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    RASPBERRY PI BOOT SEQUENCE                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  STAGE 0: On-Chip ROM (Raspberry Pi 4/5)                                 │
+│  ════════════════════════════════════════                                │
+│  1. Power-on reset                                                       │
+│  2. Load second-stage bootloader from SD/eMMC/USB                        │
+│     - Pi 4: bootcode.bin (from boot partition)                           │
+│     - Pi 5: RP1 chip handles initial boot                                │
+│                                                                          │
+│  STAGE 1: VideoCore Firmware                                             │
+│  ════════════════════════════════════════                                │
+│  1. Load start4.elf (or start.elf) from boot partition                   │
+│  2. Parse config.txt for boot configuration                              │
+│  3. Initialize DRAM, clocks, voltage                                     │
+│  4. Load kernel8.img (AArch64 kernel) to 0x80000                         │
+│  5. Load device tree (bcm2711-rpi-4-b.dtb) to memory                     │
+│  6. Release ARM cores with DTB address in x0                             │
+│                                                                          │
+│  STAGE 2: RuVix Entry (kernel8.img)                                      │
+│  ════════════════════════════════════════                                │
+│  1. _start at 0x80000 (or address from config.txt)                       │
+│  2. Parse DTB to discover hardware                                       │
+│  3. Initialize UART for early console                                    │
+│  4. Continue standard RuVix boot sequence                                │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### config.txt Configuration
+
+```ini
+# /boot/config.txt for RuVix on Raspberry Pi 4/5
+
+# Enable 64-bit mode
+arm_64bit=1
+
+# Kernel filename
+kernel=ruvix-kernel8.img
+
+# Enable UART for early console
+enable_uart=1
+
+# Disable Bluetooth to free up PL011 UART
+dtoverlay=disable-bt
+
+# Fixed kernel load address
+kernel_address=0x80000
+
+# Pass DTB to kernel
+device_tree=bcm2711-rpi-4-b.dtb
+
+# Disable GPU boot splash
+disable_splash=1
+
+# Minimum GPU memory (more for kernel)
+gpu_mem=16
+
+# For Pi 5: use correct kernel name
+[pi5]
+kernel=ruvix-kernel_2712.img
+device_tree=bcm2712-rpi-5-b.dtb
+```
+
+### D.4 BCM2711/2712 Drivers
+
+#### GPIO Driver
+
+```rust
+// ruvix-bcm2711/src/gpio.rs
+
+const GPIO_BASE_PI4: usize = 0xFE20_0000;
+const GPIO_BASE_PI5: usize = 0x1F00_00D0_0000;
+
+pub struct BcmGpio {
+    base: *mut u32,
+}
+
+impl BcmGpio {
+    pub fn new(platform: Platform) -> Self {
+        let base = match platform {
+            Platform::Pi4 => GPIO_BASE_PI4,
+            Platform::Pi5 => GPIO_BASE_PI5,
+        } as *mut u32;
+
+        Self { base }
+    }
+
+    /// Set pin function (input, output, alt0-5)
+    pub fn set_function(&self, pin: u8, function: GpioFunction) {
+        let reg = (pin / 10) as usize;
+        let shift = ((pin % 10) * 3) as u32;
+
+        unsafe {
+            let ptr = self.base.add(reg);  // GPFSEL0-5
+            let mut val = ptr.read_volatile();
+            val &= !(0b111 << shift);
+            val |= (function as u32) << shift;
+            ptr.write_volatile(val);
+        }
+    }
+
+    /// Set output pin high/low
+    pub fn set(&self, pin: u8, high: bool) {
+        let reg = if high { 7 } else { 10 };  // GPSET0 or GPCLR0
+        let offset = (pin / 32) as usize;
+        let bit = 1u32 << (pin % 32);
+
+        unsafe {
+            self.base.add(reg + offset).write_volatile(bit);
+        }
+    }
+
+    /// Read input pin level
+    pub fn read(&self, pin: u8) -> bool {
+        let offset = (pin / 32) as usize;
+        let bit = 1u32 << (pin % 32);
+
+        unsafe {
+            (self.base.add(13 + offset).read_volatile() & bit) != 0
+        }
+    }
+}
+
+#[repr(u32)]
+pub enum GpioFunction {
+    Input = 0b000,
+    Output = 0b001,
+    Alt0 = 0b100,
+    Alt1 = 0b101,
+    Alt2 = 0b110,
+    Alt3 = 0b111,
+    Alt4 = 0b011,
+    Alt5 = 0b010,
+}
+```
+
+#### VideoCore Mailbox
+
+```rust
+// ruvix-bcm2711/src/mailbox.rs
+
+const MAILBOX_BASE_PI4: usize = 0xFE00_B880;
+
+/// Property tag IDs for VideoCore communication
+pub mod tags {
+    pub const GET_BOARD_REVISION: u32 = 0x0001_0002;
+    pub const GET_ARM_MEMORY: u32 = 0x0001_0005;
+    pub const GET_VC_MEMORY: u32 = 0x0001_0006;
+    pub const SET_POWER_STATE: u32 = 0x0002_8001;
+    pub const GET_CLOCK_RATE: u32 = 0x0003_0002;
+    pub const SET_CLOCK_RATE: u32 = 0x0003_8002;
+}
+
+pub struct Mailbox {
+    base: *mut u32,
+}
+
+impl Mailbox {
+    /// Send a property tag request to VideoCore
+    pub fn call(&self, channel: u8, message: &mut PropertyMessage) -> Result<(), MailboxError> {
+        // Ensure 16-byte alignment
+        let ptr = message as *mut _ as usize;
+        assert!(ptr & 0xF == 0, "Mailbox message must be 16-byte aligned");
+
+        // Wait for mailbox to be ready
+        while self.status() & MAILBOX_FULL != 0 {
+            core::hint::spin_loop();
+        }
+
+        // Write message address (with channel in low 4 bits)
+        let value = (ptr as u32) | (channel as u32);
+        unsafe {
+            self.base.add(8).write_volatile(value);  // WRITE register
+        }
+
+        // Wait for response
+        loop {
+            while self.status() & MAILBOX_EMPTY != 0 {
+                core::hint::spin_loop();
+            }
+
+            let response = unsafe { self.base.read_volatile() };  // READ register
+            if response & 0xF == channel as u32 {
+                break;
+            }
+        }
+
+        // Check response code
+        if message.code == MAILBOX_RESPONSE_SUCCESS {
+            Ok(())
+        } else {
+            Err(MailboxError::ResponseFailed)
+        }
+    }
+}
+```
+
+### D.5 Build Path (Weeks 55-62)
+
+| Week | Milestone | Deliverables | Tests |
+|------|-----------|--------------|-------|
+| **55-56** | RPi boot stub | Linker script, kernel8.img generation, UART output | Boot to console on Pi 4 |
+| **57-58** | GPIO driver | BCM GPIO, LED blink, button input | GPIO functional tests |
+| **59-60** | VideoCore mailbox | Property tags, memory query, clock control | Query board info |
+| **61-62** | Pi 5 port | BCM2712 addresses, GICv3, RP1 | Boot on Pi 5 hardware |
+
+---
+
+## Phase E: Networking and Filesystem
+
+### E.1 Network Stack Architecture
+
+Phase E implements a minimal network stack optimized for agentic workloads: high-throughput, low-latency vector streaming and RVF package distribution.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      NETWORK STACK ARCHITECTURE                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                    RVF COMPONENT SPACE                             │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐    │   │
+│  │  │ AgentDB     │  │ RVF Package │  │ Mesh Coordinator        │    │   │
+│  │  │ Replication │  │ Distributor │  │ (Demo 5)                │    │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘    │   │
+│  │         │                │                     │                  │   │
+│  │         └────────────────┼─────────────────────┘                  │   │
+│  │                          │ queue                                   │   │
+│  └──────────────────────────┼────────────────────────────────────────┘   │
+│                             │                                            │
+│  ┌──────────────────────────┼────────────────────────────────────────┐   │
+│  │  ruvix-net (RVF component)                                        │   │
+│  │  ═════════════════════════                                        │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │                     SOCKET LAYER                             │  │   │
+│  │  │   UdpSocket   │   TcpListener (future)   │   RawSocket      │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  │                             │                                      │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │                    TRANSPORT LAYER                           │  │   │
+│  │  │        UDP         │        ICMP        │     (TCP future)   │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  │                             │                                      │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │                    NETWORK LAYER (IPv4)                      │  │   │
+│  │  │   IP Header   │   Routing Table   │   ICMP Echo/Reply       │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  │                             │                                      │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │                    LINK LAYER                                │  │   │
+│  │  │   ARP Cache   │   Ethernet Frame   │   MAC Address          │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  │                             │                                      │   │
+│  └─────────────────────────────┼─────────────────────────────────────┘   │
+│                                │ queue_send/recv                         │
+│  ┌─────────────────────────────┼─────────────────────────────────────┐   │
+│  │  KERNEL                     │                                      │   │
+│  │  ═══════                    │                                      │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │   │
+│  │  │                 NETWORK DEVICE DRIVER                        │  │   │
+│  │  │   virtio-net (QEMU)  │   bcmgenet (Pi4)  │   RP1 (Pi5)      │  │   │
+│  │  └─────────────────────────────────────────────────────────────┘  │   │
+│  │                                                                    │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### virtio-net Driver
+
+```rust
+// ruvix-drivers/src/virtio_net.rs
+
+const VIRTIO_NET_F_MAC: u64 = 1 << 5;
+const VIRTIO_NET_F_MRG_RXBUF: u64 = 1 << 15;
+
+pub struct VirtioNet {
+    common: VirtioCommon,
+    rx_queue: VirtQueue,
+    tx_queue: VirtQueue,
+    mac_address: [u8; 6],
+}
+
+impl VirtioNet {
+    pub fn init(base: *mut u8) -> Result<Self, VirtioError> {
+        let common = VirtioCommon::new(base)?;
+
+        // Negotiate features
+        let features = common.read_features();
+        let negotiated = features & (VIRTIO_NET_F_MAC | VIRTIO_NET_F_MRG_RXBUF);
+        common.write_features(negotiated);
+
+        // Initialize virtqueues
+        let rx_queue = VirtQueue::new(&common, 0, 256)?;  // Queue 0 = RX
+        let tx_queue = VirtQueue::new(&common, 1, 256)?;  // Queue 1 = TX
+
+        // Read MAC address
+        let mut mac = [0u8; 6];
+        for i in 0..6 {
+            mac[i] = common.read_config(i);
+        }
+
+        common.set_driver_ok();
+
+        Ok(Self { common, rx_queue, tx_queue, mac_address: mac })
+    }
+
+    /// Receive a packet (DMA zero-copy into queue buffer)
+    pub fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, NetError> {
+        let desc_id = self.rx_queue.pop_used()?;
+        let len = self.rx_queue.get_used_len(desc_id);
+
+        // Copy from virtqueue buffer to caller's buffer
+        self.rx_queue.read_buffer(desc_id, buffer)?;
+
+        // Recycle the descriptor
+        self.rx_queue.add_available(desc_id);
+
+        Ok(len)
+    }
+
+    /// Transmit a packet
+    pub fn transmit(&mut self, packet: &[u8]) -> Result<(), NetError> {
+        let desc_id = self.tx_queue.alloc_descriptor()?;
+
+        self.tx_queue.write_buffer(desc_id, packet)?;
+        self.tx_queue.add_available(desc_id);
+        self.tx_queue.notify();
+
+        Ok(())
+    }
+}
+```
+
+#### ARP Cache
+
+```rust
+// ruvix-net/src/arp.rs
+
+pub struct ArpCache {
+    entries: [Option<ArpEntry>; 64],
+    pending: [Option<ArpPending>; 16],
+}
+
+pub struct ArpEntry {
+    ip: Ipv4Addr,
+    mac: [u8; 6],
+    expires: Instant,
+}
+
+impl ArpCache {
+    pub fn lookup(&self, ip: Ipv4Addr) -> Option<[u8; 6]> {
+        self.entries.iter()
+            .flatten()
+            .find(|e| e.ip == ip && e.expires > Instant::now())
+            .map(|e| e.mac)
+    }
+
+    pub fn insert(&mut self, ip: Ipv4Addr, mac: [u8; 6]) {
+        let entry = ArpEntry {
+            ip,
+            mac,
+            expires: Instant::now() + Duration::from_secs(300),
+        };
+
+        // Find empty slot or oldest entry
+        let slot = self.entries.iter_mut()
+            .enumerate()
+            .min_by_key(|(_, e)| e.as_ref().map(|e| e.expires))
+            .map(|(i, _)| i)
+            .unwrap();
+
+        self.entries[slot] = Some(entry);
+    }
+}
+```
+
+### E.2 Filesystem Architecture
+
+RuVix implements a minimal VFS layer optimized for RVF package storage and retrieval, not general-purpose file operations.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     FILESYSTEM ARCHITECTURE                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                           VFS LAYER                                │   │
+│  │  ════════════════════════════════════════════════════════════════ │   │
+│  │                                                                    │   │
+│  │  open(path) → FileHandle       read(fh, buf) → usize              │   │
+│  │  close(fh)                     write(fh, buf) → usize (limited)   │   │
+│  │  stat(path) → Metadata         readdir(path) → [DirEntry]         │   │
+│  │                                                                    │   │
+│  └────────────────────────────┬──────────────────────────────────────┘   │
+│                               │                                          │
+│         ┌─────────────────────┼─────────────────────┐                    │
+│         │                     │                     │                    │
+│         ▼                     ▼                     ▼                    │
+│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐               │
+│  │   FAT32     │      │   RamFS     │      │  (Future)   │               │
+│  │  (read-only)│      │    /tmp     │      │   ext4      │               │
+│  ├─────────────┤      ├─────────────┤      ├─────────────┤               │
+│  │ SD card     │      │ Kernel heap │      │ NVMe/USB    │               │
+│  │ boot part.  │      │ regions     │      │             │               │
+│  └─────────────┘      └─────────────┘      └─────────────┘               │
+│                                                                          │
+│  Mount points:                                                           │
+│    /boot  → FAT32 (SD card boot partition, RVF packages)                │
+│    /tmp   → RamFS (temporary files, checkpoints)                        │
+│    /rvf   → Virtual (mounted RVF component namespaces)                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### VFS Layer
+
+```rust
+// ruvix-fs/src/vfs.rs
+
+pub trait Filesystem: Send + Sync {
+    fn mount(&mut self, device: &dyn BlockDevice) -> Result<(), FsError>;
+    fn open(&self, path: &str, flags: OpenFlags) -> Result<FileHandle, FsError>;
+    fn read(&self, handle: FileHandle, buf: &mut [u8]) -> Result<usize, FsError>;
+    fn write(&self, handle: FileHandle, buf: &[u8]) -> Result<usize, FsError>;
+    fn close(&self, handle: FileHandle);
+    fn stat(&self, path: &str) -> Result<Metadata, FsError>;
+    fn readdir(&self, path: &str) -> Result<Vec<DirEntry>, FsError>;
+}
+
+pub struct Vfs {
+    mounts: BTreeMap<PathBuf, Box<dyn Filesystem>>,
+}
+
+impl Vfs {
+    pub fn mount(&mut self, path: &str, fs: Box<dyn Filesystem>) -> Result<(), FsError> {
+        self.mounts.insert(PathBuf::from(path), fs);
+        Ok(())
+    }
+
+    pub fn open(&self, path: &str, flags: OpenFlags) -> Result<FileHandle, FsError> {
+        let (mount_path, relative_path) = self.resolve_mount(path)?;
+        let fs = self.mounts.get(mount_path).ok_or(FsError::NotFound)?;
+        fs.open(relative_path, flags)
+    }
+}
+```
+
+#### FAT32 (Read-Only)
+
+```rust
+// ruvix-fs/src/fat32.rs
+
+pub struct Fat32 {
+    device: Box<dyn BlockDevice>,
+    bpb: BiosParameterBlock,
+    fat_start: u64,
+    data_start: u64,
+    root_cluster: u32,
+}
+
+impl Fat32 {
+    pub fn mount(device: Box<dyn BlockDevice>) -> Result<Self, FsError> {
+        let mut sector = [0u8; 512];
+        device.read_block(0, &mut sector)?;
+
+        let bpb = BiosParameterBlock::parse(&sector)?;
+
+        // Validate FAT32 signature
+        if bpb.sectors_per_fat_16 != 0 {
+            return Err(FsError::InvalidFilesystem);
+        }
+
+        let fat_start = bpb.reserved_sectors as u64;
+        let data_start = fat_start + (bpb.num_fats as u64 * bpb.sectors_per_fat_32 as u64);
+
+        Ok(Self {
+            device,
+            bpb,
+            fat_start,
+            data_start,
+            root_cluster: bpb.root_cluster,
+        })
+    }
+
+    fn read_cluster(&self, cluster: u32, buf: &mut [u8]) -> Result<(), FsError> {
+        let sector = self.cluster_to_sector(cluster);
+        for i in 0..self.bpb.sectors_per_cluster {
+            let offset = i as usize * 512;
+            self.device.read_block(sector + i as u64, &mut buf[offset..offset + 512])?;
+        }
+        Ok(())
+    }
+
+    fn cluster_to_sector(&self, cluster: u32) -> u64 {
+        self.data_start + ((cluster - 2) as u64 * self.bpb.sectors_per_cluster as u64)
+    }
+}
+```
+
+#### RamFS
+
+```rust
+// ruvix-fs/src/ramfs.rs
+
+pub struct RamFs {
+    root: RamFsNode,
+    allocator: RegionAllocator,
+}
+
+enum RamFsNode {
+    Directory {
+        name: String,
+        children: Vec<RamFsNode>,
+    },
+    File {
+        name: String,
+        data: RegionHandle,
+        size: usize,
+    },
+}
+
+impl Filesystem for RamFs {
+    fn open(&self, path: &str, flags: OpenFlags) -> Result<FileHandle, FsError> {
+        let node = self.resolve_path(path)?;
+        match node {
+            RamFsNode::File { data, size, .. } => {
+                Ok(FileHandle::new(data.clone(), *size, flags))
+            }
+            RamFsNode::Directory { .. } => Err(FsError::IsDirectory),
+        }
+    }
+
+    fn write(&self, handle: FileHandle, buf: &[u8]) -> Result<usize, FsError> {
+        // RamFS supports writes for checkpoints
+        let region = handle.region();
+        region.write(handle.position(), buf)?;
+        Ok(buf.len())
+    }
+}
+```
+
+### E.3 New Crates
+
+| Crate | Purpose | Dependencies | Lines of Code (Est.) |
+|-------|---------|--------------|---------------------|
+| **`ruvix-net`** | Ethernet/IP/UDP/ICMP network stack | `ruvix-types`, `ruvix-queue` | ~1,500 |
+| **`ruvix-fs`** | VFS layer, FAT32, RamFS | `ruvix-types`, `ruvix-region` | ~1,800 |
+
+### E.4 Build Path (Weeks 63-74)
+
+| Week | Milestone | Deliverables | Tests |
+|------|-----------|--------------|-------|
+| **63-64** | Block device layer | SD card driver, virtio-blk | Read/write sectors |
+| **65-66** | FAT32 read-only | BPB parsing, cluster chain, directory traversal | Read files from SD |
+| **67-68** | VFS layer | Mount points, path resolution, file handles | Mount FAT32 at /boot |
+| **69-70** | RamFS | In-memory filesystem for /tmp | Checkpoint read/write |
+| **71-72** | Ethernet driver | virtio-net, bcmgenet (Pi4) | Packet TX/RX |
+| **73-74** | IP/UDP/ICMP | ARP, IP routing, UDP sockets, ping | Ping reply, UDP echo |
+
+---
+
+## QEMU Swarm Simulation
+
+### Swarm.1 Architecture
+
+The QEMU Swarm Simulation system enables testing of distributed RuVix deployments without physical hardware. Multiple QEMU instances run in parallel, connected via virtual networking.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    QEMU SWARM SIMULATION ARCHITECTURE                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────┐   │
+│  │                       SWARM ORCHESTRATOR                           │   │
+│  │  ═══════════════════════════════════════════════════════════════  │   │
+│  │                                                                    │   │
+│  │   swarm-ctl                                                        │   │
+│  │   ├── launch     : Start N QEMU nodes                              │   │
+│  │   ├── connect    : Establish virtual network                       │   │
+│  │   ├── deploy     : Push RVF packages to nodes                      │   │
+│  │   ├── monitor    : Aggregate console output                        │   │
+│  │   ├── inject     : Inject faults (network, disk, CPU)             │   │
+│  │   └── teardown   : Graceful shutdown all nodes                     │   │
+│  │                                                                    │   │
+│  └──────────────────────────────┬────────────────────────────────────┘   │
+│                                 │                                        │
+│                     ┌───────────┼───────────┐                            │
+│                     │           │           │                            │
+│              ┌──────▼──────┐ ┌──▼───┐ ┌─────▼─────┐                      │
+│              │   Node 0    │ │Node 1│ │  Node N   │                      │
+│              │  (QEMU)     │ │(QEMU)│ │  (QEMU)   │                      │
+│              │             │ │      │ │           │                      │
+│              │ ┌─────────┐ │ │ ...  │ │ ┌───────┐ │                      │
+│              │ │ RuVix   │ │ │      │ │ │RuVix  │ │                      │
+│              │ │ Kernel  │ │ │      │ │ │Kernel │ │                      │
+│              │ └────┬────┘ │ │      │ │ └───┬───┘ │                      │
+│              │      │      │ │      │ │     │     │                      │
+│              │ ┌────▼────┐ │ │      │ │ ┌───▼───┐ │                      │
+│              │ │ virtio  │ │ │      │ │ │virtio │ │                      │
+│              │ │   net   │ │ │      │ │ │ net   │ │                      │
+│              │ └────┬────┘ │ │      │ │ └───┬───┘ │                      │
+│              └──────┼──────┘ └──────┘ └─────┼─────┘                      │
+│                     │                       │                            │
+│              ┌──────▼───────────────────────▼──────┐                     │
+│              │         VIRTUAL NETWORK              │                     │
+│              │  ════════════════════════════════   │                     │
+│              │                                      │                     │
+│              │   TAP interfaces + bridge            │                     │
+│              │   OR                                 │                     │
+│              │   QEMU user-mode networking          │                     │
+│              │   OR                                 │                     │
+│              │   vde_switch for complex topologies  │                     │
+│              │                                      │                     │
+│              └──────────────────────────────────────┘                     │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Orchestrator Implementation
+
+```rust
+// tools/swarm-ctl/src/main.rs
+
+use std::process::{Command, Stdio};
+use std::collections::HashMap;
+
+pub struct SwarmOrchestrator {
+    nodes: Vec<QemuNode>,
+    network: VirtualNetwork,
+    console_mux: ConsoleMux,
+}
+
+pub struct QemuNode {
+    id: usize,
+    process: std::process::Child,
+    console: UnixStream,
+    monitor: UnixStream,
+    mac_address: [u8; 6],
+    ip_address: Ipv4Addr,
+}
+
+impl SwarmOrchestrator {
+    pub fn launch(&mut self, config: &SwarmConfig) -> Result<(), SwarmError> {
+        // Create virtual network
+        self.network = VirtualNetwork::create(&config.topology)?;
+
+        for i in 0..config.node_count {
+            let node = self.spawn_node(i, &config)?;
+            self.nodes.push(node);
+        }
+
+        // Wait for all nodes to boot
+        self.wait_for_boot_complete()?;
+
+        Ok(())
+    }
+
+    fn spawn_node(&self, id: usize, config: &SwarmConfig) -> Result<QemuNode, SwarmError> {
+        let mac = generate_mac(id);
+        let console_sock = format!("/tmp/ruvix-swarm-{}-console.sock", id);
+        let monitor_sock = format!("/tmp/ruvix-swarm-{}-monitor.sock", id);
+
+        let mut cmd = Command::new("qemu-system-aarch64");
+        cmd.args([
+            "-machine", "virt,gic-version=3",
+            "-cpu", "cortex-a72",
+            "-m", &format!("{}M", config.memory_mb),
+            "-smp", &format!("{}", config.cpus),
+            "-kernel", &config.kernel_path,
+            "-drive", &format!("file={},format=raw,if=pflash", config.rvf_path),
+            // Networking
+            "-netdev", &format!("tap,id=net0,ifname=tap{},script=no,downscript=no", id),
+            "-device", &format!("virtio-net-pci,netdev=net0,mac={}", mac_to_string(&mac)),
+            // Console
+            "-chardev", &format!("socket,id=console,path={},server=on,wait=off", console_sock),
+            "-serial", "chardev:console",
+            // Monitor
+            "-chardev", &format!("socket,id=monitor,path={},server=on,wait=off", monitor_sock),
+            "-monitor", "chardev:monitor",
+            // No graphics
+            "-nographic",
+        ]);
+
+        let process = cmd
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+
+        // Connect to console and monitor sockets
+        std::thread::sleep(Duration::from_millis(500));
+        let console = UnixStream::connect(&console_sock)?;
+        let monitor = UnixStream::connect(&monitor_sock)?;
+
+        Ok(QemuNode {
+            id,
+            process,
+            console,
+            monitor,
+            mac_address: mac,
+            ip_address: Ipv4Addr::new(10, 0, 0, (id + 1) as u8),
+        })
+    }
+}
+```
+
+### Swarm.2 Configuration
+
+#### Node Resource Allocation
+
+```yaml
+# swarm-config.yaml
+
+cluster:
+  name: "ruvix-test-cluster"
+  node_count: 5
+
+nodes:
+  default:
+    cpus: 2
+    memory_mb: 512
+    kernel: "target/aarch64-unknown-none/release/ruvix-kernel"
+    rvf: "boot.rvf"
+
+  # Override for specific nodes
+  coordinator:
+    index: 0
+    cpus: 4
+    memory_mb: 1024
+    rvf: "coordinator.rvf"
+
+  workers:
+    indices: [1, 2, 3, 4]
+    cpus: 2
+    memory_mb: 512
+    rvf: "worker.rvf"
+```
+
+#### Network Topologies
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      SUPPORTED NETWORK TOPOLOGIES                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  RING TOPOLOGY                    MESH TOPOLOGY                          │
+│  ══════════════                   ══════════════                         │
+│                                                                          │
+│      ┌───┐                            ┌───┐                              │
+│      │ 0 │◄──────┐                    │ 0 │                              │
+│      └─┬─┘      │                    └─┬─┘                              │
+│        │        │                  ╱   │   ╲                            │
+│        ▼        │                ╱     │     ╲                          │
+│      ┌───┐      │           ┌───┐    ┌─┴─┐    ┌───┐                      │
+│      │ 1 │      │           │ 1 │◄──▶│   │◄──▶│ 2 │                      │
+│      └─┬─┘      │           └─┬─┘    └───┘    └─┬─┘                      │
+│        │        │             │  ╲           ╱  │                        │
+│        ▼        │             │    ╲       ╱    │                        │
+│      ┌───┐      │             │      ╲   ╱      │                        │
+│      │ 2 │      │           ┌─┴─┐    ┌─┴─┐    ┌─┴─┐                      │
+│      └─┬─┘      │           │ 3 │◄──▶│ 4 │◄──▶│   │                      │
+│        │        │           └───┘    └───┘    └───┘                      │
+│        ▼        │                                                        │
+│      ┌───┐      │                                                        │
+│      │ 3 │──────┘                                                        │
+│      └───┘                                                               │
+│                                                                          │
+│  STAR TOPOLOGY                    HIERARCHICAL TOPOLOGY                  │
+│  ══════════════                   ═════════════════════                  │
+│                                                                          │
+│      ┌───┐  ┌───┐                        ┌───┐                           │
+│      │ 1 │  │ 2 │                        │ 0 │  (Coordinator)            │
+│      └─┬─┘  └─┬─┘                        └─┬─┘                           │
+│        │      │                        ╱   │   ╲                         │
+│        └──┬───┘                      ╱     │     ╲                       │
+│           ▼                        ╱       │       ╲                     │
+│         ┌───┐                  ┌───┐     ┌───┐     ┌───┐                 │
+│         │ 0 │  (Hub)           │ 1 │     │ 2 │     │ 3 │  (Leaders)      │
+│         └─┬─┘                  └─┬─┘     └─┬─┘     └─┬─┘                 │
+│        ╱  │  ╲                   │         │         │                   │
+│      ╱    │    ╲              ┌──┴──┐   ┌──┴──┐   ┌──┴──┐                │
+│  ┌───┐  ┌───┐  ┌───┐         │4│5│  │6│7│  │8│9│  (Workers)              │
+│  │ 3 │  │ 4 │  │ 5 │         └─┴─┘  └─┴─┘  └─┴─┘                         │
+│  └───┘  └───┘  └───┘                                                     │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+```yaml
+# Network topology configuration
+
+network:
+  topology: "mesh"  # ring | mesh | star | hierarchical
+
+  # Mesh-specific: which nodes connect to which
+  mesh:
+    connectivity: 0.7  # 70% of possible edges exist
+
+  # Star-specific: hub node index
+  star:
+    hub: 0
+
+  # Hierarchical-specific
+  hierarchical:
+    coordinator: 0
+    leaders: [1, 2, 3]
+    workers_per_leader: 3
+
+  # Network parameters
+  latency_ms: 1
+  bandwidth_mbps: 1000
+  packet_loss_percent: 0.0  # For fault injection
+```
+
+#### Fault Injection Scenarios
+
+```yaml
+# fault-injection.yaml
+
+scenarios:
+  network_partition:
+    description: "Partition cluster into two halves"
+    trigger: "manual"
+    action:
+      type: "network_partition"
+      groups:
+        - [0, 1, 2]
+        - [3, 4]
+    duration_s: 30
+
+  node_crash:
+    description: "Kill a random worker node"
+    trigger: "random"
+    probability: 0.01  # per second
+    action:
+      type: "kill_node"
+      target: "random_worker"
+    recovery_s: 10  # restart after
+
+  network_delay:
+    description: "Add latency to specific link"
+    trigger: "manual"
+    action:
+      type: "add_latency"
+      from: 0
+      to: 1
+      latency_ms: 100
+      jitter_ms: 20
+    duration_s: 60
+
+  disk_failure:
+    description: "Simulate disk I/O errors"
+    trigger: "manual"
+    action:
+      type: "disk_error"
+      target: 2
+      error_rate: 0.1  # 10% of reads/writes fail
+    duration_s: 30
+```
+
+### Swarm.3 Use Cases
+
+#### Distributed Consensus Testing
+
+```bash
+# Test Raft consensus under network partition
+./swarm-ctl launch --config swarm-5-node.yaml
+./swarm-ctl deploy --rvf consensus-test.rvf
+
+# Wait for cluster formation
+./swarm-ctl wait --condition "consensus_formed"
+
+# Inject network partition
+./swarm-ctl inject --scenario network_partition
+
+# Verify:
+# - Majority partition elects new leader
+# - Minority partition becomes read-only
+# - After healing, cluster converges
+
+./swarm-ctl verify --invariant "no_split_brain"
+./swarm-ctl inject --scenario heal_network
+
+./swarm-ctl verify --invariant "single_leader"
+./swarm-ctl verify --invariant "log_consistency"
+```
+
+#### RVF Package Deployment Across Cluster
+
+```bash
+# Deploy an updated RVF package to all nodes
+./swarm-ctl launch --config swarm-10-node.yaml
+
+# Deploy initial package
+./swarm-ctl deploy --rvf agent-v1.rvf --all
+
+# Rolling update to v2
+./swarm-ctl deploy --rvf agent-v2.rvf --strategy rolling --batch-size 2
+
+# Verify no service disruption
+./swarm-ctl verify --invariant "service_available" --throughout-deploy
+
+# Rollback if needed
+./swarm-ctl rollback --to agent-v1.rvf --all
+```
+
+#### Performance Benchmarking Under Load
+
+```bash
+# Launch benchmark cluster
+./swarm-ctl launch --config swarm-benchmark.yaml
+
+# Deploy benchmark workload
+./swarm-ctl deploy --rvf vector-benchmark.rvf
+
+# Generate load
+./swarm-ctl benchmark \
+  --workload "vector_insert" \
+  --rate 10000  \  # ops/sec
+  --duration 60 \
+  --collect-metrics
+
+# Results:
+# - Throughput: ops/sec achieved
+# - Latency: p50, p95, p99 in microseconds
+# - CPU utilization per node
+# - Memory usage per node
+# - Network bandwidth utilization
+```
+
+### Swarm.4 Console Multiplexing
+
+```rust
+// tools/swarm-ctl/src/console.rs
+
+pub struct ConsoleMux {
+    nodes: Vec<NodeConsole>,
+    output_mode: OutputMode,
+}
+
+pub enum OutputMode {
+    /// All output interleaved with node prefixes
+    Interleaved,
+    /// Each node to separate file
+    SeparateFiles,
+    /// TUI with panes per node
+    Tui,
+}
+
+impl ConsoleMux {
+    pub fn run(&mut self) {
+        match self.output_mode {
+            OutputMode::Interleaved => {
+                // Poll all consoles, prefix output with node ID
+                loop {
+                    for node in &mut self.nodes {
+                        if let Some(line) = node.read_line() {
+                            println!("[node-{}] {}", node.id, line);
+                        }
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+            OutputMode::Tui => {
+                // Use crossterm/tui-rs for multi-pane display
+                self.run_tui();
+            }
+            OutputMode::SeparateFiles => {
+                // Write each node's output to node-N.log
+                self.run_file_mode();
+            }
+        }
+    }
+}
+```
+
+### Swarm.5 Build Path (Weeks 75-82)
+
+| Week | Milestone | Deliverables | Tests |
+|------|-----------|--------------|-------|
+| **75-76** | QEMU launcher | Node spawning, console sockets, monitor control | Launch/teardown 5 nodes |
+| **77-78** | Virtual networking | TAP interfaces, bridge setup, vde_switch | Ping between nodes |
+| **79-80** | Orchestrator CLI | swarm-ctl commands, config parsing, status | Full CLI functional |
+| **81-82** | Fault injection | Network partition, node kill, latency injection | Consensus survives faults |
+
+---
+
+## Phase Timeline Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    RUVIX DEVELOPMENT TIMELINE                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  PHASE         │ WEEKS   │ DURATION │ KEY DELIVERABLES                  │
+│  ══════════════│═════════│══════════│═══════════════════════════════    │
+│                │         │          │                                    │
+│  Phase A       │  1-18   │ 18 weeks │ Linux-hosted nucleus, 12 syscalls │
+│  (Complete)    │         │          │ 760 tests passing                  │
+│                │         │          │                                    │
+│  Phase B       │ 19-42   │ 24 weeks │ Bare metal AArch64, QEMU virt      │
+│                │         │          │ MMU, GIC, timer, WASM runtime      │
+│                │         │          │                                    │
+│  Phase C       │ 43-54   │ 12 weeks │ SMP (256 cores), DMA, DTB parser   │
+│                │         │          │ Spinlocks, IPIs, per-CPU data      │
+│                │         │          │                                    │
+│  Phase D       │ 55-62   │  8 weeks │ Raspberry Pi 4/5 support           │
+│                │         │          │ BCM2711/2712 drivers               │
+│                │         │          │                                    │
+│  Phase E       │ 63-74   │ 12 weeks │ Networking (UDP/ICMP), Filesystem  │
+│                │         │          │ virtio-net, FAT32, RamFS           │
+│                │         │          │                                    │
+│  QEMU Swarm    │ 75-82   │  8 weeks │ Multi-QEMU orchestration           │
+│                │         │          │ Fault injection, benchmarking      │
+│                │         │          │                                    │
+│  ══════════════│═════════│══════════│═══════════════════════════════    │
+│  TOTAL         │  1-82   │ 82 weeks │ ~19 months                         │
+│                │         │          │                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
