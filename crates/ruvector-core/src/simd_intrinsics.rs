@@ -948,7 +948,9 @@ unsafe fn cosine_similarity_avx2_impl(a: &[f32], b: &[f32]) -> f32 {
 }
 
 // Scalar fallback implementations
+// These are kept for architectures without SIMD support
 
+#[allow(dead_code)]
 fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
         .zip(b.iter())
@@ -960,10 +962,12 @@ fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
         .sqrt()
 }
 
+#[allow(dead_code)]
 fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
+#[allow(dead_code)]
 fn cosine_similarity_scalar(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -971,6 +975,7 @@ fn cosine_similarity_scalar(a: &[f32], b: &[f32]) -> f32 {
     dot / (norm_a * norm_b)
 }
 
+#[allow(dead_code)]
 fn manhattan_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum()
 }
@@ -1212,6 +1217,7 @@ unsafe fn euclidean_distance_squared_i8_avx2_impl(a: &[i8], b: &[i8]) -> i32 {
 }
 
 /// Scalar fallback for INT8 dot product
+#[allow(dead_code)]
 fn dot_product_i8_scalar(a: &[i8], b: &[i8]) -> i32 {
     a.iter()
         .zip(b.iter())
@@ -1220,6 +1226,7 @@ fn dot_product_i8_scalar(a: &[i8], b: &[i8]) -> i32 {
 }
 
 /// Scalar fallback for INT8 euclidean distance squared
+#[allow(dead_code)]
 fn euclidean_distance_squared_i8_scalar(a: &[i8], b: &[i8]) -> i32 {
     a.iter()
         .zip(b.iter())
