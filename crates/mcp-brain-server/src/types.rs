@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 // ── Platform-specific stubs (temporal-neural-solver is x86_64-only) ──
@@ -1207,4 +1208,154 @@ pub struct AppState {
     pub neural_symbolic: std::sync::Arc<parking_lot::RwLock<crate::symbolic::NeuralSymbolicBridge>>,
     /// Gemini Flash optimizer for periodic cognitive enhancement
     pub optimizer: std::sync::Arc<parking_lot::RwLock<crate::optimizer::GeminiOptimizer>>,
+    /// Cloud Pipeline metrics and counters (ADR cloud-native ingestion)
+    pub pipeline_metrics: std::sync::Arc<PipelineState>,
+    /// RSS/Atom feed configurations for periodic ingestion
+    pub feeds: std::sync::Arc<dashmap::DashMap<String, FeedConfig>>,
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Cloud Pipeline types (cloud-native ingestion + optimization)
+// ──────────────────────────────────────────────────────────────────────
+
+/// Pipeline state: atomic counters for real-time metrics tracking.
+pub struct PipelineState {
+    pub messages_received: std::sync::atomic::AtomicU64,
+    pub messages_processed: std::sync::atomic::AtomicU64,
+    pub messages_failed: std::sync::atomic::AtomicU64,
+    pub optimization_cycles: std::sync::atomic::AtomicU64,
+    pub last_training: parking_lot::RwLock<Option<DateTime<Utc>>>,
+    pub last_drift_check: parking_lot::RwLock<Option<DateTime<Utc>>>,
+    pub last_injection: parking_lot::RwLock<Option<DateTime<Utc>>>,
+}
+
+impl PipelineState {
+    pub fn new() -> Self {
+        Self {
+            messages_received: std::sync::atomic::AtomicU64::new(0),
+            messages_processed: std::sync::atomic::AtomicU64::new(0),
+            messages_failed: std::sync::atomic::AtomicU64::new(0),
+            optimization_cycles: std::sync::atomic::AtomicU64::new(0),
+            last_training: parking_lot::RwLock::new(None),
+            last_drift_check: parking_lot::RwLock::new(None),
+            last_injection: parking_lot::RwLock::new(None),
+        }
+    }
+}
+
+impl Default for PipelineState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request to inject a single item into the pipeline.
+#[derive(Debug, Deserialize)]
+pub struct InjectRequest {
+    pub source: String,
+    pub title: String,
+    pub content: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default = "default_inject_category")]
+    pub category: BrainCategory,
+    pub metadata: Option<serde_json::Value>,
+}
+
+fn default_inject_category() -> BrainCategory {
+    BrainCategory::Pattern
+}
+
+/// Request to inject a batch of items into the pipeline.
+#[derive(Debug, Deserialize)]
+pub struct BatchInjectRequest {
+    pub source: String,
+    pub items: Vec<InjectRequest>,
+}
+
+/// Response for a single pipeline injection.
+#[derive(Debug, Serialize)]
+pub struct InjectResponse {
+    pub id: Uuid,
+    pub quality_score: f64,
+    pub witness_hash: String,
+    pub graph_edges_added: usize,
+}
+
+/// Response for a batch pipeline injection.
+#[derive(Debug, Serialize)]
+pub struct BatchInjectResponse {
+    pub accepted: usize,
+    pub rejected: usize,
+    pub memory_ids: Vec<Uuid>,
+    pub errors: Vec<String>,
+}
+
+/// Cloud Pub/Sub push message envelope.
+#[derive(Debug, Deserialize)]
+pub struct PubSubPushMessage {
+    pub message: PubSubMessageData,
+    pub subscription: String,
+}
+
+/// Cloud Pub/Sub message data (inner payload).
+#[derive(Debug, Deserialize)]
+pub struct PubSubMessageData {
+    /// Base64-encoded message payload
+    pub data: String,
+    #[serde(default)]
+    pub attributes: HashMap<String, String>,
+    #[serde(rename = "messageId")]
+    pub message_id: String,
+    #[serde(rename = "publishTime")]
+    pub publish_time: String,
+}
+
+/// Request to trigger optimization actions.
+#[derive(Debug, Deserialize)]
+pub struct OptimizeRequest {
+    pub actions: Option<Vec<String>>,
+}
+
+/// Response for an optimization run.
+#[derive(Debug, Serialize)]
+pub struct OptimizeResponse {
+    pub results: Vec<OptimizeActionResult>,
+    pub total_duration_ms: u64,
+}
+
+/// Result of a single optimization action.
+#[derive(Debug, Serialize)]
+pub struct OptimizeActionResult {
+    pub action: String,
+    pub success: bool,
+    pub message: String,
+    pub duration_ms: u64,
+}
+
+/// Pipeline health and throughput metrics.
+#[derive(Debug, Serialize)]
+pub struct PipelineMetricsResponse {
+    pub messages_received: u64,
+    pub messages_processed: u64,
+    pub messages_failed: u64,
+    pub memory_count: usize,
+    pub graph_nodes: usize,
+    pub graph_edges: usize,
+    pub last_training: Option<String>,
+    pub last_drift_check: Option<String>,
+    pub optimization_cycles: u64,
+    pub uptime_seconds: u64,
+    pub injections_per_minute: f64,
+}
+
+/// Configuration for an RSS/Atom feed source.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FeedConfig {
+    pub url: String,
+    pub name: String,
+    pub category: BrainCategory,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub poll_interval_secs: u64,
 }

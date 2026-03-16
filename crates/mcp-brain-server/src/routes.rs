@@ -3,11 +3,14 @@
 use crate::auth::AuthenticatedContributor;
 use crate::graph::cosine_similarity;
 use crate::types::{
-    AddEvidenceRequest, AppState, BetaParams, BrainMemory, ChallengeResponse,
-    ConsensusLoraWeights, CreatePageRequest, DriftQuery, DriftReport, HealthResponse,
-    ListPagesResponse, ListQuery, ListResponse, LoraLatestResponse, LoraSubmission,
-    LoraSubmitResponse, PageDelta, PageDetailResponse, PageResponse, PageStatus, PageSummary,
-    PartitionQuery, PartitionResult, PartitionResultCompact, PublishNodeRequest, ScoredBrainMemory, SearchQuery,
+    AddEvidenceRequest, AppState, BatchInjectRequest, BatchInjectResponse, BetaParams,
+    BrainMemory, ChallengeResponse, ConsensusLoraWeights, CreatePageRequest, DriftQuery,
+    DriftReport, FeedConfig, HealthResponse, InjectRequest, InjectResponse,
+    ListPagesResponse, ListQuery, ListResponse, ListSort, LoraLatestResponse, LoraSubmission,
+    LoraSubmitResponse, OptimizeActionResult, OptimizeRequest, OptimizeResponse,
+    PageDelta, PageDetailResponse, PageResponse, PageStatus, PageSummary,
+    PartitionQuery, PartitionResult, PartitionResultCompact, PipelineMetricsResponse,
+    PubSubPushMessage, PublishNodeRequest, ScoredBrainMemory, SearchQuery,
     ShareRequest, ShareResponse,
     StatusResponse, SubmitDeltaRequest, TemporalResponse, TrainingCycleResult,
     TrainingPreferencesResponse,
@@ -171,6 +174,11 @@ pub async fn create_router() -> (Router, AppState) {
     let sessions: Arc<dashmap::DashMap<String, tokio::sync::mpsc::Sender<String>>> =
         Arc::new(dashmap::DashMap::new());
 
+    // Cloud Pipeline state (atomic counters + feed configs)
+    let pipeline_metrics = Arc::new(crate::types::PipelineState::new());
+    let feeds: Arc<dashmap::DashMap<String, crate::types::FeedConfig>> =
+        Arc::new(dashmap::DashMap::new());
+
     // ── Midstream Platform (ADR-077) ──
     let nano_scheduler = Arc::new(crate::midstream::create_scheduler());
     let attractor_results = Arc::new(parking_lot::RwLock::new(std::collections::HashMap::new()));
@@ -247,6 +255,8 @@ pub async fn create_router() -> (Router, AppState) {
         internal_voice,
         neural_symbolic,
         optimizer,
+        pipeline_metrics,
+        feeds,
     };
 
     let router = Router::new()
@@ -291,6 +301,14 @@ pub async fn create_router() -> (Router, AppState) {
         .route("/v1/nodes/:id", get(get_node))
         .route("/v1/nodes/:id/wasm", get(get_node_wasm))
         .route("/v1/nodes/:id/revoke", post(revoke_node))
+        // Cloud Pipeline (real-time injection + optimization)
+        .route("/v1/pipeline/inject", post(pipeline_inject))
+        .route("/v1/pipeline/inject/batch", post(pipeline_inject_batch))
+        .route("/v1/pipeline/pubsub", post(pipeline_pubsub_push))
+        .route("/v1/pipeline/metrics", get(pipeline_metrics_handler))
+        .route("/v1/pipeline/optimize", post(pipeline_optimize))
+        .route("/v1/pipeline/feeds", post(pipeline_add_feed).get(pipeline_list_feeds))
+        .route("/v1/pipeline/scheduler/status", get(pipeline_scheduler_status))
         // MCP SSE transport
         .route("/sse", get(sse_handler))
         .route("/messages", post(messages_handler))
@@ -2269,6 +2287,519 @@ async fn optimize_endpoint(
             })
         }
     }
+// Cloud Pipeline endpoints (real-time injection + optimization)
+// ──────────────────────────────────────────────────────────────────────
+
+/// Core injection logic: PII strip, embed, witness chain, store, graph update.
+/// Returns (InjectResponse, BrainMemory) on success. Shared by single inject,
+/// batch inject, and Pub/Sub push handlers.
+async fn process_inject(
+    state: &AppState,
+    req: InjectRequest,
+) -> Result<InjectResponse, String> {
+    use std::sync::atomic::Ordering;
+
+    state.pipeline_metrics.messages_received.fetch_add(1, Ordering::Relaxed);
+
+    // PII stripping
+    let (title, content, tags, redaction_log_json) = if state.rvf_flags.pii_strip {
+        let mut field_pairs: Vec<(&str, &str)> = vec![
+            ("title", &req.title),
+            ("content", &req.content),
+        ];
+        for tag in &req.tags {
+            field_pairs.push(("tag", tag));
+        }
+        let (stripped, log) = state.verifier.write().strip_pii_fields(&field_pairs);
+        let stripped_title = stripped[0].1.clone();
+        let stripped_content = stripped[1].1.clone();
+        let stripped_tags: Vec<String> = stripped[2..].iter().map(|(_, v)| v.clone()).collect();
+        let log_json = serde_json::to_string(&log).ok();
+        (stripped_title, stripped_content, stripped_tags, log_json)
+    } else {
+        (req.title, req.content, req.tags, None)
+    };
+
+    // Auto-generate embedding via ruvllm
+    let text = crate::embeddings::EmbeddingEngine::prepare_text(&title, &content, &tags);
+    let embedding = state.embedding_engine.read().embed_for_storage(&text);
+
+    // Verify input
+    state.verifier.read()
+        .verify_share(&title, &content, &tags, &embedding)
+        .map_err(|e| e.to_string())?;
+
+    // Differential privacy noise on embedding
+    let (embedding, dp_proof_json) = if state.rvf_flags.dp_enabled {
+        let mut params: Vec<f64> = embedding.iter().map(|&v| v as f64).collect();
+        let proof = state.dp_engine.lock().add_noise(&mut params);
+        let noised: Vec<f32> = params.iter().map(|&v| v as f32).collect();
+        let proof_json = serde_json::to_string(&proof).ok();
+        (noised, proof_json)
+    } else {
+        (embedding, None)
+    };
+
+    // Witness chain
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+
+    let (witness_chain_bytes, witness_hash) = if state.rvf_flags.witness {
+        let pii_data = format!("pii_strip:{}:{}", title, content);
+        let mut emb_bytes = Vec::with_capacity(embedding.len() * 4);
+        for v in &embedding {
+            emb_bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        let content_data = format!("content:{}:{}:{}", title, content, tags.join(","));
+
+        let entries = vec![
+            rvf_crypto::WitnessEntry {
+                prev_hash: [0u8; 32],
+                action_hash: rvf_crypto::shake256_256(pii_data.as_bytes()),
+                timestamp_ns: now_ns,
+                witness_type: 0x01,
+            },
+            rvf_crypto::WitnessEntry {
+                prev_hash: [0u8; 32],
+                action_hash: rvf_crypto::shake256_256(&emb_bytes),
+                timestamp_ns: now_ns,
+                witness_type: 0x02,
+            },
+            rvf_crypto::WitnessEntry {
+                prev_hash: [0u8; 32],
+                action_hash: rvf_crypto::shake256_256(content_data.as_bytes()),
+                timestamp_ns: now_ns,
+                witness_type: 0x01,
+            },
+        ];
+        let chain = rvf_crypto::create_witness_chain(&entries);
+        let hash = hex::encode(rvf_crypto::shake256_256(&chain));
+        (Some(chain), hash)
+    } else {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"ruvector-witness:");
+        data.extend_from_slice(title.as_bytes());
+        data.extend_from_slice(b":");
+        data.extend_from_slice(content.as_bytes());
+        let hash = hex::encode(rvf_crypto::shake256_256(&data));
+        (None, hash)
+    };
+
+    // Ensure pipeline contributor exists
+    let contributor_id = format!("pipeline:{}", req.source);
+    state
+        .store
+        .get_or_create_contributor(&contributor_id, true)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+
+    let memory = BrainMemory {
+        id,
+        category: req.category,
+        title,
+        content,
+        tags,
+        code_snippet: None,
+        embedding: embedding.clone(),
+        contributor_id: contributor_id.clone(),
+        quality_score: BetaParams::new(),
+        partition_id: None,
+        witness_hash: witness_hash.clone(),
+        rvf_gcs_path: None,
+        redaction_log: redaction_log_json,
+        dp_proof: dp_proof_json,
+        witness_chain: witness_chain_bytes,
+        created_at: now,
+        updated_at: now,
+    };
+
+    // Add to embedding corpus
+    state.embedding_engine.write().add_to_corpus(&id.to_string(), embedding.clone(), None);
+
+    // Record in cognitive engine and drift monitor
+    {
+        let mut cog = state.cognitive.write();
+        cog.store_pattern(&id.to_string(), &memory.embedding);
+        let mut drift = state.drift.write();
+        drift.record(&memory.category.to_string(), &memory.embedding);
+    }
+
+    // Temporal delta tracking
+    if state.rvf_flags.temporal_enabled {
+        let delta = ruvector_delta_core::VectorDelta::from_dense(embedding.clone());
+        state.delta_stream.write().push_with_timestamp(delta, now_ns);
+    }
+
+    // Add to graph and count new edges
+    let graph_edges_before;
+    let graph_edges_after;
+    {
+        let mut graph = state.graph.write();
+        graph_edges_before = graph.edge_count();
+        graph.add_memory(&memory);
+        graph_edges_after = graph.edge_count();
+    }
+    let graph_edges_added = graph_edges_after.saturating_sub(graph_edges_before);
+
+    // Store in Firestore
+    let quality_score = memory.quality_score.mean();
+    state
+        .store
+        .store_memory(memory)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Update contributor activity
+    state.store.record_contribution(&contributor_id).await;
+
+    // SONA: Record injection as learning trajectory
+    if state.rvf_flags.sona_enabled {
+        let sona = state.sona.read();
+        let emb_for_step = embedding.clone();
+        let mut builder = sona.begin_trajectory(embedding.clone());
+        builder.add_step(emb_for_step, vec![], 0.5);
+        sona.end_trajectory(builder, 0.5);
+    }
+
+    state.pipeline_metrics.messages_processed.fetch_add(1, Ordering::Relaxed);
+    *state.pipeline_metrics.last_injection.write() = Some(now);
+
+    // Broadcast via SSE to active sessions
+    if !state.sessions.is_empty() {
+        let event_json = serde_json::json!({
+            "type": "pipeline_inject",
+            "id": id,
+            "quality_score": quality_score,
+        });
+        let event_str = serde_json::to_string(&event_json).unwrap_or_default();
+        for entry in state.sessions.iter() {
+            let _ = entry.value().try_send(event_str.clone());
+        }
+    }
+
+    Ok(InjectResponse {
+        id,
+        quality_score,
+        witness_hash,
+        graph_edges_added,
+    })
+}
+
+/// POST /v1/pipeline/inject — inject a single item into the brain pipeline
+async fn pipeline_inject(
+    State(state): State<AppState>,
+    Json(req): Json<InjectRequest>,
+) -> Result<(StatusCode, Json<InjectResponse>), (StatusCode, String)> {
+    check_read_only(&state)?;
+
+    match process_inject(&state, req).await {
+        Ok(resp) => Ok((StatusCode::CREATED, Json(resp))),
+        Err(e) => {
+            state.pipeline_metrics.messages_failed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Err((StatusCode::BAD_REQUEST, e))
+        }
+    }
+}
+
+/// POST /v1/pipeline/inject/batch — inject up to 100 items
+async fn pipeline_inject_batch(
+    State(state): State<AppState>,
+    Json(req): Json<BatchInjectRequest>,
+) -> Result<Json<BatchInjectResponse>, (StatusCode, String)> {
+    check_read_only(&state)?;
+
+    if req.items.len() > 100 {
+        return Err((StatusCode::BAD_REQUEST, "Batch size exceeds maximum of 100 items".into()));
+    }
+
+    let mut accepted = 0usize;
+    let mut rejected = 0usize;
+    let mut memory_ids = Vec::new();
+    let mut errors = Vec::new();
+
+    for item in req.items {
+        // Override source from batch envelope if item source is empty
+        let item = InjectRequest {
+            source: if item.source.is_empty() { req.source.clone() } else { item.source },
+            ..item
+        };
+
+        match process_inject(&state, item).await {
+            Ok(resp) => {
+                accepted += 1;
+                memory_ids.push(resp.id);
+            }
+            Err(e) => {
+                rejected += 1;
+                errors.push(e);
+                state.pipeline_metrics.messages_failed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
+
+    Ok(Json(BatchInjectResponse {
+        accepted,
+        rejected,
+        memory_ids,
+        errors,
+    }))
+}
+
+/// POST /v1/pipeline/pubsub — receive Cloud Pub/Sub push messages.
+/// No Bearer auth required (Cloud Run validates Pub/Sub OIDC tokens automatically).
+async fn pipeline_pubsub_push(
+    State(state): State<AppState>,
+    Json(push): Json<PubSubPushMessage>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    check_read_only(&state)?;
+
+    // Decode base64 message data
+    use base64::Engine as _;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(&push.message.data)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid base64 in Pub/Sub message: {e}")))?;
+
+    // Deserialize as InjectRequest
+    let inject_req: InjectRequest = serde_json::from_slice(&decoded)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid JSON in Pub/Sub message: {e}")))?;
+
+    match process_inject(&state, inject_req).await {
+        Ok(_) => {
+            tracing::info!(
+                "Pub/Sub message processed: messageId={}, subscription={}",
+                push.message.message_id, push.subscription,
+            );
+            Ok(StatusCode::OK)
+        }
+        Err(e) => {
+            state.pipeline_metrics.messages_failed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tracing::warn!(
+                "Pub/Sub message failed: messageId={}, error={}",
+                push.message.message_id, e,
+            );
+            // Return 200 to avoid Pub/Sub retries for permanent failures.
+            // Log the error for debugging.
+            Ok(StatusCode::OK)
+        }
+    }
+}
+
+/// GET /v1/pipeline/metrics — pipeline health and throughput metrics
+async fn pipeline_metrics_handler(
+    State(state): State<AppState>,
+) -> Json<PipelineMetricsResponse> {
+    use std::sync::atomic::Ordering;
+
+    let graph = state.graph.read();
+    let received = state.pipeline_metrics.messages_received.load(Ordering::Relaxed);
+    let processed = state.pipeline_metrics.messages_processed.load(Ordering::Relaxed);
+    let failed = state.pipeline_metrics.messages_failed.load(Ordering::Relaxed);
+    let opt_cycles = state.pipeline_metrics.optimization_cycles.load(Ordering::Relaxed);
+    let uptime = state.start_time.elapsed().as_secs();
+
+    let last_training = state.pipeline_metrics.last_training.read()
+        .map(|dt| dt.to_rfc3339());
+    let last_drift_check = state.pipeline_metrics.last_drift_check.read()
+        .map(|dt| dt.to_rfc3339());
+
+    // Calculate injections per minute from uptime
+    let injections_per_minute = if uptime > 0 {
+        processed as f64 / (uptime as f64 / 60.0)
+    } else {
+        0.0
+    };
+
+    Json(PipelineMetricsResponse {
+        messages_received: received,
+        messages_processed: processed,
+        messages_failed: failed,
+        memory_count: state.store.memory_count(),
+        graph_nodes: graph.node_count(),
+        graph_edges: graph.edge_count(),
+        last_training,
+        last_drift_check,
+        optimization_cycles: opt_cycles,
+        uptime_seconds: uptime,
+        injections_per_minute,
+    })
+}
+
+/// POST /v1/pipeline/optimize — trigger optimization actions
+async fn pipeline_optimize(
+    State(state): State<AppState>,
+    _contributor: AuthenticatedContributor,
+    Json(req): Json<OptimizeRequest>,
+) -> Result<Json<OptimizeResponse>, (StatusCode, String)> {
+    check_read_only(&state)?;
+
+    let all_actions = vec![
+        "train", "drift_check", "transfer_all", "rebuild_graph", "cleanup", "attractor_analysis",
+    ];
+    let actions: Vec<&str> = match &req.actions {
+        Some(a) => a.iter().map(|s| s.as_str()).collect(),
+        None => all_actions,
+    };
+
+    let total_start = std::time::Instant::now();
+    let mut results = Vec::new();
+
+    for action in &actions {
+        let action_start = std::time::Instant::now();
+        let (success, message) = match *action {
+            "train" => {
+                let result = run_training_cycle(&state);
+                *state.pipeline_metrics.last_training.write() = Some(chrono::Utc::now());
+                (true, format!(
+                    "Training complete: sona_patterns={}, pareto={}->{}",
+                    result.sona_patterns, result.pareto_before, result.pareto_after,
+                ))
+            }
+            "drift_check" => {
+                let drift = state.drift.read();
+                let report = drift.compute_drift(None);
+                *state.pipeline_metrics.last_drift_check.write() = Some(chrono::Utc::now());
+                (true, format!(
+                    "Drift check: drifting={}, cv={:.4}, trend={}",
+                    report.is_drifting, report.coefficient_of_variation, report.trend,
+                ))
+            }
+            "transfer_all" => {
+                use ruvector_domain_expansion::DomainId;
+                let categories: Vec<String> = {
+                    let all_mems = state.store.all_memories();
+                    let mut cats: std::collections::HashSet<String> = std::collections::HashSet::new();
+                    for m in &all_mems {
+                        cats.insert(m.category.to_string());
+                    }
+                    cats.into_iter().collect()
+                };
+                let mut transfers = 0usize;
+                let mut engine = state.domain_engine.write();
+                for i in 0..categories.len() {
+                    for j in (i + 1)..categories.len() {
+                        engine.initiate_transfer(
+                            &DomainId(categories[i].clone()),
+                            &DomainId(categories[j].clone()),
+                        );
+                        transfers += 1;
+                    }
+                }
+                (true, format!("Domain transfers initiated: {transfers} pairs across {} categories", categories.len()))
+            }
+            "rebuild_graph" => {
+                let all_mems = state.store.all_memories();
+                let mut graph = state.graph.write();
+                *graph = crate::graph::KnowledgeGraph::new();
+                for mem in &all_mems {
+                    graph.add_memory(mem);
+                }
+                (true, format!("Graph rebuilt: {} nodes, {} edges", graph.node_count(), graph.edge_count()))
+            }
+            "cleanup" => {
+                // Trigger SONA garbage collection and nonce cleanup
+                if state.rvf_flags.sona_enabled {
+                    let _ = state.sona.read().tick();
+                }
+                (true, "Cleanup complete".into())
+            }
+            "attractor_analysis" => {
+                if state.rvf_flags.midstream_attractor {
+                    let all_mems = state.store.all_memories();
+                    let mut categories: std::collections::HashMap<String, Vec<Vec<f32>>> =
+                        std::collections::HashMap::new();
+                    for m in &all_mems {
+                        categories.entry(m.category.to_string())
+                            .or_default()
+                            .push(m.embedding.clone());
+                    }
+                    let mut analyzed = 0usize;
+                    for (cat, embeddings) in &categories {
+                        if let Some(result) = crate::midstream::analyze_category_attractor(embeddings) {
+                            state.attractor_results.write().insert(cat.clone(), result);
+                            analyzed += 1;
+                        }
+                    }
+                    (true, format!("Attractor analysis: {analyzed}/{} categories analyzed", categories.len()))
+                } else {
+                    (false, "Midstream attractor feature not enabled".into())
+                }
+            }
+            other => {
+                (false, format!("Unknown action: {other}"))
+            }
+        };
+
+        results.push(OptimizeActionResult {
+            action: action.to_string(),
+            success,
+            message,
+            duration_ms: action_start.elapsed().as_millis() as u64,
+        });
+    }
+
+    state.pipeline_metrics.optimization_cycles.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    Ok(Json(OptimizeResponse {
+        results,
+        total_duration_ms: total_start.elapsed().as_millis() as u64,
+    }))
+}
+
+/// POST /v1/pipeline/feeds — add a new RSS/Atom feed configuration
+async fn pipeline_add_feed(
+    State(state): State<AppState>,
+    _contributor: AuthenticatedContributor,
+    Json(feed): Json<FeedConfig>,
+) -> Result<(StatusCode, Json<FeedConfig>), (StatusCode, String)> {
+    if feed.url.is_empty() || feed.name.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Feed url and name are required".into()));
+    }
+    if feed.poll_interval_secs < 60 {
+        return Err((StatusCode::BAD_REQUEST, "poll_interval_secs must be >= 60".into()));
+    }
+
+    let key = feed.name.clone();
+    let resp = feed.clone();
+    state.feeds.insert(key, feed);
+    Ok((StatusCode::CREATED, Json(resp)))
+}
+
+/// GET /v1/pipeline/feeds — list all configured feed sources
+async fn pipeline_list_feeds(
+    State(state): State<AppState>,
+) -> Json<Vec<FeedConfig>> {
+    let feeds: Vec<FeedConfig> = state.feeds.iter()
+        .map(|entry| entry.value().clone())
+        .collect();
+    Json(feeds)
+}
+
+/// GET /v1/pipeline/scheduler/status — nanosecond scheduler status
+async fn pipeline_scheduler_status(
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    use std::sync::atomic::Ordering;
+
+    let received = state.pipeline_metrics.messages_received.load(Ordering::Relaxed);
+    let processed = state.pipeline_metrics.messages_processed.load(Ordering::Relaxed);
+    let failed = state.pipeline_metrics.messages_failed.load(Ordering::Relaxed);
+    let queue_depth = received.saturating_sub(processed).saturating_sub(failed);
+    let uptime = state.start_time.elapsed().as_secs();
+    let feeds_count = state.feeds.len();
+
+    Json(serde_json::json!({
+        "scheduler": "active",
+        "queue_depth": queue_depth,
+        "feeds_configured": feeds_count,
+        "uptime_seconds": uptime,
+        "midstream_scheduler_enabled": state.rvf_flags.midstream_scheduler,
+        "nano_scheduler_ticks": state.nano_scheduler.metrics().total_ticks,
+    }))
 }
 
 // ──────────────────────────────────────────────────────────────────────
