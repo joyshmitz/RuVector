@@ -143,12 +143,6 @@ pub struct PubSubPushMessage {
     pub publish_time: Option<DateTime<Utc>>,
 }
 
-/// Cached access token with expiry (same pattern as GcsClient).
-struct TokenCache {
-    token: String,
-    expires_at: std::time::Instant,
-}
-
 /// Client for Google Cloud Pub/Sub pull-based message retrieval.
 #[derive(Debug)]
 pub struct PubSubClient {
