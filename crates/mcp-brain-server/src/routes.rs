@@ -2878,9 +2878,9 @@ async fn pipeline_crawl_discover(
     })?;
     let cdx_records_found = records.len();
 
-    // Fetch pages
-    let items = cc.discover_domain(
-        &req.domain_pattern,
+    // Fetch pages using pre-queried records (avoids double CDX query)
+    let items = cc.discover_from_records(
+        &records,
         req.category.clone(),
         req.tags.clone(),
         limit,

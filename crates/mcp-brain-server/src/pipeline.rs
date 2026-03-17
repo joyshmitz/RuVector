@@ -856,6 +856,18 @@ impl CommonCrawlAdapter {
             ..Default::default()
         };
         let records = self.query_cdx(&query).await?;
+        self.discover_from_records(&records, category, tags, limit).await
+    }
+
+    /// Fetch pages from pre-queried CDX records.
+    /// Use this to avoid double-querying CDX when you already have records.
+    pub async fn discover_from_records(
+        &self,
+        records: &[CdxRecord],
+        category: Option<String>,
+        tags: Vec<String>,
+        limit: usize,
+    ) -> Result<Vec<InjectionItem>, String> {
         let mut items = Vec::new();
 
         for record in records.iter().take(limit) {
