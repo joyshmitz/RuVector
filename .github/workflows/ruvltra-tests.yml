@@ -61,30 +61,32 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.os }}-unit-tests
+          cache-on-failure: true
 
       - name: Run RuvLTRA Unit Tests
+        shell: bash
         run: |
-          cargo test --package ruvllm ruvltra_tests \
-            ${{ matrix.features && format('--features {0}', matrix.features) || '' }} \
-            -- --nocapture
+          FEATURES="${{ matrix.features }}"
+          if [ -n "$FEATURES" ]; then
+            cargo test --package ruvllm ruvltra_tests --features "$FEATURES" -- --nocapture
+          else
+            cargo test --package ruvllm ruvltra_tests -- --nocapture
+          fi
         env:
           RUST_LOG: debug
 
       - name: Run Quantization Tests
-        run: |
-          cargo test --package ruvllm quantization_accuracy \
-            -- --nocapture
+        shell: bash
+        run: cargo test --package ruvllm quantization_accuracy -- --nocapture
 
       - name: Run SONA Integration Tests
-        run: |
-          cargo test --package ruvllm sona_integration \
-            -- --nocapture
+        shell: bash
+        run: cargo test --package ruvllm sona_integration -- --nocapture
 
       - name: Run ANE Dispatch Tests
         if: matrix.os == 'macos-latest'
-        run: |
-          cargo test --package ruvllm ane_dispatch --features coreml \
-            -- --nocapture
+        shell: bash
+        run: cargo test --package ruvllm ane_dispatch --features coreml -- --nocapture
 
   # ============================================================================
   # End-to-End Tests - Full Inference Pipeline

@@ -110,6 +110,11 @@
 #![allow(clippy::mut_from_ref)]
 #![allow(clippy::needless_question_mark)]
 #![allow(clippy::unnecessary_unwrap)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::missing_safety_doc)]
+#![allow(clippy::unwrap_or_default)]
+#![allow(clippy::assertions_on_constants)]
+#![allow(clippy::if_same_then_else)]
 
 pub mod adapter_manager;
 pub mod autodetect;

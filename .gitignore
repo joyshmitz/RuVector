@@ -24,9 +24,14 @@ target
 #.idea/
 
 # Node.js
-node_modules/
+**/node_modules/
 package-lock.json
 !npm/package-lock.json
+
+# UI build artifacts
+ui/**/build/
+ui/**/.svelte-kit/
+ui/**/adapter-node/
 
 # napi-rs build artifacts
 *.node
