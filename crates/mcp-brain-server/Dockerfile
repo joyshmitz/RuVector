@@ -4,10 +4,11 @@ FROM rustlang/rust:nightly-bookworm AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies (native-tls requires OpenSSL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy minimal workspace file (only includes required crates)
@@ -73,6 +74,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binary from builder

@@ -23,8 +23,9 @@ tower-http = { version = "0.6", features = ["cors", "trace", "limit", "set-heade
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# HTTP client (for Firestore/GCS REST APIs)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+# HTTP client (for Firestore/GCS REST APIs + Common Crawl)
+# Using native-tls for compatibility with servers that don't send TLS close_notify
+reqwest = { version = "0.12", features = ["json", "native-tls"], default-features = false }
 
 # Crypto
 sha2 = "0.10"
