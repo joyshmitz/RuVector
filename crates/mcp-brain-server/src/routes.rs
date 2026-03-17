@@ -3021,28 +3021,30 @@ async fn pipeline_crawl_test(
         })
     };
 
-    // Test alternative HTTPS endpoint for comparison
+    // Test multiple HTTPS endpoints for comparison
     let start2 = std::time::Instant::now();
-    let (success2, status2, body_len2, error2, url2) = adapter.test_external_connectivity().await;
+    let external_results = adapter.test_external_connectivity().await;
     let latency_ms2 = start2.elapsed().as_millis();
 
-    let external_result = if success2 {
-        serde_json::json!({
-            "success": true,
-            "url": url2,
-            "status": status2,
-            "body_length": body_len2,
-            "latency_ms": latency_ms2,
-        })
-    } else {
-        serde_json::json!({
-            "success": false,
-            "url": url2,
-            "status": status2,
-            "error": error2,
-            "latency_ms": latency_ms2,
-        })
-    };
+    let external_tests: Vec<serde_json::Value> = external_results.iter().map(|(name, success, status, body_len, error, url)| {
+        if *success {
+            serde_json::json!({
+                "name": name,
+                "success": true,
+                "url": url,
+                "status": status,
+                "body_length": body_len,
+            })
+        } else {
+            serde_json::json!({
+                "name": name,
+                "success": false,
+                "url": url,
+                "status": status,
+                "error": error,
+            })
+        }
+    }).collect();
 
     let adapter_status = serde_json::json!({
         "adapter_queries": adapter.stats().0,
@@ -3050,8 +3052,9 @@ async fn pipeline_crawl_test(
     });
 
     Json(serde_json::json!({
-        "common_crawl_test": cc_result,
-        "external_https_test": external_result,
+        "common_crawl_cdx_test": cc_result,
+        "external_tests": external_tests,
+        "external_tests_latency_ms": latency_ms2,
         "adapter_status": adapter_status,
     }))
 }

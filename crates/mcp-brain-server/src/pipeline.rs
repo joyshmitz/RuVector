@@ -668,21 +668,30 @@ impl CommonCrawlAdapter {
         (false, 0, 0, Some("Max retries exceeded".into()), 3)
     }
 
-    /// Test connectivity to a different HTTPS endpoint for comparison.
-    /// Returns (success, status_code, body_length, error_message, url)
-    pub async fn test_external_connectivity(&self) -> (bool, u16, usize, Option<String>, String) {
-        // Use httpbin.org as a reference HTTPS endpoint
-        let url = "https://httpbin.org/get".to_string();
-        match self.http.get(&url).send().await {
-            Ok(resp) => {
-                let status = resp.status().as_u16();
-                match resp.text().await {
-                    Ok(body) => (status >= 200 && status < 300, status, body.len(), None, url),
-                    Err(e) => (false, status, 0, Some(format!("Body read error: {e}")), url),
+    /// Test connectivity to different HTTPS endpoints for comparison.
+    /// Returns Vec of (name, success, status_code, body_length, error_message, url)
+    pub async fn test_external_connectivity(&self) -> Vec<(String, bool, u16, usize, Option<String>, String)> {
+        let endpoints = vec![
+            ("httpbin", "https://httpbin.org/get"),
+            ("internet_archive_cdx", "https://web.archive.org/cdx/search/cdx?url=example.com&limit=1"),
+            ("commoncrawl_data", "https://data.commoncrawl.org/"),
+        ];
+
+        let mut results = Vec::new();
+        for (name, url) in endpoints {
+            let result = match self.http.get(url).send().await {
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    match resp.text().await {
+                        Ok(body) => (name.to_string(), status >= 200 && status < 300, status, body.len(), None, url.to_string()),
+                        Err(e) => (name.to_string(), false, status, 0, Some(format!("Body read error: {e}")), url.to_string()),
+                    }
                 }
-            }
-            Err(e) => (false, 0, 0, Some(format!("{:?}", e)), url),
+                Err(e) => (name.to_string(), false, 0, 0, Some(format!("{:?}", e)), url.to_string()),
+            };
+            results.push(result);
         }
+        results
     }
 
     /// Query CDX index for URLs matching a pattern (Tier 1: real-time).
