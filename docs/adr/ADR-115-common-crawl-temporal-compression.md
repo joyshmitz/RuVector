@@ -27,10 +27,12 @@ Common Crawl represents the largest public web archive:
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Monthly crawl pages | 2.1-2.3 billion | [Feb 2026 release](https://commoncrawl.org/blog/february-2026-crawl-archive-now-available) |
+| Monthly crawl pages | 2.1-2.3 billion | [CC-MAIN-2026-08](https://commoncrawl.org/latest-crawl) |
 | Monthly uncompressed size | 363-398 TiB | Common Crawl statistics |
 | Total corpus (2008-present) | 300+ billion pages | Historical archives |
 | Host-level graph edges | Billions | [Graph releases](https://commoncrawl.org/blog/host--and-domain-level-web-graphs-november-december-2025-and-january-2026) |
+
+**Current latest crawl**: CC-MAIN-2026-08 (August 2026). All examples in this ADR use publicly available crawl IDs: CC-MAIN-2026-06, CC-MAIN-2026-07, CC-MAIN-2026-08.
 
 The challenge: this scale makes naive storage prohibitively expensive (~$5,000+/month for embeddings alone).
 
@@ -180,7 +182,7 @@ Build a **phased compressed web memory service**, starting with conservative tec
 
 | Component | Technology | Purpose | Cost |
 |-----------|------------|---------|------|
-| CDX Cache | Cloud Memorystore (Redis) | Cache Common Crawl CDX index queries | ~$8/mo |
+| CDX Cache | Redis or disk-backed | Cache Common Crawl CDX index queries | $5-200/mo* |
 | WARC Fetcher | reqwest + Range headers | Fetch only needed bytes from S3 | $0 (public bucket) |
 | URL Deduplication | DashMap<hash, ()> | Skip previously seen URLs | ~2 GB RAM |
 | Content Deduplication | SimHash/MinHash | Skip near-duplicate content | ~500 MB RAM |
@@ -188,6 +190,8 @@ Build a **phased compressed web memory service**, starting with conservative tec
 | HNSW Index | ruvector-hnsw | Fast approximate nearest neighbor | CPU/RAM |
 | Exemplar Store | GCS + Firestore | Raw exemplars per cluster | Storage |
 | Scheduler | Cloud Scheduler | Periodic crawl ingestion | ~$0.50/mo |
+
+*CDX cache cost depends on backend choice. [Google Memorystore pricing](https://cloud.google.com/memorystore/docs/redis/pricing) shows ~$160/mo for 8 GiB Basic tier in us-central1. A disk-backed SQLite cache or smaller Redis instance can reduce this to $5-50/mo.
 
 ## 6. Compression Stack (Conservative Claims)
 
@@ -324,15 +328,33 @@ HNSW provides:
 
 ### 8.1 Acceptance Test
 
-Before claiming aggressive compression ratios:
+Before claiming aggressive compression ratios, execute this benchmark:
 
-1. Take 3 monthly Common Crawl slices (CC-MAIN-2026-08, 09, 10)
-2. Embed full text (all-MiniLM-L6-v2)
-3. Apply PiQ3 quantization
-4. Apply semantic deduplication (SimHash)
-5. Build HNSW index
-6. **Measure**: Recall@10 vs uncompressed baseline on fixed benchmark
-7. **Target**: ≥90% recall with ≥10x storage reduction
+**Dataset**: Three publicly available monthly crawls:
+- CC-MAIN-2026-06
+- CC-MAIN-2026-07
+- CC-MAIN-2026-08
+
+**Procedure**:
+1. Sample 1M pages per crawl (3M total)
+2. Embed full text with all-MiniLM-L6-v2 (384-dim fp32)
+3. Build fp32 baseline HNSW index
+4. Apply PiQ3 quantization
+5. Apply SimHash deduplication (cosine > 0.95)
+6. Build compressed HNSW index
+7. Generate 10K random query embeddings
+
+**Required Measurements**:
+| Metric | Measurement | Target |
+|--------|-------------|--------|
+| Recall@10 | % of true top-10 in compressed results | ≥ 0.90 |
+| nDCG@10 | Ranking quality vs fp32 baseline | ≥ 0.85 |
+| Storage (embeddings) | Compressed bytes / fp32 bytes | ≤ 0.10 (10x) |
+| p95 latency | 95th percentile query time | < 30ms |
+| p99 latency | 99th percentile query time | < 50ms |
+| Provenance recovery | % of results traceable to source URL | ≥ 0.99 |
+
+**Pass Criteria**: All targets met simultaneously.
 
 ### 8.2 Metrics to Track
 
@@ -346,12 +368,22 @@ Before claiming aggressive compression ratios:
 
 ## 9. Failure Modes & Mitigations
 
+### 9.0 Mandatory Exemplar Retention Rule
+
+**Hard policy**: Any cluster compression pass must:
+1. Retain at least one raw exemplar per cluster
+2. Retain at least one provenance anchor (source URL + timestamp) per cluster
+3. Preserve high-novelty outliers even when compression pressure is high
+4. Never merge clusters without preserving lineage graph edges
+
+This rule protects long-tail knowledge and auditability.
+
 ### 9.1 Compression Destroys Edge Cases
 
 **Risk**: Exotic compression preserves the average and kills rare-but-valuable content.
 
 **Mitigation**:
-- Retain raw exemplar pages per cluster
+- Retain raw exemplar pages per cluster (see 9.0)
 - Preserve long-tail pockets (high novelty score)
 - Measure recall separately for common vs rare concepts
 
@@ -392,7 +424,7 @@ Authorization: Bearer <token>
 
 {
   "query": "*.arxiv.org/abs/*",
-  "crawl": "CC-MAIN-2026-10",
+  "crawl": "CC-MAIN-2026-08",
   "limit": 1000,
   "filters": {"language": "en", "min_length": 1000}
 }
@@ -413,7 +445,7 @@ Authorization: Bearer <token>
 
 {
   "urls": ["https://arxiv.org/abs/2603.12345"],
-  "crawl": "CC-MAIN-2026-10",
+  "crawl": "CC-MAIN-2026-08",
   "options": {"skip_duplicates": true, "compute_novelty": true}
 }
 
@@ -473,29 +505,51 @@ Response:
 
 ## 11. Cost Analysis
 
-### 11.1 Conservative Estimate (Validated Compression)
+[Cloud Run pricing](https://cloud.google.com/run/pricing) is request-based: $0.000024/vCPU-second and $0.0000025/GiB-second in us-central1, plus free tier credits. Actual costs depend heavily on usage pattern.
+
+### 11.1 Cost by Workload Type
+
+| Workload | Pattern | Estimated Monthly |
+|----------|---------|-------------------|
+| **Scheduled ingest jobs** | Bursty, 1-2 hrs/day | $20-50 |
+| **Always-on retrieval** | Warm instance, continuous | $100-200 |
+| **Backfill/benchmark** | Spike, one-time | $50-500 (varies) |
+
+### 11.2 Conservative Estimate (Validated Compression)
+
+| Component | Monthly Cost | Notes |
+|-----------|--------------|-------|
+| CDX cache (disk-backed) | $5-50 | SQLite on GCS or small Redis |
+| CDX cache (Memorystore) | $80-200 | 4-16 GiB Basic tier |
+| GCS storage (150 GB compressed) | $3 | Standard class |
+| Firestore (metadata) | $10 | Document ops |
+| Cloud Run (retrieval) | $100-200 | Duty-cycle dependent |
+| Cloud Run (ingest jobs) | $20-50 | Bursty pattern |
+| Cloud Scheduler (8 jobs) | $0.50 | |
+| Egress | $20 | |
+| **Total (disk cache)** | **$160-340/month** | |
+| **Total (Memorystore)** | **$230-480/month** | |
+
+### 11.3 Cost Optimization Options
+
+| Option | Savings | Trade-off |
+|--------|---------|-----------|
+| Disk-backed CDX cache (SQLite) | -$150 | Slightly higher latency |
+| Scale-to-zero retrieval | -$100 | Cold start latency |
+| Regional egress only | -$15 | Limited to us-central1 |
+| Committed use discounts | -20% | 1-3 year commitment |
+
+### 11.4 Aggressive Estimate (If Research Compression Validates)
 
 | Component | Monthly Cost |
 |-----------|--------------|
-| Cloud Memorystore (CDX cache) | $8 |
-| GCS storage (150 GB compressed) | $3 |
-| Firestore (metadata) | $10 |
-| Cloud Run (4 vCPU, 16 GB RAM) | $100 |
-| Cloud Scheduler (8 jobs) | $0.50 |
-| Egress | $20 |
-| **Total** | **~$150/month** |
-
-### 11.2 Aggressive Estimate (If Research Compression Validates)
-
-| Component | Monthly Cost |
-|-----------|--------------|
-| Cloud Memorystore (CDX cache) | $8 |
+| CDX cache (disk-backed) | $5 |
 | GCS storage (56 MB compressed) | $0.01 |
 | Firestore (attractor metadata) | $5 |
-| Cloud Run (2 vCPU, 8 GB RAM) | $50 |
+| Cloud Run (scale-to-zero) | $30-80 |
 | Cloud Scheduler (8 jobs) | $0.50 |
 | Egress | $10 |
-| **Total** | **~$75/month** |
+| **Total** | **$50-100/month** |
 
 ## 12. Success Metrics
 
@@ -506,7 +560,9 @@ Response:
 | Compression ratio (vs naive embeddings) | ≥ 10x |
 | Retrieval latency (p99) | < 50ms |
 | Recall@10 | ≥ 0.90 |
-| Monthly operating cost | < $200 |
+| nDCG@10 | ≥ 0.85 |
+| Provenance recovery | ≥ 0.99 |
+| Monthly operating cost | < $350 (disk cache) |
 
 ### 12.2 Phase 3 Success (Aggressive)
 
@@ -528,9 +584,10 @@ Response:
 
 ## 14. References
 
-- [Common Crawl February 2026 Archive](https://commoncrawl.org/blog/february-2026-crawl-archive-now-available)
+- [Common Crawl Latest Crawl](https://commoncrawl.org/latest-crawl)
 - [Common Crawl Graph Statistics](https://commoncrawl.github.io/cc-crawl-statistics/)
 - [Cloud Run Pricing](https://cloud.google.com/run/pricing)
+- [Memorystore for Redis Pricing](https://cloud.google.com/memorystore/docs/redis/pricing)
 - [ADR-096: Cloud Pipeline](./ADR-096-cloud-pipeline-realtime-optimization.md)
 - [ADR-077: Midstream Platform](./ADR-077-midstream-ruvector-platform.md)
 
@@ -538,10 +595,28 @@ Response:
 
 ## 15. Decision Summary
 
-**What we're building**: A compressed web memory service for agents, not "the whole web in 56 MB."
+**Decision**: Implement Common Crawl integration as a phased compressed web memory service.
 
-**Conservative framing**: Turn the open web into a compact, queryable, time-aware semantic memory layer—with enough compression to move from expensive archive analytics to cheap always-on retrieval.
+**Phase 1 scope**: Limited to validated compression techniques:
+- PiQ3 quantization (10.7x, 96% recall validated)
+- Near-duplicate reduction via SimHash
+- Exemplar-preserving clustering
+- HNSW-based retrieval
+
+**Research scope**: More aggressive attractor and temporal compression stages remain experimental until benchmark gates for recall, fidelity, provenance, and cost are met.
+
+**Acceptance gate**: A three-crawl benchmark (CC-MAIN-2026-06, 07, 08) must demonstrate:
+- ≥10x storage reduction over naive embeddings
+- Recall@10 ≥ 0.90
+- p99 retrieval < 50ms on hot index
+- All sources traceable to exemplars
+
+**What this enables**: Not just cheaper storage. A new memory substrate where:
+- Retrieval becomes structural, not just lexical or vector-based
+- Summarization becomes state tracking
+- Monitoring becomes topology watching
+- Memory becomes a living graph of conceptual basins and transitions
+
+**Conservative framing**: Turn the open web into a compact, queryable, time-aware semantic memory layer for agents.
 
 **Exotic framing**: We're not compressing pages. We're compressing the web's evolving conceptual structure.
-
-**Starting point**: Phase 1 with validated compression (10x minimum), then validate research hypotheses for exotic compression.
