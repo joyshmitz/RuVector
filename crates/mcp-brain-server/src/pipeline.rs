@@ -611,7 +611,9 @@ impl CommonCrawlAdapter {
             http: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(120)) // Increased for CDX latency
                 .connect_timeout(std::time::Duration::from_secs(30))
-                .pool_idle_timeout(std::time::Duration::from_secs(90))
+                .pool_max_idle_per_host(0) // Disable connection pooling (Common Crawl closes connections)
+                .http1_only() // Force HTTP/1.1 (Common Crawl CDX doesn't handle HTTP/2 well)
+                .tcp_nodelay(true)
                 .user_agent("RuVector-Brain/1.0 (pi.ruv.io; +https://github.com/ruvnet/ruvector)")
                 .build()
                 .expect("Failed to build reqwest client"),
