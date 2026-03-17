@@ -284,6 +284,7 @@ mod tests {
             outbound_links: vec![],
             compression_tier: tier,
             novelty_score: novelty,
+            quantized_embedding: None,
         }
     }
 

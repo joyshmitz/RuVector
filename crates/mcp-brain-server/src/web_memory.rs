@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::types::{BetaParams, BrainCategory, BrainMemory};
+use crate::quantization::QuantizedEmbedding;
 
 // ── Core Web Memory Types ───────────────────────────────────────────────
 
@@ -37,6 +38,9 @@ pub struct WebMemory {
     pub compression_tier: CompressionTier,
     /// Novelty score relative to existing memory (0.0 = duplicate, 1.0 = entirely new)
     pub novelty_score: f32,
+    /// Quantized embedding (PiQ3 compression) — only for non-Full tiers
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantized_embedding: Option<QuantizedEmbedding>,
 }
 
 /// Temporal compression tiers (ADR-017 alignment).

@@ -14,6 +14,7 @@
 
 use crate::embeddings::{EmbeddingEngine, EMBED_DIM};
 use crate::graph::{cosine_similarity, KnowledgeGraph};
+use crate::quantization::PiQQuantizer;
 use crate::types::{BetaParams, BrainCategory, BrainMemory};
 use crate::web_memory::*;
 use chrono::Utc;
@@ -64,6 +65,9 @@ pub fn ingest_batch(
 
     // Track hashes seen within this batch to prevent intra-batch duplicates
     let mut batch_hashes: HashSet<String> = HashSet::new();
+
+    // PiQ3 quantizer for embedding compression (ADR-115)
+    let quantizer = PiQQuantizer::new();
 
     let batch = if pages.len() > MAX_BATCH_SIZE {
         &pages[..MAX_BATCH_SIZE]
@@ -130,6 +134,9 @@ pub fn ingest_batch(
             CompressionTier::Archived => {}
         }
 
+        // Phase 5b: Apply PiQ quantization for non-Full tiers (ADR-115)
+        let quantized_embedding = quantizer.quantize(&primary_embedding, tier);
+
         // Phase 6 + 7: Construct WebMemory with witness hash
         let domain = extract_domain(&page.url);
         let memory_id = Uuid::new_v4();
@@ -173,6 +180,7 @@ pub fn ingest_batch(
             outbound_links: page.links.clone(),
             compression_tier: tier,
             novelty_score: novelty,
+            quantized_embedding,
         };
 
         // Add to knowledge graph for similarity edge construction
