@@ -327,6 +327,8 @@ pub fn attractor_recrawl_priority(
 /// Use temporal solver to predict content drift for a domain.
 ///
 /// High-confidence stability predictions → lower crawl frequency.
+/// Only available on x86_64 with SIMD support (temporal-neural-solver).
+#[cfg(feature = "x86-simd")]
 pub fn solver_drift_prediction(
     solver: &mut temporal_neural_solver::TemporalSolver,
     recent_embeddings: &[Vec<f32>],
@@ -345,6 +347,15 @@ pub fn solver_drift_prediction(
     } else {
         None
     }
+}
+
+/// Stub for non-x86 platforms.
+#[cfg(not(feature = "x86-simd"))]
+pub fn solver_drift_prediction_stub(
+    _recent_embeddings: &[Vec<f32>],
+) -> Option<f32> {
+    // Temporal solver not available on this platform
+    None
 }
 
 #[cfg(test)]

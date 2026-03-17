@@ -309,6 +309,9 @@ pub async fn create_router() -> (Router, AppState) {
         .route("/v1/pipeline/optimize", post(pipeline_optimize))
         .route("/v1/pipeline/feeds", post(pipeline_add_feed).get(pipeline_list_feeds))
         .route("/v1/pipeline/scheduler/status", get(pipeline_scheduler_status))
+        // Common Crawl Integration (ADR-096 §10)
+        .route("/v1/pipeline/crawl/discover", post(pipeline_crawl_discover))
+        .route("/v1/pipeline/crawl/stats", get(pipeline_crawl_stats))
         // MCP SSE transport
         .route("/sse", get(sse_handler))
         .route("/messages", post(messages_handler))
@@ -2287,6 +2290,8 @@ async fn optimize_endpoint(
             })
         }
     }
+}
+
 // Cloud Pipeline endpoints (real-time injection + optimization)
 // ──────────────────────────────────────────────────────────────────────
 
@@ -2799,6 +2804,148 @@ async fn pipeline_scheduler_status(
         "uptime_seconds": uptime,
         "midstream_scheduler_enabled": state.rvf_flags.midstream_scheduler,
         "nano_scheduler_ticks": state.nano_scheduler.metrics().total_ticks,
+    }))
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Common Crawl Integration (ADR-096 §10)
+// ──────────────────────────────────────────────────────────────────────
+
+/// Request to discover pages from Common Crawl
+#[derive(Debug, serde::Deserialize)]
+struct CrawlDiscoverRequest {
+    /// URL pattern to query (e.g., "arxiv.org/abs/*")
+    domain_pattern: String,
+    /// Optional crawl index (e.g., "CC-MAIN-2026-13")
+    crawl_index: Option<String>,
+    /// Maximum pages to fetch
+    limit: Option<usize>,
+    /// Category for injected memories
+    category: Option<String>,
+    /// Tags for injected memories
+    #[serde(default)]
+    tags: Vec<String>,
+    /// If true, actually inject into brain; if false, just preview
+    #[serde(default)]
+    inject: bool,
+}
+
+/// Response from Common Crawl discovery
+#[derive(Debug, serde::Serialize)]
+struct CrawlDiscoverResponse {
+    cdx_records_found: usize,
+    pages_fetched: usize,
+    pages_injected: usize,
+    duplicates_skipped: usize,
+    errors: usize,
+    memory_ids: Vec<uuid::Uuid>,
+    preview_titles: Vec<String>,
+}
+
+/// POST /v1/pipeline/crawl/discover — query CDX + fetch pages from Common Crawl
+async fn pipeline_crawl_discover(
+    State(state): State<AppState>,
+    _contributor: AuthenticatedContributor,
+    Json(req): Json<CrawlDiscoverRequest>,
+) -> Result<Json<CrawlDiscoverResponse>, (StatusCode, String)> {
+    check_read_only(&state)?;
+
+    let cc = crate::pipeline::CommonCrawlAdapter::new();
+    if let Some(ref idx) = req.crawl_index {
+        cc.set_crawl_index(idx).await;
+    }
+
+    let limit = req.limit.unwrap_or(20).min(100);
+    let query = crate::pipeline::CdxQuery {
+        url_pattern: req.domain_pattern.clone(),
+        crawl_index: req.crawl_index.clone(),
+        limit,
+        ..Default::default()
+    };
+
+    // Query CDX index
+    let records = cc.query_cdx(&query).await.map_err(|e| {
+        (StatusCode::BAD_GATEWAY, format!("CDX query failed: {e}"))
+    })?;
+    let cdx_records_found = records.len();
+
+    // Fetch pages
+    let items = cc.discover_domain(
+        &req.domain_pattern,
+        req.category.clone(),
+        req.tags.clone(),
+        limit,
+    ).await.map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("Discovery failed: {e}"))
+    })?;
+
+    let pages_fetched = items.len();
+    let (_, _, _, dupes, errors) = cc.stats();
+    let preview_titles: Vec<String> = items.iter().take(10).map(|i| i.title.clone()).collect();
+
+    // Optionally inject into brain
+    let mut memory_ids = Vec::new();
+    let mut pages_injected = 0usize;
+    if req.inject {
+        for item in &items {
+            let category = match item.category.as_deref() {
+                Some("architecture") => crate::types::BrainCategory::Architecture,
+                Some("solution") => crate::types::BrainCategory::Solution,
+                Some("convention") => crate::types::BrainCategory::Convention,
+                Some("security") => crate::types::BrainCategory::Security,
+                Some("performance") => crate::types::BrainCategory::Performance,
+                Some("tooling") => crate::types::BrainCategory::Tooling,
+                Some("debug") => crate::types::BrainCategory::Debug,
+                _ => crate::types::BrainCategory::Pattern,
+            };
+            let inject_req = crate::types::InjectRequest {
+                source: "common_crawl".into(),
+                title: item.title.clone(),
+                content: item.content.clone(),
+                tags: item.tags.clone(),
+                category,
+                metadata: Some(serde_json::json!(item.metadata)),
+            };
+            match process_inject(&state, inject_req).await {
+                Ok(resp) => {
+                    memory_ids.push(resp.id);
+                    pages_injected += 1;
+                }
+                Err(e) => {
+                    tracing::warn!("Common Crawl inject failed: {}", e);
+                }
+            }
+        }
+    }
+
+    Ok(Json(CrawlDiscoverResponse {
+        cdx_records_found,
+        pages_fetched,
+        pages_injected,
+        duplicates_skipped: dupes as usize,
+        errors: errors as usize,
+        memory_ids,
+        preview_titles,
+    }))
+}
+
+/// GET /v1/pipeline/crawl/stats — Common Crawl adapter statistics
+async fn pipeline_crawl_stats(
+    State(_state): State<AppState>,
+) -> Json<serde_json::Value> {
+    // Create a fresh adapter (in production, this would be part of AppState)
+    let cc = crate::pipeline::CommonCrawlAdapter::new();
+    let (queries, fetched, extracted, dupes, errors) = cc.stats();
+
+    Json(serde_json::json!({
+        "adapter": "common_crawl",
+        "cdx_queries": queries,
+        "pages_fetched": fetched,
+        "pages_extracted": extracted,
+        "duplicates_skipped": dupes,
+        "errors": errors,
+        "seen_urls": cc.seen_urls_count(),
+        "seen_hashes": cc.seen_hashes_count(),
     }))
 }
 
