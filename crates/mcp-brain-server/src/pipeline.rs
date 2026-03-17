@@ -644,7 +644,12 @@ impl CommonCrawlAdapter {
                 tokio::time::sleep(delay).await;
             }
 
-            match self.http.get(&url).send().await {
+            // Add headers that might help with compatibility
+            match self.http.get(&url)
+                .header("Accept", "application/json")
+                .header("Connection", "close")
+                .send().await
+            {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
                     match resp.text().await {
@@ -744,7 +749,11 @@ impl CommonCrawlAdapter {
                 tokio::time::sleep(delay).await;
             }
 
-            match self.http.get(&url).send().await {
+            match self.http.get(&url)
+                .header("Accept", "application/json")
+                .header("Connection", "close")
+                .send().await
+            {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         last_error = format!("CDX returned status {}", resp.status());
