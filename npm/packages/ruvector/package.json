@@ -1,6 +1,6 @@
 {
   "name": "ruvector",
-  "version": "0.2.14",
+  "version": "0.2.16",
   "description": "High-performance vector database for Node.js with automatic native/WASM fallback",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,7 +8,7 @@
     "ruvector": "./bin/cli.js"
   },
   "scripts": {
-    "build": "tsc && cp src/core/onnx/pkg/package.json dist/core/onnx/pkg/",
+    "build": "tsc && cp -r src/core/onnx dist/core/",
     "prepublishOnly": "npm run build",
     "test": "node test/integration.js && node test/cli-commands.js"
   },

@@ -6,7 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" pre-bash",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" pre-bash",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" pre-edit",
             "timeout": 5000
           }
         ]
@@ -18,8 +28,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" post-edit",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-edit",
             "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-bash",
+            "timeout": 5000
           }
         ]
       }
@@ -29,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" route",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" route",
             "timeout": 10000
           }
         ]
@@ -40,18 +60,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" session-restore",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-restore",
             "timeout": 15000
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/auto-memory-hook.mjs\" import",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/auto-memory-hook.mjs\" import",
             "timeout": 8000
-          },
-          {
-            "type": "command",
-            "command": "[ -f ~/.zshrc ] && source ~/.zshrc 2>/dev/null; ruvector brain sync pull 2>/dev/null || true",
-            "timeout": 10000
           }
         ]
       }
@@ -61,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" session-end",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
             "timeout": 10000
           }
         ]
@@ -72,13 +87,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/auto-memory-hook.mjs\" sync",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/auto-memory-hook.mjs\" sync",
             "timeout": 10000
-          },
-          {
-            "type": "command",
-            "command": "[ -f ~/.zshrc ] && source ~/.zshrc 2>/dev/null; ruvector brain share \"RuVector Session $(date +%Y-%m-%d)\" --category solution --content \"Session ended.\" 2>/dev/null || true",
-            "timeout": 8000
           }
         ]
       }
@@ -89,11 +99,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" compact-manual"
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" compact-manual"
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" session-end",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
             "timeout": 5000
           }
         ]
@@ -103,11 +113,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" compact-auto"
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" compact-auto"
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" session-end",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
             "timeout": 6000
           }
         ]
@@ -118,7 +128,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/hook-handler.cjs\" status",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" status",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-task",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" notify",
             "timeout": 3000
           }
         ]
@@ -127,7 +159,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node \"$CLAUDE_PROJECT_DIR/.claude/helpers/statusline.cjs\""
+    "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/statusline.cjs\""
   },
   "permissions": {
     "allow": [
@@ -153,6 +185,11 @@
   "claudeFlow": {
     "version": "3.0.0",
     "enabled": true,
+    "platform": {
+      "os": "darwin",
+      "arch": "arm64",
+      "shell": "zsh"
+    },
     "modelPreferences": {
       "default": "claude-opus-4-6",
       "routing": "claude-haiku-4-5-20251001"
@@ -277,13 +314,6 @@
       "scanOnEdit": true,
       "cveCheck": true,
       "threatModel": true
-    },
-    "piBrain": {
-      "enabled": true,
-      "endpoint": "https://π.ruv.io",
-      "syncOnStart": true,
-      "shareOnTaskComplete": true,
-      "shareCategories": ["solution", "pattern", "architecture", "debug"]
     }
   }
 }

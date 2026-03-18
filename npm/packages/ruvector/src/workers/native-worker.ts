@@ -11,7 +11,52 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
+
+// Glob function type
+type GlobFn = (pattern: string, options?: any) => Promise<string[]>;
+let cachedGlob: GlobFn | null = null;
+
+// Fallback glob implementation using fs
+function createFallbackGlob(): GlobFn {
+  return async (pattern: string, options?: { cwd?: string; ignore?: string[] }) => {
+    const cwd = options?.cwd || process.cwd();
+    const results: string[] = [];
+    const walk = (dir: string) => {
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+            walk(fullPath);
+          } else if (entry.isFile()) {
+            results.push(path.relative(cwd, fullPath));
+          }
+        }
+      } catch { /* ignore permission errors */ }
+    };
+    walk(cwd);
+    // Simple pattern matching for *.ext patterns
+    const ext = pattern.match(/\*\.(\w+)$/)?.[1];
+    return ext ? results.filter(f => f.endsWith('.' + ext)) : results;
+  };
+}
+
+async function getGlob(): Promise<GlobFn> {
+  if (cachedGlob) return cachedGlob;
+
+  try {
+    // Dynamic import - may fail if glob not installed
+    const mod = await (Function('return import("glob")')() as Promise<any>);
+    if (mod && typeof mod.glob === 'function') {
+      cachedGlob = mod.glob as GlobFn;
+      return cachedGlob;
+    }
+  } catch { /* glob not available */ }
+
+  // Fallback to simple implementation
+  cachedGlob = createFallbackGlob();
+  return cachedGlob;
+}
 import {
   WorkerConfig,
   WorkerResult,
@@ -186,13 +231,14 @@ export class NativeWorker {
     const exclude = config?.exclude || ['**/node_modules/**', '**/dist/**', '**/.git/**'];
 
     const files: string[] = [];
+    const glob = await getGlob();
     for (const pattern of patterns) {
       const matches = await glob(pattern, {
         cwd: context.targetPath,
         ignore: exclude,
         nodir: true,
       });
-      files.push(...matches.map(f => path.join(context.targetPath, f)));
+      files.push(...matches.map((f: string) => path.join(context.targetPath, f)));
     }
 
     this.stats.filesAnalyzed = files.length;

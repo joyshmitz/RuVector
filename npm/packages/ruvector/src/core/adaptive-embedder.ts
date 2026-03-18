@@ -117,12 +117,13 @@ class MicroLoRA {
     this.rank = rank;
     this.scale = scale;
 
-    // Initialize with small random values (Xavier-like)
+    // Initialize A with small random values (Xavier-like)
+    // Initialize B to EXACTLY ZERO so untrained LoRA is identity
+    // This preserves semantic signal until training occurs
     const stdA = Math.sqrt(2 / (dim + rank));
-    const stdB = Math.sqrt(2 / (rank + dim)) * 0.01; // B starts near zero
 
     this.A = this.initFlatMatrix(dim, rank, stdA);
-    this.B = this.initFlatMatrix(rank, dim, stdB);
+    this.B = new Float32Array(rank * dim); // Zero-initialized (identity)
 
     // Pre-allocate buffers
     this.hiddenBuffer = new Float32Array(rank);
