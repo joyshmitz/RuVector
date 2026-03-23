@@ -28,16 +28,17 @@ pub struct PatternConfig {
 impl Default for PatternConfig {
     fn default() -> Self {
         // OPTIMIZED DEFAULTS based on @ruvector/sona v0.1.1 benchmarks:
-        // - 100 clusters = 1.3ms search vs 50 clusters = 3.0ms (2.3x faster)
-        // - Quality threshold 0.3 balances learning vs noise filtering
+        // - ADR-123: Relaxed thresholds to enable pattern crystallization
+        //   with fewer trajectories. Previous defaults (k=100, min=5, q=0.3)
+        //   prevented crystallization when trajectory count < 500.
         Self {
-            k_clusters: 100, // OPTIMIZED: 2.3x faster search (1.3ms vs 3.0ms)
+            k_clusters: 50,  // ADR-123: fewer clusters = more members per cluster
             embedding_dim: 256,
             max_iterations: 100,
             convergence_threshold: 0.001,
-            min_cluster_size: 5,
+            min_cluster_size: 2,  // ADR-123: was 5, allow small clusters to crystallize
             max_trajectories: 10000,
-            quality_threshold: 0.3, // OPTIMIZED: Lower threshold for more learning
+            quality_threshold: 0.1, // ADR-123: was 0.3, allow lower-quality patterns through
         }
     }
 }

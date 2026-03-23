@@ -437,6 +437,31 @@ pub fn run_enhanced_training_cycle(state: &AppState) -> EnhancedTrainingResult {
         props.len()
     };
 
+    // 3b. ADR-123: Record drift snapshots from cluster centroids
+    {
+        let mut drift = state.drift.write();
+        for (centroid, _ids, category) in &clusters {
+            drift.record(category, centroid);
+        }
+        // Also record a global centroid (average of all cluster centroids)
+        if !clusters.is_empty() {
+            let dim = clusters[0].0.len();
+            let mut global = vec![0.0f32; dim];
+            for (centroid, _, _) in &clusters {
+                for (i, &v) in centroid.iter().enumerate() {
+                    if i < dim {
+                        global[i] += v;
+                    }
+                }
+            }
+            let n = clusters.len() as f32;
+            for g in &mut global {
+                *g /= n;
+            }
+            drift.record("global", &global);
+        }
+    }
+
     // 4. Internal voice reflection (ADR-110)
     let voice_thoughts = {
         let mut voice = state.internal_voice.write();
@@ -1218,6 +1243,19 @@ async fn search_memories(
             results[0].memory.quality_score.mean() as f32,
         );
         sona.end_trajectory(builder, 0.5);
+    }
+
+    // ── ADR-123: Auto-populate GWT working memory from top search result ──
+    if !results.is_empty() {
+        let top = &results[0];
+        let wm_content = format!("[search] {}", top.memory.title);
+        let wm_embedding = top.memory.embedding.clone();
+        let mut voice = state.internal_voice.write();
+        voice.remember(
+            wm_content,
+            wm_embedding,
+            crate::voice::ContentSource::Perception,
+        );
     }
 
     Ok(Json(results))
@@ -3845,9 +3883,23 @@ async fn sse_handler(
             yield Ok(Event::default().event("message").data(msg));
         }
 
-        // Clean up session on disconnect
-        sessions_cleanup.remove(&session_id_cleanup);
-        tracing::info!("SSE session ended: {}", session_id_cleanup);
+        // Clean up session on disconnect — grace period lets clients reconnect
+        // without losing the session (e.g. MCP SDK's EventSource polyfill)
+        tracing::info!("SSE stream closed for session: {}, starting 30s grace period", session_id_cleanup);
+        tokio::spawn({
+            let sessions = sessions_cleanup.clone();
+            let sid = session_id_cleanup.clone();
+            async move {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                if let Some(entry) = sessions.get(&sid) {
+                    // Only remove if the sender is closed (no new SSE reconnected)
+                    if entry.is_closed() {
+                        sessions.remove(&sid);
+                        tracing::info!("SSE session expired after grace period: {}", sid);
+                    }
+                }
+            }
+        });
     };
 
     Sse::new(stream).keep_alive(KeepAlive::default())

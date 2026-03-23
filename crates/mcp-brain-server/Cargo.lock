@@ -2329,7 +2329,7 @@ dependencies = [
 
 [[package]]
 name = "ruvector-sona"
-version = "0.1.6"
+version = "0.1.8"
 dependencies = [
  "crossbeam",
  "getrandom 0.2.17",

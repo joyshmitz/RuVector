@@ -148,6 +148,8 @@ pub enum PredicateType {
     DependsOn,
     /// X is part of Y
     PartOf,
+    /// X is a subtype of Y
+    IsSubtypeOf,
     /// Custom predicate
     Custom(String),
 }
@@ -163,6 +165,7 @@ impl PredicateType {
             Self::Solves => "solves",
             Self::DependsOn => "depends_on",
             Self::PartOf => "part_of",
+            Self::IsSubtypeOf => "is_subtype_of",
             Self::Custom(s) => s,
         }
     }
@@ -287,6 +290,57 @@ impl NeuralSymbolicBridge {
             PredicateType::Causes,
             0.5,
         ));
+
+        // ── ADR-123: Relational rules for cognitive enrichment ──
+
+        // Subtype transitivity: if A is_subtype_of B and B is_subtype_of C, then A is_subtype_of C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::IsSubtypeOf, PredicateType::IsSubtypeOf],
+            PredicateType::IsSubtypeOf,
+            0.85,
+        ));
+
+        // Type hierarchy: if A is_type_of B and B is_subtype_of C, then A is_type_of C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::IsTypeOf, PredicateType::IsSubtypeOf],
+            PredicateType::IsTypeOf,
+            0.85,
+        ));
+
+        // Dependency chain: if A depends_on B and B depends_on C, then A depends_on C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::DependsOn, PredicateType::DependsOn],
+            PredicateType::DependsOn,
+            0.6,
+        ));
+
+        // Same-type relation: if A is_type_of X and B is_type_of X, then A relates_to B
+        self.rules.push(HornClause::new(
+            vec![PredicateType::IsTypeOf, PredicateType::IsTypeOf],
+            PredicateType::RelatesTo,
+            0.5,
+        ));
+
+        // Transitive solution via dependency: if A solves B and B depends_on C, then A solves C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::Solves, PredicateType::DependsOn],
+            PredicateType::Solves,
+            0.7,
+        ));
+
+        // Causal prevention: if A causes B and B prevents C, then A prevents C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::Causes, PredicateType::Prevents],
+            PredicateType::Prevents,
+            0.6,
+        ));
+
+        // Composition: if A part_of B and B part_of C, then A part_of C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::PartOf, PredicateType::PartOf],
+            PredicateType::PartOf,
+            0.7,
+        ));
     }
 
     /// Extract propositions from memory clusters
@@ -313,6 +367,52 @@ impl NeuralSymbolicBridge {
             if prop.confidence >= self.config.min_confidence {
                 extracted.push(prop.clone());
                 self.store_proposition(prop);
+            }
+        }
+
+        // ── ADR-123: Extract relates_to propositions between clusters sharing a category ──
+        // Group clusters by category and create cross-cluster relations
+        let mut by_category: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, (_, _, category)) in clusters.iter().enumerate() {
+            by_category.entry(category.clone()).or_default().push(i);
+        }
+        for (_category, indices) in &by_category {
+            if indices.len() < 2 {
+                continue;
+            }
+            // Create relates_to between pairs (limit to first 5 pairs to avoid combinatorial explosion)
+            let mut pair_count = 0;
+            for i in 0..indices.len() {
+                for j in (i + 1)..indices.len() {
+                    if pair_count >= 5 {
+                        break;
+                    }
+                    let (ref c1, ref ids1, _) = clusters[indices[i]];
+                    let (ref c2, ref ids2, _) = clusters[indices[j]];
+                    if ids1.len() < self.config.min_cluster_size || ids2.len() < self.config.min_cluster_size {
+                        continue;
+                    }
+                    // Compute similarity between centroids
+                    let sim = cosine_similarity(c1, c2);
+                    if sim > 0.3 {
+                        let mut merged_evidence = ids1.clone();
+                        merged_evidence.extend_from_slice(ids2);
+                        merged_evidence.truncate(10); // cap evidence size
+                        let midpoint: Vec<f32> = c1.iter().zip(c2.iter()).map(|(a, b)| (a + b) / 2.0).collect();
+                        let prop = GroundedProposition::new(
+                            PredicateType::RelatesTo.as_str().to_string(),
+                            vec![format!("cluster_{}", ids1.len()), format!("cluster_{}", ids2.len())],
+                            midpoint,
+                            sim * self.cluster_confidence(ids1.len().min(ids2.len())),
+                            merged_evidence,
+                        );
+                        if prop.confidence >= self.config.min_confidence {
+                            extracted.push(prop.clone());
+                            self.store_proposition(prop);
+                        }
+                        pair_count += 1;
+                    }
+                }
             }
         }
 
