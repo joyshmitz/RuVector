@@ -24,6 +24,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tower_http::cors::CorsLayer;
@@ -272,6 +273,7 @@ pub async fn create_router() -> (Router, AppState) {
         web_store,
         crawl_adapter,
         cached_partition: Arc::new(parking_lot::RwLock::new(None)),
+        notifier: crate::notify::ResendNotifier::from_env(),
     };
 
     let router = Router::new()
@@ -343,6 +345,15 @@ pub async fn create_router() -> (Router, AppState) {
         // ── Gemini Optimizer ──
         .route("/v1/optimizer/status", get(optimizer_status))
         .route("/v1/optimize", post(optimize_endpoint))
+        // ── Email Notifications (ADR-125) ──
+        .route("/v1/notify/test", post(notify_test))
+        .route("/v1/notify/status", post(notify_status))
+        .route("/v1/notify/send", post(notify_send))
+        .route("/v1/notify/welcome", post(notify_welcome))
+        .route("/v1/notify/help", post(notify_help))
+        .route("/v1/notify/digest", post(notify_digest))
+        .route("/v1/notify/pixel/:tracking_id", get(notify_pixel))
+        .route("/v1/notify/opens", get(notify_opens))
         .layer({
             // CORS origins: configurable via CORS_ORIGINS env var (comma-separated).
             // Falls back to safe defaults if unset.
@@ -5355,5 +5366,377 @@ async fn proxy_delete(
     } else {
         let body = resp.text().await.unwrap_or_default();
         Err(format!("API error ({status}): {body}"))
+    }
+}
+
+// ── Email Notification Handlers (ADR-125) ──────────────────────────────
+
+/// POST /v1/notify/test — send a test email via Resend
+async fn notify_test(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    match notifier.send_test().await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id,
+            "from": "pi@ruv.io",
+            "message": "Test email sent successfully"
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// POST /v1/notify/status — send a brain status email
+async fn notify_status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    // Collect stats without holding locks across await points
+    let (memories, graph_edges, sona_patterns, drift) = {
+        let memories = state.store.memory_count();
+        let graph_edges = state.graph.read().edge_count();
+        let sona_patterns = state.sona.read().stats().patterns_stored;
+        let drift = state.drift.read().compute_drift(None).coefficient_of_variation;
+        (memories, graph_edges, sona_patterns, drift)
+    };
+
+    match notifier.send_status(memories, graph_edges, sona_patterns, drift).await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id,
+            "memories": memories,
+            "graph_edges": graph_edges,
+            "sona_patterns": sona_patterns,
+            "drift": drift
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// POST /v1/notify/send — send a custom notification email
+async fn notify_send(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    let category = body["category"].as_str().unwrap_or("status");
+    let subject = match body["subject"].as_str() {
+        Some(s) => s,
+        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "missing 'subject' field" }))),
+    };
+    let html = match body["html"].as_str() {
+        Some(s) => s,
+        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "missing 'html' field" }))),
+    };
+
+    match notifier.send(category, subject, html).await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id,
+            "category": category
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// POST /v1/notify/welcome — send welcome email to a user
+async fn notify_welcome(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    let email = match body["email"].as_str() {
+        Some(e) => e,
+        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "missing 'email' field" }))),
+    };
+    let name = body["name"].as_str();
+
+    match notifier.send_welcome(email, name).await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id,
+            "sent_to": email
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// POST /v1/notify/help — send help/commands reference email
+async fn notify_help(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    let to = body["email"].as_str();
+
+    match notifier.send_help(to).await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// POST /v1/notify/digest — send daily discovery digest email
+/// Triggered by Cloud Scheduler after research jobs complete.
+/// Body: { "topic": "optional focus topic", "limit": 10, "hours": 24 }
+async fn notify_digest(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    let limit = body["limit"].as_u64().unwrap_or(10) as usize;
+    let topic = body["topic"].as_str();
+    let hours = body["hours"].as_u64().unwrap_or(24);
+
+    // Gather recent discoveries from the store
+    let cutoff = chrono::Utc::now() - chrono::Duration::hours(hours as i64);
+    let mut all = state.store.all_memories();
+    all.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Filter by recency and optionally by topic
+    let filtered: Vec<_> = all.iter()
+        .filter(|m| {
+            if m.created_at < cutoff {
+                return false;
+            }
+            topic.map_or(true, |t| {
+                let t_lower = t.to_lowercase();
+                m.title.to_lowercase().contains(&t_lower)
+                    || m.content.to_lowercase().contains(&t_lower)
+                    || m.tags.iter().any(|tag| tag.to_lowercase().contains(&t_lower))
+            })
+        })
+        .take(limit)
+        .collect();
+
+    if filtered.is_empty() {
+        return (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "skipped": true,
+            "reason": "no new discoveries in the last period"
+        })));
+    }
+
+    // Build HTML rows
+    let mut rows = String::new();
+    for (i, m) in filtered.iter().enumerate() {
+        let title = if m.title.len() > 100 { &m.title[..100] } else { &m.title };
+        let content = if m.content.len() > 200 { &m.content[..200] } else { &m.content };
+        let quality = m.quality_score.mean();
+        let tags_html: Vec<_> = m.tags.iter().take(4).map(|t| {
+            format!("<span style=\"display:inline-block;background:#1a1a3a;color:#4fc3f7;padding:1px 6px;border-radius:3px;font-size:10px;margin:1px;\">{}</span>", t)
+        }).collect();
+        rows.push_str(&format!(
+            r#"<tr style="border-bottom:1px solid #222;">
+<td style="padding:10px 0;">
+<strong style="color:#4fc3f7;">{num}. {title}</strong><br>
+<span style="color:#888;font-size:11px;">{cat} | quality: {quality:.2}</span> {tags}<br>
+<span style="color:#999;font-size:12px;">{content}...</span>
+</td></tr>"#,
+            num = i + 1,
+            title = title,
+            cat = m.category,
+            quality = quality,
+            tags = tags_html.join(""),
+            content = content,
+        ));
+    }
+
+    let topic_line = topic.map_or(String::new(), |t| {
+        format!("<p style=\"color:#888;font-size:12px;\">Focus: <span style=\"background:#1a1a3a;color:#7fdbca;padding:2px 6px;border-radius:4px;\">{}</span></p>", t)
+    });
+
+    let status = state.store.memory_count();
+    let edges = state.graph.read().edge_count();
+
+    let html = format!(
+        r#"<div style="font-family:'SF Mono',monospace;background:#0a0a23;color:#e0e0ff;padding:24px;border-radius:12px;max-width:600px;">
+<h2 style="color:#4fc3f7;margin:0 0 4px 0;">Daily Discovery Digest</h2>
+<p style="color:#888;font-size:12px;margin:0 0 4px 0;">Last {hours}h | {count} discoveries | {total} total memories | {edges} edges</p>
+{topic_line}
+<table style="color:#e0e0ff;font-size:13px;width:100%;">{rows}</table>
+<div style="background:#1a1a3a;padding:12px 16px;border-radius:8px;margin-top:16px;">
+<p style="color:#7fdbca;font-size:13px;margin:0;">Reply with <code style="color:#7fdbca;">search &lt;query&gt;</code> to explore | <code style="color:#7fdbca;">help</code> for commands</p>
+</div>
+<div style="color:#666;margin-top:20px;font-size:11px;border-top:1px solid #222;padding-top:12px;">
+<a href="https://pi.ruv.io" style="color:#4fc3f7;">pi.ruv.io</a> | Powered by Resend
+</div></div>"#,
+        hours = hours,
+        count = filtered.len(),
+        total = status,
+        edges = edges,
+        topic_line = topic_line,
+        rows = rows,
+    );
+
+    let subject = match topic {
+        Some(t) => format!("[pi.ruv.io/discovery] Daily Digest: {}", t),
+        None => "[pi.ruv.io/discovery] Daily Discovery Digest".into(),
+    };
+
+    match notifier.send("discovery", &subject, &html).await {
+        Ok(id) => (StatusCode::OK, Json(serde_json::json!({
+            "ok": true,
+            "email_id": id,
+            "discoveries": filtered.len(),
+            "topic": topic
+        }))),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e }))),
+    }
+}
+
+/// 1x1 transparent GIF for email open tracking
+const TRACKING_PIXEL_GIF: &[u8] = &[
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00,
+    0x80, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21,
+    0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00,
+    0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44,
+    0x01, 0x00, 0x3b,
+];
+
+/// GET /v1/notify/pixel/:tracking_id — email open tracking pixel
+async fn notify_pixel(
+    State(state): State<AppState>,
+    Path(tracking_id): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> impl axum::response::IntoResponse {
+    let category = params.get("c").map(|s| s.as_str()).unwrap_or("unknown");
+    let subject = params.get("s").map(|s| s.as_str()).unwrap_or("");
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok());
+
+    if let Some(notifier) = state.notifier.as_ref() {
+        notifier.tracker.record_open(&tracking_id, category, subject, user_agent);
+    }
+
+    (
+        StatusCode::OK,
+        [
+            (axum::http::header::CONTENT_TYPE, "image/gif"),
+            (axum::http::header::CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0"),
+            (axum::http::header::PRAGMA, "no-cache"),
+            (axum::http::header::EXPIRES, "Thu, 01 Jan 1970 00:00:00 GMT"),
+        ],
+        TRACKING_PIXEL_GIF,
+    )
+}
+
+/// GET /v1/notify/opens — get email open tracking stats (requires system key)
+async fn notify_opens(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    if let Err(resp) = verify_system_key(&headers) {
+        return resp;
+    }
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "RESEND_API_KEY not configured" }))),
+    };
+
+    let limit = params.get("limit").and_then(|l| l.parse().ok()).unwrap_or(20);
+    let recent = notifier.tracker.recent_opens(limit);
+    let stats = notifier.tracker.stats_summary();
+
+    let opens: Vec<serde_json::Value> = recent.iter().map(|o| {
+        serde_json::json!({
+            "tracking_id": o.tracking_id,
+            "category": o.category,
+            "subject": o.subject,
+            "opened_at": o.opened_at.to_rfc3339(),
+            "user_agent": o.user_agent,
+        })
+    }).collect();
+
+    (StatusCode::OK, Json(serde_json::json!({
+        "ok": true,
+        "stats": stats,
+        "recent_opens": opens,
+        "open_rates": notifier.tracker.open_rates(),
+    })))
+}
+
+/// Verify the system key for internal endpoints
+fn verify_system_key(
+    headers: &HeaderMap,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    let system_key = std::env::var("BRAIN_SYSTEM_KEY").unwrap_or_default();
+    // If no system key is set, allow (dev mode)
+    if system_key.is_empty() {
+        return Ok(());
+    }
+    let auth = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let token = auth.strip_prefix("Bearer ").unwrap_or(auth);
+    if subtle::ConstantTimeEq::ct_eq(token.as_bytes(), system_key.as_bytes()).into() {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "invalid system key" })),
+        ))
     }
 }
