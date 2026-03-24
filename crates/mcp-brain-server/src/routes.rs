@@ -356,6 +356,8 @@ pub async fn create_router() -> (Router, AppState) {
         .route("/v1/notify/opens", get(notify_opens))
         .route("/v1/notify/subscribe", post(notify_subscribe))
         .route("/v1/notify/unsubscribe", post(notify_unsubscribe))
+        // ── Inbound Email Webhook (ADR-125) ──
+        .route("/v1/email/inbound", post(email_inbound))
         .layer({
             // CORS origins: configurable via CORS_ORIGINS env var (comma-separated).
             // Falls back to safe defaults if unset.
@@ -5766,6 +5768,172 @@ async fn notify_unsubscribe(
         "unsubscribed": email,
         "message": "You have been unsubscribed from Pi Brain digests."
     })))
+}
+
+// ── Inbound Email Webhook Handler (ADR-125) ─────────────────────────
+
+/// Resend inbound email webhook payload
+#[derive(Debug, serde::Deserialize)]
+struct ResendInboundPayload {
+    #[serde(rename = "type")]
+    event_type: Option<String>,
+    data: Option<ResendInboundData>,
+    // Flat fields (Resend sometimes sends flat payloads)
+    from: Option<String>,
+    to: Option<serde_json::Value>, // String or Vec<String>
+    subject: Option<String>,
+    html: Option<String>,
+    text: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ResendInboundData {
+    from: Option<String>,
+    to: Option<serde_json::Value>,
+    subject: Option<String>,
+    html: Option<String>,
+    text: Option<String>,
+}
+
+/// POST /v1/email/inbound — Resend webhook for incoming email
+/// Parses the subject for a command and replies via Resend.
+async fn email_inbound(
+    State(state): State<AppState>,
+    _headers: HeaderMap,
+    Json(payload): Json<ResendInboundPayload>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    // Extract fields from nested or flat payload
+    let (from, subject, body_text) = match &payload.data {
+        Some(d) => (
+            d.from.as_deref().or(payload.from.as_deref()).unwrap_or("unknown"),
+            d.subject.as_deref().or(payload.subject.as_deref()).unwrap_or(""),
+            d.text.as_deref().or(d.html.as_deref())
+                .or(payload.text.as_deref()).or(payload.html.as_deref())
+                .unwrap_or(""),
+        ),
+        None => (
+            payload.from.as_deref().unwrap_or("unknown"),
+            payload.subject.as_deref().unwrap_or(""),
+            payload.text.as_deref().or(payload.html.as_deref()).unwrap_or(""),
+        ),
+    };
+
+    tracing::info!("Inbound email: from={}, subject={}", from, subject);
+
+    let notifier = match state.notifier.as_ref() {
+        Some(n) => n,
+        None => return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": "notifier not configured" }))),
+    };
+
+    // Parse command from subject (case-insensitive, strip Re: prefixes)
+    let clean_subject = subject
+        .trim()
+        .to_lowercase();
+    let cmd = clean_subject
+        .trim_start_matches("re:")
+        .trim_start_matches("fwd:")
+        .trim_start_matches("fw:")
+        .trim_start_matches("[pi.ruv.io/")
+        .split(']')
+        .last()
+        .unwrap_or(&clean_subject)
+        .trim();
+
+    let reply_to = from;
+
+    match cmd.split_whitespace().next().unwrap_or("") {
+        "search" => {
+            let query = cmd.strip_prefix("search").unwrap_or("").trim();
+            if query.is_empty() {
+                let _ = notifier.send_to(reply_to, "chat", "Re: search",
+                    &format!(r#"<div style="font-family:monospace;background:#0a0a23;color:#e0e0ff;padding:20px;border-radius:8px;">
+                    <p style="color:#ff6b6b;">Please include a search query, e.g.: <code>search authentication patterns</code></p></div>"#)).await;
+                return (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "search_empty"})));
+            }
+
+            // Perform semantic search
+            let embedding = {
+                let engine = state.embedding_engine.read();
+                engine.embed(query)
+            };
+            let all = state.store.all_memories();
+            let mut scored: Vec<_> = all.iter()
+                .map(|m| {
+                    let score = cosine_similarity(&embedding, &m.embedding);
+                    (m.title.clone(), m.content.clone(), score)
+                })
+                .filter(|(_, _, s)| *s > 0.1)
+                .collect();
+            scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+            let top: Vec<_> = scored.into_iter().take(5).collect();
+
+            let _ = notifier.send_search_results(reply_to, query, &top).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "search", "query": query, "results": top.len()})))
+        }
+
+        "status" => {
+            let (memories, graph_edges, sona_patterns, drift) = {
+                let memories = state.store.memory_count();
+                let graph_edges = state.graph.read().edge_count();
+                let sona_patterns = state.sona.read().stats().patterns_stored;
+                let drift = state.drift.read().compute_drift(None).coefficient_of_variation;
+                (memories, graph_edges, sona_patterns, drift)
+            };
+            let _ = notifier.send_status(memories, graph_edges, sona_patterns, drift).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "status"})))
+        }
+
+        "help" => {
+            let _ = notifier.send_help(Some(reply_to)).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "help"})))
+        }
+
+        "welcome" => {
+            let _ = notifier.send_welcome(reply_to, None).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "welcome"})))
+        }
+
+        "subscribe" => {
+            let _ = notifier.send_welcome(reply_to, None).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "subscribe"})))
+        }
+
+        "unsubscribe" => {
+            tracing::info!("Unsubscribe via email: {}", reply_to);
+            let _ = notifier.send_to(reply_to, "chat", "Unsubscribed from Pi Brain",
+                r#"<div style="font-family:monospace;background:#0a0a23;color:#e0e0ff;padding:20px;border-radius:8px;">
+                <h2 style="color:#4fc3f7;">Unsubscribed</h2>
+                <p>You've been removed from Pi Brain digests. Reply with <code style="color:#7fdbca;">subscribe</code> anytime to rejoin.</p>
+                </div>"#).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "unsubscribe"})))
+        }
+
+        "drift" => {
+            let drift_report = state.drift.read().compute_drift(None);
+            let html = format!(
+                r#"<div style="font-family:monospace;background:#0a0a23;color:#e0e0ff;padding:20px;border-radius:8px;">
+                <h2 style="color:#4fc3f7;">Knowledge Drift Report</h2>
+                <table style="color:#e0e0ff;font-size:14px;">
+                <tr><td style="padding:4px 12px 4px 0;">Coefficient of Variation</td><td><strong>{:.4}</strong></td></tr>
+                <tr><td style="padding:4px 12px 4px 0;">Is Drifting</td><td><strong>{}</strong></td></tr>
+                <tr><td style="padding:4px 12px 4px 0;">Trend</td><td><strong>{}</strong></td></tr>
+                <tr><td style="padding:4px 12px 4px 0;">Suggested Action</td><td>{}</td></tr>
+                </table></div>"#,
+                drift_report.coefficient_of_variation,
+                if drift_report.is_drifting { "Yes" } else { "No" },
+                drift_report.trend,
+                drift_report.suggested_action,
+            );
+            let _ = notifier.send_to(reply_to, "chat", "Pi Brain — Drift Report", &html).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "drift"})))
+        }
+
+        _ => {
+            // Unknown command — send help
+            let _ = notifier.send_help(Some(reply_to)).await;
+            (StatusCode::OK, Json(serde_json::json!({"ok": true, "action": "help_fallback", "unrecognized": cmd})))
+        }
+    }
 }
 
 /// Verify the system key for internal endpoints
