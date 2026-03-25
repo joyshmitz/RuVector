@@ -6069,17 +6069,15 @@ struct GoogleChatUser {
     email: Option<String>,
 }
 
-/// Google Chat response wrapped in the Add-ons DataActions format.
+/// Google Chat response — return raw Message object.
 ///
-/// Google Workspace Add-ons expect responses wrapped in:
-///   { "hostAppDataAction": { "chatDataActionMarkup": { "createMessageAction": { "message": {...} } } } }
+/// For HTTP endpoint Chat apps, the response is a plain Message object:
+///   { "text": "...", "cardsV2": [...] }
 ///
-/// NOT the raw Message object. Returning a raw Message causes Google Chat
-/// to show "not responding" even though the HTTP status is 200.
-///
-/// See: https://developers.google.com/workspace/add-ons/chat/build
+/// The text field is required as a notification fallback.
+/// cardsV2 provides the rich card UI.
 fn chat_card(title: &str, subtitle: &str, sections: Vec<serde_json::Value>) -> serde_json::Value {
-    let message = serde_json::json!({
+    serde_json::json!({
         "text": format!("{} — {}", title, subtitle),
         "cardsV2": [{
             "cardId": "brain-response",
@@ -6093,21 +6091,6 @@ fn chat_card(title: &str, subtitle: &str, sections: Vec<serde_json::Value>) -> s
                 "sections": sections
             }
         }]
-    });
-
-    wrap_chat_response(message)
-}
-
-/// Wrap a Chat Message in the Add-ons DataActions envelope.
-fn wrap_chat_response(message: serde_json::Value) -> serde_json::Value {
-    serde_json::json!({
-        "hostAppDataAction": {
-            "chatDataActionMarkup": {
-                "createMessageAction": {
-                    "message": message
-                }
-            }
-        }
     })
 }
 
@@ -6135,15 +6118,19 @@ async fn google_chat_handler(
     State(state): State<AppState>,
     body: axum::body::Bytes,
 ) -> Json<serde_json::Value> {
+    // Log raw payload for debugging (truncated)
+    let raw_preview = String::from_utf8_lossy(&body[..body.len().min(500)]);
+    tracing::info!("Google Chat raw payload ({} bytes): {}", body.len(), raw_preview);
+
     // Parse body manually for resilience — log raw payload on failure
     let event: GoogleChatEvent = match serde_json::from_slice(&body) {
         Ok(e) => e,
         Err(err) => {
             let raw = String::from_utf8_lossy(&body);
             tracing::warn!("Failed to parse Chat event: {}. Raw: {}", err, &raw[..raw.len().min(500)]);
-            return Json(wrap_chat_response(serde_json::json!({
+            return Json(serde_json::json!({
                 "text": "Pi Brain received your message but couldn't parse it. Try: help"
-            })));
+            }));
         }
     };
 
