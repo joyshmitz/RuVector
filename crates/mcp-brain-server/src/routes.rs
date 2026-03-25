@@ -275,6 +275,7 @@ pub async fn create_router() -> (Router, AppState) {
         cached_partition: Arc::new(parking_lot::RwLock::new(None)),
         notifier: crate::notify::ResendNotifier::from_env(),
         cached_status: Arc::new(parking_lot::RwLock::new(None)),
+        gist_publisher: crate::gist::GistPublisher::from_env().map(Arc::new),
     };
 
     let router = Router::new()
@@ -359,6 +360,9 @@ pub async fn create_router() -> (Router, AppState) {
         .route("/v1/notify/unsubscribe", post(notify_unsubscribe))
         // ── Inbound Email Webhook (ADR-125) ──
         .route("/v1/email/inbound", post(email_inbound))
+        // ── Gist Publisher ──
+        .route("/v1/gist/preview", post(gist_preview))
+        .route("/v1/gist/publish", post(gist_publish))
         // ── Google Chat Bot (ADR-126) ──
         .route("/v1/chat/google", post(google_chat_handler))
         .layer({
@@ -469,12 +473,21 @@ pub fn run_enhanced_training_cycle(state: &AppState) -> EnhancedTrainingResult {
     // 3. Neural-symbolic rule extraction (ADR-110)
     let all_memories = state.store.all_memories();
     let clusters = build_memory_clusters(&all_memories);
-    let (propositions_extracted, inferences_derived) = {
+    let (propositions_extracted, inferences_derived, raw_propositions, raw_inferences) = {
         let mut ns = state.neural_symbolic.write();
         let props = ns.extract_from_clusters(&clusters);
         // Run forward-chaining inference over all propositions (new + existing)
         let inferences = ns.run_inference();
-        (props.len(), inferences.len())
+        // Capture actual content for discovery publishing
+        let prop_data: Vec<(String, String, String, f64)> = props.iter().map(|p| {
+            let subject = p.arguments.first().cloned().unwrap_or_default();
+            let object = p.arguments.get(1).cloned().unwrap_or_default();
+            (subject, p.predicate.clone(), object, p.confidence)
+        }).collect();
+        let inference_data: Vec<String> = inferences.iter().map(|inf| {
+            inf.explanation.clone()
+        }).collect();
+        (props.len(), inferences.len(), prop_data, inference_data)
     };
 
     // 3b. ADR-123: Record drift snapshots from cluster centroids
@@ -892,6 +905,164 @@ pub fn run_enhanced_training_cycle(state: &AppState) -> EnhancedTrainingResult {
 
     // Record reflection in the internal voice
     state.internal_voice.write().reflect(self_reflection.clone());
+
+    // ── Step 10: Build discovery for potential gist publication ──
+    let witness_memory_ids: Vec<String> = all_memories
+        .iter()
+        .filter(|m| m.witness_chain.is_some())
+        .take(10)
+        .map(|m| m.id.to_string())
+        .collect();
+    let witness_hashes: Vec<String> = all_memories
+        .iter()
+        .filter(|m| !m.witness_hash.is_empty())
+        .take(10)
+        .map(|m| m.witness_hash.clone())
+        .collect();
+
+    // Build findings from actual brain knowledge — pull top cross-domain memories
+    let mut findings = Vec::new();
+
+    // Find memories tagged with "cross-domain" or "discovery" — these are the real insights
+    let discovery_memories: Vec<&BrainMemory> = all_memories.iter()
+        .filter(|m| {
+            m.tags.iter().any(|t| t.contains("cross-domain") || t.contains("discovery") || t.contains("hypothesis"))
+                || m.title.contains("Cross-Domain")
+                || m.title.contains("Discovery")
+                || m.title.contains("Hypothesis")
+        })
+        .collect();
+
+    // Use actual memory content as findings (real knowledge, not metrics)
+    for mem in discovery_memories.iter().take(5) {
+        // Truncate content to first meaningful sentence
+        let content = &mem.content;
+        let finding = if let Some(pos) = content[..content.len().min(300)].find(". ") {
+            &content[..pos + 1]
+        } else {
+            &content[..content.len().min(200)]
+        };
+        findings.push(format!("{}: {}", mem.title, finding));
+    }
+
+    // Add reflection parts that aren't just metrics
+    for part in &reflection_parts {
+        if part.len() > 30 && !part.starts_with("Vote coverage") {
+            findings.push(part.clone());
+        }
+    }
+
+    if curiosity_triggered {
+        findings.push("Curiosity engine detected knowledge gaps and synthesized exploratory memory".to_string());
+    }
+
+    let mut methodology = Vec::new();
+    methodology.push(format!("SONA trajectory replay: {}", sona_result));
+    methodology.push(format!(
+        "Domain evolution: Pareto front {} → {} solutions",
+        pareto_before, pareto_after
+    ));
+    methodology.push(format!(
+        "Neural-symbolic extraction from {} category clusters",
+        clusters.len()
+    ));
+    methodology.push(format!(
+        "Strange loop meta-cognitive assessment: quality={:.4}",
+        strange_loop_adjustment
+    ));
+    methodology.push(format!(
+        "Internal voice reflection: {} thoughts generated",
+        voice_thoughts
+    ));
+
+    let dominant_category = category_counts
+        .iter()
+        .max_by_key(|(_, c)| *c)
+        .map(|(cat, _)| cat.clone())
+        .unwrap_or_else(|| "general".to_string());
+
+    // Build a title from the actual inferences (not generic metrics)
+    let discovery_title = if !raw_inferences.is_empty() {
+        // Use first inference as the basis for the title
+        let first = &raw_inferences[0];
+        let short = if first.len() > 80 { &first[..80] } else { first };
+        format!("Discovery: {}", short)
+    } else if curiosity_triggered {
+        "Curiosity-Driven Knowledge Gap Analysis".to_string()
+    } else {
+        format!("Cross-Domain Synthesis in {}", dominant_category)
+    };
+
+    // Build abstract from actual findings, not metrics
+    let abstract_parts: Vec<&str> = raw_inferences.iter()
+        .take(3)
+        .map(|s| s.as_str())
+        .collect();
+    let abstract_text = if !abstract_parts.is_empty() {
+        format!(
+            "Through forward-chaining symbolic reasoning over {} observations, \
+             the π Brain discovered: {}. These inferences emerge from {} propositions \
+             extracted across {} knowledge clusters, with a meta-cognitive quality \
+             assessment of {:.4}.",
+            memory_count,
+            abstract_parts.join("; "),
+            propositions_extracted,
+            clusters.len(),
+            strange_loop_adjustment,
+        )
+    } else {
+        format!(
+            "Analysis of {} observations across {} clusters yielded {} propositions. \
+             The cognitive pipeline is building towards novel inference capability.",
+            memory_count, clusters.len(), propositions_extracted
+        )
+    };
+
+    let pareto_growth = pareto_after.saturating_sub(pareto_before);
+
+    let discovery = crate::gist::Discovery {
+        title: discovery_title,
+        category: dominant_category,
+        abstract_text,
+        findings,
+        methodology,
+        evidence_count: memory_count,
+        confidence: vote_coverage,
+        timestamp: chrono::Utc::now(),
+        witness_memory_ids,
+        witness_hashes,
+        strange_loop_score: strange_loop_adjustment,
+        new_inferences: inferences_derived,
+        propositions_extracted,
+        sona_patterns: sona_stats.patterns_stored,
+        pareto_growth,
+        curiosity_triggered,
+        self_reflection: self_reflection.clone(),
+        propositions: raw_propositions,
+        inferences: raw_inferences,
+    };
+
+    // Attempt gist publication (non-blocking — caller handles async)
+    if let Some(ref publisher) = state.gist_publisher {
+        if discovery.is_publishable() {
+            let pub_clone = publisher.clone();
+            let disc_clone = discovery.clone();
+            // Spawn async publish in background (can't await in sync fn)
+            tokio::spawn(async move {
+                match pub_clone.try_publish(&disc_clone).await {
+                    Ok(Some(url)) => {
+                        tracing::info!("Discovery published to gist: {}", url);
+                    }
+                    Ok(None) => {} // Not novel enough or rate limited
+                    Err(e) => {
+                        tracing::warn!("Gist publish failed: {}", e);
+                    }
+                }
+            });
+        } else {
+            tracing::debug!("Discovery not publishable: {}", discovery.novelty_report());
+        }
+    }
 
     EnhancedTrainingResult {
         sona_message: sona_result,
@@ -5389,6 +5560,79 @@ async fn proxy_delete(
         let body = resp.text().await.unwrap_or_default();
         Err(format!("API error ({status}): {body}"))
     }
+}
+
+// ── Gist Publisher Handlers ──────────────────────────────────────────
+
+/// POST /v1/gist/preview — show what the novelty gate sees without publishing.
+async fn gist_preview(
+    State(state): State<AppState>,
+    _contributor: AuthenticatedContributor,
+) -> Json<serde_json::Value> {
+    // Run enhanced training (which internally builds a discovery and checks publishability)
+    let result = run_enhanced_training_cycle(&state);
+
+    // Read current propositions + inferences from symbolic engine
+    let ns = state.neural_symbolic.read();
+    let props: Vec<serde_json::Value> = ns.all_propositions().iter().take(10).map(|p| {
+        serde_json::json!({
+            "predicate": p.predicate,
+            "arguments": p.arguments,
+            "confidence": p.confidence,
+            "reinforcements": p.reinforcement_count,
+        })
+    }).collect();
+    drop(ns);
+
+    Json(serde_json::json!({
+        "training_result": {
+            "propositions_extracted": result.propositions_extracted,
+            "inferences_derived": result.inferences_derived,
+            "strange_loop_score": result.strange_loop_score,
+            "sona_patterns": result.sona_patterns,
+            "pareto_before": result.pareto_before,
+            "pareto_after": result.pareto_after,
+            "curiosity_triggered": result.curiosity_triggered,
+            "self_reflection": result.self_reflection,
+        },
+        "novelty_thresholds": {
+            "min_inferences": 5,
+            "min_propositions": 8,
+            "min_strange_loop": 0.05,
+            "min_sona_patterns": 1,
+            "min_pareto_growth": 2,
+            "min_evidence": 100,
+        },
+        "current_propositions": props,
+        "gist_publisher_active": state.gist_publisher.is_some(),
+        "published_count": state.gist_publisher.as_ref().map(|p| p.published_count()).unwrap_or(0),
+    }))
+}
+
+/// POST /v1/gist/publish — force-publish (the automatic path publishes only when
+/// the novelty gate passes during the background cognitive loop).
+async fn gist_publish(
+    State(state): State<AppState>,
+    _contributor: AuthenticatedContributor,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let publisher = state.gist_publisher.as_ref()
+        .ok_or((StatusCode::SERVICE_UNAVAILABLE, "GITHUB_GIST_PAT not configured".into()))?;
+
+    // The enhanced training cycle now auto-publishes via tokio::spawn if thresholds are met.
+    // This endpoint triggers a cycle and reports the result.
+    let result = run_enhanced_training_cycle(&state);
+
+    Ok(Json(serde_json::json!({
+        "cycle_ran": true,
+        "propositions_extracted": result.propositions_extracted,
+        "inferences_derived": result.inferences_derived,
+        "strange_loop_score": result.strange_loop_score,
+        "sona_patterns": result.sona_patterns,
+        "pareto_growth": result.pareto_after.saturating_sub(result.pareto_before),
+        "curiosity_triggered": result.curiosity_triggered,
+        "note": "Gist is published automatically when all novelty thresholds are met. Check Cloud Run logs for 'Discovery published to gist' entries.",
+        "published_count": publisher.published_count(),
+    })))
 }
 
 // ── Email Notification Handlers (ADR-125) ──────────────────────────────

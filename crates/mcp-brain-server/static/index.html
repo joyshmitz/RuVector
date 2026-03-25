@@ -1705,44 +1705,44 @@ window.addEventListener('resize', () => {
 });
 
 // ── Live data ──
+const FETCH_TIMEOUT = 8000; // 8s timeout per request
+function fetchWithTimeout(url, opts = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 async function fetchData() {
   try {
     console.log('[π] Fetching live data...');
-    const [statusResp, healthResp, memResp] = await Promise.all([
-      fetch('/v1/status', { headers: { Authorization: 'Bearer brain-ui' } }),
-      fetch('/v1/health'),
-      fetch('/v1/memories/list?limit=100', { headers: { Authorization: 'Bearer brain-ui' } }),
+    // Fetch status+health first (fast), memories separately (can be slow)
+    const [statusResp, healthResp] = await Promise.all([
+      fetchWithTimeout('/v1/status', { headers: { Authorization: 'Bearer brain-ui' } }),
+      fetchWithTimeout('/v1/health'),
     ]);
-    console.log('[π] Status:', statusResp.status, 'Health:', healthResp.status, 'Memories:', memResp.status);
 
     const status = statusResp.ok ? await statusResp.json() : null;
     const health = healthResp.ok ? await healthResp.json() : null;
-    const memJson = memResp.ok ? await memResp.json() : [];
-    const memories = Array.isArray(memJson) ? memJson : (Array.isArray(memJson.memories) ? memJson.memories : []);
 
     if (status) {
-      console.log('[π] Status data:', JSON.stringify(status));
       document.getElementById('s-mem').textContent = status.total_memories || 0;
       document.getElementById('s-con').textContent = status.total_contributors || 0;
       document.getElementById('s-edg').textContent = (status.graph_edges || 0).toLocaleString();
       document.getElementById('s-edge').textContent = status.graph_nodes || 0;
       document.getElementById('s-emb').textContent = status.embedding_engine ? status.embedding_dim + 'd' : '--';
-      if (!liveData || liveData.total_memories !== status.total_memories) buildParticles(memories);
-      liveData = status;
-    } else {
-      console.warn('[π] Status fetch failed:', statusResp.status, await statusResp.text().catch(()=>''));
+      // Rebuild particles when memory count changes (buildParticles only uses count, not data)
+      if (!liveData || liveData.total_memories !== status.total_memories) {
+        buildParticles(new Array(Math.min(status.total_memories || 0, 200)));
+      }
     }
     if (health) {
-      console.log('[π] Health:', JSON.stringify(health));
       const hrs = Math.floor(health.uptime_seconds / 3600);
       const mins = Math.floor((health.uptime_seconds % 3600) / 60);
       document.getElementById('s-up').textContent = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
-    } else {
-      console.warn('[π] Health fetch failed:', healthResp.status);
     }
-    console.log('[π] Memories loaded:', memories.length);
+    liveData = status;
   } catch(e) {
-    console.error('[π] fetchData error:', e.message, e.stack);
+    console.error('[π] fetchData error:', e.message);
   }
 }
 fetchData();
@@ -1889,6 +1889,303 @@ function subscribeEmail(source){
     window.location.href = 'mailto:pi@ruv.io?subject=subscribe&body=Subscribe%20me%20to%20daily%20discovery%20digests.%0A%0AEmail:%20' + encodeURIComponent(email);
   });
 }
+</script>
+
+<!-- π Brain Console API + Background Worker -->
+<script>
+(function(){
+'use strict';
+
+// ── Auth helper ──
+const H = k => ({ headers: { Authorization: 'Bearer ' + (k || localStorage.getItem('pi_key') || 'brain-ui'), 'Content-Type': 'application/json' }});
+const J = r => r.ok ? r.json() : r.text().then(t => { throw new Error(r.status + ': ' + t) });
+
+// ── Background memory sync (Web Worker via Blob) ──
+const workerCode = `
+let interval = null;
+let apiKey = 'brain-ui';
+let pollMs = 60000;
+
+self.onmessage = function(e) {
+  const d = e.data;
+  if (d.cmd === 'start') {
+    apiKey = d.key || apiKey;
+    pollMs = d.interval || pollMs;
+    if (interval) clearInterval(interval);
+    poll();
+    interval = setInterval(poll, pollMs);
+  }
+  if (d.cmd === 'stop') { clearInterval(interval); interval = null; }
+  if (d.cmd === 'poll') poll();
+  if (d.cmd === 'key') apiKey = d.key;
+  if (d.cmd === 'interval') { pollMs = d.interval; if (interval) { clearInterval(interval); interval = setInterval(poll, pollMs); } }
+};
+
+async function poll() {
+  try {
+    const r = await fetch('/v1/status', { headers: { Authorization: 'Bearer ' + apiKey } });
+    if (r.ok) {
+      const status = await r.json();
+      self.postMessage({ type: 'status', data: status });
+    }
+  } catch(e) {
+    self.postMessage({ type: 'error', msg: e.message });
+  }
+}
+`;
+
+const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+const worker = new Worker(URL.createObjectURL(workerBlob));
+let _lastSync = null;
+
+worker.onmessage = function(e) {
+  const msg = e.data;
+  if (msg.type === 'status') {
+    _lastSync = msg.data;
+    // Update page stats silently
+    const s = msg.data;
+    const el = id => document.getElementById(id);
+    if (el('s-mem')) el('s-mem').textContent = s.total_memories || 0;
+    if (el('s-con')) el('s-con').textContent = s.total_contributors || 0;
+    if (el('s-edg')) el('s-edg').textContent = (s.graph_edges || 0).toLocaleString();
+    if (el('s-edge')) el('s-edge').textContent = s.graph_nodes || 0;
+    if (el('s-emb')) el('s-emb').textContent = s.embedding_engine ? s.embedding_dim + 'd' : '--';
+    // Rebuild particles if count changed
+    if (typeof liveData !== 'undefined' && typeof buildParticles === 'function') {
+      if (!liveData || liveData.total_memories !== s.total_memories) {
+        buildParticles(new Array(Math.min(s.total_memories || 0, 200)));
+      }
+    }
+    if (typeof liveData !== 'undefined') liveData = s;
+  }
+};
+worker.postMessage({ cmd: 'start', key: localStorage.getItem('pi_key') || 'brain-ui', interval: 60000 });
+
+// ── Console formatting ──
+const _t = (label, color) => [`%c${label}`, `color:${color};font-weight:bold`];
+const _log = (label, data) => { console.log(..._t('π ' + label, '#d4a574')); if (data !== undefined) console.table ? console.table(data) : console.log(data); return data; };
+const _ok = (msg, data) => { console.log(..._t('✓ ' + msg, '#7ddf64')); if (data !== undefined) console.log(data); return data; };
+const _err = msg => { console.error(..._t('✗ ' + msg, '#ff6b6b')); };
+
+// ── π Brain Console API ──
+const pi = {
+  // ── Auth ──
+  key(k) { if (k) { localStorage.setItem('pi_key', k); worker.postMessage({ cmd: 'key', key: k }); return _ok('Key saved'); } return localStorage.getItem('pi_key') || 'brain-ui'; },
+
+  // ── Status & Health ──
+  async s()      { return _log('status', _lastSync || await fetch('/v1/status', H()).then(J)); },
+  async hp()     { return _log('health', await fetch('/v1/health').then(J)); },
+  async drift()  { return _log('drift', await fetch('/v1/drift', H()).then(J)); },
+  async sona()   { return _log('sona', await fetch('/v1/sona/stats', H()).then(J)); },
+  async cog()    { return _log('cognitive', await fetch('/v1/cognitive/status', H()).then(J)); },
+  async mid()    { return _log('midstream', await fetch('/v1/midstream', H()).then(J)); },
+  async temp()   { return _log('temporal', await fetch('/v1/temporal', H()).then(J)); },
+  async lora()   { return _log('lora', await fetch('/v1/lora/latest', H()).then(J)); },
+  async pipe()   { return _log('pipeline', await fetch('/v1/pipeline/metrics', H()).then(J)); },
+  async opt()    { return _log('optimizer', await fetch('/v1/optimizer/status', H()).then(J)); },
+  async explore(){ return _log('explore', await fetch('/v1/explore', H()).then(J)); },
+
+  // ── Search & List ──
+  async q(query, n=5) {
+    const p = new URLSearchParams({ q: query, limit: n });
+    const r = await fetch('/v1/memories/search?' + p, H()).then(J);
+    const mems = (r.results || r).map(m => ({ id: (m.id||'').slice(0,8), score: m.score?.toFixed(3), title: m.title, cat: m.category, tags: (m.tags||[]).join(',') }));
+    return _log(`search "${query}"`, mems);
+  },
+  async ls(n=20, cat) {
+    const p = new URLSearchParams({ limit: n }); if (cat) p.set('category', cat);
+    const r = await fetch('/v1/memories/list?' + p, H()).then(J);
+    const mems = (r.memories || r).map(m => ({ id: (m.id||'').slice(0,8), title: m.title, cat: m.category, q: m.quality_score?.mean?.toFixed(2) || '?', tags: (m.tags||[]).join(',') }));
+    return _log(`list (${(r.total_count||mems.length)} total)`, mems);
+  },
+  async get(id) {
+    const r = await fetch('/v1/memories/' + id, H()).then(J);
+    return _log('memory ' + id.slice(0,8), { title: r.title, content: r.content, category: r.category, tags: r.tags, quality: r.quality_score, contributor: r.contributor, created: r.created_at });
+  },
+
+  // ── Write ──
+  async add(title, content, opts={}) {
+    const body = { title, content, category: opts.cat || 'solution', tags: opts.tags || [], source: opts.src || 'console' };
+    const r = await fetch('/v1/memories', { method: 'POST', ...H(), body: JSON.stringify(body) }).then(J);
+    return _ok('shared: ' + (r.id||'').slice(0,8), r);
+  },
+  async vote(id, dir='up') {
+    const r = await fetch('/v1/memories/' + id + '/vote', { method: 'POST', ...H(), body: JSON.stringify({ direction: dir }) }).then(J);
+    return _ok(dir + 'voted ' + id.slice(0,8), r);
+  },
+  async up(id)   { return this.vote(id, 'up'); },
+  async down(id) { return this.vote(id, 'down'); },
+  async rm(id) {
+    await fetch('/v1/memories/' + id, { method: 'DELETE', ...H() });
+    return _ok('deleted ' + id.slice(0,8));
+  },
+
+  // ── Inject (pipeline) ──
+  async inject(title, content, opts={}) {
+    const body = { title, content, category: opts.cat || 'solution', tags: opts.tags || [], source: opts.src || 'console-inject' };
+    const r = await fetch('/v1/pipeline/inject', { method: 'POST', ...H(), body: JSON.stringify(body) }).then(J);
+    return _ok('injected', r);
+  },
+  async batch(items) {
+    // items: [{title, content, category?, tags?}, ...]
+    const r = await fetch('/v1/pipeline/inject/batch', { method: 'POST', ...H(), body: JSON.stringify({ memories: items }) }).then(J);
+    return _ok('batch: ' + (r.injected || 0) + ' injected', r);
+  },
+
+  // ── Training ──
+  async train(opts={}) {
+    const r = await fetch('/v1/train', { method: 'POST', ...H(), body: JSON.stringify(opts) }).then(J);
+    return _ok('training', r);
+  },
+  async trainx(opts={}) {
+    const r = await fetch('/v1/train/enhanced', { method: 'POST', ...H(), body: JSON.stringify(opts) }).then(J);
+    return _ok('enhanced training', r);
+  },
+
+  // ── Pages (wiki) ──
+  async pages(n=20) {
+    const r = await fetch('/v1/pages?limit=' + n, H()).then(J);
+    const pgs = (r.pages || r).map(p => ({ id: (p.id||'').slice(0,8), title: p.title, status: p.status, deltas: p.delta_count }));
+    return _log('pages', pgs);
+  },
+  async page(id) { return _log('page', await fetch('/v1/pages/' + id, H()).then(J)); },
+  async mkpage(title, content, opts={}) {
+    const body = { title, initial_content: content, category: opts.cat || 'general', tags: opts.tags || [] };
+    const r = await fetch('/v1/pages', { method: 'POST', ...H(), body: JSON.stringify(body) }).then(J);
+    return _ok('page created: ' + (r.id||'').slice(0,8), r);
+  },
+
+  // ── Nodes (WASM) ──
+  async nodes() { return _log('nodes', await fetch('/v1/nodes', H()).then(J)); },
+  async node(id) { return _log('node', await fetch('/v1/nodes/' + id, H()).then(J)); },
+
+  // ── Reasoning ──
+  async reason(query, opts={}) {
+    const body = { query, max_steps: opts.steps || 5, ...opts };
+    const r = await fetch('/v1/reason', { method: 'POST', ...H(), body: JSON.stringify(body) }).then(J);
+    return _log('reason', r);
+  },
+  async ground(statement) {
+    const r = await fetch('/v1/ground', { method: 'POST', ...H(), body: JSON.stringify({ statement }) }).then(J);
+    return _log('ground', r);
+  },
+  async props() { return _log('propositions', await fetch('/v1/propositions', H()).then(J)); },
+
+  // ── Voice / Internal ──
+  async voice()     { return _log('voice', await fetch('/v1/voice/working', H()).then(J)); },
+  async thoughts()  { return _log('thoughts', await fetch('/v1/voice/history', H()).then(J)); },
+  async goal(text)  { return _ok('goal set', await fetch('/v1/voice/goal', { method: 'POST', ...H(), body: JSON.stringify({ goal: text }) }).then(J)); },
+
+  // ── Graph ──
+  async part(compact=true) {
+    const p = compact ? '?compact=true' : '';
+    return _log('partition', await fetch('/v1/partition' + p, H()).then(J));
+  },
+
+  // ── Notifications ──
+  async notify(to, subject, body) {
+    const r = await fetch('/v1/notify/send', { method: 'POST', ...H(), body: JSON.stringify({ to, subject, body }) }).then(J);
+    return _ok('sent to ' + to, r);
+  },
+
+  // ── Transfer ──
+  async transfer(target, query, n=10) {
+    const body = { target_url: target, query, limit: n };
+    const r = await fetch('/v1/transfer', { method: 'POST', ...H(), body: JSON.stringify(body) }).then(J);
+    return _ok('transferred', r);
+  },
+
+  // ── Worker control ──
+  sync()     { worker.postMessage({ cmd: 'poll' }); return _ok('syncing...'); },
+  pause()    { worker.postMessage({ cmd: 'stop' }); return _ok('worker paused'); },
+  resume(ms) { worker.postMessage({ cmd: 'start', key: localStorage.getItem('pi_key') || 'brain-ui', interval: ms || 60000 }); return _ok('worker resumed'); },
+  freq(ms)   { worker.postMessage({ cmd: 'interval', interval: ms }); return _ok('poll interval: ' + ms + 'ms'); },
+
+  // ── Verify ──
+  async verify(id) {
+    const r = await fetch('/v1/verify', { method: 'POST', ...H(), body: JSON.stringify({ memory_id: id }) }).then(J);
+    return _log('verify', r);
+  },
+
+  // ── Help ──
+  help() {
+    const cmds = [
+      ['QUERY',       ''],
+      ['pi.q("AI")',  'Search memories'],
+      ['pi.q("AI",10)','Search with limit'],
+      ['pi.ls()',     'List recent memories'],
+      ['pi.ls(10,"pattern")','List by category'],
+      ['pi.get(id)',  'Get full memory'],
+      ['',            ''],
+      ['WRITE',       ''],
+      ['pi.add("title","content",{cat:"pattern",tags:["a"]})', 'Share memory'],
+      ['pi.inject("t","c")', 'Pipeline inject'],
+      ['pi.batch([{title,content}])', 'Batch inject'],
+      ['pi.up(id)',   'Upvote'],
+      ['pi.down(id)', 'Downvote'],
+      ['pi.rm(id)',   'Delete memory'],
+      ['',            ''],
+      ['PAGES',       ''],
+      ['pi.pages()',  'List wiki pages'],
+      ['pi.page(id)', 'Get page'],
+      ['pi.mkpage("t","c")', 'Create page'],
+      ['',            ''],
+      ['AI / REASONING',''],
+      ['pi.reason("query")', 'Neural-symbolic reasoning'],
+      ['pi.ground("X is Y")', 'Ground a proposition'],
+      ['pi.props()',  'List propositions'],
+      ['pi.voice()',  'Working memory'],
+      ['pi.thoughts()','Voice history'],
+      ['pi.goal("text")', 'Set internal goal'],
+      ['',            ''],
+      ['STATUS',      ''],
+      ['pi.s()',      'Brain status'],
+      ['pi.hp()',     'Health'],
+      ['pi.drift()',  'Drift report'],
+      ['pi.sona()',   'SONA stats'],
+      ['pi.cog()',    'Cognitive status'],
+      ['pi.mid()',    'Midstream stats'],
+      ['pi.temp()',   'Temporal stats'],
+      ['pi.lora()',   'LoRA federation'],
+      ['pi.pipe()',   'Pipeline metrics'],
+      ['pi.opt()',    'Optimizer status'],
+      ['pi.explore()','Meta-learning'],
+      ['pi.part()',   'Graph partition'],
+      ['',            ''],
+      ['TRAINING',    ''],
+      ['pi.train()',  'Run training cycle'],
+      ['pi.trainx()', 'Enhanced training'],
+      ['',            ''],
+      ['SYSTEM',      ''],
+      ['pi.key("k")', 'Set API key'],
+      ['pi.key()',    'Show current key'],
+      ['pi.sync()',   'Force sync now'],
+      ['pi.pause()',  'Pause background worker'],
+      ['pi.resume()', 'Resume worker'],
+      ['pi.freq(30000)', 'Set poll interval (ms)'],
+      ['pi.verify(id)', 'Verify memory RVF chain'],
+      ['pi.notify(to,subj,body)', 'Send email'],
+      ['pi.transfer(url,q)', 'Transfer memories'],
+      ['pi.nodes()',  'List WASM nodes'],
+    ];
+    console.log('%c\n  π Brain Console\n  ─────────────────────────────────', 'color:#d4a574;font-weight:bold;font-size:14px');
+    cmds.forEach(([cmd, desc]) => {
+      if (!cmd && !desc) console.log('');
+      else if (!desc) console.log('%c  ' + cmd, 'color:#7ddf64;font-weight:bold;font-size:11px');
+      else console.log('%c  ' + cmd.padEnd(38) + '%c' + desc, 'color:#e8d5b7;font-family:monospace', 'color:#888');
+    });
+    console.log('%c\n  Tip: All commands return promises — use await or .then()', 'color:#666;font-style:italic');
+    return 'π';
+  }
+};
+
+// Expose globally
+window.pi = pi;
+
+// Startup banner (quiet — no status dump)
+console.log('%c π Brain Console %c ready — type pi.help() for commands', 'background:#d4a574;color:#1a1a2e;padding:2px 8px;border-radius:3px;font-weight:bold', 'color:#888');
+
+})();
 </script>
 
 </body>

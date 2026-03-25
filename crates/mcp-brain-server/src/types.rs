@@ -359,7 +359,7 @@ pub struct HealthResponse {
     pub persistence_mode: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StatusResponse {
     pub total_memories: usize,
     pub total_contributors: usize,
@@ -1247,6 +1247,10 @@ pub struct AppState {
     pub cached_partition: std::sync::Arc<parking_lot::RwLock<Option<PartitionResult>>>,
     /// Resend email notifier (ADR-125) — None if RESEND_API_KEY not set
     pub notifier: Option<crate::notify::ResendNotifier>,
+    /// Cached /v1/status response to avoid recomputing expensive aggregates every call
+    pub cached_status: std::sync::Arc<parking_lot::RwLock<Option<(std::time::Instant, StatusResponse)>>>,
+    /// GitHub Gist publisher for autonomous discoveries — None if GITHUB_GIST_PAT not set
+    pub gist_publisher: Option<std::sync::Arc<crate::gist::GistPublisher>>,
 }
 
 // ──────────────────────────────────────────────────────────────────────

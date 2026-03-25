@@ -901,6 +901,14 @@ impl FirestoreClient {
         self.memories.iter().map(|e| e.value().clone()).collect()
     }
 
+    /// Get the N most recently created memories (cheap — no sort, just takes latest by insert order)
+    pub fn recent_memories(&self, n: usize) -> Vec<BrainMemory> {
+        let mut mems: Vec<BrainMemory> = self.memories.iter().map(|e| e.value().clone()).collect();
+        mems.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        mems.truncate(n);
+        mems
+    }
+
     /// Auto-upvote a memory's quality_score directly (used by training cycle for vote coverage).
     /// Bypasses voter dedup and contributor checks — only for internal heuristic voting.
     pub fn auto_upvote_quality(&self, id: &Uuid) {

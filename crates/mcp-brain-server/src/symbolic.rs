@@ -107,12 +107,35 @@ impl Inference {
         premises: Vec<Uuid>,
         combined_confidence: f64,
     ) -> Self {
-        let explanation = format!(
-            "Derived '{}' by applying rules [{}] to {} premises",
-            conclusion.to_string_human(),
-            rules_applied.join(" → "),
-            premises.len()
-        );
+        // Use confidence-gated language — never overstate weak signals
+        let strength = if combined_confidence >= 0.8 {
+            "strongly associated with"
+        } else if combined_confidence >= 0.65 {
+            "likely influences"
+        } else if combined_confidence >= 0.5 {
+            "may be associated with"
+        } else {
+            "shows weak co-occurrence with"
+        };
+
+        let explanation = if conclusion.arguments.len() >= 2 {
+            format!(
+                "{} {} {} (confidence: {:.0}%, {} evidence items, via {})",
+                conclusion.arguments[0],
+                strength,
+                conclusion.arguments[1],
+                combined_confidence * 100.0,
+                conclusion.evidence.len(),
+                rules_applied.join(" + ")
+            )
+        } else {
+            format!(
+                "Derived '{}' via {} ({} premises)",
+                conclusion.to_string_human(),
+                rules_applied.join(" + "),
+                premises.len()
+            )
+        };
         Self {
             id: Uuid::new_v4(),
             conclusion,
@@ -284,10 +307,25 @@ impl NeuralSymbolicBridge {
             0.8,
         ));
 
-        // Causation is transitive
+        // Association is transitive (with decay): if A associated_with B and B associated_with C → A co_occurs_with C
         self.rules.push(HornClause::new(
-            vec![PredicateType::Causes, PredicateType::Causes],
-            PredicateType::Causes,
+            vec![PredicateType::Custom("associated_with".to_string()), PredicateType::Custom("associated_with".to_string())],
+            PredicateType::Custom("co_occurs_with".to_string()),
+            0.5,
+        ));
+
+        // Influence chain: if A may_influence B and B may_influence C → A associated_with C
+        // (demotes from influence to association when chaining — honest decay)
+        self.rules.push(HornClause::new(
+            vec![PredicateType::Custom("may_influence".to_string()), PredicateType::Custom("may_influence".to_string())],
+            PredicateType::Custom("associated_with".to_string()),
+            0.6,
+        ));
+
+        // Cross-type influence: if A may_influence B and B is_type_of C → A associated_with C
+        self.rules.push(HornClause::new(
+            vec![PredicateType::Custom("may_influence".to_string()), PredicateType::IsTypeOf],
+            PredicateType::Custom("associated_with".to_string()),
             0.5,
         ));
 
@@ -314,11 +352,12 @@ impl NeuralSymbolicBridge {
             0.6,
         ));
 
-        // Same-type relation: if A is_type_of X and B is_type_of X, then A relates_to B
+        // Same-type relation: if A is_type_of X and B is_type_of X, then A co_occurs_with B
+        // (NOT "relates_to" — sharing a type is weak evidence)
         self.rules.push(HornClause::new(
             vec![PredicateType::IsTypeOf, PredicateType::IsTypeOf],
-            PredicateType::RelatesTo,
-            0.5,
+            PredicateType::Custom("co_occurs_with".to_string()),
+            0.4,
         ));
 
         // Transitive solution via dependency: if A solves B and B depends_on C, then A solves C
@@ -328,11 +367,11 @@ impl NeuralSymbolicBridge {
             0.7,
         ));
 
-        // Causal prevention: if A causes B and B prevents C, then A prevents C
+        // Influence→prevention: if A may_influence B and B prevents C, then A co_occurs_with C
         self.rules.push(HornClause::new(
-            vec![PredicateType::Causes, PredicateType::Prevents],
-            PredicateType::Prevents,
-            0.6,
+            vec![PredicateType::Custom("may_influence".to_string()), PredicateType::Prevents],
+            PredicateType::Custom("co_occurs_with".to_string()),
+            0.4,
         ));
 
         // Composition: if A part_of B and B part_of C, then A part_of C
@@ -370,47 +409,96 @@ impl NeuralSymbolicBridge {
             }
         }
 
-        // ── ADR-123: Extract relates_to propositions between clusters sharing a category ──
-        // Group clusters by category and create cross-cluster relations
-        let mut by_category: HashMap<String, Vec<usize>> = HashMap::new();
-        for (i, (_, _, category)) in clusters.iter().enumerate() {
-            by_category.entry(category.clone()).or_default().push(i);
-        }
-        for (_category, indices) in &by_category {
-            if indices.len() < 2 {
-                continue;
-            }
-            // Create relates_to between pairs (limit to first 5 pairs to avoid combinatorial explosion)
-            let mut pair_count = 0;
-            for i in 0..indices.len() {
-                for j in (i + 1)..indices.len() {
-                    if pair_count >= 5 {
-                        break;
+        // ── Cross-category relations: find structural connections between different domains ──
+        // This is where real discoveries happen — connecting clusters across categories
+        for i in 0..clusters.len() {
+            for j in (i + 1)..clusters.len() {
+                let (ref c1, ref ids1, ref cat1) = clusters[i];
+                let (ref c2, ref ids2, ref cat2) = clusters[j];
+
+                if ids1.len() < self.config.min_cluster_size || ids2.len() < self.config.min_cluster_size {
+                    continue;
+                }
+
+                let sim = cosine_similarity(c1, c2);
+                let cross_domain = cat1 != cat2;
+
+                // Skip weak signals
+                if sim < 0.3 {
+                    continue;
+                }
+
+                let mut merged_evidence = ids1.clone();
+                merged_evidence.extend_from_slice(ids2);
+                merged_evidence.truncate(20);
+                let midpoint: Vec<f32> = c1.iter().zip(c2.iter()).map(|(a, b)| (a + b) / 2.0).collect();
+
+                // Use category names instead of cluster sizes for human-readable arguments
+                let arg1 = cat1.clone();
+                let arg2 = cat2.clone();
+
+                // ── Confidence-gated predicate selection ──
+                // Embedding similarity alone only establishes co-occurrence, not causation.
+                // Use honest language:
+                //   sim > 0.7 + cross-domain → "may_influence" (candidate directional link)
+                //   sim > 0.5 + cross-domain → "associated_with" (co-occurrence signal)
+                //   sim > 0.3 + cross-domain → "co_occurs_with" (weak association)
+                //   sim > 0.6 + same domain  → "similar_to"
+                // "causes" and "depends_on" are reserved for validated temporal evidence.
+
+                let conf = sim * self.cluster_confidence(ids1.len().min(ids2.len()));
+
+                if cross_domain && sim > 0.7 {
+                    // Strong cross-domain co-occurrence — candidate influence, NOT proven causal
+                    let prop = GroundedProposition::new(
+                        "may_influence".to_string(),
+                        vec![arg1.clone(), arg2.clone()],
+                        midpoint.clone(),
+                        conf,
+                        merged_evidence.clone(),
+                    );
+                    if prop.confidence >= self.config.min_confidence {
+                        extracted.push(prop.clone());
+                        self.store_proposition(prop);
                     }
-                    let (ref c1, ref ids1, _) = clusters[indices[i]];
-                    let (ref c2, ref ids2, _) = clusters[indices[j]];
-                    if ids1.len() < self.config.min_cluster_size || ids2.len() < self.config.min_cluster_size {
-                        continue;
+                } else if cross_domain && sim > 0.5 {
+                    // Moderate cross-domain signal — association
+                    let prop = GroundedProposition::new(
+                        "associated_with".to_string(),
+                        vec![arg1.clone(), arg2.clone()],
+                        midpoint.clone(),
+                        conf,
+                        merged_evidence.clone(),
+                    );
+                    if prop.confidence >= self.config.min_confidence {
+                        extracted.push(prop.clone());
+                        self.store_proposition(prop);
                     }
-                    // Compute similarity between centroids
-                    let sim = cosine_similarity(c1, c2);
-                    if sim > 0.3 {
-                        let mut merged_evidence = ids1.clone();
-                        merged_evidence.extend_from_slice(ids2);
-                        merged_evidence.truncate(10); // cap evidence size
-                        let midpoint: Vec<f32> = c1.iter().zip(c2.iter()).map(|(a, b)| (a + b) / 2.0).collect();
-                        let prop = GroundedProposition::new(
-                            PredicateType::RelatesTo.as_str().to_string(),
-                            vec![format!("cluster_{}", ids1.len()), format!("cluster_{}", ids2.len())],
-                            midpoint,
-                            sim * self.cluster_confidence(ids1.len().min(ids2.len())),
-                            merged_evidence,
-                        );
-                        if prop.confidence >= self.config.min_confidence {
-                            extracted.push(prop.clone());
-                            self.store_proposition(prop);
-                        }
-                        pair_count += 1;
+                } else if cross_domain && sim > 0.3 {
+                    // Weak cross-domain signal — co-occurrence only
+                    let prop = GroundedProposition::new(
+                        "co_occurs_with".to_string(),
+                        vec![arg1.clone(), arg2.clone()],
+                        midpoint.clone(),
+                        conf,
+                        merged_evidence.clone(),
+                    );
+                    if prop.confidence >= self.config.min_confidence {
+                        extracted.push(prop.clone());
+                        self.store_proposition(prop);
+                    }
+                } else if !cross_domain && sim > 0.6 {
+                    // Same category, high similarity → "similar_to"
+                    let prop = GroundedProposition::new(
+                        PredicateType::SimilarTo.as_str().to_string(),
+                        vec![arg1, arg2],
+                        midpoint,
+                        sim * self.cluster_confidence(ids1.len().min(ids2.len())),
+                        merged_evidence,
+                    );
+                    if prop.confidence >= self.config.min_confidence {
+                        extracted.push(prop.clone());
+                        self.store_proposition(prop);
                     }
                 }
             }
@@ -750,7 +838,8 @@ impl NeuralSymbolicBridge {
                     let combined_confidence =
                         rule.confidence * pa.confidence * pb.confidence;
 
-                    if combined_confidence < min_confidence * 0.5 {
+                    // Require meaningful confidence — no coin-flip inferences
+                    if combined_confidence < 0.4 {
                         continue;
                     }
 
