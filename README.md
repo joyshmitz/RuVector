@@ -1,4 +1,4 @@
-# RuVector — A Self-Learning, Agentic Operating System
+# RuVector — A Self-Learning, Vector Memory & Agentic Operating System
 [![CES 2026 Innovation Award](https://img.shields.io/badge/🏅_CES_2026-Innovation_Award-gold.svg)](https://cognitum.one)
 [![GitHub Trending](https://img.shields.io/badge/🔥_GitHub-Trending-orange.svg)](https://github.com/ruvnet/ruvector)
 
