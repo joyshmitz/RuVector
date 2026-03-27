@@ -8,6 +8,10 @@
 //! - Graph attention for GNN applications
 //! - Geometric attention in hyperbolic spaces
 //! - Sparse attention patterns
+//! - FlashAttention-3 IO-aware tiled attention
+//! - Multi-Head Latent Attention (MLA) with KV-cache compression
+//! - Selective State Space Models (Mamba)
+//! - Speculative decoding with draft/verify
 //!
 //! ## Features
 //!
