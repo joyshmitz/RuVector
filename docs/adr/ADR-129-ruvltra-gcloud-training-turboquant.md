@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Proposed — pending governance and release gate hardening
 
 ## Date
 
@@ -102,7 +102,49 @@ gcloud run jobs create ruvltra-calibration \
 | **v2.1.0 code** | 8,577 lines | TurboQuant, Graph RAG, FlashAttention-3, DiskANN implementations | Git history |
 | **ADR corpus** | 129 docs | Architectural decisions with rationale | `docs/adr/` |
 
-#### 2.2 Data Processing Pipeline
+#### 2.2 Dataset Governance
+
+**Record schema** — every training record must contain:
+
+```json
+{
+  "id": "uuid",
+  "source": "brain|wet|claude-routing|code|adr",
+  "text": "...",
+  "license": "apache-2.0|mit|cc-by-4.0|public-domain",
+  "quality_score": 0.0-1.0,
+  "provenance": "url or commit hash",
+  "created_at": "ISO-8601",
+  "content_hash": "sha256"
+}
+```
+
+**Source allowlist**: Only these sources may contribute training data:
+
+| Source | License | Allowed |
+|--------|---------|---------|
+| Brain memories (pi.ruv.io) | Apache-2.0 (project-owned) | Yes |
+| Common Crawl WET | CC-BY-4.0 / robots.txt compliant | Yes, with content filter |
+| Claude Flow routing dataset | Apache-2.0 (HF: `ruvnet/claude-flow-routing`) | Yes |
+| RuVector source code | MIT (project-owned) | Yes |
+| ADR corpus | MIT (project-owned) | Yes |
+| HumanEval / MBPP | MIT | Eval only — never train |
+| SWE-Bench | MIT | Eval only — never train |
+
+**Deduplication**: Content-hash dedup (SHA-256) at record level. Fuzzy dedup via MinHash (Jaccard > 0.8 = duplicate). Run before any train/eval split.
+
+**Eval contamination check**: After dedup, compute 13-gram overlap between training set and all eval sets (HumanEval, MBPP, SWE-Bench Lite, routing eval). Any record with >50% 13-gram overlap with an eval instance is removed from training and flagged. Contamination report is a required Phase 3 artifact.
+
+**Quality scoring**: Each record gets a quality score (0.0-1.0):
+- Brain memories: score = memory confidence (from brain API)
+- WET pages: score = content relevance classifier (>0.6 to include)
+- Claude routing: score = 1.0 (curated dataset)
+- Code: score = 1.0 (project-owned, reviewed)
+- ADRs: score = 1.0 (project-owned)
+
+Records with quality_score < 0.5 are excluded. Final corpus statistics (count, token count, source distribution, quality histogram) are logged as a Phase 2 artifact.
+
+#### 2.3 Data Processing Pipeline
 
 ```
 WET segments → CommonCrawlAdapter → Dedup (bloom) → Content filter
@@ -115,7 +157,7 @@ Claude dataset → HF download → Format validation → Unified corpus
                                                     (80/20 train/eval)
 ```
 
-#### 2.3 Training Configuration
+#### 2.4 Training Configuration
 
 **Infrastructure**:
 - **Phase 2a (SFT)**: Vertex AI Custom Job, 1x A100-80GB, 4-8 hours
@@ -161,7 +203,39 @@ Claude dataset → HF download → Format validation → Unified corpus
 | **Long context** | Perplexity at 32K tokens | N/A | <15 PPL (3B with TQ3) |
 | **SWE-Bench Lite** | Resolution rate | TBD | >10% (0.5B), >20% (3B) |
 
-#### 3.2 TurboQuant-Specific Benchmarks
+#### 3.2 Release Gate — Ship/No-Ship Criteria
+
+A model version is **approved for publishing** only if ALL of the following pass:
+
+| Gate | Criterion | Measurement |
+|------|-----------|-------------|
+| **G1: Code quality** | HumanEval pass@1 improves by ≥5 percentage points over current baseline, or ≥45% (0.5B) / ≥55% (3B) absolute | `eval_humaneval.py` |
+| **G2: Routing no-regression** | Agent routing accuracy ≥ current baseline (80%). Must not regress. | `eval_routing.py` on held-out routing eval set |
+| **G3: General no-regression** | Perplexity on Wikitext-2 does not increase by >5% vs current baseline | `eval_perplexity.py` |
+| **G4: TurboQuant memory** | TQ3 KV compression ≥ 8x with perplexity delta < 1% | `turbo_quant_bench` |
+| **G5: Long context** | Perplexity at 16K tokens (3B model) < 20 PPL with TQ3 | `eval_long_context.py` |
+| **G6: Contamination** | Zero eval contamination detected (13-gram check passes) | Phase 2 contamination report |
+| **G7: Inference speed** | tok/s ≥ 80 (0.5B) / ≥ 40 (3B) on reference hardware (M4 Pro or L4 GPU) | `e2e_bench` |
+
+If any gate fails, the model is **not published**. The team must either fix the issue and re-run, or document the regression and get explicit approval to ship with a known deficit.
+
+**Gate evaluation is automated** via `scripts/release_gate.py` which runs all checks and produces a single PASS/FAIL verdict with per-gate details.
+
+#### 3.3 Ablation Matrix
+
+Each improvement must be measured in isolation to attribute impact:
+
+| Run | imatrix Recal | LoRA SFT | DPO | TQ Runtime | Purpose |
+|-----|:---:|:---:|:---:|:---:|---------|
+| A (baseline) | | | | | Current published model |
+| B | ✓ | | | | Isolate imatrix improvement |
+| C | ✓ | ✓ | | | Isolate SFT impact |
+| D | ✓ | ✓ | ✓ | | Isolate DPO impact |
+| E | ✓ | ✓ | ✓ | ✓ | Full pipeline (ship candidate) |
+
+Each run is evaluated on the same held-out eval set. Results are recorded in `reports/ablation-{date}.json`. The ablation report is a required Phase 3 artifact.
+
+#### 3.4 TurboQuant-Specific Benchmarks
 
 ```rust
 // Run from crates/ruvllm
@@ -182,7 +256,7 @@ cargo bench --bench turbo_quant_bench
 | KV-cache tier push (per entry) | <10µs |
 | Embedding store search (10K vectors, top-10) | <5ms |
 
-#### 3.3 Automated Benchmark Pipeline
+#### 3.5 Automated Benchmark Pipeline
 
 ```yaml
 # Cloud Scheduler: weekly benchmark
@@ -225,7 +299,72 @@ Each model card will include:
 | ruvltra-medium | v1.0 | v2.0-tq |
 | ruvltra-small | v1.0 | v2.0-tq |
 
+## Rollback Plan
+
+If fine-tuning degrades model quality (any release gate fails after publishing):
+
+1. **Immediate**: Revert HuggingFace model files to previous commit. HF supports git-based rollback:
+   ```bash
+   # Revert to previous version
+   git -C /path/to/hf-clone revert HEAD
+   huggingface-cli upload ruv/ruvltra-medium . --commit-message "Rollback: v2.0-tq regressed on G3"
+   ```
+
+2. **Model versioning**: All GGUF files are tagged with `v1.0` (current) and `v2.0-tq` (new). Both versions remain downloadable. The `latest` tag only moves to `v2.0-tq` after all gates pass. Users pinning `v1.0` are unaffected.
+
+3. **Registry rollback**: Update `crates/ruvllm/src/hub/registry.rs` to point default downloads back to v1.0 GGUF files. Publish `ruvllm` patch release.
+
+4. **npm rollback**: Publish `@ruvector/ruvllm` patch with reverted model defaults and updated README noting the rollback.
+
+5. **Post-mortem**: File a GitHub issue documenting which gate failed, root cause, and what changes are needed before the next attempt.
+
+## TurboQuant Serving Plan
+
+TurboQuant is a runtime technique, not a GGUF artifact. The serving integration works as follows:
+
+### Config Discovery
+
+```
+model.gguf (standard GGUF, unchanged)
+model.turboquant.json (TurboQuant runtime config, new file)
+```
+
+The `.turboquant.json` file is a sidecar published alongside the GGUF on HuggingFace:
+
+```json
+{
+  "version": 1,
+  "default_bits": "3.5",
+  "default_eviction": "h2o",
+  "use_qjl": true,
+  "per_layer_config": {
+    "layer_0": {"bits": "4.0", "reason": "high entropy, needs precision"},
+    "layer_1": {"bits": "3.5"},
+    "layer_23": {"bits": "3.0", "reason": "low entropy, safe to compress"}
+  }
+}
+```
+
+### Runtime Loading in RuvLLM
+
+`ruvllm` loads TurboQuant config in this order:
+1. User-provided `TurboQuantConfig` (explicit override)
+2. `.turboquant.json` sidecar file next to the GGUF (auto-discovered)
+3. Default config (3.5-bit, H2O eviction, QJL enabled)
+
+This requires a small addition to the model loading path in `crates/ruvllm/src/gguf/`. The sidecar is optional — models without it use the default config.
+
+### Implementation Steps
+
+1. Add `TurboQuantProfile` struct to `crates/ruvllm/src/quantize/turbo_quant.rs`
+2. Add sidecar loading to `GgufLoader` in `crates/ruvllm/src/gguf/`
+3. Generate `.turboquant.json` files during Phase 1 profiling
+4. Upload sidecar files alongside GGUF to HuggingFace
+5. Update `ModelDownloader` to also fetch the sidecar
+
 ## Cost Estimate
+
+**Note**: This covers initial experimental compute only (happy-path GPU time). It does not include failed runs, repeated calibration, data cleaning retries, GCS storage, network egress, or engineer time. Budget 2-3x for realistic end-to-end cost.
 
 | Phase | Resource | Duration | Cost |
 |-------|----------|----------|------|
@@ -269,15 +408,36 @@ Weekly benchmark runs add ~$4/week (~$16/month).
 
 ## Next Steps
 
-1. [ ] Build `gcr.io/ruv-dev/ruvltra-training:latest` Docker image with TurboQuant calibration tooling
-2. [ ] Export brain memories and WET-processed data as training corpus
-3. [ ] Create Vertex AI custom training job template
-4. [ ] Run Phase 1 TurboQuant calibration on existing models
-5. [ ] Benchmark calibrated models against uncalibrated baseline
-6. [ ] Run Phase 2 SFT + DPO training
-7. [ ] Produce new GGUF variants and publish to HuggingFace
-8. [ ] Update model cards with benchmark results
-9. [ ] Set up weekly benchmark scheduler job
+### Pre-Approval (before marking Accepted)
+1. [ ] Review and finalize dataset governance rules (Section 2.2)
+2. [ ] Confirm release gate thresholds with stakeholders (Section 3.2)
+3. [ ] Validate HuggingFace token has write scope for all 4 model repos
+
+### Phase 1 (Week 1)
+4. [ ] Build `gcr.io/ruv-dev/ruvltra-training:latest` Docker image
+5. [ ] Run imatrix recalibration with code-focused calibration data
+6. [ ] Generate TurboQuant per-layer profiles and `.turboquant.json` sidecars
+7. [ ] Benchmark recalibrated GGUFs against baseline (ablation run B)
+
+### Phase 2 (Week 2-3)
+8. [ ] Export brain memories and WET-processed data as training corpus
+9. [ ] Run eval contamination check on training corpus
+10. [ ] Create Vertex AI custom training job template
+11. [ ] Run SFT training (ablation run C)
+12. [ ] Run DPO training (ablation run D)
+
+### Phase 3 (Week 3-4)
+13. [ ] Run full ablation matrix (runs A-E)
+14. [ ] Evaluate all release gates (G1-G7)
+15. [ ] Produce contamination report and ablation report
+16. [ ] Implement `scripts/release_gate.py` automation
+
+### Phase 4 (Week 4)
+17. [ ] Produce new GGUF variants + sidecar configs
+18. [ ] Publish to HuggingFace with updated model cards
+19. [ ] Update `ruvllm` model registry with checksums
+20. [ ] Set up weekly benchmark scheduler job
+21. [ ] Publish `ruvllm` and `@ruvector/ruvllm` with sidecar loading support
 
 ## Existing Training Infrastructure
 
