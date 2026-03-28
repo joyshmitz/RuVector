@@ -15,7 +15,7 @@ Accepted — Phase 1 (calibration) deployed and executing. Governance and releas
 | **Infrastructure** | **Deployed** | Docker image `gcr.io/ruv-dev/ruvltra-training:latest` (torch 2.5.1+cu124, libgomp, gguf, peft, trl) |
 | **Cloud Run Jobs** | **3 deployed** | `ruvltra-calibration`, `ruvltra-nightly-train`, `ruvltra-benchmark` (all L4 GPU) |
 | **Cloud Schedulers** | **2 enabled** | Nightly 03:00 UTC, Weekly benchmark Mon 06:00 UTC |
-| **Phase 1: Calibration** | **In Progress** | `ruv/ruvltra-small` complete (uploaded). `ruv/ruvltra-medium`, `ruv/ruvltra-claude-code`, `ruv/ruvltra` executing on L4 GPU |
+| **Phase 1: Calibration** | **Complete** | All 4 models calibrated on L4 GPU. TQ profiles + benchmarks uploaded to HuggingFace. Results: 75.4 tok/s (small), 62.6 tok/s (medium), 67.1 tok/s (claude-code) |
 | **Phase 2: SFT** | **Ready** | Training corpus exported (230 records, 530K tokens), scripts ready |
 | **Phase 3: Benchmarks** | **Partial** | Release gate automation implemented and tested; inference benchmarks running |
 | **Phase 4: Publishing** | **Partial** | TurboQuant sidecar configs uploaded to all 4 HF models |
