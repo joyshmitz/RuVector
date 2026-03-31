@@ -12,7 +12,9 @@ use crate::types::{
     PartitionQuery, PartitionResult, PartitionResultCompact, PipelineMetricsResponse,
     PubSubPushMessage, PublishNodeRequest, ScoredBrainMemory, SearchQuery,
     ShareRequest, ShareResponse,
-    StatusResponse, SubmitDeltaRequest, TemporalResponse, TrainingCycleResult,
+    StatusResponse, SubmitDeltaRequest, TemporalResponse,
+    ConsciousnessComputeRequest, ConsciousnessComputeResponse,
+    TrainingCycleResult,
     TrainingPreferencesResponse,
     TrainingQuery, TransferRequest, TransferResponse, VerifyRequest, VerifyResponse,
     VoteDirection, VoteRequest, WasmNode, WasmNodeSummary,
@@ -119,12 +121,11 @@ pub async fn create_router() -> (Router, AppState) {
             g.add_memory(mem);
         }
         tracing::info!("Graph rebuilt: {} nodes, {} edges", g.node_count(), g.edge_count());
-        // ADR-116: Sparsifier build deferred to background — too slow for startup probe
-        // on large graphs (1M+ edges). Scheduled rebuild_graph job will build it.
+        // ADR-116: Build sparsifier inline for small graphs, background for large.
         if g.edge_count() <= 100_000 {
             g.rebuild_sparsifier();
         } else {
-            tracing::info!("Skipping sparsifier on startup ({} edges > 100K) — deferred to background job", g.edge_count());
+            tracing::info!("Deferring sparsifier build for {} edges to background task", g.edge_count());
         }
     }
 
@@ -374,6 +375,9 @@ pub async fn create_router() -> (Router, AppState) {
         .route("/internal/queue/drain", get(internal_queue_drain))
         .route("/internal/session/create", post(internal_session_create))
         .route("/internal/session/:id", delete(internal_session_delete))
+        // ── Consciousness / IIT 4.0 ──
+        .route("/v1/consciousness/compute", post(consciousness_compute))
+        .route("/v1/consciousness/status", get(consciousness_status))
         .layer({
             // CORS origins: configurable via CORS_ORIGINS env var (comma-separated).
             // Falls back to safe defaults if unset.
@@ -2460,13 +2464,18 @@ async fn status(
         },
         sona_trajectories: {
             let ss = state.sona.read().stats();
-            ss.trajectories_buffered
+            ss.trajectories_recorded as usize
         },
         midstream_scheduler_ticks: state.nano_scheduler.metrics().total_ticks,
         midstream_attractor_categories: state.attractor_results.read().len(),
         midstream_strange_loop_version: strange_loop::VERSION.to_string(),
         sparsifier_compression: graph.sparsifier_stats().map(|s| s.compression_ratio).unwrap_or(0.0),
         sparsifier_edges: graph.sparsifier_stats().map(|s| s.sparsified_edges).unwrap_or(0),
+        consciousness_algorithms: vec![
+            "iit4_phi".into(), "ces".into(), "phi_id".into(),
+            "pid".into(), "streaming".into(), "bounds".into(), "auto".into(),
+        ],
+        consciousness_max_elements: 12,
     };
 
     // Cache the computed response for 5 seconds
@@ -3430,6 +3439,7 @@ async fn pipeline_optimize(
 
     let all_actions = vec![
         "train", "drift_check", "transfer_all", "rebuild_graph", "cleanup", "attractor_analysis",
+        "seed_consciousness",
     ];
     let actions: Vec<&str> = match &req.actions {
         Some(a) => a.iter().map(|s| s.as_str()).collect(),
@@ -3520,6 +3530,60 @@ async fn pipeline_optimize(
                 } else {
                     (false, "Midstream attractor feature not enabled".into())
                 }
+            }
+            "seed_consciousness" => {
+                // Inject curated IIT 4.0 / consciousness SOTA knowledge
+                let seeds = vec![
+                    ("IIT 4.0: Integrated Information Theory formulation",
+                     "Albantakis et al. (2023) PLoS Computational Biology. IIT 4.0 replaces KL-divergence with Earth Mover's Distance (intrinsic difference), making phi topology-aware. Key concepts: cause/effect repertoires, mechanism phi, Cause-Effect Structure (CES), and the distinction between states (2^n) and elements (n). Mirror partition symmetry provides 2x speedup.",
+                     vec!["iit", "phi", "consciousness", "emd", "albantakis"],
+                     crate::types::BrainCategory::Consciousness),
+                    ("Cause-Effect Structure: the mathematical shape of experience",
+                     "In IIT 4.0, experience is identified with a Cause-Effect Structure (CES) — the set of all distinctions (mechanisms with phi > 0) and their relations. CES enumeration is O(2^n × cost_per_mechanism), practically limited to ~12 elements. Rayon parallelism provides linear speedup for n >= 5.",
+                     vec!["ces", "iit", "distinctions", "experience", "consciousness"],
+                     crate::types::BrainCategory::Consciousness),
+                    ("Phi-ID: Integrated Information Decomposition",
+                     "Mediano et al. (2021). Decomposes mutual information between subsystems into redundancy (shared by all parts), unique (only one part contributes), and synergy (emerges only from combination). Uses MMI (Minimum Mutual Information) as redundancy measure.",
+                     vec!["phi-id", "information-decomposition", "redundancy", "synergy", "mediano"],
+                     crate::types::BrainCategory::InformationDecomposition),
+                    ("Williams-Beer PID: Partial Information Decomposition",
+                     "Williams & Beer (2010). Framework for decomposing information from multiple sources about a target into redundancy, unique information per source, and synergy. I_min measure computes minimum specific information across sources. Source marginal caching provides 3-5x speedup.",
+                     vec!["pid", "williams-beer", "information-decomposition", "redundancy"],
+                     crate::types::BrainCategory::InformationDecomposition),
+                    ("Streaming Phi Estimation for real-time BCI",
+                     "Real-time consciousness monitoring from a stream of observed states. Maintains empirical TPM from transition counts with lazy normalization (cache invalidation on observe). EWMA smoothing, CUSUM change detection for sudden phi shifts. O(1) ring buffer replaces O(n) history management.",
+                     vec!["streaming", "bci", "real-time", "ewma", "cusum", "consciousness"],
+                     crate::types::BrainCategory::Consciousness),
+                    ("PAC bounds for phi estimation: spectral and concentration",
+                     "Provable confidence intervals for approximate phi. Spectral bounds via Fiedler eigenvalue (lambda_2) with Cheeger inequality. Hoeffding concentration for stochastic sampling. Empirical Bernstein for tighter intervals when variance is low. Convergence early-exit via Rayleigh quotient delta.",
+                     vec!["bounds", "pac", "spectral", "fiedler", "hoeffding", "consciousness"],
+                     crate::types::BrainCategory::Consciousness),
+                    ("GeoMIP: 100-300x speedup for phi computation",
+                     "Recasts MIP search as graph optimization on n-dimensional hypercube. Gray code iteration ensures O(1) incremental updates. Automorphism pruning skips symmetric partitions. Balance-first ordering evaluates balanced partitions first (most likely to be MIP). 100-300x faster than exhaustive for symmetric systems.",
+                     vec!["geomip", "phi", "optimization", "gray-code", "hypercube"],
+                     crate::types::BrainCategory::Performance),
+                    ("Causal Emergence: when the map is better than the territory",
+                     "Hoel (2017, 2025). Effective Information (EI) measures how deterministic and non-degenerate a system is. Coarse-graining can increase EI — macro-level descriptions carry more causal information than micro-level ones. SVD-based approach (Zhang 2025) computes emergence in O(n^2 * k).",
+                     vec!["emergence", "causal", "hoel", "effective-information", "coarse-graining"],
+                     crate::types::BrainCategory::Sota),
+                ];
+                let mut injected = 0usize;
+                for (title, content, tags, category) in seeds {
+                    let tag_strs: Vec<String> = tags.into_iter().map(String::from).collect();
+                    let inject_req = crate::types::InjectRequest {
+                        source: "consciousness-seed".into(),
+                        title: title.into(),
+                        content: content.into(),
+                        tags: tag_strs,
+                        category,
+                        metadata: None,
+                    };
+                    match process_inject(&state, inject_req).await {
+                        Ok(_) => injected += 1,
+                        Err(e) => tracing::warn!("Consciousness seed inject failed: {e}"),
+                    }
+                }
+                (true, format!("Consciousness knowledge seeded: {injected}/8 entries"))
             }
             other => {
                 (false, format!("Unknown action: {other}"))
@@ -3685,6 +3749,10 @@ async fn pipeline_crawl_discover(
                 Some("performance") => crate::types::BrainCategory::Performance,
                 Some("tooling") => crate::types::BrainCategory::Tooling,
                 Some("debug") => crate::types::BrainCategory::Debug,
+                Some("sota") => crate::types::BrainCategory::Sota,
+                Some("discovery") => crate::types::BrainCategory::Discovery,
+                Some("consciousness") => crate::types::BrainCategory::Consciousness,
+                Some("information_decomposition") => crate::types::BrainCategory::InformationDecomposition,
                 _ => crate::types::BrainCategory::Pattern,
             };
             let inject_req = crate::types::InjectRequest {
@@ -5083,6 +5151,28 @@ fn mcp_tool_definitions() -> Vec<serde_json::Value> {
                 "required": ["predicate", "subject", "object"]
             }
         }),
+        // ── Consciousness Computation (IIT 4.0) ──────────────
+        serde_json::json!({
+            "name": "brain_consciousness_compute",
+            "description": "Compute IIT 4.0 consciousness metrics (Φ, CES, ΦID, PID, bounds) for a transition system. Supports algorithms: iit4_phi, ces, phi_id, pid, bounds, auto.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tpm": { "type": "array", "items": { "type": "number" }, "description": "Transition probability matrix (flattened n×n row-major)" },
+                    "n": { "type": "integer", "description": "Number of states (power of 2)" },
+                    "state": { "type": "integer", "description": "Current state index" },
+                    "algorithm": { "type": "string", "description": "Algorithm: iit4_phi, ces, phi_id, pid, bounds, auto (default: auto)" },
+                    "phi_threshold": { "type": "number", "description": "Min φ for CES distinctions (default: 1e-6)" },
+                    "partition_mask": { "type": "integer", "description": "Bitmask for ΦID/PID partition (optional)" }
+                },
+                "required": ["tpm", "n", "state"]
+            }
+        }),
+        serde_json::json!({
+            "name": "brain_consciousness_status",
+            "description": "Get consciousness subsystem capabilities: available algorithms, max system size, IIT 4.0 features.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
         // ── Consciousness Model (Group 2) ─────────────────────
         serde_json::json!({
             "name": "brain_voice_working",
@@ -5451,6 +5541,13 @@ async fn handle_mcp_tool_call(
             proxy_get(&client, &base, "/v1/status", api_key, &[]).await
         },
 
+        // ── Consciousness / IIT 4.0 ───────────────────────────
+        "brain_consciousness_compute" => {
+            proxy_post(&client, &base, "/v1/consciousness/compute", api_key, &args).await
+        },
+        "brain_consciousness_status" => {
+            proxy_get(&client, &base, "/v1/consciousness/status", api_key, &[]).await
+        },
         // ── Cognitive & Symbolic ─────────────────────────────
         "brain_cognitive_status" => {
             proxy_get(&client, &base, "/v1/cognitive/status", api_key, &[]).await
@@ -6966,4 +7063,194 @@ async fn internal_session_delete(
     state.sessions.remove(&id);
     tracing::info!("internal/session/delete: removed session {}", id);
     StatusCode::OK
+}
+
+// ── Consciousness / IIT 4.0 endpoints ────────────────────────────────────
+
+/// GET /v1/consciousness/status — consciousness subsystem capabilities
+async fn consciousness_status() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "available": true,
+        "version": "4.0",
+        "framework": "IIT 4.0 (Albantakis et al. 2023)",
+        "algorithms": [
+            { "name": "iit4_phi", "description": "IIT 4.0 mechanism-level φ with intrinsic information (EMD)" },
+            { "name": "ces", "description": "Full Cause-Effect Structure: distinctions, relations, big Φ" },
+            { "name": "phi_id", "description": "Integrated Information Decomposition (ΦID): redundancy, synergy, unique" },
+            { "name": "pid", "description": "Partial Information Decomposition (Williams-Beer I_min)" },
+            { "name": "streaming", "description": "Online streaming Φ with EWMA, CUSUM change-point detection" },
+            { "name": "bounds", "description": "PAC-style bounds: spectral-Cheeger, Hoeffding, empirical Bernstein" },
+            { "name": "auto", "description": "Auto-select algorithm based on system size and budget" },
+        ],
+        "max_elements": 12,
+        "max_states_exact": 4096,
+        "features": [
+            "intrinsic_difference_emd",
+            "cause_effect_repertoires",
+            "mechanism_partition_search",
+            "relation_computation",
+            "streaming_change_point",
+            "confidence_intervals",
+        ],
+    }))
+}
+
+/// POST /v1/consciousness/compute — run consciousness computation
+async fn consciousness_compute(
+    Json(req): Json<ConsciousnessComputeRequest>,
+) -> Result<Json<ConsciousnessComputeResponse>, (StatusCode, Json<serde_json::Value>)> {
+    use ruvector_consciousness::types::{TransitionMatrix, ComputeBudget};
+
+    // Validate input
+    if req.n < 2 || !req.n.is_power_of_two() {
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "error": "n must be a power of 2 and >= 2"
+        }))));
+    }
+    if req.tpm.len() != req.n * req.n {
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "error": format!("tpm must have {} elements (n×n), got {}", req.n * req.n, req.tpm.len())
+        }))));
+    }
+    let num_elements = req.n.trailing_zeros() as usize;
+    if num_elements > 12 {
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "error": format!("system too large: {} elements (max 12)", num_elements)
+        }))));
+    }
+    if req.state >= req.n {
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "error": format!("state {} out of range [0, {})", req.state, req.n)
+        }))));
+    }
+
+    let tpm = TransitionMatrix::new(req.n, req.tpm.clone());
+    let start = std::time::Instant::now();
+
+    let algo = if req.algorithm == "auto" {
+        if num_elements <= 4 { "ces" } else { "iit4_phi" }
+    } else {
+        &req.algorithm
+    };
+
+    let (phi, details) = match algo {
+        "iit4_phi" => {
+            use ruvector_consciousness::iit4::mechanism_phi;
+            use ruvector_consciousness::types::Mechanism;
+            // Compute φ for the full system mechanism
+            let full_mech = Mechanism::new((1u64 << num_elements) - 1, num_elements);
+            let dist = mechanism_phi(&tpm, &full_mech, req.state);
+            (dist.phi, serde_json::json!({
+                "phi_cause": dist.phi_cause,
+                "phi_effect": dist.phi_effect,
+                "mechanism_elements": num_elements,
+            }))
+        }
+        "ces" => {
+            use ruvector_consciousness::ces::{compute_ces, ces_complexity};
+            let budget = ComputeBudget::exact();
+            match compute_ces(&tpm, req.state, req.phi_threshold, &budget) {
+                Ok(ces) => {
+                    let (nd, nr, sp) = ces_complexity(&ces);
+                    (ces.big_phi, serde_json::json!({
+                        "big_phi": ces.big_phi,
+                        "sum_phi": ces.sum_phi,
+                        "num_distinctions": nd,
+                        "num_relations": nr,
+                        "sum_relation_phi": sp,
+                        "distinctions": ces.distinctions.iter().map(|d| serde_json::json!({
+                            "mechanism": format!("{:b}", d.mechanism.elements),
+                            "phi": d.phi,
+                            "phi_cause": d.phi_cause,
+                            "phi_effect": d.phi_effect,
+                        })).collect::<Vec<_>>(),
+                    }))
+                }
+                Err(e) => return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "error": format!("{e}")
+                })))),
+            }
+        }
+        "phi_id" => {
+            use ruvector_consciousness::phi_id::compute_phi_id;
+            let mask = req.partition_mask.unwrap_or(
+                (1u64 << (num_elements / 2)) - 1  // default: split in half
+            );
+            match compute_phi_id(&tpm, mask) {
+                Ok(result) => (result.total_mi, serde_json::json!({
+                    "total_mi": result.total_mi,
+                    "redundancy": result.redundancy,
+                    "unique": result.unique,
+                    "synergy": result.synergy,
+                    "transfer_entropy": result.transfer_entropy,
+                })),
+                Err(e) => return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "error": format!("{e}")
+                })))),
+            }
+        }
+        "pid" => {
+            use ruvector_consciousness::pid::compute_pid;
+            // Convert partition_mask to sources/target arrays.
+            let mask = req.partition_mask.unwrap_or(
+                (1u64 << (num_elements / 2)) - 1
+            );
+            let mut source_a: Vec<usize> = Vec::new();
+            let mut source_b: Vec<usize> = Vec::new();
+            for i in 0..req.n {
+                if mask & (1 << i) != 0 {
+                    source_a.push(i);
+                } else {
+                    source_b.push(i);
+                }
+            }
+            let sources = vec![source_a, source_b.clone()];
+            match compute_pid(&tpm, &sources, &source_b) {
+                Ok(result) => (result.redundancy, serde_json::json!({
+                    "redundancy": result.redundancy,
+                    "unique": result.unique,
+                    "synergy": result.synergy,
+                    "total_mi": result.total_mi,
+                    "num_sources": result.num_sources,
+                })),
+                Err(e) => return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "error": format!("{e}")
+                })))),
+            }
+        }
+        "bounds" => {
+            use ruvector_consciousness::bounds::spectral_bounds;
+            match spectral_bounds(&tpm) {
+                Ok(bound) => (
+                    (bound.lower + bound.upper) / 2.0,
+                    serde_json::json!({
+                        "lower_bound": bound.lower,
+                        "upper_bound": bound.upper,
+                        "confidence": bound.confidence,
+                        "samples": bound.samples,
+                        "method": bound.method,
+                    }),
+                ),
+                Err(e) => return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "error": format!("{e}")
+                })))),
+            }
+        }
+        _ => {
+            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                "error": format!("unknown algorithm: {}. Use: iit4_phi, ces, phi_id, pid, bounds, auto", algo)
+            }))));
+        }
+    };
+
+    let elapsed = start.elapsed();
+
+    Ok(Json(ConsciousnessComputeResponse {
+        algorithm: algo.to_string(),
+        phi,
+        num_elements,
+        num_states: req.n,
+        elapsed_us: elapsed.as_micros() as u64,
+        details,
+    }))
 }
