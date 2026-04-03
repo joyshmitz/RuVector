@@ -25,9 +25,21 @@ The structural heuristics tier (40% of declarations) produces low-quality names 
 
 ### Training Data Sources
 
-1. **Ground-truth fixtures** -- `crates/ruvector-decompiler/tests/ground_truth.rs` and `tests/real_world.rs` contain hand-annotated (minified, original) pairs with context.
-2. **Open source npm packages** -- extracting identifiers from unminified source, then creating synthetic minified versions.
-3. **Cross-version analysis** -- functions with identical structure but different minified names across bundle versions share the same original name.
+| Source | Pairs | Type | Status |
+|--------|-------|------|--------|
+| Ground-truth fixtures | ~200 | Hand-annotated | Deployed |
+| Synthetic minification | ~8,000 | Generated from identifier dictionaries | Deployed (v2) |
+| Cross-version analysis | ~750 | Structural fingerprinting across versions | Deployed |
+| **Local source maps** | **~140,000** | **Real .js.map files from node_modules (6,941 files)** | **In progress** |
+| **Top 100 npm packages** | **~500,000** | **Source maps from most popular packages** | **In progress** |
+
+#### Source Map Training (highest quality)
+
+6,941 `.js.map` files in `node_modules/` contain ground-truth minified→original name mappings. Each source map has a `names` array with original identifiers and VLQ-encoded mappings to their minified positions. This is the gold standard — real compiler output, not synthetic data.
+
+Key packages with source maps: `@modelcontextprotocol/sdk`, `typescript`, `zod`, `ajv`, `rxjs`, and thousands more.
+
+Additionally, the top 100 npm packages by download count are being fetched and their source maps extracted for maximum coverage across the JavaScript ecosystem.
 
 ## Decision
 
