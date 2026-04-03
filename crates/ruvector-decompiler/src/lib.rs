@@ -41,10 +41,28 @@ pub mod tree;
 pub mod types;
 pub mod witness;
 
+// LLM model weight decompilation (feature-gated).
+#[cfg(feature = "model")]
+pub mod model_decompiler;
+#[cfg(feature = "model")]
+pub mod model_gguf;
+#[cfg(feature = "model")]
+pub mod model_safetensors;
+#[cfg(feature = "model")]
+pub mod model_types;
+
 pub use error::{DecompilerError, Result};
 pub use types::{
     DecompileConfig, DecompileResult, Declaration, InferredName, Module,
     ModuleTree, WitnessChainData,
+};
+
+#[cfg(feature = "model")]
+pub use model_decompiler::{decompile_gguf, decompile_model, decompile_safetensors};
+#[cfg(feature = "model")]
+pub use model_types::{
+    LayerInfo, LayerType, ModelArchitecture, ModelDecompileResult,
+    ModelFormat, QuantizationInfo, TokenizerInfo,
 };
 
 /// Decompile a minified JavaScript bundle.

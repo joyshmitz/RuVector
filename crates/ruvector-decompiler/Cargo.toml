@@ -32,6 +32,8 @@ wasm = ["ruvector-mincut/wasm"]
 # Enable neural name inference using ONNX Runtime (via `ort` crate)
 # or a GGUF/RVF model file. Adds model loading + inference capability.
 neural = ["ort", "ndarray"]
+# LLM model weight decompilation (GGUF, Safetensors). See ADR-138.
+model = []
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

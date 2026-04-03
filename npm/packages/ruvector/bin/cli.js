@@ -8935,13 +8935,52 @@ const decompileCmd = program
   .option('-q, --quiet', 'Suppress progress output')
   .option('--version-pkg <ver>', 'Package version (alternative to @version syntax)')
   .option('--diff <version>', 'Compare against another version')
+  .option('--model <file>', 'Decompile LLM model weight file (.gguf, .safetensors)')
+  .option('--api <model-id>', 'Probe remote LLM API to discover architecture')
+  .option('--api-key <key>', 'API key for --api mode (or use env vars)')
   .action(async (target, opts) => {
+    // Model weight decompilation mode (ADR-138)
+    if (opts.model) {
+      try {
+        const modelDecompiler = require('../src/decompiler/model-decompiler.js');
+        const result = await modelDecompiler.decompileModelFile(opts.model);
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          modelDecompiler.printModelResult(result);
+        }
+      } catch (err) {
+        console.error(chalk.red(`Model decompilation failed: ${err.message}`));
+        process.exit(1);
+      }
+      return;
+    }
+
+    // API probing mode (ADR-138)
+    if (opts.api) {
+      try {
+        const apiProber = require('../src/decompiler/api-prober.js');
+        const result = await apiProber.probeModel(opts.api, { apiKey: opts.apiKey });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          apiProber.printProbeResult(result);
+        }
+      } catch (err) {
+        console.error(chalk.red(`API probe failed: ${err.message}`));
+        process.exit(1);
+      }
+      return;
+    }
+
     if (!target) {
       console.log(chalk.cyan('\nUsage:'));
       console.log(chalk.white('  ruvector decompile <package>           Decompile npm package'));
       console.log(chalk.white('  ruvector decompile <pkg>@<ver>         Specific version'));
       console.log(chalk.white('  ruvector decompile ./bundle.js         Local file'));
       console.log(chalk.white('  ruvector decompile https://unpkg.com/x URL'));
+      console.log(chalk.white('  ruvector decompile --model <file.gguf> LLM weight file'));
+      console.log(chalk.white('  ruvector decompile --api <model-id>    Probe remote API'));
       console.log(chalk.dim('\nOptions:'));
       console.log(chalk.dim('  -o, --output <dir>     Output directory'));
       console.log(chalk.dim('  -f, --format <type>    modules | single | json'));
@@ -8949,6 +8988,9 @@ const decompileCmd = program
       console.log(chalk.dim('  --no-witness           Skip witness chain'));
       console.log(chalk.dim('  --json                 JSON to stdout'));
       console.log(chalk.dim('  --diff <version>       Diff against another version'));
+      console.log(chalk.dim('  --model <file>         Decompile .gguf/.safetensors'));
+      console.log(chalk.dim('  --api <model-id>       Probe LLM API'));
+      console.log(chalk.dim('  --api-key <key>        API key (or set env var)'));
       console.log('');
       return;
     }

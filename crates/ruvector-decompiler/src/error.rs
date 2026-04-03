@@ -29,6 +29,10 @@ pub enum DecompilerError {
     #[error("model error: {0}")]
     ModelError(String),
 
+    /// I/O error (file access, reading).
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+
     /// JSON serialization/deserialization error.
     #[error("json error: {0}")]
     JsonError(#[from] serde_json::Error),
