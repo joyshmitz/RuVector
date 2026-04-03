@@ -1,101 +1,57 @@
-# Claude Code v2.1.91 (2.1 series)
+# Claude Code v2.1.91 — Decompiled by ruDevolution
 
-## Binary RVF Container
+**Latest version** — 34,759 declarations, 981 Louvain-detected modules, 100% valid JS.
 
-| Property | Value |
-|----------|-------|
-| Version | 2.1.91 |
-| Series | 2.1 |
-| Bundle size | 12.6MB |
-| RVF size | 4617.2KB |
-| Vectors | 9058 |
-| RVF File ID | `91f120e4b8c0...` |
-| Classes | 1632 |
-| Functions | 19906 |
-| Modules | 17 |
-| Coverage | 100.6% |
-| Extracted | 2026-04-03T03:17:17.277Z |
+## Pipeline Stats
 
-## Source Metrics
+| Phase | Time | Result |
+|-------|------|--------|
+| Parse | 6.6s | 34,759 declarations |
+| Graph | 0.7s | 599,034 reference edges |
+| Partition | 1.2s | 981 modules (Louvain) |
+| Infer | 13.8s | 32,091 names (HIGH=1,436) |
+| Validate | auto | 100% parse rate |
 
-| Metric | Value |
-|--------|-------|
-| Lines | 16967 |
-| Async functions | 1903 |
-| Arrow functions | 25893 |
-| Class extensions | 852 |
-| const declarations | 230 |
-| let declarations | 33496 |
-| var declarations | 14837 |
-| imports | 290 |
-| exports | 50 |
-| requires | 8 |
-| await expressions | 6541 |
-| try blocks | 2790 |
+## Key Discoveries (vs v2.0)
 
-## Modules
+| Feature | Evidence |
+|---------|----------|
+| 🤖 Agent Teams | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, `CLAUDE_CODE_TEAMMATE_COMMAND` |
+| 🌙 Auto Dream Mode | `tengu_auto_dream_completed`, `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` |
+| 🔮 Unreleased Models | `claude-opus-4-6`, `claude-sonnet-4-6` |
+| 🔐 Amber Codenames | `tengu_amber_flint`, `amber_prism`, `amber_stoat`, `amber_wren` |
+| 🧰 Advisor Tool | `tengu_advisor_tool_call` |
+| 🧰 Agentic Search | `tengu_agentic_search_cancelled` |
+| 📋 Tasks System | `CLAUDE_CODE_ENABLE_TASKS`, `CLAUDE_CODE_TASK_LIST_ID` |
+| ⏰ Cron Scheduling | `CLAUDE_CODE_DISABLE_CRON` |
+| 🧠 Plan V2 Interviews | `CLAUDE_CODE_PLAN_MODE_INTERVIEW_PHASE` |
+| 🏪 Plugin Marketplace | 7 new `PLUGIN_*` env vars |
+| 📡 MCP Streamable HTTP | `/v1/toolbox/shttp/mcp/` |
+| 🔢 117 new env vars | Total since v2.0.62 |
 
-| Module | Fragments | Size | Confidence |
-|--------|-----------|------|------------|
-| model-provider | 165 | 331.2KB | 0.275 |
-| tool-dispatch | 531 | 1304.7KB | 0.885 |
-| session | 361 | 723.5KB | 0.602 |
-| agent-loop | 77 | 143.7KB | 0.128 |
-| permission-system | 500 | 1072.8KB | 0.834 |
-| context-manager | 49 | 124.9KB | 0.082 |
-| config | 473 | 1039.8KB | 0.789 |
-| streaming-handler | 24 | 48.0KB | 0.04 |
-| telemetry | 524 | 1068.6KB | 0.874 |
-| mcp-client | 51 | 107.6KB | 0.085 |
-| commands | 80 | 170.3KB | 0.133 |
-| telemetry-events | 861 | 26.2KB | 0.5 |
-| command-defs | 93 | 8.1KB | 0.5 |
-| class-hierarchy | 1467 | 22.5KB | 0.5 |
-| env-vars | 223 | 6.5KB | 0.5 |
-| api-endpoints | 52 | 0.9KB | 0.5 |
-| uncategorized | 3162 | 6731.4KB | 0.1 |
-
-## Directory Structure
+## Growth
 
 ```
-v2.1.x/
-  source/               # Source code only (no .rvf files)
-    core/               # agent-loop, context-manager, streaming-handler, session
-    tools/              # tool-dispatch
-    tools/mcp/          # mcp-client
-    permissions/        # permission-system
-    ui/                 # commands, command-defs
-    config/             # config, env-vars, model-provider
-    telemetry/          # telemetry, telemetry-events
-    types/              # class-hierarchy, api-endpoints
-    uncategorized/      # remaining bundle code
-    witness.json        # SHA-256 witness chain
-
-  rvf/                  # RVF containers only (no .js files)
-    master.rvf          # All vectors combined
-    core.rvf            # Core modules only
-    tools.rvf           # Tool modules only
-    permissions.rvf     # Permission modules only
-    config.rvf          # Configuration modules only
-    telemetry.rvf       # Telemetry modules only
-    ...
-
-  metrics.json          # Overall metrics
+v0.2.126 ████░░░░░░░░░░░░░░░░  6.9 MB   13,869 funcs
+v1.0.128 ██████░░░░░░░░░░░░░░  8.9 MB   16,593 funcs
+v2.0.77  ████████░░░░░░░░░░░░ 10.5 MB   20,395 funcs
+v2.1.91  ████████████████████ 13.2 MB   34,759 decls  ← THIS
 ```
 
-## RVF Container Details
+## Files
 
-Each `.rvf` file is a binary container with:
+- `source/` — decompiled modules by category
+- `modules-manifest.json` — all 661 modules with sizes
+- `witness.json` — SHA3-256 Merkle proof
+- `metrics.json` — pipeline metrics
 
-- **128-dimensional fingerprint vectors** for each code fragment
-- **HNSW index** (M=16, ef_construction=200) for fast similarity search
-- **Cosine distance** metric
-- **Witness chain** for provenance verification
+## Full 981-module decompile
 
-```typescript
-import { RvfDatabase } from '@ruvector/rvf';
+Too large for git (638MB). Generate locally:
 
-const db = await RvfDatabase.openReadonly('./rvf/master.rvf');
-const results = await db.query(queryVector, 10);
-await db.close();
+```bash
+cargo run --release -p ruvector-decompiler --example run_on_cli -- \
+  $(npm root -g)/@anthropic-ai/claude-code/cli.js --output-dir ./decompiled
 ```
+
+Or download: [github.com/ruvnet/rudevolution/releases/tag/v0.1.0-claude-code-v2.1.91](https://github.com/ruvnet/rudevolution/releases/tag/v0.1.0-claude-code-v2.1.91)

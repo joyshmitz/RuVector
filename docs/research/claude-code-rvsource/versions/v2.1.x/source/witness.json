@@ -2,50 +2,6 @@
   "source_hash": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816",
   "module_hashes": [
     {
-      "name": "model-provider",
-      "hash": "fead4398bae3f36e4b91baf98ee935d05dae7758e8fccf426cccfa3dd37e08aa"
-    },
-    {
-      "name": "tool-dispatch",
-      "hash": "f327a500fcae2e72fa6be81c09ae1a457c819b817263e274504f3cabc3821369"
-    },
-    {
-      "name": "session",
-      "hash": "3dc3d5a9c39985b3c9f140299c69fcdb1efc793ca1a4a6b39179436f15231929"
-    },
-    {
-      "name": "agent-loop",
-      "hash": "8c85a974a5d3b43079bf9283d3554b81e4581474ef0d73aa66b05b061d9670f8"
-    },
-    {
-      "name": "permission-system",
-      "hash": "698f085f82a7d83450760f2ae2ff569675d8bd08209c36e203ba5e4b7e7bf0c6"
-    },
-    {
-      "name": "context-manager",
-      "hash": "17a4d97fa2d97078142f26952beb788e8462d182122582476478526170a1beb5"
-    },
-    {
-      "name": "config",
-      "hash": "b8f3cc3eb353dc224c6ed1f4dfebdc58f2c9799b1c211d3f5b38e1ddb3d131a1"
-    },
-    {
-      "name": "streaming-handler",
-      "hash": "61c4b0c23e45b4e69652784ecd2fbe4e588df7c1ffbdb04a1526084797ca428f"
-    },
-    {
-      "name": "telemetry",
-      "hash": "4ee15096030c26fbbc58081ee203a5a25aca9fb7f9c6465ad7574b129d95aaa1"
-    },
-    {
-      "name": "mcp-client",
-      "hash": "2a3565ec56771b24131cd685fd2dbf5b5b4754dc13d132a8d02054b8438b8f91"
-    },
-    {
-      "name": "commands",
-      "hash": "52218eff72761b447d264c9503ab67bbec37abd984a48fe9b9fd12b1d203bd5e"
-    },
-    {
       "name": "telemetry-events",
       "hash": "bad632d7f22a3851b102cf11b0caa460fb129a0dd1c2447fabed21a02a2d0c0e"
     },
@@ -67,70 +23,15 @@
     },
     {
       "name": "uncategorized",
-      "hash": "18ce0982740551637057fb6eb88ee05d76270af031685c7a582e7913fb13c27a"
+      "hash": "e551914747cf45789a431a2a100eb32665f265d662a05095426490d7335a372d"
     }
   ],
-  "root": "a6a5cd0c7cf7d00d0c6de061e2e32127497b47c72c5af53e4a5f571d4206480e",
+  "root": "d212a9167937d5ed054812141cc16140cbe902313addd089c29425a8012686d9",
   "chain": [
     {
       "hash": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816",
       "label": "source",
       "parent": null
-    },
-    {
-      "hash": "fead4398bae3f36e4b91baf98ee935d05dae7758e8fccf426cccfa3dd37e08aa",
-      "label": "module:model-provider",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "f327a500fcae2e72fa6be81c09ae1a457c819b817263e274504f3cabc3821369",
-      "label": "module:tool-dispatch",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "3dc3d5a9c39985b3c9f140299c69fcdb1efc793ca1a4a6b39179436f15231929",
-      "label": "module:session",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "8c85a974a5d3b43079bf9283d3554b81e4581474ef0d73aa66b05b061d9670f8",
-      "label": "module:agent-loop",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "698f085f82a7d83450760f2ae2ff569675d8bd08209c36e203ba5e4b7e7bf0c6",
-      "label": "module:permission-system",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "17a4d97fa2d97078142f26952beb788e8462d182122582476478526170a1beb5",
-      "label": "module:context-manager",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "b8f3cc3eb353dc224c6ed1f4dfebdc58f2c9799b1c211d3f5b38e1ddb3d131a1",
-      "label": "module:config",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "61c4b0c23e45b4e69652784ecd2fbe4e588df7c1ffbdb04a1526084797ca428f",
-      "label": "module:streaming-handler",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "4ee15096030c26fbbc58081ee203a5a25aca9fb7f9c6465ad7574b129d95aaa1",
-      "label": "module:telemetry",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "2a3565ec56771b24131cd685fd2dbf5b5b4754dc13d132a8d02054b8438b8f91",
-      "label": "module:mcp-client",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
-    },
-    {
-      "hash": "52218eff72761b447d264c9503ab67bbec37abd984a48fe9b9fd12b1d203bd5e",
-      "label": "module:commands",
-      "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
     },
     {
       "hash": "bad632d7f22a3851b102cf11b0caa460fb129a0dd1c2447fabed21a02a2d0c0e",
@@ -158,16 +59,16 @@
       "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
     },
     {
-      "hash": "18ce0982740551637057fb6eb88ee05d76270af031685c7a582e7913fb13c27a",
+      "hash": "e551914747cf45789a431a2a100eb32665f265d662a05095426490d7335a372d",
       "label": "module:uncategorized",
       "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
     },
     {
-      "hash": "a6a5cd0c7cf7d00d0c6de061e2e32127497b47c72c5af53e4a5f571d4206480e",
+      "hash": "d212a9167937d5ed054812141cc16140cbe902313addd089c29425a8012686d9",
       "label": "root",
       "parent": "b4bf141f30cf8b40196295816c7a6b9d01a36e906908d73a9f9a865ce4cdf816"
     }
   ],
-  "created": "2026-04-03T03:17:16.434Z",
+  "created": "2026-04-03T15:10:03.561Z",
   "algorithm": "sha256"
 }
