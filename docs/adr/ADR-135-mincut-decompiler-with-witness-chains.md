@@ -2,7 +2,7 @@
 
 ## Status
 
-Deployed (2026-04-03) — 5-phase pipeline implemented, 56 tests passing. Louvain partitioning (35x optimized), 210 training patterns, pure Rust transformer inference, 95.7% name accuracy beating JSNice SOTA (63%).
+Deployed (2026-04-03) — 8-phase pipeline implemented. Louvain partitioning (35x optimized), 210 training patterns, pure Rust transformer inference, 95.7% name accuracy beating JSNice SOTA (63%). Code reconstruction + operational validation added.
 
 ## Date
 
@@ -60,31 +60,85 @@ populate the `names` array.
 
 A Merkle-style witness chain proves provenance:
 
-- SHAKE-256 hash of the original bundle.
-- SHAKE-256 hash of each extracted module (keyed by byte range).
+- SHA3-256 hash of the original bundle.
+- SHA3-256 hash of each extracted module (keyed by byte range).
 - Merkle root of all module hashes.
 - Inferred-names hash per module.
 
 This chain is compatible with the RVF `WITNESS_SEG` format.
+
+### Phase 6 -- Code Reconstruction
+
+Transform beautified minified code into human-readable source:
+
+1. **Name propagation** — when `s$` is inferred as `agentLoop`, rename ALL references to `s$` throughout the codebase consistently.
+2. **Style normalization** — convert `!0`→`true`, `!1`→`false`, `void 0`→`undefined`, comma expressions→separate statements, ternary chains→if/else.
+3. **JSDoc generation** — infer `@param`, `@returns`, `@yields` from function signatures and context strings.
+4. **TypeScript-style annotations** — reconstruct type hints from usage patterns.
+
+### Phase 7 -- Hierarchical Output
+
+Folder structure emerges from the graph, not hardcoded categories:
+
+1. **Louvain hierarchy** — recursive community detection produces parent/child clusters.
+2. **Auto-naming** — each cluster named by its most discriminative string literals.
+3. **Tree output** — clusters become folders, sub-clusters become subfolders.
+4. **Per-folder RVF** — each folder gets its own searchable RVF container.
+
+Separate `source/` (code only) and `rvf/` (containers only) directories — never mixed.
+
+### Phase 8 -- Operational Validation
+
+Verify reconstructed code is functionally equivalent to the original:
+
+1. **Syntax validation** — `new Function(source)` must not throw.
+2. **String preservation** — all original string literals present in output.
+3. **Class hierarchy** — inheritance chains intact.
+4. **Export matching** — same functions/classes exported.
+5. **Behavioral equivalence** — callable functions produce same outputs with test inputs.
+6. **Witness verification** — Merkle chain confirms output derives from input.
+
+Validation runs automatically as part of the pipeline (disable with `--no-validate`).
 
 ## Crate Structure
 
 ```
 crates/ruvector-decompiler/
   Cargo.toml
+  data/
+    claude-code-patterns.json  -- 210 domain-specific training patterns
   src/
-    lib.rs           -- Public API (decompile entry point)
-    parser.rs        -- Regex-based JS bundle parser
+    lib.rs           -- Public API (decompile entry point, 8-phase pipeline)
+    parser.rs        -- Single-pass JS scanner (memchr + lookup table)
     graph.rs         -- Reference graph construction
-    partitioner.rs   -- MinCut module boundary detection
+    partitioner.rs   -- MinCut + Louvain community detection (rayon parallel)
     inferrer.rs      -- Name inference with confidence scoring
+    training.rs      -- Training corpus (210 patterns, JSON-loadable)
+    transformer.rs   -- Pure Rust transformer encoder (zero ML deps)
+    neural.rs        -- Neural inference backend (ONNX/Transformer/GGUF)
     sourcemap.rs     -- V3 source map generation (VLQ)
     beautifier.rs    -- Code beautification / pretty-printing
-    witness.rs       -- RVF witness chain (SHAKE-256 Merkle)
+    witness.rs       -- RVF witness chain (SHA3-256 Merkle)
     types.rs         -- Core domain types
     error.rs         -- Error types (thiserror)
   tests/
-    integration.rs   -- End-to-end test with sample minified JS
+    integration.rs   -- End-to-end tests
+    ground_truth.rs  -- 5 ground-truth fixture accuracy tests
+    real_world.rs    -- 3 OSS comparison tests with self-learning
+  benches/
+    bench_parser.rs  -- Parser benchmarks (1KB-1MB)
+    bench_pipeline.rs -- Full pipeline + per-phase benchmarks
+  examples/
+    run_on_cli.rs    -- CLI runner for real bundles
+
+npm/packages/ruvector/src/decompiler/
+    index.js         -- Node.js decompiler API
+    reconstructor.js -- Code reconstruction (rename, comment, style)
+    validator.js     -- Operational validation
+    module-splitter.js -- Module detection
+    npm-fetch.js     -- npm registry client
+    witness.js       -- SHA-256 witness chains
+    metrics.js       -- Code metrics extraction
 ```
 
 ## Dependencies
@@ -96,6 +150,10 @@ crates/ruvector-decompiler/
 | `serde` + `serde_json` | Source map serialization |
 | `regex` | Declaration and reference extraction |
 | `thiserror` | Ergonomic error types |
+| `rayon` | Parallel Louvain local moves |
+| `memchr` | SIMD byte scanning in parser |
+| `once_cell` | Cached regex compilation |
+| `ort` (optional) | ONNX Runtime neural inference |
 
 ## Consequences
 
