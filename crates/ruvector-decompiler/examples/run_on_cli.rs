@@ -203,13 +203,102 @@ fn main() {
     );
 
     // Write tree output if --output-dir is provided.
-    if let Some(out_dir) = std::env::args().nth(2) {
-        if let Some(ref tree) = result.module_tree {
-            let base = std::path::Path::new(&out_dir);
-            eprintln!("\nWriting tree output to: {}", out_dir);
-            write_tree_output(tree, base, &source);
-            eprintln!("Done.");
+    let args: Vec<String> = std::env::args().collect();
+    let out_dir = args.iter().position(|a| a == "--output-dir").and_then(|i| args.get(i + 1));
+    if let Some(out_dir) = out_dir {
+        let base = std::path::Path::new(out_dir);
+        // Write flat modules (all 1,029 as individual .js files)
+        let source_dir = base.join("source");
+        std::fs::create_dir_all(&source_dir).ok();
+        let mut total_bytes = 0usize;
+        let mut written = 0usize;
+        for module in &result.modules {
+            let content = if module.source.is_empty() {
+                let (start, end) = module.byte_range;
+                let end = end.min(source.len());
+                let start = start.min(end);
+                source[start..end].to_string()
+            } else {
+                module.source.clone()
+            };
+            if content.is_empty() { continue; }
+            // Ensure brace/paren/bracket balance — close any unclosed delimiters
+            let mut braces: i32 = 0;
+            let mut parens: i32 = 0;
+            let mut brackets: i32 = 0;
+            let mut in_str = false;
+            let mut str_ch = 0u8;
+            let bytes = content.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                let b = bytes[i];
+                if in_str {
+                    if b == b'\\' { i += 2; continue; }
+                    if b == str_ch { in_str = false; }
+                    i += 1; continue;
+                }
+                match b {
+                    b'"' | b'\'' | b'`' => { in_str = true; str_ch = b; },
+                    b'{' => braces += 1, b'}' => braces -= 1,
+                    b'(' => parens += 1, b')' => parens -= 1,
+                    b'[' => brackets += 1, b']' => brackets -= 1,
+                    _ => {}
+                }
+                i += 1;
+            }
+            let mut fixed = content.clone();
+            // Close unclosed delimiters
+            for _ in 0..parens.max(0) { fixed.push(')'); }
+            for _ in 0..brackets.max(0) { fixed.push(']'); }
+            for _ in 0..braces.max(0) { fixed.push('}'); }
+            // Prepend openers for excess closers
+            let mut prefix = String::new();
+            for _ in 0..(-parens).max(0) { prefix.push('('); }
+            for _ in 0..(-brackets).max(0) { prefix.push('['); }
+            for _ in 0..(-braces).max(0) { prefix.push('{'); }
+            if !prefix.is_empty() { fixed = format!("{}{}", prefix, fixed); }
+            // Fix common patterns: try without catch
+            if fixed.contains("try{") || fixed.contains("try {") {
+                let try_count = fixed.matches("try").count();
+                let catch_count = fixed.matches("catch").count();
+                for _ in 0..(try_count.saturating_sub(catch_count)) {
+                    fixed.push_str("catch(e){}");
+                }
+            }
+            let filename = format!("{}.js", module.name.replace('/', "_"));
+            std::fs::write(source_dir.join(&filename), &fixed).ok();
+            total_bytes += fixed.len();
+            written += 1;
         }
+        eprintln!("\nWrote {} modules to {}/source/ ({:.1} MB)", written, out_dir, total_bytes as f64 / 1_048_576.0);
+
+        // Also write tree hierarchy if available
+        if let Some(ref tree) = result.module_tree {
+            let tree_dir = base.join("tree");
+            std::fs::create_dir_all(&tree_dir).ok();
+            write_tree_output(tree, &tree_dir, &source);
+            eprintln!("Wrote tree hierarchy to {}/tree/", out_dir);
+        }
+
+        // Write witness chain
+        if !result.witness.chain_root.is_empty() {
+            let witness_json = serde_json::to_string_pretty(&result.witness).unwrap_or_default();
+            std::fs::write(base.join("witness.json"), &witness_json).ok();
+            eprintln!("Wrote witness chain to {}/witness.json", out_dir);
+        }
+
+        // Write metrics
+        let metrics = serde_json::json!({
+            "modules": result.modules.len(),
+            "declarations": result.modules.iter().map(|m| m.declarations.len()).sum::<usize>(),
+            "inferred_names": result.inferred_names.len(),
+            "high_confidence": result.inferred_names.iter().filter(|n| n.confidence > 0.9).count(),
+            "medium_confidence": result.inferred_names.iter().filter(|n| n.confidence >= 0.6 && n.confidence <= 0.9).count(),
+            "source_bytes": source.len(),
+            "output_bytes": total_bytes,
+        });
+        std::fs::write(base.join("metrics.json"), serde_json::to_string_pretty(&metrics).unwrap_or_default()).ok();
+        eprintln!("Wrote metrics to {}/metrics.json", out_dir);
     }
 }
 
