@@ -149,6 +149,7 @@ members = [
     "examples/climate-consciousness",
     # JS bundle decompiler (ADR-135)
     "crates/ruvector-decompiler",
+    "crates/ruvector-decompiler-wasm",
 ]
 resolver = "2"
 

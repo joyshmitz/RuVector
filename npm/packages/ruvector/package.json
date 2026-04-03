@@ -1,6 +1,6 @@
 {
   "name": "ruvector",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "Self-learning vector database for Node.js — hybrid search, Graph RAG, FlashAttention-3, DiskANN, 50+ attention mechanisms",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -90,6 +90,7 @@
     "bin/",
     "dist/",
     "src/decompiler/",
+    "wasm/",
     "README.md",
     "LICENSE"
   ],

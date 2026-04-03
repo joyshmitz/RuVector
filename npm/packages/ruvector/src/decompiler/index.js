@@ -28,6 +28,55 @@ const { reconstructCode, reconstructRunnable } = require('./reconstructor');
 const { validateReconstruction } = require('./validator');
 
 /**
+ * Try the WASM Louvain decompiler (full graph-partitioning pipeline).
+ * Returns null if WASM module is not available or fails.
+ *
+ * @param {string} source - raw JavaScript source
+ * @param {object} [options]
+ * @returns {{modules: object[], metrics: object, witness: object|null}|null}
+ */
+function tryWasmDecompiler(source, options = {}) {
+  try {
+    const wasm = require('../../wasm/ruvector_decompiler_wasm');
+    const configJson = JSON.stringify({
+      target_modules: null,
+      min_confidence: options.minConfidence || 0.3,
+      generate_source_maps: false,
+      generate_witness: options.witness !== false,
+      output_filename: 'bundle.js',
+      model_path: null,
+      hierarchical_output: true,
+      max_depth: 3,
+      min_folder_size: 3,
+    });
+    const resultJson = wasm.decompile(source, configJson);
+    const result = JSON.parse(resultJson);
+    if (result.error) return null;
+
+    // Convert Rust DecompileResult to Node.js format
+    return {
+      modules: (result.modules || []).map((m) => ({
+        name: m.name,
+        content: m.source || '',
+        declarations: (m.declarations && m.declarations.length) || 0,
+        fragments: (m.declarations && m.declarations.length) || 0,
+        confidence: 0.8,
+      })),
+      metrics: {
+        source: { sizeBytes: source.length },
+        modules: (result.modules || []).length,
+        engine: 'wasm-louvain',
+      },
+      witness: result.witness || null,
+      moduleTree: result.module_tree || null,
+      beautifiedSource: source,
+    };
+  } catch {
+    return null; // WASM not available, fall back
+  }
+}
+
+/**
  * Try to beautify source code using js-beautify (optional dep).
  * Falls back to returning the source unchanged if not installed.
  * @param {string} source
@@ -118,7 +167,13 @@ function decompileSource(source, options = {}) {
     filePath,
   } = options;
 
-  // Try Rust Louvain pipeline first (878+ modules, 100% parse rate)
+  // Priority 1: WASM Louvain (full pipeline, works everywhere, no binary needed)
+  if (useRust !== false && source.length > 1000) {
+    const wasmResult = tryWasmDecompiler(source, options);
+    if (wasmResult) return wasmResult;
+  }
+
+  // Priority 2: Rust binary (full pipeline, requires cargo build)
   if (useRust && filePath && source.length > 100000) {
     const tmpDir = path.join(require('os').tmpdir(), 'ruvector-decompile-' + Date.now());
     const rustResult = tryRustDecompiler(filePath, tmpDir);
@@ -404,4 +459,5 @@ module.exports = {
   reconstructCode,
   reconstructRunnable,
   validateReconstruction,
+  tryWasmDecompiler,
 };

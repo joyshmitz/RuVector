@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::error::{DecompilerError, Result};
@@ -164,8 +165,12 @@ fn louvain_partition(
         // Parallel phase: compute best community for each node.
         // Each node reads community[] and sigma_totals[] (snapshot).
         // No writes during this phase.
-        let gains: Vec<(usize, usize, f64)> = (0..n)
-            .into_par_iter()
+        #[cfg(feature = "parallel")]
+        let iter = (0..n).into_par_iter();
+        #[cfg(not(feature = "parallel"))]
+        let iter = (0..n).into_iter();
+
+        let gains: Vec<(usize, usize, f64)> = iter
             .filter_map(|i| {
                 let current_comm = community[i];
                 let ki = node_weights[i];

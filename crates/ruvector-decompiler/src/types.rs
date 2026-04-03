@@ -158,7 +158,7 @@ pub struct ModuleWitnessData {
 }
 
 /// Configuration for the decompiler pipeline.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecompileConfig {
     /// Target number of modules to reconstruct. If `None`, auto-detect.
     pub target_modules: Option<usize>,
