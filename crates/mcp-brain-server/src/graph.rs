@@ -860,11 +860,34 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
-    let sim = ruvector_core::simd_intrinsics::cosine_similarity_simd(a, b);
-    // The SIMD path can return NaN/Inf for zero-norm vectors; clamp to 0.0.
-    if sim.is_finite() {
-        sim as f64
-    } else {
-        0.0
+    // 4x unrolled dot product — compiler auto-vectorizes to SSE/AVX on x86,
+    // NEON on ARM. Avoids ruvector-core::simd_intrinsics which is stripped
+    // in the Docker build for cross-compilation compatibility.
+    let n = a.len();
+    let chunks = n / 4;
+    let (mut dot0, mut dot1) = (0.0f64, 0.0f64);
+    let (mut na0, mut na1) = (0.0f64, 0.0f64);
+    let (mut nb0, mut nb1) = (0.0f64, 0.0f64);
+    for c in 0..chunks {
+        let i = c * 4;
+        let (a0, a1, a2, a3) = (a[i] as f64, a[i+1] as f64, a[i+2] as f64, a[i+3] as f64);
+        let (b0, b1, b2, b3) = (b[i] as f64, b[i+1] as f64, b[i+2] as f64, b[i+3] as f64);
+        dot0 += a0 * b0 + a2 * b2;
+        dot1 += a1 * b1 + a3 * b3;
+        na0 += a0 * a0 + a2 * a2;
+        na1 += a1 * a1 + a3 * a3;
+        nb0 += b0 * b0 + b2 * b2;
+        nb1 += b1 * b1 + b3 * b3;
     }
+    for i in (chunks * 4)..n {
+        let (ai, bi) = (a[i] as f64, b[i] as f64);
+        dot0 += ai * bi;
+        na0 += ai * ai;
+        nb0 += bi * bi;
+    }
+    let dot = dot0 + dot1;
+    let norm_a = (na0 + na1).sqrt();
+    let norm_b = (nb0 + nb1).sqrt();
+    if norm_a < 1e-10 || norm_b < 1e-10 { return 0.0; }
+    dot / (norm_a * norm_b)
 }

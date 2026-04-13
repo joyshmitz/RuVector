@@ -582,13 +582,9 @@ impl Default for InternalVoice {
 // Utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Cosine similarity between two vectors (SIMD-accelerated via ruvector-core)
+/// Cosine similarity — delegates to the optimized version in graph.rs
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-    let sim = ruvector_core::simd_intrinsics::cosine_similarity_simd(a, b);
-    if sim.is_finite() { sim as f64 } else { 0.0 }
+    crate::graph::cosine_similarity(a, b)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

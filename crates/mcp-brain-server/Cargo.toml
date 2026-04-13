@@ -57,7 +57,8 @@ async-stream = "0.3"
 urlencoding = "2"
 
 # RuVector Cognitive Stack
-ruvector-core = { path = "../ruvector-core", default-features = false }
+# ruvector-core not used directly — simd_intrinsics stripped in Docker build.
+# Cosine similarity is inlined in graph.rs with 4x unrolled auto-vectorizable loop.
 sona = { package = "ruvector-sona", path = "../sona", features = ["serde-support"] }
 ruvector-mincut = { path = "../ruvector-mincut", features = ["canonical"] }
 ruvector-nervous-system = { path = "../ruvector-nervous-system" }
