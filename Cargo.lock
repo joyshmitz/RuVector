@@ -5857,6 +5857,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]
@@ -9584,7 +9585,7 @@ dependencies = [
  "memmap2",
  "napi",
  "napi-derive",
- "ndarray 0.16.1",
+ "ndarray 0.17.2",
  "page_size",
  "parking_lot 0.12.5",
  "proptest",
