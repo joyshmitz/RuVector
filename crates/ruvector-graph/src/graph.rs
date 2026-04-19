@@ -218,6 +218,32 @@ impl GraphDB {
         }
     }
 
+    /// Delete multiple edges (batch)
+    pub fn delete_edges_batch(&self, ids: &[EdgeId]) -> Result<usize> {
+        let mut deleted = 0;
+        let mut edges_to_update = Vec::with_capacity(ids.len());
+
+        for id in ids {
+            let key: &str = id.as_ref();
+            if let Some((_, edge)) = self.edges.remove(key) {
+                edges_to_update.push(edge);
+                deleted += 1;
+            }
+        }
+
+        for edge in &edges_to_update {
+            self.edge_type_index.remove_edge(edge);
+            self.adjacency_index.remove_edge(edge);
+        }
+
+        #[cfg(feature = "storage")]
+        if let Some(storage) = &self.storage {
+            storage.delete_edges_batch(ids)?;
+        }
+
+        Ok(deleted)
+    }
+
     /// Get edges by type
     pub fn get_edges_by_type(&self, edge_type: &str) -> Vec<Edge> {
         self.edge_type_index
