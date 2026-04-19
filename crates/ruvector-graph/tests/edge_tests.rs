@@ -405,3 +405,73 @@ fn test_get_edges_for_nodes() {
     let empty = db.get_edges_for_nodes(&[]);
     assert_eq!(empty.len(), 0);
 }
+
+#[test]
+fn test_delete_edges_batch_basic() {
+    let db = GraphDB::new();
+
+    db.create_node(Node::new("a".to_string(), vec![], Properties::new())).unwrap();
+    db.create_node(Node::new("b".to_string(), vec![], Properties::new())).unwrap();
+
+    for i in 0..5 {
+        let edge = Edge::new(
+            format!("e{}", i),
+            "a".to_string(),
+            "b".to_string(),
+            "LINKS".to_string(),
+            Properties::new(),
+        );
+        db.create_edge(edge).unwrap();
+    }
+
+    let ids = vec!["e0".to_string(), "e2".to_string(), "e4".to_string()];
+    let deleted = db.delete_edges_batch(&ids).unwrap();
+    assert_eq!(deleted, 3);
+
+    assert!(db.get_edge("e0").is_none());
+    assert!(db.get_edge("e2").is_none());
+    assert!(db.get_edge("e4").is_none());
+    assert!(db.get_edge("e1").is_some());
+    assert!(db.get_edge("e3").is_some());
+}
+
+#[test]
+fn test_delete_edges_batch_partial_not_found() {
+    let db = GraphDB::new();
+
+    db.create_node(Node::new("x".to_string(), vec![], Properties::new())).unwrap();
+    db.create_node(Node::new("y".to_string(), vec![], Properties::new())).unwrap();
+
+    let edge = Edge::new("e1".to_string(), "x".to_string(), "y".to_string(), "TO".to_string(), Properties::new());
+    db.create_edge(edge).unwrap();
+
+    let ids = vec!["e1".to_string(), "does_not_exist".to_string()];
+    let deleted = db.delete_edges_batch(&ids).unwrap();
+    assert_eq!(deleted, 1);
+
+    assert!(db.get_edge("e1").is_none());
+}
+
+#[test]
+fn test_delete_edges_batch_updates_indexes() {
+    let db = GraphDB::new();
+
+    db.create_node(Node::new("src".to_string(), vec![], Properties::new())).unwrap();
+    db.create_node(Node::new("dst".to_string(), vec![], Properties::new())).unwrap();
+
+    let edge = Edge::new("edge1".to_string(), "src".to_string(), "dst".to_string(), "T".to_string(), Properties::new());
+    db.create_edge(edge).unwrap();
+
+    assert!(db.get_edges_for_nodes(&["src".to_string()]).len() == 1);
+
+    db.delete_edges_batch(&["edge1".to_string()]).unwrap();
+
+    assert!(db.get_edges_for_nodes(&["src".to_string()]).is_empty());
+}
+
+#[test]
+fn test_delete_edges_batch_empty() {
+    let db = GraphDB::new();
+    let deleted = db.delete_edges_batch(&[]).unwrap();
+    assert_eq!(deleted, 0);
+}
