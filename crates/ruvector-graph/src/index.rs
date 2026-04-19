@@ -161,7 +161,7 @@ impl PropertyIndex {
             PropertyValue::Integer(i) => i.to_string(),
             PropertyValue::Float(f) => f.to_string(),
             PropertyValue::String(s) => s.clone(),
-            PropertyValue::Array(_) | PropertyValue::List(_) => format!("{:?}", value),
+            PropertyValue::FloatArray(_) | PropertyValue::Array(_) | PropertyValue::List(_) => format!("{:?}", value),
             PropertyValue::Map(_) => format!("{:?}", value),
         }
     }
