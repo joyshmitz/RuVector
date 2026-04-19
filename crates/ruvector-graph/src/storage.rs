@@ -261,13 +261,13 @@ impl GraphStorage {
         Ok(deleted)
     }
 
-    pub fn delete_edges_batch(&self, ids: &[EdgeId]) -> Result<usize> {
+    pub fn delete_edges_batch(&self, ids: &[impl AsRef<str>]) -> Result<usize> {
         let write_txn = self.db.begin_write()?;
         let mut deleted = 0;
         {
             let mut table = write_txn.open_table(EDGES_TABLE)?;
             for id in ids {
-                if table.remove(id.as_str())?.is_some() {
+                if table.remove(id.as_ref())?.is_some() {
                     deleted += 1;
                 }
             }

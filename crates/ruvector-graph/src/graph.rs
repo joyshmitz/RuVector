@@ -219,7 +219,7 @@ impl GraphDB {
     }
 
     /// Delete multiple edges (batch)
-    pub fn delete_edges_batch(&self, ids: &[EdgeId]) -> Result<usize> {
+    pub fn delete_edges_batch(&self, ids: &[impl AsRef<str>]) -> Result<usize> {
         let mut deleted = 0;
         let mut edges_to_update = Vec::with_capacity(ids.len());
 
@@ -238,7 +238,8 @@ impl GraphDB {
 
         #[cfg(feature = "storage")]
         if let Some(storage) = &self.storage {
-            storage.delete_edges_batch(ids)?;
+            let str_ids = ids.iter().map(|id| id.as_ref()).collect::<Vec<_>>();
+            storage.delete_edges_batch(&str_ids)?;
         }
 
         Ok(deleted)

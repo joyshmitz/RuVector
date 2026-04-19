@@ -472,6 +472,7 @@ fn test_delete_edges_batch_updates_indexes() {
 #[test]
 fn test_delete_edges_batch_empty() {
     let db = GraphDB::new();
-    let deleted = db.delete_edges_batch(&[]).unwrap();
+    let empty_ids: Vec<String> = vec![];
+    let deleted = db.delete_edges_batch(&empty_ids).unwrap();
     assert_eq!(deleted, 0);
 }
