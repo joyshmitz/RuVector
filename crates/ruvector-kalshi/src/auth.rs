@@ -7,6 +7,8 @@
 //!
 //! The canonical string is `format!("{ts}{method}{path}")` with no separators.
 
+use std::sync::Arc;
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
@@ -35,12 +37,15 @@ impl SignedHeaders {
     }
 }
 
-/// Kalshi request signer. Holds a parsed RSA private key and the caller's
-/// API key string. Cheap to clone (both fields clone trivially).
+/// Kalshi request signer.
+///
+/// Internally holds an `Arc<SigningKey<Sha256>>` so `Clone` is O(1) — the
+/// RSA private key is reference-counted across all clones. The API key is
+/// also shared as `Arc<str>` to avoid per-request allocations.
 #[derive(Clone)]
 pub struct Signer {
-    api_key: String,
-    signing_key: SigningKey<Sha256>,
+    api_key: Arc<str>,
+    signing_key: Arc<SigningKey<Sha256>>,
 }
 
 impl std::fmt::Debug for Signer {
@@ -48,7 +53,7 @@ impl std::fmt::Debug for Signer {
         // Never leak the API key or key material in Debug output.
         f.debug_struct("Signer")
             .field("api_key_len", &self.api_key.len())
-            .field("key_size_bits", &self.signing_key.as_ref().size())
+            .field("key_size_bits", &self.signing_key.as_ref().as_ref().size())
             .finish()
     }
 }
@@ -57,9 +62,10 @@ impl Signer {
     /// Build a signer from a PEM string (accepts PKCS#1 or PKCS#8) and API key.
     pub fn from_pem(api_key: impl Into<String>, pem: &str) -> Result<Self> {
         let private_key = parse_rsa_pem(pem)?;
+        let api_key: String = api_key.into();
         Ok(Self {
-            api_key: api_key.into(),
-            signing_key: SigningKey::<Sha256>::new(private_key),
+            api_key: Arc::from(api_key.into_boxed_str()),
+            signing_key: Arc::new(SigningKey::<Sha256>::new(private_key)),
         })
     }
 
@@ -75,7 +81,7 @@ impl Signer {
         let mut rng = rand::thread_rng();
         let sig = self.signing_key.sign_with_rng(&mut rng, msg.as_bytes());
         SignedHeaders {
-            access_key: self.api_key.clone(),
+            access_key: self.api_key.as_ref().to_string(),
             timestamp_ms: ts_ms.to_string(),
             signature_b64: STANDARD.encode(sig.to_bytes()),
         }

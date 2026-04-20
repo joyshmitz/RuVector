@@ -21,7 +21,12 @@ use crate::{KalshiError, Result};
 
 #[derive(Clone)]
 pub struct RestClient {
-    base_url: String,
+    /// Base URL string (for `reqwest` to consume). `Arc<str>` keeps clone O(1).
+    base_url: Arc<str>,
+    /// Pre-computed URL path component of `base_url` (e.g. `/trade-api/v2`)
+    /// — prepended to the caller path to build the signature payload
+    /// without re-parsing the URL on every request.
+    base_path: Arc<str>,
     signer: Signer,
     http: reqwest::Client,
     limiter: Arc<RateLimiter>,
@@ -46,8 +51,15 @@ impl RestClient {
             .user_agent("ruvector-kalshi/0.1")
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
+        let base: String = base_url.into();
+        // Parse once at construction. For malformed URLs fall back to the
+        // caller-supplied string (same behavior as the old path lookup).
+        let base_path: String = reqwest::Url::parse(&base)
+            .map(|u| u.path().trim_end_matches('/').to_string())
+            .unwrap_or_else(|_| "".to_string());
         Ok(Self {
-            base_url: base_url.into(),
+            base_url: Arc::from(base.into_boxed_str()),
+            base_path: Arc::from(base_path.into_boxed_str()),
             signer,
             http,
             limiter: Arc::new(RateLimiter::new(burst, per_sec)),
@@ -56,14 +68,17 @@ impl RestClient {
 
     /// Path used in the signature must be the full `/trade-api/v2/...` path,
     /// not the host-relative fragment, per Kalshi's spec.
+    ///
+    /// Uses the pre-computed `base_path` so there is no URL parse per call.
     fn sig_path_for(&self, path: &str) -> String {
-        // `base_url` already ends with `/trade-api/v2`; the sig path is the
-        // full URL path component.
-        let url = url_join(&self.base_url, path);
-        match reqwest::Url::parse(&url) {
-            Ok(u) => u.path().to_string(),
-            Err(_) => path.to_string(),
-        }
+        let p = if path.starts_with('/') { path } else { &format!("/{path}")[..] };
+        // Strip any query string for the signature base — Kalshi signs only
+        // the path component.
+        let path_only = match p.find('?') {
+            Some(i) => &p[..i],
+            None => p,
+        };
+        format!("{}{}", self.base_path, path_only)
     }
 
     async fn send<R: for<'de> serde::Deserialize<'de>>(
