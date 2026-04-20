@@ -15,7 +15,6 @@ ruvector-core = { version = "2.1.0", path = "../ruvector-core", default-features
 
 # Math and numerics
 ndarray = { version = "0.17.2", features = ["serde"] }
-# ndarray = { workspace = true, features = ["serde"] }
 rand = { workspace = true }
 rand_distr = { workspace = true }
 
