@@ -12,6 +12,7 @@
 //! - Secret loading from Google Cloud Secret Manager or a local PEM file
 
 pub mod auth;
+pub mod brain;
 pub mod models;
 pub mod normalize;
 pub mod rate_limit;
@@ -19,6 +20,7 @@ pub mod rest;
 pub mod secrets;
 pub mod strategy_adapter;
 pub mod ws;
+pub mod ws_client;
 
 use thiserror::Error;
 
@@ -26,10 +28,14 @@ use thiserror::Error;
 pub const KALSHI_VENUE_ID: u16 = 1001;
 
 /// Default Kalshi REST base URL (production).
-pub const KALSHI_API_URL: &str = "https://trading-api.kalshi.com/trade-api/v2";
+///
+/// Kalshi migrated from `trading-api.kalshi.com` to `api.elections.kalshi.com`
+/// in early 2025. The old host returns `401 Unauthorized` with a migration
+/// pointer. Override via the `KALSHI_API_URL` env/GCS secret if needed.
+pub const KALSHI_API_URL: &str = "https://api.elections.kalshi.com/trade-api/v2";
 
 /// Default Kalshi WebSocket URL (production).
-pub const KALSHI_WS_URL: &str = "wss://trading-api.kalshi.com/trade-api/ws/v2";
+pub const KALSHI_WS_URL: &str = "wss://api.elections.kalshi.com/trade-api/ws/v2";
 
 /// Kalshi fixed-point scale for price. Kalshi quotes in cents 0..=100;
 /// we upscale into the canonical `price_fp` scale (value × 1e8) so

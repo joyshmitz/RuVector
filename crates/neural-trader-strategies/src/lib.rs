@@ -15,10 +15,14 @@
 //! against live Kalshi (or any future venue that normalizes to
 //! `MarketEvent`).
 
+pub mod attention_scalper;
+pub mod coherence_arb;
 pub mod ev_kelly;
 pub mod intent;
 pub mod risk;
 
+pub use attention_scalper::{AttentionScalper, AttentionScalperConfig};
+pub use coherence_arb::{CoherenceArb, CoherenceArbConfig};
 pub use ev_kelly::{ExpectedValueKelly, ExpectedValueKellyConfig};
 pub use intent::{Action, Intent, Side};
 pub use risk::{

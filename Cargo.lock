@@ -9803,6 +9803,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
+ "futures-util",
  "neural-trader-core",
  "neural-trader-strategies",
  "rand 0.8.5",
@@ -9813,6 +9814,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-tungstenite",
  "tracing",
 ]
 
@@ -12878,8 +12880,12 @@ checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
 dependencies = [
  "futures-util",
  "log",
+ "rustls 0.23.37",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls 0.26.4",
  "tungstenite",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -13232,6 +13238,8 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.5",
+ "rustls 0.23.37",
+ "rustls-pki-types",
  "sha1",
  "thiserror 1.0.69",
  "utf-8",
