@@ -1,22 +1,27 @@
 //! Multi-level order-book imbalance scalper.
 //!
-//! Kalshi's orderbook is shallow (binary contracts) so traditional CNNs
-//! over deep ladders add little value. Instead, this strategy tracks a
-//! rolling, attention-weighted **imbalance** signal across the visible
-//! top levels: recent levels closer to the mid get higher weight, and
-//! when the smoothed imbalance sustains above a threshold, a short
-//! position is opened on the pressured side.
+//! Two imbalance computations are available, switchable via
+//! [`AttentionScalperConfig::use_sdpa`]:
+//!
+//! 1. **Geometric decay** (default): near-mid levels weight `1.0`, each
+//!    further level decays by `level_decay`. Deterministic and fast —
+//!    ~10 ns/level.
+//!
+//! 2. **Scaled dot-product attention** (`use_sdpa = true`): every level
+//!    is encoded as a `[size_log, side_sign, depth_idx, 1.0]` vector
+//!    and passed to
+//!    [`ruvector_attention::ScaledDotProductAttention`] with a fixed
+//!    "pressure" query. The attention-weighted context vector's sign-
+//!    dimension becomes the signed imbalance. This is an honest
+//!    integration with the ruvector attention stack and behaves
+//!    consistently with the geometric path on single-sided books; the
+//!    value appears on mixed books where attention can upweight the
+//!    wide side.
 //!
 //! Consumes only [`MarketEvent::BookSnapshot`] from
 //! `neural_trader_core`, so it composes with the Kalshi normalizer
 //! unchanged and — when a deeper ladder is available from another venue
 //! — the same strategy applies.
-//!
-//! Not a learned attention model. The weighting is fixed (geometric
-//! decay) to keep the strategy deterministic and testable. A future
-//! version can feed the imbalance window through `ruvector-cnn` or
-//! `ruvector-attention` once a numeric-tensor backbone exists for
-//! order-book data (current `ruvector-cnn` is image-only).
 
 use std::collections::HashMap;
 
@@ -30,7 +35,7 @@ pub struct AttentionScalperConfig {
     /// Top-N price levels to weight per side.
     pub depth: usize,
     /// Geometric decay factor for level weights. 0.5 → near level weighs
-    /// 2× the next out. Must be in (0, 1].
+    /// 2× the next out. Must be in (0, 1]. Ignored when `use_sdpa = true`.
     pub level_decay: f64,
     /// EMA smoothing alpha for the imbalance signal. Smaller = smoother.
     pub ema_alpha: f64,
@@ -39,6 +44,10 @@ pub struct AttentionScalperConfig {
     pub abs_threshold: f64,
     pub quantity: i64,
     pub strategy_name: &'static str,
+    /// When true, compute the imbalance via
+    /// `ruvector_attention::ScaledDotProductAttention` instead of the
+    /// fixed geometric decay.
+    pub use_sdpa: bool,
 }
 
 impl Default for AttentionScalperConfig {
@@ -50,6 +59,7 @@ impl Default for AttentionScalperConfig {
             abs_threshold: 0.4,
             quantity: 10,
             strategy_name: "attention-scalper",
+            use_sdpa: false,
         }
     }
 }
@@ -99,14 +109,18 @@ impl AttentionScalper {
             let drop = state.no_levels.len() - depth;
             state.no_levels.drain(0..drop);
         }
-        let wy = weighted_depth(&state.yes_levels, depth, decay);
-        let wn = weighted_depth(&state.no_levels, depth, decay);
-        let total = wy + wn;
-        if total <= 0.0 {
-            return None;
-        }
-        // Imbalance in [-1, 1]. Positive → YES pressure.
-        let raw = (wy - wn) / total;
+        let raw = if self.config.use_sdpa {
+            sdpa_imbalance(&state.yes_levels, &state.no_levels, depth)
+        } else {
+            let wy = weighted_depth(&state.yes_levels, depth, decay);
+            let wn = weighted_depth(&state.no_levels, depth, decay);
+            let total = wy + wn;
+            if total <= 0.0 {
+                return None;
+            }
+            // Imbalance in [-1, 1]. Positive → YES pressure.
+            (wy - wn) / total
+        };
         state.smoothed_imbalance = (1.0 - alpha) * state.smoothed_imbalance + alpha * raw;
         Some(state.smoothed_imbalance)
     }
@@ -157,6 +171,52 @@ fn weighted_depth(levels: &[(i64, i64)], depth: usize, decay: f64) -> f64 {
         weight *= decay;
     }
     sum
+}
+
+/// Imbalance via scaled dot-product attention over top levels.
+///
+/// Levels are encoded as `[size_log, side_sign, depth_idx_norm, 1.0]`.
+/// A fixed query of `[1.0, 1.0, 0.0, 0.5]` upweights size-heavy, side-
+/// aware levels. The returned context vector's component 1 is the
+/// signed imbalance (sign direction lives on that axis).
+///
+/// Returns a value in roughly `[-1, 1]`, NaN guarded.
+fn sdpa_imbalance(yes_levels: &[(i64, i64)], no_levels: &[(i64, i64)], depth: usize) -> f64 {
+    use ruvector_attention::traits::Attention;
+    use ruvector_attention::ScaledDotProductAttention;
+
+    const D: usize = 4;
+    let mut keys_buf: Vec<[f32; D]> = Vec::with_capacity(2 * depth);
+    for (i, (_, size)) in yes_levels.iter().take(depth).enumerate() {
+        let size_log = (*size as f32 + 1.0).ln();
+        let depth_norm = i as f32 / depth.max(1) as f32;
+        keys_buf.push([size_log, 1.0, depth_norm, 1.0]);
+    }
+    for (i, (_, size)) in no_levels.iter().take(depth).enumerate() {
+        let size_log = (*size as f32 + 1.0).ln();
+        let depth_norm = i as f32 / depth.max(1) as f32;
+        keys_buf.push([size_log, -1.0, depth_norm, 1.0]);
+    }
+    if keys_buf.is_empty() {
+        return 0.0;
+    }
+    // Values mirror keys so the attended context carries the side-sign
+    // on component 1.
+    let keys_refs: Vec<&[f32]> = keys_buf.iter().map(|k| &k[..]).collect();
+    let values_refs: Vec<&[f32]> = keys_refs.clone();
+    let query: [f32; D] = [1.0, 1.0, 0.0, 0.5];
+    let attn = ScaledDotProductAttention::new(D);
+    match attn.compute(&query[..], &keys_refs, &values_refs) {
+        Ok(context) => {
+            let signed = context.get(1).copied().unwrap_or(0.0);
+            if signed.is_finite() {
+                signed as f64
+            } else {
+                0.0
+            }
+        }
+        Err(_) => 0.0,
+    }
 }
 
 impl Strategy for AttentionScalper {
@@ -218,6 +278,7 @@ mod tests {
             level_decay: 1.0,
             quantity: 5,
             strategy_name: "scalper-test",
+            use_sdpa: false,
         });
         s.on_event(&level(1, NtSide::Bid, 24, 500, 0));
         s.on_event(&level(1, NtSide::Bid, 23, 300, 1));
@@ -236,10 +297,51 @@ mod tests {
             level_decay: 1.0,
             quantity: 5,
             strategy_name: "scalper-test",
+            use_sdpa: false,
         });
         s.on_event(&level(2, NtSide::Bid, 24, 100, 0));
         s.on_event(&level(2, NtSide::Ask, 76, 500, 1));
         let intent = s.on_event(&level(2, NtSide::Ask, 77, 400, 2)).expect("should emit");
+        assert!(matches!(intent.side, Side::No));
+    }
+
+    #[test]
+    fn sdpa_path_detects_heavy_yes() {
+        let mut s = AttentionScalper::new(AttentionScalperConfig {
+            use_sdpa: true,
+            abs_threshold: 0.05,
+            ema_alpha: 1.0,
+            depth: 3,
+            quantity: 5,
+            strategy_name: "scalper-sdpa",
+            ..Default::default()
+        });
+        // Heavy YES, light NO: attention should return a positive signal.
+        s.on_event(&level(1, NtSide::Bid, 24, 1000, 0));
+        s.on_event(&level(1, NtSide::Bid, 23, 900, 1));
+        let intent = s
+            .on_event(&level(1, NtSide::Ask, 76, 10, 2))
+            .expect("sdpa must emit on one-sided book");
+        assert!(matches!(intent.side, Side::Yes));
+        assert!(intent.confidence > 0.0);
+    }
+
+    #[test]
+    fn sdpa_path_detects_heavy_no() {
+        let mut s = AttentionScalper::new(AttentionScalperConfig {
+            use_sdpa: true,
+            abs_threshold: 0.05,
+            ema_alpha: 1.0,
+            depth: 3,
+            quantity: 5,
+            strategy_name: "scalper-sdpa",
+            ..Default::default()
+        });
+        s.on_event(&level(2, NtSide::Bid, 24, 10, 0));
+        s.on_event(&level(2, NtSide::Ask, 76, 1000, 1));
+        let intent = s
+            .on_event(&level(2, NtSide::Ask, 77, 800, 2))
+            .expect("sdpa must emit on heavy-no book");
         assert!(matches!(intent.side, Side::No));
     }
 

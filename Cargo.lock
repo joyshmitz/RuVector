@@ -5928,6 +5928,7 @@ dependencies = [
  "anyhow",
  "neural-trader-coherence",
  "neural-trader-core",
+ "ruvector-attention",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

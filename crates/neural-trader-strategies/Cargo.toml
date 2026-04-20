@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 neural-trader-core = { path = "../neural-trader-core" }
 neural-trader-coherence = { path = "../neural-trader-coherence" }
+ruvector-attention = { path = "../ruvector-attention", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
