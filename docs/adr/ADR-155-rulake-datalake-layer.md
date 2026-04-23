@@ -2,11 +2,14 @@
 
 ## Status
 
-Proposed
+**Accepted (M1)** — core abstraction + LocalBackend + FsBackend shipped
+and measured on branch `research/rulake-datalake-analysis`. Backend
+adapters (Parquet, BigQuery, Iceberg, Delta) are M2+.
 
 ## Date
 
 2026-04-23 (v2 — intermediary reframe)
+2026-04-22 (v3 — M1 measured + cache-first reframe)
 
 ## Authors
 
@@ -125,11 +128,33 @@ Key shape decisions:
 See [`docs/research/ruLake/07-implementation-plan.md`](../research/ruLake/07-implementation-plan.md)
 for the full breakdown.
 
-- **M1 (weeks 1–2)**: `rvf-lake` crate scaffold. `BackendAdapter` trait,
-  `LocalBackend` for tests, RaBitQ-cache glue, one-shot `/search` HTTP
-  endpoint via `rvf-server`. **Acceptance:** end-to-end query against
+- **M1 (weeks 1–2) — shipped on branch, measured:** the
+  `ruvector-rulake` crate scaffold with `BackendAdapter` trait,
+  `LocalBackend` + `FsBackend`, RaBitQ-cache glue, witness-addressed
+  cache with cross-backend sharing, LRU eviction over unpinned
+  entries, rayon parallel fan-out across shards, and the bundle
+  sidecar (`table.rulake.json`) with atomic FS persistence. 24 tests
+  passing (9 bundle + 3 fs_backend + 12 federation incl. concurrent
+  hammer). Acceptance numbers from `crates/ruvector-rulake/BENCHMARK.md`:
+
+  - Intermediary tax on LocalBackend: 1.00× at n=100k (2,991 QPS
+    cache-hit vs 3,050 QPS direct RaBitQ).
+  - Cache-hit path in `RuLake::search_one` byte-exact vs direct
+    `RabitqPlusIndex::search` at the same `(seed, rerank_factor)`.
+  - Rayon parallel fan-out prime-time speedups: 2-shard 1.97×,
+    4-shard 3.86× at n=100k.
+  - Recall@10 > 90% on clustered D=128 rerank×20 (gate test
+    `rulake_recall_at_10_above_90pct_vs_brute_force`).
+  - Witness-addressed cache: two `LocalBackend`s with identical data
+    share one compressed entry; `shared_hits` counter bumps on the
+    install (test `two_backends_share_cache_when_witness_matches`).
+  - Send+Sync under contention: 8 threads × 50 queries,
+    mixed single-shard + federated, zero primes after warmup (test
+    `concurrent_searches_are_safe_and_correct`).
+
+  **Original M1 acceptance (preserved):** end-to-end query against
   an in-memory collection returns top-k identical to direct
-  `RabitqPlusIndex::search`.
+  `RabitqPlusIndex::search`. Met.
 
 - **M2 (weeks 3–5)**: `ParquetBackend` (read vectors from S3-Parquet or
   local Parquet via the `arrow` crate). Cache coherence via Parquet
@@ -270,27 +295,42 @@ as a mode flag for customers who cannot tolerate cache staleness.
 
 ## Open questions
 
-1. **Cache sizing.** At what fraction of total vectors does the
-   intermediary tax stop being worth it? Needs measurement during M2.
-2. **Consistency SLA.** Is "cache is up to ≤ 60 s stale per backend
-   coherence check" acceptable as the v1 default? Or do we need to
-   expose tunables per backend?
-3. **Per-collection vs per-backend cache.** One big cache with LRU, or
-   per-collection quotas? The latter is easier to reason about for
-   governance (you can say "this collection is always hot"), but wastes
-   memory in the tail.
-4. **Is the `rvf-lake` crate inside `crates/rvf/` or a sibling top-level
-   crate?** Inside keeps the workspace tight; top-level keeps the RVF
-   core `no_std`-friendly.
-5. **Push-down negotiation.** When a backend supports native push-down
+### Resolved in M1
+
+- ~~**Cache sizing.**~~ **Resolved (partial):** LRU eviction over
+  unpinned entries is implemented via `RuLake::with_max_cache_entries(n)`
+  + `CacheEntry::last_used`. M2 measures the tail-working-set ratio
+  where the tax becomes unattractive.
+- ~~**Consistency SLA.**~~ **Resolved:** `Consistency::{Fresh, Eventual{ttl_ms}}`
+  is a per-`RuLake` setting with `Fresh` as the default. Per-backend
+  override deferred — no customer has asked and the surface is easy
+  to add later.
+- ~~**Per-collection vs per-backend cache.**~~ **Resolved:** One pool,
+  witness-addressed. Per-collection quotas are an M4 governance
+  feature if a customer needs "hot collection" guarantees.
+- ~~**Crate placement.**~~ **Resolved:** `crates/ruvector-rulake/` — a
+  top-level workspace member (not under `crates/rvf/`). Keeps rvf core
+  `no_std`-friendly, matches the rabitq crate's location.
+
+### Still open (M2+)
+
+1. **Push-down negotiation.** When a backend supports native push-down
    (BQ Vector Search, Snowflake Cortex), at what point does the planner
-   prefer it over the cache? Probably when cache hit-rate < 20 % for the
+   prefer it over the cache? Probably when cache hit-rate < 20% for the
    collection — needs a policy, not a constant.
-6. **JVM client for the wire protocol.** Enterprise customers want a
+2. **JVM client for the wire protocol.** Enterprise customers want a
    maintained Java client. Spec'd as v2 but the enterprise-pipeline
    customer will ask about it in week one.
-7. **Trademark / naming.** "ruLake" vs alternatives before docs and
+3. **Trademark / naming.** "ruLake" vs alternatives before docs and
    crate names lock.
-8. **Cost accounting.** When the planner pushes down to BQ, whose
+4. **Cost accounting.** When the planner pushes down to BQ, whose
    BQ credits are burned? Needs a customer-facing cost-attribution
    story, not just an engineering one.
+5. **Remote-backend tax.** BENCHMARK.md's 1.00× tax on `LocalBackend`
+   is the floor. M2 needs to measure the real tax on a Parquet-on-GCS
+   prime and document the p50/p99 numbers the BQ UDF path can expect.
+6. **Cache sidecar daemon protocol.** Bundle sidecar is shipped, FS
+   persistence is atomic. The missing piece is the on-line protocol
+   by which the warehouse-push path hands a new `table.rulake.json`
+   to a running ruLake — file-watcher, signed notification, or a
+   polling refresh on `Eventual` TTL?
