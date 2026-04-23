@@ -1,0 +1,21 @@
+[package]
+name = "ruvector-rulake"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "ruLake — vector-native federation intermediary over heterogeneous backends (ADR-155)"
+
+[[bin]]
+name = "rulake-demo"
+path = "src/bin/rulake-demo.rs"
+
+[dependencies]
+ruvector-rabitq = { path = "../ruvector-rabitq" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+# needed by the bin; tests already pull these via dev-deps.
+rand = { workspace = true }
+rand_distr = { workspace = true }

@@ -10262,6 +10262,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-rulake"
+version = "2.2.0"
+dependencies = [
+ "rand 0.8.5",
+ "rand_distr 0.4.3",
+ "ruvector-rabitq",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "ruvector-scipix"
 version = "2.2.0"
 dependencies = [
