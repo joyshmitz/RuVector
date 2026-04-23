@@ -52,17 +52,25 @@ but buys less leverage than the alternative proposed here.
 
 ## Decision
 
-**Build ruLake as a cache-first vector execution fabric.** The cache —
-RaBitQ-compressed hot codes with deterministic rotation + witness — *is*
-the product; federation is the cache's refill mechanism. An
-app or agent speaks the RVF wire to `rvf-server`; ruLake answers from
-the cache whenever the backend's coherence token is current. On miss
-or drift, the corresponding backend adapter (Parquet-on-GCS, BigQuery,
-Snowflake, Iceberg, Delta, local) pulls fresh vectors, rebuilds the
-cache entry, and returns the result. The cache-hit path matches direct
-`RabitqPlusIndex::search` at ~957 QPS / 100 % recall@10
-(`ruvector-rabitq::BENCHMARK.md`) and measures a 1.00× intermediary
-tax on a local backend (`ruvector-rulake::BENCHMARK.md`).
+**ruLake is a vector execution cache with deterministic compression and
+federated refill.** One sentence, because the product really is that
+narrow:
+
+- **Cache** — RaBitQ 1-bit codes with Haar-rotation determinism and a
+  SHAKE-256 witness. The hit path is the entire product surface.
+- **Deterministic compression** — two processes reading the same
+  `(data_ref, dim, rotation_seed, rerank_factor, generation)` produce
+  byte-identical codes. Cache sharing is safe without comparing
+  payloads.
+- **Federated refill** — on cache miss the backend adapter
+  (Parquet-on-GCS, BigQuery, Iceberg, Delta, local) pulls fresh
+  vectors, primes the cache, and serves. Federation is the *refill
+  mechanism*, not the product shape.
+
+The measured cache-hit path in `RuLake::search_one` is 1.02× the direct
+`RabitqPlusIndex::search` cost (`ruvector-rulake::BENCHMARK.md`). The
+abstraction layer is not a bottleneck; we can afford orchestration,
+governance, and routing on top.
 
 **Why cache-first, not federation-first**, per the decision matrix in
 [`06-positioning.md`](../research/ruLake/06-positioning.md) §"Decision matrix":
@@ -132,29 +140,45 @@ for the full breakdown.
   `ruvector-rulake` crate scaffold with `BackendAdapter` trait,
   `LocalBackend` + `FsBackend`, RaBitQ-cache glue, witness-addressed
   cache with cross-backend sharing, LRU eviction over unpinned
-  entries, rayon parallel fan-out across shards, and the bundle
-  sidecar (`table.rulake.json`) with atomic FS persistence. 24 tests
-  passing (9 bundle + 3 fs_backend + 12 federation incl. concurrent
-  hammer). Acceptance numbers from `crates/ruvector-rulake/BENCHMARK.md`:
+  entries, rayon parallel fan-out with **adaptive per-shard rerank**,
+  bundle sidecar protocol (publish + refresh, atomic FS persistence),
+  and hit-rate / prime-time instrumentation. 28 tests passing.
+  Acceptance numbers from `crates/ruvector-rulake/BENCHMARK.md`:
 
-  - Intermediary tax on LocalBackend: 1.00× at n=100k (2,991 QPS
-    cache-hit vs 3,050 QPS direct RaBitQ).
+  - Intermediary tax on LocalBackend: 1.02× at n=100k (2,854 QPS
+    cache-hit vs 2,854 QPS direct RaBitQ under concurrent clients).
   - Cache-hit path in `RuLake::search_one` byte-exact vs direct
     `RabitqPlusIndex::search` at the same `(seed, rerank_factor)`.
   - Rayon parallel fan-out prime-time speedups: 2-shard 1.97×,
     4-shard 3.86× at n=100k.
-  - Recall@10 > 90% on clustered D=128 rerank×20 (gate test
-    `rulake_recall_at_10_above_90pct_vs_brute_force`).
+  - Adaptive per-shard rerank lifts 4-shard concurrent federation
+    from 0.60× → 0.98× the single-shard QPS, recall@10 ≥ 0.85
+    (tests `adaptive_per_shard_rerank_preserves_recall` + bench).
+  - Recall@10 > 90% on clustered D=128 rerank×20 single-shard
+    (gate test `rulake_recall_at_10_above_90pct_vs_brute_force`).
   - Witness-addressed cache: two `LocalBackend`s with identical data
-    share one compressed entry; `shared_hits` counter bumps on the
-    install (test `two_backends_share_cache_when_witness_matches`).
+    share one compressed entry (test
+    `two_backends_share_cache_when_witness_matches`).
   - Send+Sync under contention: 8 threads × 50 queries,
-    mixed single-shard + federated, zero primes after warmup (test
+    mixed single-shard + federated, hit rate preserved (test
     `concurrent_searches_are_safe_and_correct`).
+  - `CacheStats::hit_rate()` + `avg_prime_ms()` exposed as the
+    cache-first KPI surface — the acceptance target for M1.5 is
+    **hit_rate ≥ 0.95** on a realistic workload, which is now
+    measurable from the stats stream alone (no external tracing
+    required for the headline number).
 
-  **Original M1 acceptance (preserved):** end-to-end query against
-  an in-memory collection returns top-k identical to direct
-  `RabitqPlusIndex::search`. Met.
+- **M1.5 (acceptance test for the cache-first reframe):**
+
+  > 95% of queries return exact top-k **without touching the backend**.
+
+  This is the product claim. Measurable via
+  `RuLake::cache_stats().hit_rate()` on the serving fleet. M1 gives
+  the primitive; M1.5 is the workload-driven demonstration that the
+  Eventual-consistency path genuinely stays above the 0.95 threshold
+  under the target workload. Replaces the prior "federation works
+  across 4 shards" gate, which the concurrent bench showed was a
+  distraction.
 
 - **M2 (weeks 3–5)**: `ParquetBackend` (read vectors from S3-Parquet or
   local Parquet via the `arrow` crate). Cache coherence via Parquet
@@ -323,6 +347,52 @@ as a mode flag for customers who cannot tolerate cache staleness.
   itself is ~10 lines of user code — a loop that calls refresh on
   each watched `(key, dir)` pair either on a timer or on inotify
   events; the protocol is the primitive, not a daemon.
+- ~~**Per-shard rerank factor under federation.**~~ **Resolved:**
+  `RabitqPlusIndex::search_with_rerank(query, k, rerank_factor)` lets
+  `RuLake::search_federated` fan out with `per_shard = max(5, global /
+  K)`. Measured: 4-shard concurrent federation QPS went from 0.60× →
+  0.98× the single-shard baseline. Recall@10 stays above 0.85 on
+  clustered D=128 n=5k (test
+  `adaptive_per_shard_rerank_preserves_recall`). Callers who need
+  byte-exact parity with single-shard still have
+  `search_federated_with_rerank(.., Some(global_rerank))`.
+- ~~**Cache-first KPI surface.**~~ **Resolved:** `CacheStats` now
+  exposes `hit_rate()` (`Option<f64>`) and `avg_prime_ms()` plus raw
+  `total_prime_ms` / `last_prime_ms`. Serving processes can emit
+  hit_rate directly as the headline cache-first metric; the 95% gate
+  is measurable without external tracing.
+
+### Strategic positioning (product, not engineering)
+
+Surfaced by the 2026-04-22 strategic review. These are deliberately
+not "engineering open questions" — the answers shape what ruLake *is*,
+not just how it's built. Recording them here with recommendations
+rather than resolutions so the product owner can commit.
+
+1. **Invisible infrastructure, or user-facing query layer?** The
+   measured cache-hit path is 1.02× direct RaBitQ — the abstraction
+   is cheap enough to hide inside a BQ UDF, a Snowflake external
+   function, or a Parquet accelerator, never seen by end users. It's
+   also rich enough to be exposed as a standalone HTTP endpoint with
+   its own wire protocol. **Recommendation:** invisible infrastructure
+   first. The BQ UDF path lets BQ customers query 1M vectors without
+   knowing ruLake exists. A user-facing query layer is a second
+   product when the first has pull.
+
+2. **Strict freshness, or 10× throughput?** `Consistency::Fresh` calls
+   the backend's generation token on every search; `Eventual { ttl_ms
+   }` caches for a window. Measured tax on LocalBackend is 1.02×
+   either way, but on a real Parquet-on-GCS or BigQuery backend Fresh
+   adds 10–100 ms per query. **Recommendation:** ship both as a
+   product knob, not a flag.
+
+   | Mode     | Use case                                          |
+   |----------|---------------------------------------------------|
+   | Fresh    | compliance, finance, policy-enforced workloads    |
+   | Eventual | search, AI retrieval, recommendation, RAG         |
+
+   The knob itself becomes part of the pitch: "you pick your own
+   staleness SLA per collection."
 
 ### Still open (M2+)
 
@@ -342,23 +412,3 @@ as a mode flag for customers who cannot tolerate cache staleness.
    is the floor. M2 needs to measure the real tax on a Parquet-on-GCS
    prime and document the p50/p99 numbers the BQ UDF path can expect.
 
-6. **Per-shard rerank factor under federation.** Surfaced by the
-   concurrent-clients benchmark in `crates/ruvector-rulake/BENCHMARK.md`:
-   K-shard federated search pays ~K× the rerank work because the
-   RaBitQ `rerank_factor × k = 200` rerank runs per shard. The fix
-   needs a cross-crate API change:
-
-   1. Add `RabitqPlusIndex::search_with_rerank(&self, query, k, rerank_factor: usize) -> Vec<SearchResult>`
-      — same body as `search` but takes the rerank factor as a
-      parameter instead of reading the field. Keeps the stored field
-      as the default.
-   2. Plumb it through `VectorCache::search_cached_with_rerank` and
-      `RuLake::search_federated` with an optional `per_shard_rerank`
-      parameter. Default policy when caller doesn't override: divide
-      by K with a floor of 5.
-   3. Re-run the concurrent-clients bench to verify the per-shard
-      rerank cut actually pays off; recall@10 should stay > 85%.
-
-   Deferred to M2 because ruvector-rabitq was merged in the prior
-   sprint and changing its public API mid-branch is out of scope.
-   Filed as the explicit trigger for the first rabitq follow-up.
