@@ -81,21 +81,44 @@ pub fn normalize_inplace(v: &mut [f32]) {
 mod tests {
     use super::*;
 
+    /// Full orthogonality check — every pair of rows must be orthonormal.
+    /// Stricter than the shipped version at `f2dbb6efb` which only tested
+    /// (row 0, row 1).
     #[test]
-    fn orthogonality() {
-        let rot = RandomRotation::random(64, 42);
+    fn orthogonality_all_pairs_d64() {
+        check_orthonormal(64, 42, 1e-4);
+    }
+
+    #[test]
+    fn orthogonality_all_pairs_d128() {
+        check_orthonormal(128, 7, 1e-4);
+    }
+
+    /// At D=256 classical Gram-Schmidt accumulates enough f32 round-off
+    /// that we widen the tolerance to 1e-3 — still tight enough for the
+    /// estimator not to drift but surfaces that GS is not numerically
+    /// stable at large D. Reminder to move to Householder / modified GS
+    /// when we start shipping D ≥ 1024.
+    #[test]
+    fn orthogonality_all_pairs_d256() {
+        check_orthonormal(256, 11, 1e-3);
+    }
+
+    fn check_orthonormal(dim: usize, seed: u64, tol: f32) {
+        let rot = RandomRotation::random(dim, seed);
         let d = rot.dim;
-        // Each row should be unit length.
         for i in 0..d {
-            let row = &rot.matrix[i * d..(i + 1) * d];
-            let norm: f32 = row.iter().map(|&x| x * x).sum::<f32>().sqrt();
-            assert!((norm - 1.0).abs() < 1e-4, "row {i} norm = {norm}");
+            let ri = &rot.matrix[i * d..(i + 1) * d];
+            // Unit norm.
+            let ni: f32 = ri.iter().map(|&x| x * x).sum::<f32>().sqrt();
+            assert!((ni - 1.0).abs() < tol, "row {i} norm = {ni}, D={d}");
+            // Orthogonal to all later rows.
+            for j in (i + 1)..d {
+                let rj = &rot.matrix[j * d..(j + 1) * d];
+                let dot: f32 = ri.iter().zip(rj.iter()).map(|(&a, &b)| a * b).sum();
+                assert!(dot.abs() < tol, "rows {i},{j} dot={dot}, D={d}");
+            }
         }
-        // Dot product of distinct rows should be ≈ 0.
-        let row0 = &rot.matrix[0..d];
-        let row1 = &rot.matrix[d..2 * d];
-        let dot: f32 = row0.iter().zip(row1.iter()).map(|(&a, &b)| a * b).sum();
-        assert!(dot.abs() < 1e-3, "rows 0,1 not orthogonal: dot={dot}");
     }
 
     #[test]
@@ -106,5 +129,13 @@ mod tests {
         let norm_in: f32 = v.iter().map(|&x| x * x).sum::<f32>().sqrt();
         let norm_out: f32 = rv.iter().map(|&x| x * x).sum::<f32>().sqrt();
         assert!((norm_in - norm_out).abs() / norm_in < 1e-3);
+    }
+
+    /// Determinism: same seed + same dim → bit-identical rotation matrix.
+    #[test]
+    fn seed_reproducibility() {
+        let a = RandomRotation::random(64, 1234);
+        let b = RandomRotation::random(64, 1234);
+        assert_eq!(a.matrix, b.matrix);
     }
 }

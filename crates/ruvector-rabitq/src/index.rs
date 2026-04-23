@@ -1,9 +1,32 @@
-//! RaBitQ flat index with three search backends:
-//!   - Variant A: naive f32 brute-force (baseline)
-//!   - Variant B: binary-code XNOR-popcount scan (RaBitQ, no rerank)
-//!   - Variant C: binary-code scan + exact f32 rerank on top-K candidates (RaBitQ+)
+//! RaBitQ flat indexes — four search backends behind one trait:
 //!
-//! All three share the same trait so callers can swap transparently.
+//!   - [`FlatF32Index`]         — exact f32 brute force baseline.
+//!   - [`RabitqIndex`]          — symmetric 1-bit scan, Charikar-style estimator,
+//!                                no reranking. Lowest memory.
+//!   - [`RabitqPlusIndex`]      — symmetric scan + exact f32 rerank on the top
+//!                                `rerank_factor·k` candidates.
+//!   - [`RabitqAsymIndex`]      — asymmetric scan (query in f32, db 1-bit),
+//!                                optional rerank. Tighter IP estimator at the
+//!                                cost of O(D) arithmetic per candidate vs
+//!                                O(D/64) popcount.
+//!
+//! All share the [`AnnIndex`] trait.
+//!
+//! ## Optimizations
+//!
+//! - **Top-k via bounded binary heap**: O(n log k) per query instead of
+//!   O(n log n), matters at n ≥ 10 000.
+//! - **NaN-safe scoring**: `f32::total_cmp` means a rogue NaN never panics the
+//!   search — it sorts to the back.
+//! - **Padding-safe popcount**: [`BinaryCode::masked_xnor_popcount`] correctly
+//!   handles `D % 64 != 0`.
+//! - **Query rotated once**: both symmetric and asymmetric paths compute
+//!   `q_rot = P · q̂` once per search, amortised across n.
+//! - **Honest memory accounting**: `RabitqIndex` does *not* keep the originals;
+//!   only `RabitqPlusIndex` and `RabitqAsymIndex` do (and only when rerank > 0).
+
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use crate::error::{RabitqError, Result};
 use crate::quantize::BinaryCode;
@@ -13,10 +36,11 @@ use crate::rotation::{normalize_inplace, RandomRotation};
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchResult {
     pub id: usize,
-    pub score: f32, // estimated or exact squared L2 distance
+    /// Estimated or exact squared-L2 distance.
+    pub score: f32,
 }
 
-/// Common trait so benchmarks can swap backends.
+/// Common trait so benchmarks can swap backends transparently.
 pub trait AnnIndex: Send + Sync {
     fn add(&mut self, id: usize, vector: Vec<f32>) -> Result<()>;
     fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>>;
@@ -25,7 +49,83 @@ pub trait AnnIndex: Send + Sync {
         self.len() == 0
     }
     fn dim(&self) -> usize;
+    /// Actual bytes allocated by the index (all of: originals + codes +
+    /// rotation matrix + bookkeeping). Honest — no hidden `Vec<f32>`.
     fn memory_bytes(&self) -> usize;
+}
+
+// ── score ordering helpers (NaN-safe) ───────────────────────────────────────
+
+#[inline]
+fn cmp_score_asc(a: f32, b: f32) -> Ordering {
+    // total_cmp sorts NaN to the back of ascending order — safer than
+    // partial_cmp().unwrap() which panics.
+    a.total_cmp(&b)
+}
+
+/// Bounded max-heap that keeps the smallest `k` scores seen so far.
+struct TopK {
+    k: usize,
+    // Max-heap by score so the worst of the top-k is at the top and can be
+    // evicted when something smaller comes along.
+    heap: BinaryHeap<HeapEntry>,
+}
+
+/// Heap entry — ordered by score ascending (so BinaryHeap's max acts as our
+/// "worst candidate in the top-k" evictee).
+#[derive(Debug, Clone, Copy)]
+struct HeapEntry {
+    id: usize,
+    score: f32,
+}
+impl PartialEq for HeapEntry {
+    fn eq(&self, o: &Self) -> bool {
+        self.score == o.score && self.id == o.id
+    }
+}
+impl Eq for HeapEntry {}
+impl Ord for HeapEntry {
+    fn cmp(&self, o: &Self) -> Ordering {
+        // BinaryHeap is a max-heap; we want the WORST (highest-score) at the
+        // root so push/pop evicts it. total_cmp is NaN-safe.
+        self.score.total_cmp(&o.score).then(self.id.cmp(&o.id))
+    }
+}
+impl PartialOrd for HeapEntry {
+    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
+        Some(self.cmp(o))
+    }
+}
+
+impl TopK {
+    fn new(k: usize) -> Self {
+        Self {
+            k,
+            heap: BinaryHeap::with_capacity(k + 1),
+        }
+    }
+    #[inline]
+    fn push(&mut self, id: usize, score: f32) {
+        if self.heap.len() < self.k {
+            self.heap.push(HeapEntry { id, score });
+            return;
+        }
+        // heap.peek() is the current worst — evict only if new entry is better.
+        let worst = self.heap.peek().unwrap().score;
+        if score.total_cmp(&worst) == Ordering::Less {
+            self.heap.pop();
+            self.heap.push(HeapEntry { id, score });
+        }
+    }
+    fn into_sorted_asc(self) -> Vec<SearchResult> {
+        let mut v: Vec<SearchResult> = self
+            .heap
+            .into_iter()
+            .map(|e| SearchResult { id: e.id, score: e.score })
+            .collect();
+        v.sort_unstable_by(|a, b| cmp_score_asc(a.score, b.score));
+        v
+    }
 }
 
 // ── Variant A: naive f32 brute-force ─────────────────────────────────────────
@@ -39,6 +139,11 @@ impl FlatF32Index {
     pub fn new(dim: usize) -> Self {
         Self { dim, vectors: Vec::new() }
     }
+}
+
+#[inline]
+fn sq_l2(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b.iter()).map(|(&x, &y)| (x - y) * (x - y)).sum()
 }
 
 impl AnnIndex for FlatF32Index {
@@ -57,46 +162,42 @@ impl AnnIndex for FlatF32Index {
         if self.vectors.is_empty() {
             return Err(RabitqError::EmptyIndex);
         }
-        let n = self.vectors.len();
-        if k > n {
-            return Err(RabitqError::KTooLarge { k, n });
+        if query.len() != self.dim {
+            return Err(RabitqError::DimensionMismatch {
+                expected: self.dim,
+                actual: query.len(),
+            });
         }
-        let mut scores: Vec<(usize, f32)> = self
-            .vectors
-            .iter()
-            .map(|(id, v)| {
-                let sq: f32 = query.iter().zip(v.iter()).map(|(&a, &b)| (a - b) * (a - b)).sum();
-                (*id, sq)
-            })
-            .collect();
-        scores.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        Ok(scores[..k]
-            .iter()
-            .map(|&(id, score)| SearchResult { id, score })
-            .collect())
+        let k_eff = k.min(self.vectors.len());
+        let mut top = TopK::new(k_eff);
+        for (id, v) in &self.vectors {
+            top.push(*id, sq_l2(query, v));
+        }
+        Ok(top.into_sorted_asc())
     }
 
     fn len(&self) -> usize {
         self.vectors.len()
     }
-
     fn dim(&self) -> usize {
         self.dim
     }
-
     fn memory_bytes(&self) -> usize {
-        self.vectors.len() * self.dim * 4
+        // each Vec<f32> is dim*4 bytes; the (usize, Vec<f32>) pair adds
+        // 16 bytes (id + Vec header) per entry.
+        self.vectors.len() * (self.dim * 4 + 16)
     }
 }
 
-// ── Variant B: RaBitQ scan (no reranking) ────────────────────────────────────
+// ── Variant B: RaBitQ symmetric scan (no originals, no rerank) ──────────────
 
+/// Pure 1-bit index. Stores the rotation matrix + binary codes. Does NOT
+/// keep the original f32 vectors — `RabitqPlusIndex` / `RabitqAsymIndex`
+/// own that storage when rerank is desired.
 pub struct RabitqIndex {
     dim: usize,
     rotation: RandomRotation,
     codes: Vec<(usize, BinaryCode)>,
-    /// Original (unnormalized) vectors — kept only for Variant C reranking.
-    originals: Vec<Vec<f32>>,
 }
 
 impl RabitqIndex {
@@ -105,11 +206,10 @@ impl RabitqIndex {
             dim,
             rotation: RandomRotation::random(dim, seed),
             codes: Vec::new(),
-            originals: Vec::new(),
         }
     }
 
-    /// Encode a raw vector into the index. Returns the binary code for inspection.
+    /// Encode a raw vector into a binary code (normalise → rotate → pack).
     pub fn encode_vector(&self, v: &[f32]) -> BinaryCode {
         let norm: f32 = v.iter().map(|&x| x * x).sum::<f32>().sqrt();
         let mut unit = v.to_vec();
@@ -118,23 +218,37 @@ impl RabitqIndex {
         BinaryCode::encode(&rotated, norm)
     }
 
-    /// Encode a query vector, preserving its original norm for the distance estimator.
-    fn encode_query(&self, q: &[f32]) -> BinaryCode {
+    /// Encode a query — same math as `encode_vector`.
+    pub fn encode_query(&self, q: &[f32]) -> BinaryCode {
         let norm: f32 = q.iter().map(|&x| x * x).sum::<f32>().sqrt();
         let mut unit = q.to_vec();
         normalize_inplace(&mut unit);
         let rotated = self.rotation.apply(&unit);
-        // Pass original norm so estimated_sq_distance reconstructs ||q - x||² correctly.
         BinaryCode::encode(&rotated, norm.max(1e-10))
+    }
+
+    /// Prepare a query for the asymmetric estimator — returns the rotated
+    /// *unit* query (f32) and the original norm. Done once per search.
+    pub fn prepare_query_f32(&self, q: &[f32]) -> (Vec<f32>, f32) {
+        let norm: f32 = q.iter().map(|&x| x * x).sum::<f32>().sqrt();
+        let mut unit = q.to_vec();
+        normalize_inplace(&mut unit);
+        (self.rotation.apply(&unit), norm.max(1e-10))
     }
 
     /// Bytes used by the binary codes alone (not counting the rotation matrix).
     pub fn codes_bytes(&self) -> usize {
-        self.codes.len() * ((self.dim + 63) / 64 * 8 + 4 + 8)
+        // Each BinaryCode stores: Vec<u64> words, f32 norm, usize dim.
+        // Vec header is 24 bytes on 64-bit; dim+norm+pair tuple overhead ≈ 16.
+        self.codes.len() * ((self.dim + 63) / 64 * 8 + 4 + 16 + 24)
     }
 
     pub fn rotation(&self) -> &RandomRotation {
         &self.rotation
+    }
+
+    pub fn codes(&self) -> &[(usize, BinaryCode)] {
+        &self.codes
     }
 }
 
@@ -147,7 +261,6 @@ impl AnnIndex for RabitqIndex {
             });
         }
         let code = self.encode_vector(&vector);
-        self.originals.push(vector);
         self.codes.push((id, code));
         Ok(())
     }
@@ -156,43 +269,39 @@ impl AnnIndex for RabitqIndex {
         if self.codes.is_empty() {
             return Err(RabitqError::EmptyIndex);
         }
-        let n = self.codes.len();
-        if k > n {
-            return Err(RabitqError::KTooLarge { k, n });
+        if query.len() != self.dim {
+            return Err(RabitqError::DimensionMismatch {
+                expected: self.dim,
+                actual: query.len(),
+            });
         }
         let query_code = self.encode_query(query);
-        let mut scores: Vec<(usize, f32)> = self
-            .codes
-            .iter()
-            .map(|(id, code)| (*id, code.estimated_sq_distance(&query_code)))
-            .collect();
-        scores.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        Ok(scores[..k]
-            .iter()
-            .map(|&(id, score)| SearchResult { id, score })
-            .collect())
+        let k_eff = k.min(self.codes.len());
+        let mut top = TopK::new(k_eff);
+        for (id, code) in &self.codes {
+            top.push(*id, code.estimated_sq_distance(&query_code));
+        }
+        Ok(top.into_sorted_asc())
     }
 
     fn len(&self) -> usize {
         self.codes.len()
     }
-
     fn dim(&self) -> usize {
         self.dim
     }
-
     fn memory_bytes(&self) -> usize {
-        // rotation matrix + binary codes (+ originals for rerank)
         self.rotation.bytes() + self.codes_bytes()
     }
 }
 
-// ── Variant C: RaBitQ scan + exact f32 rerank ────────────────────────────────
+// ── Variant C: symmetric scan + exact f32 rerank ─────────────────────────────
 
-/// Scans all binary codes, takes `rerank_factor * k` candidates, then re-ranks
-/// with exact f32 distance. This trades speed for recall.
+/// Owns an inner [`RabitqIndex`] plus the original f32 vectors. Symmetric
+/// 1-bit scan produces candidate IDs, exact f32 rerank picks the winners.
 pub struct RabitqPlusIndex {
     inner: RabitqIndex,
+    originals: Vec<Vec<f32>>, // parallel to inner.codes; indexed by ID-order position
     rerank_factor: usize,
 }
 
@@ -200,58 +309,170 @@ impl RabitqPlusIndex {
     pub fn new(dim: usize, seed: u64, rerank_factor: usize) -> Self {
         Self {
             inner: RabitqIndex::new(dim, seed),
-            rerank_factor,
+            originals: Vec::new(),
+            rerank_factor: rerank_factor.max(1),
         }
+    }
+
+    pub fn rerank_factor(&self) -> usize {
+        self.rerank_factor
+    }
+    pub fn set_rerank_factor(&mut self, f: usize) {
+        self.rerank_factor = f.max(1);
     }
 }
 
 impl AnnIndex for RabitqPlusIndex {
     fn add(&mut self, id: usize, vector: Vec<f32>) -> Result<()> {
-        self.inner.add(id, vector)
+        self.inner.add(id, vector.clone())?;
+        self.originals.push(vector);
+        Ok(())
     }
 
     fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>> {
-        let candidates = k.saturating_mul(self.rerank_factor).max(k);
-        let candidates = candidates.min(self.inner.len());
+        if self.inner.codes.is_empty() {
+            return Err(RabitqError::EmptyIndex);
+        }
+        if query.len() != self.inner.dim {
+            return Err(RabitqError::DimensionMismatch {
+                expected: self.inner.dim,
+                actual: query.len(),
+            });
+        }
+        let n = self.inner.codes.len();
+        let candidates = k.saturating_mul(self.rerank_factor).max(k).min(n);
 
-        // Binary-code scan for candidates.
+        // Binary-code scan — keep the top `candidates` in a heap.
         let query_code = self.inner.encode_query(query);
-        let mut scores: Vec<(usize, f32)> = self
-            .inner
-            .codes
-            .iter()
-            .map(|(id, code)| (*id, code.estimated_sq_distance(&query_code)))
-            .collect();
-        scores.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let mut top_cand = TopK::new(candidates);
+        for (pos, (id, code)) in self.inner.codes.iter().enumerate() {
+            let s = code.estimated_sq_distance(&query_code);
+            // Store ID-order position in the 48 high bits so we can recover
+            // `originals[pos]` in the rerank pass without re-scanning.
+            let packed = ((pos as u64) << 32) | (*id as u64 & 0xFFFF_FFFF);
+            top_cand.push(packed as usize, s);
+        }
 
-        // Exact rerank on the top `candidates`.
-        let mut reranked: Vec<(usize, f32)> = scores[..candidates]
-            .iter()
-            .map(|&(id, _)| {
-                let v = &self.inner.originals[id];
-                let sq: f32 = query.iter().zip(v.iter()).map(|(&a, &b)| (a - b) * (a - b)).sum();
-                (id, sq)
-            })
-            .collect();
-        reranked.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-        Ok(reranked[..k.min(reranked.len())]
-            .iter()
-            .map(|&(id, score)| SearchResult { id, score })
-            .collect())
+        // Exact rerank on the candidate set.
+        let cand = top_cand.into_sorted_asc();
+        let k_eff = k.min(cand.len());
+        let mut top = TopK::new(k_eff);
+        for r in &cand {
+            let packed = r.id as u64;
+            let pos = (packed >> 32) as usize;
+            let id = (packed & 0xFFFF_FFFF) as usize;
+            let v = &self.originals[pos];
+            top.push(id, sq_l2(query, v));
+        }
+        Ok(top.into_sorted_asc())
     }
 
     fn len(&self) -> usize {
         self.inner.len()
     }
-
     fn dim(&self) -> usize {
         self.inner.dim()
     }
-
     fn memory_bytes(&self) -> usize {
-        // originals also stored for rerank
-        self.inner.memory_bytes() + self.inner.originals.len() * self.inner.dim * 4
+        self.inner.memory_bytes()
+            + self.originals.len() * (self.inner.dim * 4 + 24)
+    }
+}
+
+// ── Variant D: asymmetric RaBitQ-2024 estimator ─────────────────────────────
+
+/// Asymmetric scan: query stays in f32 (rotated once per search), database is
+/// 1-bit. Uses [`BinaryCode::estimated_sq_distance_asymmetric`] — the RaBitQ
+/// SIGMOD 2024-style IP estimator. Optional exact rerank on top-k·factor.
+pub struct RabitqAsymIndex {
+    inner: RabitqIndex,
+    originals: Vec<Vec<f32>>, // needed only if rerank_factor > 1
+    rerank_factor: usize,
+    store_originals: bool,
+}
+
+impl RabitqAsymIndex {
+    /// `rerank_factor = 1` disables rerank (purest 1-bit memory footprint).
+    /// Any value > 1 stores the originals alongside the codes for exact rerank.
+    pub fn new(dim: usize, seed: u64, rerank_factor: usize) -> Self {
+        let rf = rerank_factor.max(1);
+        Self {
+            inner: RabitqIndex::new(dim, seed),
+            originals: Vec::new(),
+            rerank_factor: rf,
+            store_originals: rf > 1,
+        }
+    }
+}
+
+impl AnnIndex for RabitqAsymIndex {
+    fn add(&mut self, id: usize, vector: Vec<f32>) -> Result<()> {
+        if self.store_originals {
+            self.originals.push(vector.clone());
+        }
+        self.inner.add(id, vector)
+    }
+
+    fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>> {
+        if self.inner.codes.is_empty() {
+            return Err(RabitqError::EmptyIndex);
+        }
+        if query.len() != self.inner.dim {
+            return Err(RabitqError::DimensionMismatch {
+                expected: self.inner.dim,
+                actual: query.len(),
+            });
+        }
+        let n = self.inner.codes.len();
+        let candidates = k.saturating_mul(self.rerank_factor).max(k).min(n);
+
+        let (q_rot_unit, q_norm) = self.inner.prepare_query_f32(query);
+
+        // Asymmetric scan — O(D) arithmetic per candidate.
+        let mut top_cand = TopK::new(candidates);
+        for (pos, (id, code)) in self.inner.codes.iter().enumerate() {
+            let s = code.estimated_sq_distance_asymmetric(&q_rot_unit, q_norm);
+            let packed = ((pos as u64) << 32) | (*id as u64 & 0xFFFF_FFFF);
+            top_cand.push(packed as usize, s);
+        }
+        let cand = top_cand.into_sorted_asc();
+
+        // No rerank path: return the candidate order directly (IDs unpacked).
+        if self.rerank_factor <= 1 || !self.store_originals {
+            let k_eff = k.min(cand.len());
+            let mut out: Vec<SearchResult> = cand.into_iter().take(k_eff).map(|r| {
+                let id = (r.id as u64 & 0xFFFF_FFFF) as usize;
+                SearchResult { id, score: r.score }
+            }).collect();
+            out.sort_unstable_by(|a, b| cmp_score_asc(a.score, b.score));
+            return Ok(out);
+        }
+
+        // Rerank path.
+        let k_eff = k.min(cand.len());
+        let mut top = TopK::new(k_eff);
+        for r in &cand {
+            let packed = r.id as u64;
+            let pos = (packed >> 32) as usize;
+            let id = (packed & 0xFFFF_FFFF) as usize;
+            let v = &self.originals[pos];
+            top.push(id, sq_l2(query, v));
+        }
+        Ok(top.into_sorted_asc())
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+    fn dim(&self) -> usize {
+        self.inner.dim()
+    }
+    fn memory_bytes(&self) -> usize {
+        let mut b = self.inner.memory_bytes();
+        if self.store_originals {
+            b += self.originals.len() * (self.inner.dim * 4 + 24);
+        }
+        b
     }
 }
 
@@ -271,20 +492,13 @@ mod tests {
             .collect()
     }
 
-    /// Gaussian-cluster data that mimics real embedding distributions.
-    ///
-    /// Random uniform vectors in high-D suffer from distance concentration (curse of
-    /// dimensionality), making ALL pairwise distances nearly equal and recall meaningless.
-    /// Cluster data preserves the nearest-neighbour structure that binary quantization
-    /// can exploit, matching real-world embedding workloads (SIFT, GloVe, OpenAI).
+    /// Gaussian-cluster data. See `main.rs` for the equivalent.
     fn make_clustered(n: usize, d: usize, n_clusters: usize, seed: u64) -> Vec<Vec<f32>> {
         use rand::{Rng as _, SeedableRng as _};
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-        // Draw cluster centroids from a wide range.
         let centroids: Vec<Vec<f32>> = (0..n_clusters)
             .map(|_| (0..d).map(|_| rng.gen::<f32>() * 4.0 - 2.0).collect::<Vec<_>>())
             .collect();
-        // Points = centroid + small Gaussian noise (std ≈ 0.15).
         (0..n)
             .map(|_| {
                 let c = &centroids[rng.gen_range(0..n_clusters)];
@@ -303,53 +517,40 @@ mod tests {
         }
         let query = &data[7].1;
         let results = idx.search(query, 1).unwrap();
-        // exact NN of a stored vector must be itself (distance 0).
         assert_eq!(results[0].id, 7);
         assert!(results[0].score < 1e-6);
     }
 
+    /// Regression test for the 20%-but-named-70% test. The no-rerank 1-bit
+    /// scan on D=128 clustered data is expected to sit in the 20–45% range;
+    /// we assert the weaker "better than random chance" bound.
     #[test]
-    fn rabitq_recall_at_10_above_70pct() {
-        // Measure recall@10 on clustered embedding data, D=128.
-        // Using Gaussian clusters (20 centroids, tight noise) to mimic real embeddings;
-        // pure uniform random in 128D causes distance concentration (all ≈ equidistant).
+    fn rabitq_recall_above_random() {
         let d = 128;
         let n = 1000;
         let nq = 100;
-
         let all_data = make_clustered(n + nq, d, 20, 42);
         let (db_vecs, query_vecs) = all_data.split_at(n);
         let data: Vec<(usize, Vec<f32>)> = db_vecs.iter().cloned().enumerate().collect();
         let queries: Vec<Vec<f32>> = query_vecs.to_vec();
 
-        let mut exact_idx = FlatF32Index::new(d);
-        let mut rabitq_idx = RabitqIndex::new(d, 42);
-
+        let mut exact = FlatF32Index::new(d);
+        let mut idx = RabitqIndex::new(d, 42);
         for (id, v) in &data {
-            exact_idx.add(*id, v.clone()).unwrap();
-            rabitq_idx.add(*id, v.clone()).unwrap();
+            exact.add(*id, v.clone()).unwrap();
+            idx.add(*id, v.clone()).unwrap();
         }
 
         let k = 10;
         let mut hits = 0usize;
-
         for q in &queries {
-            let exact = exact_idx.search(q, k).unwrap();
-            let approx = rabitq_idx.search(q, k).unwrap();
-            let exact_ids: std::collections::HashSet<usize> = exact.iter().map(|r| r.id).collect();
-            hits += approx.iter().filter(|r| exact_ids.contains(&r.id)).count();
+            let e: std::collections::HashSet<usize> =
+                exact.search(q, k).unwrap().iter().map(|r| r.id).collect();
+            hits += idx.search(q, k).unwrap().iter().filter(|r| e.contains(&r.id)).count();
         }
-
         let recall = hits as f64 / (nq * k) as f64;
-        // Without reranking, 1-bit binary scan at D=128 achieves ~25-35% recall@10
-        // on structured data. This is significantly above random chance (k/n = 1%)
-        // and demonstrates that the angular estimator provides real discriminative power.
-        // High recall requires reranking (see rabitq_plus_recall_above_90pct).
-        assert!(
-            recall > 0.20,
-            "recall@10 = {:.1}% (expected > 20% — above random chance)",
-            recall * 100.0
-        );
+        // k/n = 1% is random chance; we want the estimator to beat it by ≥ 10×.
+        assert!(recall > 0.20, "recall@10={:.1}% — not above 20 % baseline", recall * 100.0);
     }
 
     #[test]
@@ -357,67 +558,143 @@ mod tests {
         let d = 128;
         let n = 1000;
         let nq = 100;
-
         let all_data = make_clustered(n + nq, d, 20, 55);
         let (db_vecs, query_vecs) = all_data.split_at(n);
         let data: Vec<(usize, Vec<f32>)> = db_vecs.iter().cloned().enumerate().collect();
         let queries: Vec<Vec<f32>> = query_vecs.to_vec();
 
-        let mut exact_idx = FlatF32Index::new(d);
-        let mut rabitq_plus = RabitqPlusIndex::new(d, 55, 5); // 5x rerank
-
+        let mut exact = FlatF32Index::new(d);
+        let mut idx = RabitqPlusIndex::new(d, 55, 5);
         for (id, v) in &data {
-            exact_idx.add(*id, v.clone()).unwrap();
-            rabitq_plus.add(*id, v.clone()).unwrap();
+            exact.add(*id, v.clone()).unwrap();
+            idx.add(*id, v.clone()).unwrap();
         }
-
         let k = 10;
         let mut hits = 0usize;
-
         for q in &queries {
-            let exact = exact_idx.search(q, k).unwrap();
-            let approx = rabitq_plus.search(q, k).unwrap();
-            let exact_ids: std::collections::HashSet<usize> = exact.iter().map(|r| r.id).collect();
-            hits += approx.iter().filter(|r| exact_ids.contains(&r.id)).count();
+            let e: std::collections::HashSet<usize> =
+                exact.search(q, k).unwrap().iter().map(|r| r.id).collect();
+            hits += idx.search(q, k).unwrap().iter().filter(|r| e.contains(&r.id)).count();
         }
-
         let recall = hits as f64 / (nq * k) as f64;
-        assert!(
-            recall > 0.90,
-            "recall@10 = {:.1}% with rerank (expected > 90%)",
-            recall * 100.0
-        );
+        assert!(recall > 0.90, "rerank×5 recall@10={:.1}% < 90 %", recall * 100.0);
+    }
+
+    /// Asymmetric (f32 query × 1-bit db) should *equal or beat* symmetric on
+    /// the same substrate because it uses the unrotated-query magnitude
+    /// directly. We assert: asym_recall ≥ sym_recall − 2% (noise-margin).
+    #[test]
+    fn asymmetric_meets_or_beats_symmetric() {
+        let d = 128;
+        let n = 1000;
+        let nq = 100;
+        let all_data = make_clustered(n + nq, d, 20, 77);
+        let (db_vecs, query_vecs) = all_data.split_at(n);
+        let data: Vec<(usize, Vec<f32>)> = db_vecs.iter().cloned().enumerate().collect();
+        let queries: Vec<Vec<f32>> = query_vecs.to_vec();
+
+        let mut exact = FlatF32Index::new(d);
+        let mut sym = RabitqIndex::new(d, 77);
+        let mut asym = RabitqAsymIndex::new(d, 77, 1);
+        for (id, v) in &data {
+            exact.add(*id, v.clone()).unwrap();
+            sym.add(*id, v.clone()).unwrap();
+            asym.add(*id, v.clone()).unwrap();
+        }
+        let k = 10;
+        let mut sh = 0usize;
+        let mut ah = 0usize;
+        for q in &queries {
+            let e: std::collections::HashSet<usize> =
+                exact.search(q, k).unwrap().iter().map(|r| r.id).collect();
+            sh += sym.search(q, k).unwrap().iter().filter(|r| e.contains(&r.id)).count();
+            ah += asym.search(q, k).unwrap().iter().filter(|r| e.contains(&r.id)).count();
+        }
+        let sr = sh as f64 / (nq * k) as f64;
+        let ar = ah as f64 / (nq * k) as f64;
+        eprintln!("sym={:.1}%  asym={:.1}%", sr * 100.0, ar * 100.0);
+        // Asymmetric should not drop materially below symmetric.
+        assert!(ar + 0.02 >= sr, "asymmetric regressed vs symmetric");
+    }
+
+    /// At D=100 the popcount padding bug would bias estimated distances toward
+    /// zero (padding bits always match). Confirm the masked path keeps
+    /// recall > 0.15 (above random=1%).
+    #[test]
+    fn recall_holds_at_non_aligned_dim() {
+        let d = 100;
+        let n = 500;
+        let nq = 50;
+        let all_data = make_clustered(n + nq, d, 15, 17);
+        let (db_vecs, query_vecs) = all_data.split_at(n);
+        let data: Vec<(usize, Vec<f32>)> = db_vecs.iter().cloned().enumerate().collect();
+        let queries: Vec<Vec<f32>> = query_vecs.to_vec();
+
+        let mut exact = FlatF32Index::new(d);
+        let mut idx = RabitqPlusIndex::new(d, 17, 5);
+        for (id, v) in &data {
+            exact.add(*id, v.clone()).unwrap();
+            idx.add(*id, v.clone()).unwrap();
+        }
+        let k = 10;
+        let mut hits = 0usize;
+        for q in &queries {
+            let e: std::collections::HashSet<usize> =
+                exact.search(q, k).unwrap().iter().map(|r| r.id).collect();
+            hits += idx.search(q, k).unwrap().iter().filter(|r| e.contains(&r.id)).count();
+        }
+        let r = hits as f64 / (nq * k) as f64;
+        assert!(r > 0.80, "D=100 rerank×5 recall={:.1}% < 80 %", r * 100.0);
     }
 
     #[test]
-    fn memory_compression() {
-        let d = 256;
-        let n = 10_000;
-        let data = make_dataset(n, d, 0);
-
-        let mut f32_idx = FlatF32Index::new(d);
-        let mut rabitq_idx = RabitqIndex::new(d, 0);
-
+    fn nan_query_does_not_panic() {
+        let d = 64;
+        let mut idx = RabitqIndex::new(d, 42);
+        let data = make_dataset(100, d, 3);
         for (id, v) in &data {
-            f32_idx.add(*id, v.clone()).unwrap();
-            rabitq_idx.add(*id, v.clone()).unwrap();
+            idx.add(*id, v.clone()).unwrap();
         }
+        let mut q = data[0].1.clone();
+        q[5] = f32::NAN;
+        // Must not panic — NaN scores sort to the back via total_cmp.
+        let _ = idx.search(&q, 5);
+    }
 
-        let f32_bytes = f32_idx.memory_bytes();
-        let rabitq_bytes = rabitq_idx.memory_bytes();
+    #[test]
+    fn memory_accounting_is_honest() {
+        let d = 256;
+        let n = 1000;
+        let data = make_dataset(n, d, 0);
+        let mut flat = FlatF32Index::new(d);
+        let mut rq = RabitqIndex::new(d, 0);
+        let mut rq_plus = RabitqPlusIndex::new(d, 0, 5);
+        for (id, v) in &data {
+            flat.add(*id, v.clone()).unwrap();
+            rq.add(*id, v.clone()).unwrap();
+            rq_plus.add(*id, v.clone()).unwrap();
+        }
+        let f = flat.memory_bytes();
+        let rqb = rq.memory_bytes();
+        let rqpb = rq_plus.memory_bytes();
+        // Pure 1-bit index MUST report less than flat — it holds no originals.
+        assert!(rqb < f, "RabitqIndex {rqb} should be < Flat {f}");
+        // Plus-index reports MORE than flat — it holds originals AND codes.
+        assert!(rqpb > f, "RabitqPlusIndex {rqpb} should be > Flat {f} (rerank stores both)");
+    }
 
-        // Rotation is D²·4 bytes. Beyond ~10k vectors the binary codes dominate.
-        // codes_bytes per vector = (D/64)·8 + 4 + 8 = 4·8+12 = 44 bytes for D=256
-        // f32 per vector = 256·4 = 1024 bytes → ~23x compression per vector-region.
-        assert!(
-            rabitq_bytes < f32_bytes,
-            "rabitq {rabitq_bytes}B should be < f32 {f32_bytes}B"
-        );
-        println!(
-            "Memory: f32={:.1}MB  rabitq={:.1}MB  ratio={:.1}x",
-            f32_bytes as f64 / 1e6,
-            rabitq_bytes as f64 / 1e6,
-            f32_bytes as f64 / rabitq_bytes as f64
-        );
+    #[test]
+    fn heap_topk_is_sorted_ascending() {
+        let d = 64;
+        let mut idx = FlatF32Index::new(d);
+        let data = make_dataset(50, d, 2);
+        for (id, v) in &data {
+            idx.add(*id, v.clone()).unwrap();
+        }
+        let r = idx.search(&data[0].1, 10).unwrap();
+        assert_eq!(r.len(), 10);
+        for w in r.windows(2) {
+            assert!(w[0].score <= w[1].score, "top-k not ascending: {:?}", r);
+        }
     }
 }
