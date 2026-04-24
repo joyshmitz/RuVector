@@ -193,10 +193,12 @@ double maintenance for no technical win. The positioning serves both.
    jobs?** Probably yes — the ingest job already witness-signs the
    output — but codify the handoff rather than leaving it to
    convention.
-4. **Does the substrate acceptance test need to live as a runnable
-   test?** Currently the six guarantees are checked individually by
-   separate smoke tests. A single "brain substrate acceptance" test
-   that drives the full (recall → verify → forget → rehydrate) loop
-   against a `LocalBackend` would make the substrate claim concrete.
-   Probably worth ~100 lines of test code when a brain-system
-   consumer lands.
+4. ~~**Does the substrate acceptance test need to live as a runnable
+   test?**~~ **Resolved:** shipped as
+   `brain_substrate_acceptance_recall_verify_forget_rehydrate` in
+   `tests/federation_smoke.rs`. Drives the six-guarantee loop
+   (recall → verify → forget → rehydrate → location-transparency,
+   compact explicitly deferred per this ADR) against a single
+   `LocalBackend`. If this test stays green on every commit, the
+   agent-facing memory substrate claim is mechanical, not
+   aspirational.

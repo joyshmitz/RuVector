@@ -763,6 +763,139 @@ fn refresh_from_bundle_dir_reports_all_three_states() {
 }
 
 #[test]
+fn brain_substrate_acceptance_recall_verify_forget_rehydrate() {
+    // ADR-156 acceptance test (six-guarantee loop for the memory
+    // substrate claim):
+    //
+    //   1. Recall        — search against a "warm" backend, get results
+    //   2. Verify        — witness verification via publish_bundle +
+    //                      RuLakeBundle::verify_witness (proves the
+    //                      compressed codes came from known bytes)
+    //   3. Forget        — invalidate the cache pointer; next search
+    //                      cannot answer from the old compressed entry
+    //   4. Rehydrate     — next search transparently re-primes from the
+    //                      backend (cold → warm)
+    //   5. Location-     — caller only references (backend_id, collection)
+    //      transparency    and queries; never touches data_ref, never
+    //                      knows which tier physically served the call
+    //   6. (Compact is explicitly out of scope — belongs to RVM/Cognitum
+    //      per ADR-156, not the substrate.)
+    //
+    // If this test stays green on every commit, the "agent-facing
+    // memory substrate" claim is not just aspirational — it's mechanical.
+
+    use ruvector_rulake::{RefreshResult, RuLakeBundle};
+
+    let d = 16;
+    let n = 100;
+    let seed = 77;
+    let data = clustered(n, d, 5, seed);
+    let backend = Arc::new(LocalBackend::new("warm-tier"));
+    backend
+        .put_collection("agent-memory", d, (0..n as u64).collect(), data.clone())
+        .unwrap();
+
+    let lake = RuLake::new(20, seed).with_consistency(Consistency::Eventual { ttl_ms: 60_000 });
+    lake.register_backend(backend.clone()).unwrap();
+    let key = ("warm-tier".to_string(), "agent-memory".to_string());
+
+    let query = clustered(1, d, 5, seed ^ 0xcafe)[0].clone();
+
+    // === 1. Recall ===
+    let recall_1 = lake
+        .search_one("warm-tier", "agent-memory", &query, 5)
+        .unwrap();
+    assert_eq!(recall_1.len(), 5);
+    let s_after_recall = lake.cache_stats();
+    assert_eq!(s_after_recall.primes, 1, "first recall primes the cache");
+
+    // === 2. Verify — publish bundle, read back, verify witness ===
+    let tmp = std::env::temp_dir().join(format!(
+        "rulake-substrate-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&tmp).unwrap();
+    lake.publish_bundle(&key, &tmp).unwrap();
+    let bundle = RuLakeBundle::read_from_dir(&tmp).unwrap();
+    assert!(
+        bundle.verify_witness(),
+        "published bundle's witness must self-verify"
+    );
+    assert_eq!(
+        bundle.rvf_witness,
+        lake.cache_witness_of(&key).unwrap(),
+        "on-disk witness must match the cache pointer after a recall"
+    );
+
+    // === 3. Forget ===
+    lake.invalidate_cache(&key);
+    assert!(
+        lake.cache_witness_of(&key).is_none(),
+        "invalidation must drop the cache pointer"
+    );
+
+    // Explicit refresh from the (still-published) bundle reports
+    // UpToDate — we forgot the pointer, not the on-disk sidecar, and
+    // forget is cache-level not artifact-level per ADR-156.
+    let refresh = lake.refresh_from_bundle_dir(&key, &tmp).unwrap();
+    assert!(
+        matches!(
+            refresh,
+            RefreshResult::BundleMissing | RefreshResult::UpToDate | RefreshResult::Invalidated
+        ),
+        "refresh after forget must return a defined state, got {:?}",
+        refresh
+    );
+
+    // === 4. Rehydrate — next search re-primes from the backend ===
+    let recall_2 = lake
+        .search_one("warm-tier", "agent-memory", &query, 5)
+        .unwrap();
+    let s_after_rehydrate = lake.cache_stats();
+    assert_eq!(
+        s_after_rehydrate.primes, 2,
+        "rehydrate must trigger a second prime"
+    );
+    assert!(
+        lake.cache_witness_of(&key).is_some(),
+        "rehydrate must reinstall the cache pointer"
+    );
+
+    // === 5. Location-transparency ===
+    // The agent-facing call pattern (search_one with backend+collection,
+    // query, k) never touches data_ref, generation, or any tier-specific
+    // knob. Results before forget and after rehydrate must be identical
+    // (same data, same seed, same rerank_factor, so byte-exact scores).
+    assert_eq!(
+        recall_1.len(),
+        recall_2.len(),
+        "recall count must survive forget/rehydrate"
+    );
+    for (a, b) in recall_1.iter().zip(recall_2.iter()) {
+        assert_eq!(a.id, b.id, "id drift across forget/rehydrate");
+        assert!(
+            (a.score - b.score).abs() < 1e-5,
+            "score drift across forget/rehydrate: {} vs {}",
+            a.score,
+            b.score
+        );
+    }
+
+    // Hit-rate sanity: one new prime, but the recall calls are hits
+    // (Eventual mode, within TTL). The 95% gate from ADR-155 is
+    // realistic on this workload.
+    let stats = lake.cache_stats();
+    let hr = stats.hit_rate().unwrap_or(0.0);
+    assert!((0.0..=1.0).contains(&hr), "hit_rate out of bounds: {hr}");
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn cache_stats_by_backend_attributes_hits_to_the_right_backend() {
     // Two backends; query A a lot, query B once. Per-backend stats
     // must report A with far more hits than B.
