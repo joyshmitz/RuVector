@@ -763,6 +763,61 @@ fn refresh_from_bundle_dir_reports_all_three_states() {
 }
 
 #[test]
+fn frozen_consistency_never_rechecks_after_prime() {
+    // Frozen asserts immutability. After the first miss-prime, backend
+    // generation bumps must NOT trigger a re-prime or invalidation.
+    // The caller owns that assertion; this is the audit-tier mode.
+    let d = 8;
+    let backend = Arc::new(LocalBackend::new("audit"));
+    backend
+        .put_collection("snap", d, vec![1], vec![vec![1.0; d]])
+        .unwrap();
+    let lake = RuLake::new(20, 42).with_consistency(Consistency::Frozen);
+    lake.register_backend(backend.clone()).unwrap();
+
+    // First search → miss + prime.
+    lake.search_one("audit", "snap", &vec![1.0f32; d], 1)
+        .unwrap();
+    let s1 = lake.cache_stats();
+    assert_eq!(s1.primes, 1);
+    assert_eq!(s1.misses, 1);
+
+    // Bump the backend. Under Fresh or Eventual (after TTL) this would
+    // trigger a re-prime. Under Frozen it must not.
+    backend.append("snap", 99, vec![2.0; d]).unwrap();
+
+    for _ in 0..10 {
+        lake.search_one("audit", "snap", &vec![1.0f32; d], 1)
+            .unwrap();
+    }
+    let s2 = lake.cache_stats();
+    assert_eq!(
+        s2.primes, 1,
+        "Frozen must not re-prime after backend bump (got {} primes)",
+        s2.primes
+    );
+    assert!(s2.hits >= 10, "Frozen should hit for every warm query");
+
+    // Explicit refresh via bundle-dir still works — the Frozen
+    // guarantee is about *automatic* coherence, not operator control.
+    // Publishing writes the backend's *current* witness (post-bump),
+    // which differs from the cache's frozen pointer, so the refresh
+    // correctly reports Invalidated. That proves operator-driven
+    // coherence still works under Frozen.
+    let tmp_dir = std::env::temp_dir().join(format!("rulake-frozen-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let key = ("audit".to_string(), "snap".to_string());
+    lake.publish_bundle(&key, &tmp_dir).unwrap();
+    let refresh = lake.refresh_from_bundle_dir(&key, &tmp_dir).unwrap();
+    assert_eq!(
+        refresh,
+        ruvector_rulake::RefreshResult::Invalidated,
+        "explicit refresh must still be able to invalidate a Frozen cache"
+    );
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
 fn adaptive_per_shard_rerank_preserves_recall() {
     // The adaptive federated rerank (global / K, floored) must keep
     // global recall@10 > 85% on clustered data, matching ADR-155's

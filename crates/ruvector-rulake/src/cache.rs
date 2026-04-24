@@ -34,14 +34,34 @@ use ruvector_rabitq::{AnnIndex, RabitqPlusIndex};
 use crate::backend::{BackendId, CollectionId, PulledBatch};
 
 /// How strictly the cache checks freshness before answering.
+///
+/// This is the product knob surfaced by the strategic review: Fresh
+/// for compliance, Eventual for recall, Frozen for audit. It lets a
+/// single ruLake deployment expose per-collection staleness SLAs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Consistency {
     /// Consult the backend's current bundle on every search. Default.
+    /// Use for compliance, finance, policy-enforced workloads where
+    /// any stale answer is worse than a slower answer.
     #[default]
     Fresh,
     /// Trust the cache for up to `ttl_ms` milliseconds between checks.
-    /// Higher QPS; backend updates may be ignored for up to ttl.
+    /// Higher QPS; backend updates may be ignored for up to ttl. Use
+    /// for search, AI retrieval, recommendation, RAG — where a small
+    /// staleness window is a trade every customer accepts.
     Eventual { ttl_ms: u64 },
+    /// Caller asserts the bundle at this `(backend, collection)` key
+    /// is immutable for the cache's lifetime — never re-check the
+    /// backend, never invalidate on generation bump. Designed for
+    /// witness-sealed historical snapshots: the audit tier.
+    ///
+    /// Use when you have a materialized bundle whose `data_ref` points
+    /// at a content-addressed (CA) artifact and the `rvf_witness` is
+    /// already verifiable end-to-end. An explicit `refresh_from_bundle_dir`
+    /// call still invalidates — the guarantee is about automatic
+    /// coherence checks, not about whether the cache can be swapped
+    /// by the operator.
+    Frozen,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -414,6 +434,14 @@ impl VectorCache {
                     Some(t) => t.elapsed().as_millis() < ttl_ms as u128,
                     None => false,
                 }
+            }
+            // Frozen skips the coherence check iff the pointer is
+            // already installed — we still need the first prime. After
+            // that the caller has asserted immutability, so we never
+            // round-trip to the backend again.
+            Consistency::Frozen => {
+                let inner = self.inner.lock().unwrap();
+                inner.pointers.contains_key(key)
             }
         }
     }
