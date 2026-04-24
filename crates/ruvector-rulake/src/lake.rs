@@ -406,8 +406,13 @@ impl RuLake {
     ///    pointer, zero prime work. This is the cross-backend share.
     /// 4. Witness not in the pool → pull + prime.
     fn ensure_fresh(&self, key: &CacheKey) -> Result<()> {
+        // Intern once at the entry of the hot path — every downstream
+        // mark_hit / mark_miss / per_backend_mut call then takes
+        // refcount-cheap Arc<str> clones instead of cloning the owned
+        // String tuple. Memory-audit finding #1.
+        let interned = crate::cache::intern_key(&key.0, &key.1);
         if self.cache.can_skip_check(key, self.consistency) {
-            self.cache.mark_hit(key);
+            self.cache.mark_hit(&interned);
             return Ok(());
         }
 
@@ -421,14 +426,14 @@ impl RuLake {
 
         if self.cache.witness_of(key).as_deref() == Some(target_witness.as_str()) {
             // Case 2: pointer up-to-date.
-            self.cache.mark_hit(key);
+            self.cache.mark_hit(&interned);
             self.cache.touch(key);
             return Ok(());
         }
 
         // Cases 3 + 4 are handled in `prime`: it reuses an existing
         // entry for the target witness if present, or builds a new one.
-        self.cache.mark_miss(key);
+        self.cache.mark_miss(&interned);
         let batch = backend.pull_vectors(&key.1)?;
         self.cache.prime(key.clone(), target_witness, batch)?;
         Ok(())
