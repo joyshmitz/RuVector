@@ -138,6 +138,9 @@ members = [
     "crates/rvAgent/rvagent-acp",
     "crates/rvAgent/rvagent-mcp",
     "crates/rvAgent/rvagent-wasm",
+    "crates/rvAgent/rvagent-a2a",
+    # ADR-159 a2a-swarm demo
+    "examples/a2a-swarm",
     # ETL pipeline example
     "examples/train-discoveries",
     # Spectral graph sparsification

@@ -3,6 +3,19 @@
 version = 3
 
 [[package]]
+name = "a2a-swarm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest 0.12.28",
+ "rvagent-cli",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10962,6 +10975,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "rvagent-a2a"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum 0.8.8",
+ "axum-test 16.4.1",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "criterion 0.5.1",
+ "ed25519-dalek",
+ "futures",
+ "hex",
+ "hmac 0.12.1",
+ "parking_lot 0.12.5",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "rayon",
+ "reqwest 0.12.28",
+ "rvagent-core",
+ "rvagent-middleware",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sha3",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-test",
+ "toml",
+ "tower 0.5.3",
+ "tower-http 0.6.8",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "rvagent-acp"
 version = "0.1.0"
 dependencies = [
@@ -13531,6 +13584,7 @@ dependencies = [
  "idna 1.1.0",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]
