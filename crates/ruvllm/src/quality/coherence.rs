@@ -482,8 +482,7 @@ impl CoherenceValidator {
             (marker_hits / segments.len() as f32) * 0.3
         };
 
-        let flow_score =
-            (avg_transition - violation_penalty * 0.5 + marker_bonus).clamp(0.0, 1.0);
+        let flow_score = (avg_transition - violation_penalty * 0.5 + marker_bonus).clamp(0.0, 1.0);
         let has_logical_flow = flow_score >= self.config.logical_flow_threshold;
 
         Ok(LogicalFlowResult {
