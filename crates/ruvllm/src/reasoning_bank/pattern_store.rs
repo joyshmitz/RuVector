@@ -686,7 +686,7 @@ impl PatternStore {
                 })
                 .collect();
 
-            sorted.sort_by(|a, b| a.1.last_accessed.cmp(&b.1.last_accessed));
+            sorted.sort_by_key(|a| a.1.last_accessed);
 
             let remove_count = sorted.len().min(self.config.max_patterns / 10);
             sorted

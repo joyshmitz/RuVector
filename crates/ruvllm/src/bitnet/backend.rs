@@ -1649,11 +1649,7 @@ impl BitNetBackend {
         let seq_len = self.kv_caches[layer_idx].len();
 
         // GQA attention scores with 4-wide dot product
-        let gqa_groups = if num_kv_heads > 0 {
-            num_heads / num_kv_heads
-        } else {
-            1
-        };
+        let gqa_groups = num_heads.checked_div(num_kv_heads).unwrap_or(1);
         let inv_sqrt_d = 1.0 / (head_dim as f32).sqrt();
         let mut attn_out = vec![0.0f32; hidden];
         let dim_chunks = head_dim / 4;
@@ -2053,11 +2049,7 @@ impl BitNetBackend {
             let num_heads = config.num_attention_heads;
             let head_dim = hidden / num_heads;
             let kv_dim = config.num_kv_heads * head_dim;
-            let gqa_groups = if config.num_kv_heads > 0 {
-                num_heads / config.num_kv_heads
-            } else {
-                1
-            };
+            let gqa_groups = num_heads.checked_div(config.num_kv_heads).unwrap_or(1);
 
             let q = self.tl1_gemv(
                 &self.layers[layer_idx].attention.q_proj,
@@ -3253,16 +3245,15 @@ impl BitNetBackend {
 
         // Decode
         let mut generated = Vec::new();
-        let mut pos = prompt_tokens.len();
+        let prompt_len = prompt_tokens.len();
 
-        for _ in 0..max_tokens {
+        for pos in prompt_len..prompt_len + max_tokens {
             let next_token = Self::argmax(&last_logits);
             if next_token == eos_id || next_token == 0 {
                 break;
             }
             generated.push(next_token);
             last_logits = self.forward_token(next_token, pos)?;
-            pos += 1;
         }
 
         let tokenizer = self.tok.as_ref().unwrap();
@@ -3323,11 +3314,10 @@ impl BitNetBackend {
 
         // Decode with streaming callback
         let mut generated_tokens = Vec::new();
-        let mut pos = prompt_len;
 
         let start_time = std::time::Instant::now();
 
-        for _ in 0..max_tokens {
+        for pos in prompt_len..prompt_len + max_tokens {
             let next_token = Self::argmax(&last_logits);
             if next_token == eos_id || next_token == 0 {
                 break;
@@ -3345,7 +3335,6 @@ impl BitNetBackend {
             }
 
             last_logits = self.forward_token(next_token, pos)?;
-            pos += 1;
         }
 
         let elapsed = start_time.elapsed();
