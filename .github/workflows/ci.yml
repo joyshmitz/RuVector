@@ -126,16 +126,20 @@ jobs:
               -p ruqu-core
               -p ruqu-exotic
               -p ruqu-wasm
-          - name: ml-research
+          - name: ml-research-heavy
+            # Heaviest crates split into their own shard so ml-research
+            # doesn't exceed the 45-min timeout.
             packages: >-
               -p ruvector-attention
               -p ruvector-mincut
-              -p ruvector-scipix
               -p ruvector-fpga-transformer
+              -p ruvector-graph-transformer
+          - name: ml-research-rest
+            packages: >-
+              -p ruvector-scipix
               -p ruvector-sparse-inference
               -p ruvector-sparsifier
               -p ruvector-solver
-              -p ruvector-graph-transformer
               -p ruvector-domain-expansion
               -p ruvector-robotics
           - name: core-and-rest
