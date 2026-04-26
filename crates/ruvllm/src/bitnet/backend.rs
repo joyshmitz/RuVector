@@ -4686,6 +4686,7 @@ mod tests {
     // =========================================================================
 
     #[test]
+    #[ignore = "perf-gated: throughput target fragile on shared CI runners. Run via `cargo test --package ruvllm --lib bitnet -- --ignored` on a quiet machine."]
     fn test_bench_forward_token_throughput() {
         let mut backend = build_tiny_model();
         backend.reset_cache();
@@ -4706,6 +4707,7 @@ mod tests {
         );
     }
 
+    #[ignore = "perf-gated: throughput target fragile on shared CI runners. Run via `cargo test --package ruvllm --lib bitnet -- --ignored` on a quiet machine."]
     #[test]
     fn test_bench_tl1_gemv_dispatch_performance() {
         let backend = BitNetBackend::new();
@@ -4744,6 +4746,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "perf-gated: 10K norms/sec target is fragile on shared CI runners. Run via `cargo test --package ruvllm --lib bitnet -- --ignored` on a quiet machine."]
     fn test_bench_rms_norm_performance() {
         let w = vec![1.0f32; 2048];
         let mut x: Vec<f32> = (0..2048).map(|i| (i as f32) * 0.001).collect();
@@ -4764,6 +4767,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "perf-gated: throughput target fragile on shared CI runners. Run via `cargo test --package ruvllm --lib bitnet -- --ignored` on a quiet machine."]
     fn test_bench_softmax_performance() {
         let mut x: Vec<f32> = (0..1024).map(|i| (i as f32) * 0.01).collect();
 
@@ -4783,6 +4787,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "perf-gated: throughput target fragile on shared CI runners. Run via `cargo test --package ruvllm --lib bitnet -- --ignored` on a quiet machine."]
     fn test_bench_expert_forward_performance() {
         let backend = BitNetBackend::new();
         let config = BitNetModelConfig {
