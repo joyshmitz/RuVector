@@ -5,6 +5,7 @@
 //! `discover` + `send-task` against it.
 
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -39,17 +40,51 @@ async fn a2a_serve_discover_and_send_task() {
         .expect("spawn rvagent a2a serve");
 
     let stdout = server.stdout.take().expect("server stdout piped");
+    let stderr = server.stderr.take().expect("server stderr piped");
     let mut reader = BufReader::new(stdout).lines();
+
+    // Drain stderr in the background so it doesn't block the child if the
+    // pipe fills, AND so we can dump it on diagnostic failure paths.
+    let stderr_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
+    {
+        let buf = stderr_buf.clone();
+        tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            let mut reader = stderr;
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = reader.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+                buf.lock().unwrap().extend_from_slice(&chunk[..n]);
+            }
+        });
+    }
+    let dump_stderr = || -> String {
+        let raw = stderr_buf.lock().unwrap().clone();
+        String::from_utf8_lossy(&raw).into_owned()
+    };
 
     // -- 2) Parse "listening on 127.0.0.1:<port>" from the first line.
     //
     // Give the server up to 20s to bind + print; CI under load is slower
-    // than local.
-    let line = tokio::time::timeout(Duration::from_secs(20), reader.next_line())
-        .await
-        .expect("server listening line timed out")
-        .expect("server stdout read error")
-        .expect("server closed before emitting listening line");
+    // than local. On every failure path we dump stderr so the actual
+    // error reason is visible.
+    let line = match tokio::time::timeout(Duration::from_secs(20), reader.next_line()).await {
+        Ok(Ok(Some(l))) => l,
+        Ok(Ok(None)) => panic!(
+            "server closed stdout before emitting listening line.\n--- server stderr ---\n{}",
+            dump_stderr()
+        ),
+        Ok(Err(e)) => panic!(
+            "server stdout read error: {e}\n--- server stderr ---\n{}",
+            dump_stderr()
+        ),
+        Err(_) => panic!(
+            "timed out waiting for server listening line (>20s)\n--- server stderr ---\n{}",
+            dump_stderr()
+        ),
+    };
     let addr = line
         .strip_prefix("listening on ")
         .unwrap_or_else(|| panic!("unexpected first-line stdout from server: {:?}", line))

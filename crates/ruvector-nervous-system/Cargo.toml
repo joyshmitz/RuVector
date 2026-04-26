@@ -36,6 +36,11 @@ approx = "0.5"
 default = ["parallel"]
 serde = ["dep:bincode"]
 parallel = ["rayon"]
+# Gate absolute throughput / latency assertions in tests behind this feature.
+# `cargo test` (no features) runs the smoke versions only — they exercise the
+# code paths and assert correctness. `cargo test --features perf-tests` adds
+# the absolute-threshold variants intended for tuned/release-mode runners.
+perf-tests = []
 
 [[bench]]
 name = "pattern_separation"
