@@ -756,10 +756,7 @@ mod tests {
 
         // x = 3 (q = 30 with scale=0.1) → HardSwish(x) ≈ x
         let x_pos3 = (lut[lut_idx(30 - zero_point)] as i32 - zero_point) as f32 * scale;
-        assert!(
-            (x_pos3 - 3.0).abs() < 0.5,
-            "expected ~3.0 got {x_pos3}"
-        ); // Should be close to 3.0
+        assert!((x_pos3 - 3.0).abs() < 0.5, "expected ~3.0 got {x_pos3}"); // Should be close to 3.0
     }
 
     #[test]
