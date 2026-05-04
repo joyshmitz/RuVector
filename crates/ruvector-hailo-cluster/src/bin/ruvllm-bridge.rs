@@ -61,6 +61,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tls_client_cert: Option<String> = None;
     let mut tls_client_key: Option<String> = None;
 
+    // Iter 238 — opt-in coordinator-side LRU cache. Disabled by default.
+    // Real ruvllm RAG flows query the same context repeatedly (system
+    // prompt, tool descriptions, frequently-cited docs) — at full hit
+    // rate the cluster-bench measured 32500× speedup vs the 70 RPS NPU
+    // ceiling because the cache resolves in the bridge process without
+    // a worker round-trip. See iter-238 commit for measurements.
+    let mut cache_cap: usize = 0;
+    // Iter 243 — optional TTL for cached entries. 0 = no TTL (default;
+    // LRU only). Useful for long-running bridges where the operator
+    // wants a max-staleness bound — an entry sitting in cache for >TTL
+    // re-fetches from the worker, which catches worker config drift
+    // even when the fingerprint gate didn't fire (e.g. silent NPU
+    // recalibration that doesn't change the HEF hash).
+    let mut cache_ttl_secs: u64 = 0;
+
+    // Iter 245 — optional background health checker. 0 = disabled
+    // (default; preserves iter-238 behavior). When set, spawns a
+    // tokio runtime that probes every worker on the configured
+    // interval, ejects fingerprint-mismatched workers from the
+    // dispatch pool, and clears the cache on a fingerprint event.
+    // Long-running bridges that don't restart for days would
+    // otherwise keep dispatching to a worker that silently swapped
+    // its HEF — the checker closes that window.
+    let mut health_check_secs: u64 = 0;
+
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -98,6 +123,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--tls-client-key" => {
                 tls_client_key = args.get(i + 1).cloned();
+                i += 2;
+            }
+            "--cache" => {
+                cache_cap = args
+                    .get(i + 1)
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--cache <N> requires a non-negative integer")?;
+                i += 2;
+            }
+            "--cache-ttl" => {
+                cache_ttl_secs = args
+                    .get(i + 1)
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--cache-ttl <secs> requires a non-negative integer")?;
+                i += 2;
+            }
+            "--health-check" => {
+                health_check_secs = args
+                    .get(i + 1)
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--health-check <secs> requires a non-negative integer")?;
                 i += 2;
             }
             "--help" | "-h" => {
@@ -173,13 +219,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(GrpcTransport::new()?)
     };
 
-    let cluster = HailoClusterEmbedder::new(workers, transport, dim, fingerprint)?;
+    // Iter 238 — opt-in coordinator-side LRU cache. ADR-172 §2a guard:
+    // refuse cache when fingerprint is empty *unless* the operator has
+    // explicitly opted out of fingerprint enforcement (--allow-empty-
+    // fingerprint), which is the same gate embed.rs / bench.rs already
+    // apply. Without a fingerprint binding, a cache could leak vectors
+    // across worker fleets that don't share the same model.
+    if cache_cap > 0 && fingerprint.is_empty() && !allow_empty_fingerprint {
+        return Err(
+            "refusing --cache > 0 with empty --fingerprint (ADR-172 §2a); pass \
+             --fingerprint <hex> or opt out with --allow-empty-fingerprint"
+                .into(),
+        );
+    }
+    let cluster_inner = HailoClusterEmbedder::new(workers, transport, dim, fingerprint)?;
+    let cluster = match (cache_cap, cache_ttl_secs) {
+        (0, _) => cluster_inner,
+        (cap, 0) => cluster_inner.with_cache(cap),
+        (cap, ttl) => {
+            cluster_inner.with_cache_ttl(cap, std::time::Duration::from_secs(ttl))
+        }
+    };
+
+    // Iter 245 — optional background health checker. Mirror of
+    // embed.rs's pattern: spawn a single-threaded tokio runtime,
+    // hand its handle to spawn_health_checker, keep both alive
+    // for the lifetime of main via the let binding.
+    let _health_keepalive = if health_check_secs > 0 {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .thread_name("health-check")
+            .build()
+            .map_err(|e| format!("health-check runtime: {}", e))?;
+        let cfg = ruvector_hailo_cluster::HealthCheckerConfig {
+            interval: std::time::Duration::from_secs(health_check_secs),
+            ..cluster.health_checker_config()
+        };
+        let checker = cluster.spawn_health_checker(rt.handle(), cfg);
+        if !quiet {
+            eprintln!(
+                "ruvllm-bridge: --health-check spawned, interval={}s",
+                health_check_secs
+            );
+        }
+        Some((rt, checker))
+    } else {
+        None
+    };
 
     if !quiet {
+        let cache_msg = if cache_cap > 0 {
+            format!(", cache={} entries", cache_cap)
+        } else {
+            String::new()
+        };
         eprintln!(
-            "ruvllm-bridge: cluster sink active — {} worker(s), dim={}",
+            "ruvllm-bridge: cluster sink active — {} worker(s), dim={}{}",
             csv.split(',').filter(|s| !s.is_empty()).count(),
             dim,
+            cache_msg,
         );
         eprintln!("ruvllm-bridge: ready — send JSONL on stdin, EOF to exit");
     }
@@ -363,6 +462,16 @@ OPTIONAL:\n    \
     --tls-domain <name>          SNI / cert-SAN to assert.\n    \
     --tls-client-cert <path>     PEM client cert for mTLS (ADR-172 §1b).\n    \
     --tls-client-key <path>      PEM private key matching client cert.\n    \
+    --cache <N>                  Coordinator-side LRU cache (default 0=off).\n                                 \
+                                 Iter 238: 32500\u{00d7} speedup at full hit rate.\n                                 \
+                                 Recommended for RAG workloads with repeated\n                                 \
+                                 context queries; needs --fingerprint set or\n                                 \
+                                 --allow-empty-fingerprint per ADR-172 \u{00a7}2a.\n    \
+    --cache-ttl <secs>           Optional TTL on cached entries (default 0=off).\n    \
+    --health-check <secs>        Background fingerprint+health probe (iter 245).\n                                 \
+                                 Default 0=off. Recommended 30-60 for long-\n                                 \
+                                 running bridges so silent worker swaps don't\n                                 \
+                                 keep producing wrong embeddings.\n    \
     --help                       This message.\n    \
     --version                    Print version.\n",
         env!("CARGO_PKG_NAME"),

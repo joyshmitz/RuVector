@@ -158,7 +158,25 @@ impl LogTextContent {
                 }
                 hex
             }
-            Self::Full => text.to_string(),
+            Self::Full => {
+                // Iter 247 — cap Full mode at 200 chars (truncated on
+                // a char boundary, marker appended). The iter-180
+                // request-byte cap is 64 KB; without this, an
+                // operator who flips RUVECTOR_LOG_TEXT_CONTENT=full
+                // for debugging in prod could push 64 KB × 70 RPS =
+                // 4.5 MB/s into journald — fast journal-disk burn,
+                // and a long single-line log entry that breaks most
+                // ops tooling. 200 chars is plenty to grep / eyeball
+                // correlations against the request_id field.
+                const FULL_LOG_CAP: usize = 200;
+                if text.chars().count() <= FULL_LOG_CAP {
+                    text.to_string()
+                } else {
+                    let mut out: String = text.chars().take(FULL_LOG_CAP).collect();
+                    out.push_str("…");
+                    out
+                }
+            }
         }
     }
 }
@@ -376,10 +394,14 @@ impl Embedding for WorkerService {
         let dim = embedder.dimensions() as u32;
         let (tx, rx) = tokio::sync::mpsc::channel::<Result<EmbedStreamResponse, Status>>(n.max(1));
 
-        // Spawn the embed work — order-preserving sequential issue (the
-        // current HailoEmbedder is single-threaded; later iterations can
-        // pipeline once the NPU is hooked up). `index` field guards the
-        // contract that consumers reorder if needed.
+        // Spawn the embed work — order-preserving sequential issue.
+        // Iter 236 measured that the NPU+PCIe path serializes at the
+        // device level even with HefEmbedderPool > 1, so dispatching
+        // each batch item in parallel won't unlock throughput on this
+        // hardware. `index` field guards the contract that consumers
+        // reorder if needed; concurrent dispatch can land the day we
+        // adopt async vstreams (iter 240+ candidate) or a batch-
+        // compiled HEF.
         tokio::task::spawn(async move {
             for (i, text) in req.texts.into_iter().enumerate() {
                 let start = Instant::now();
@@ -609,6 +631,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_text_content =
         LogTextContent::parse(&std::env::var("RUVECTOR_LOG_TEXT_CONTENT").unwrap_or_default())?;
     info!(mode = ?log_text_content, "embed text-content audit mode");
+
+    // Iter 248 — surface the NPU pool size operators set via env. The
+    // env var is consumed inside HailoEmbedder::open (iter 235) but
+    // wasn't logged at startup, so an operator who flipped pool=2→4
+    // had no confirmation the new mode took effect short of probing
+    // RSS. Log the parsed value (defaults to 1) alongside the other
+    // iter-180+ tunable knobs so deploy diffs are auditable from the
+    // journal alone.
+    let npu_pool_size: usize = std::env::var("RUVECTOR_NPU_POOL_SIZE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
+    info!(
+        pool_size = npu_pool_size,
+        "NPU pipeline pool size (iter 235; >=2 enables HefEmbedderPool, see iter-237 deploy default)"
+    );
 
     // ADR-172 §3b iter-104: per-peer rate limiter. None = disabled (back-
     // compat default); Some(_) when RUVECTOR_RATE_LIMIT_RPS > 0. Wrapped
@@ -983,5 +1021,44 @@ mod tests {
     #[test]
     fn render_full_passes_through() {
         assert_eq!(LogTextContent::Full.render("payload"), "payload");
+    }
+
+    /// Iter 247 — short Full-mode input is unmodified (cap not hit).
+    #[test]
+    fn render_full_short_unchanged() {
+        let s: String = "x".repeat(199);
+        assert_eq!(LogTextContent::Full.render(&s), s);
+        let s: String = "x".repeat(200);
+        assert_eq!(LogTextContent::Full.render(&s), s);
+    }
+
+    /// Iter 247 — long Full-mode input truncated at the 200-char cap
+    /// with the U+2026 horizontal-ellipsis marker appended.
+    #[test]
+    fn render_full_long_truncated() {
+        let s: String = "x".repeat(1024);
+        let rendered = LogTextContent::Full.render(&s);
+        let chars: Vec<char> = rendered.chars().collect();
+        assert_eq!(chars.len(), 201, "201 chars (200 + ellipsis)");
+        assert!(
+            chars[..200].iter().all(|&c| c == 'x'),
+            "first 200 chars unchanged"
+        );
+        assert_eq!(chars[200], '…', "trailing marker");
+    }
+
+    /// Iter 247 — multi-byte UTF-8 truncates on a char boundary, not a
+    /// byte boundary. Without this, slicing at byte 200 would panic
+    /// mid-codepoint on input dominated by 4-byte glyphs.
+    #[test]
+    fn render_full_truncates_on_char_boundary() {
+        // 300 emoji × 4 bytes = 1.2 KB; cap is 200 chars.
+        let s: String = "🦀".repeat(300);
+        let rendered = LogTextContent::Full.render(&s);
+        let char_count = rendered.chars().count();
+        assert_eq!(char_count, 201, "200 emoji + ellipsis = 201 chars");
+        // `is_char_boundary` is the API contract; this assert documents
+        // that the cut is byte-clean even with multi-byte glyphs.
+        assert!(rendered.is_char_boundary(rendered.len()));
     }
 }
